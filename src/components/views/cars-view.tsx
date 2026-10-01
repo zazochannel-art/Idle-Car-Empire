@@ -5,7 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { CARS, CAR_MODEL, carProfit } from "@/game/config/cars";
 import { carModelCost, unlockedCarIds } from "@/game/engine/economy";
 import { carRequirement } from "@/game/engine/insights";
-import { formatMoney, formatNumber, formatPercent } from "@/game/format";
+import { formatMoney, formatNumber, formatPercent, formatTime } from "@/game/format";
+import { useContent } from "@/i18n/content";
+import { useT } from "@/i18n/use-t";
 import { useGame } from "@/store/game-store";
 import { CostButton } from "../game/cost-button";
 import { ViewHeader } from "./section-title";
@@ -14,6 +16,8 @@ export function CarsView() {
   const state = useGame((g) => g.state);
   const snap = useGame((g) => g.snap);
   const upgradeCarModel = useGame((g) => g.upgradeCarModel);
+  const { t, lang } = useT();
+  const n = useContent(lang);
   const unlocked = unlockedCarIds(state, snap.gm);
 
   // Best live value per car across factories currently building it.
@@ -26,11 +30,12 @@ export function CarsView() {
 
   return (
     <div className="space-y-4">
-      <ViewHeader icon="🚗" title="Car Models" subtitle={`${unlocked.size} of ${CARS.length} models unlocked. Refine a model to raise its value in every factory.`} />
+      <ViewHeader icon="🚗" title={t("cars.title")} subtitle={t("cars.subtitle", { n: unlocked.size, total: CARS.length })} />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {CARS.map((car) => {
           const isUnlocked = unlocked.has(car.id);
-          const req = isUnlocked ? null : carRequirement(state, car, snap);
+          const requirement = isUnlocked ? null : carRequirement(state, car, snap);
+          const req = requirement ? n.requirement(requirement) : null;
           const lvl = state.carModels[car.id] ?? 0;
           const produced = state.lifetime.carsByType[car.id];
           return (
@@ -45,25 +50,25 @@ export function CarsView() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold">{car.name}</span>
-                    <Badge variant={isUnlocked ? "default" : "muted"}>Tier {car.tier}</Badge>
-                    {lvl > 0 && <Badge variant="gold">Model Lv {lvl}</Badge>}
+                    <span className="font-semibold">{n.car(car)}</span>
+                    <Badge variant={isUnlocked ? "default" : "muted"}>{t("cars.tier", { tier: car.tier })}</Badge>
+                    {lvl > 0 && <Badge variant="gold">{t("cars.modelLv", { level: lvl })}</Badge>}
                   </div>
-                  <p className="text-xs text-white/45">{car.tagline}</p>
+                  <p className="text-xs text-white/45">{n.carTagline(car)}</p>
                 </div>
               </div>
 
               <div className="relative mt-3 grid grid-cols-3 gap-1.5 text-center">
-                <Spec label="Cost" value={formatMoney(car.cost)} />
-                <Spec label="Price" value={formatMoney(car.price)} />
-                <Spec label="Profit" value={formatMoney(carProfit(car))} accent />
+                <Spec label={t("cars.cost")} value={formatMoney(car.cost)} />
+                <Spec label={t("cars.price")} value={formatMoney(car.price)} />
+                <Spec label={t("cars.profit")} value={formatMoney(carProfit(car))} accent />
               </div>
               <div className="relative mt-2 flex justify-between text-[11px] text-white/50">
-                <span>Base time {car.time}s</span>
-                <span>Produced: {formatNumber(produced)}</span>
+                <span>{t("cars.baseTime", { time: formatTime(car.time) })}</span>
+                <span>{t("cars.produced", { n: formatNumber(produced) })}</span>
               </div>
               {liveValue.has(car.id) && (
-                <div className="relative mt-1 text-[11px] text-emerald-300">Selling now at {formatMoney(liveValue.get(car.id)!)} each</div>
+                <div className="relative mt-1 text-[11px] text-emerald-300">{t("cars.sellingNow", { price: formatMoney(liveValue.get(car.id)!) })}</div>
               )}
 
               {isUnlocked ? (
@@ -71,7 +76,7 @@ export function CarsView() {
                   className="relative mt-3 w-full"
                   cost={carModelCost(state, car.id)}
                   onBuy={() => upgradeCarModel(car.id)}
-                  label={`Refine model: +${formatPercent(CAR_MODEL.valuePerLevel - 1)} value`}
+                  label={t("cars.refine", { pct: formatPercent(CAR_MODEL.valuePerLevel - 1) })}
                 />
               ) : (
                 <div className="relative mt-3 flex items-center gap-2 rounded-xl bg-white/[0.03] p-2.5 text-xs text-white/55 ring-1 ring-white/[0.06]">

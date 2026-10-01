@@ -3,6 +3,7 @@
 import { Lock } from "lucide-react";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { formatDuration, formatMoney, formatNumber } from "@/game/format";
+import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { useGame } from "@/store/game-store";
 
@@ -24,26 +25,27 @@ export function CostButton({
   label,
   currency = "cash",
   locked,
-  maxedLabel = "MAX",
+  maxedLabel,
   showEta = true,
   className,
   variant,
   size,
   ...rest
 }: CostButtonProps) {
+  const { t } = useT();
   const balance = useGame((g) => (currency === "cash" ? g.state.cash : g.state.rp));
   const rate = useGame((g) => (currency === "cash" ? g.snap.incomePerSec : g.snap.rpPerSec));
 
   if (cost === null) {
     return (
       <Button variant="secondary" size={size} disabled className={cn("text-gold", className)} {...rest}>
-        {maxedLabel}
+        {maxedLabel ?? t("common.max")}
       </Button>
     );
   }
 
   const affordable = !locked && balance >= cost;
-  const fmt = currency === "cash" ? formatMoney(cost) : `${formatNumber(cost)} RP`;
+  const fmt = currency === "cash" ? formatMoney(cost) : `${formatNumber(cost)} ${t("unit.rp")}`;
   const eta = !affordable && !locked && showEta && rate > 0 ? (cost - balance) / rate : null;
 
   return (
@@ -63,7 +65,7 @@ export function CostButton({
         {locked && <Lock className="!size-3" />}
         {fmt}
       </span>
-      {eta !== null && eta < 86400 * 30 && <span className="text-[10px] font-normal opacity-70">in {formatDuration(eta)}</span>}
+      {eta !== null && eta < 86400 * 30 && <span className="text-[10px] font-normal opacity-70">{t("common.in", { time: formatDuration(eta) })}</span>}
     </Button>
   );
 }

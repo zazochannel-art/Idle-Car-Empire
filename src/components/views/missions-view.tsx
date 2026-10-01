@@ -3,6 +3,8 @@
 import { MILESTONES } from "@/game/config/missions";
 import { dailyProgress, metric, openMilestones } from "@/game/engine/progress";
 import { formatDuration } from "@/game/format";
+import { useContent } from "@/i18n/content";
+import { useT } from "@/i18n/use-t";
 import { useGame } from "@/store/game-store";
 import { MissionRow } from "../game/goals";
 import { SectionTitle, ViewHeader } from "./section-title";
@@ -18,18 +20,20 @@ export function MissionsView() {
   const state = useGame((g) => g.state);
   const snap = useGame((g) => g.snap);
   const { claimDaily, claimMilestone } = useGame.getState();
+  const { t, lang } = useT();
+  const n = useContent(lang);
   const miles = openMilestones(state, 5);
 
   return (
     <div className="space-y-5">
-      <ViewHeader icon="📋" title="Missions" subtitle="Clear goals, real rewards. Daily missions refresh at midnight and scale with your empire." />
+      <ViewHeader icon="📋" title={t("nav.missions")} subtitle={t("missions.subtitle")} />
 
       <section className="space-y-2">
-        <SectionTitle title="Daily" subtitle={`New missions in ${formatDuration(untilMidnight())}`} />
+        <SectionTitle title={t("mission.daily")} subtitle={t("missions.newIn", { time: formatDuration(untilMidnight()) })} />
         {state.missions.daily.map((m) => (
           <MissionRow
             key={m.id}
-            title={m.title}
+            title={n.daily(m)}
             value={dailyProgress(state, m, snap)}
             target={m.target}
             reward={m.reward}
@@ -41,12 +45,12 @@ export function MissionsView() {
       </section>
 
       <section className="space-y-2">
-        <SectionTitle title="Milestones" subtitle={`${state.missions.milestonesClaimed.length}/${MILESTONES.length} completed`} />
-        {miles.length === 0 && <p className="text-sm text-white/50">Every milestone completed. Legendary.</p>}
+        <SectionTitle title={t("missions.milestones")} subtitle={t("missions.completed", { n: state.missions.milestonesClaimed.length, total: MILESTONES.length })} />
+        {miles.length === 0 && <p className="text-sm text-white/50">{t("missions.allDone")}</p>}
         {miles.map((m) => (
           <MissionRow
             key={m.id}
-            title={m.title}
+            title={n.milestone(m)}
             value={metric(state, m.metric, snap)}
             target={m.target}
             reward={m.reward}

@@ -5,11 +5,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FACTORIES, FACTORY_BY_ID } from "@/game/config/factories";
 import { formatMoney, formatNumber } from "@/game/format";
 import type { FactoryId } from "@/game/types";
+import { useContent } from "@/i18n/content";
+import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { uiEvents } from "@/store/events";
 import { useGame } from "@/store/game-store";
 import { GarageScene } from "./scene/garage-scene";
 import { PlantScene } from "./scene/plant-scene";
+import type { SceneLabels } from "./scene/stages";
 
 interface Pop {
   id: number;
@@ -29,6 +32,25 @@ export function FactoryScene() {
   const factories = useGame((g) => g.state.factories);
   const snap = useGame((g) => g.snap);
   const rush = useGame((g) => g.rush);
+  const { t, lang } = useT();
+  const names = useContent(lang);
+  const labels: SceneLabels = useMemo(
+    () => ({
+      stages: {
+        chassis: t("stage.chassis"),
+        weld: t("stage.weld"),
+        paint: t("stage.paint"),
+        assembly: t("stage.assembly"),
+        qc: t("stage.qc"),
+        delivery: t("stage.delivery"),
+        idle: t("stage.idle"),
+      },
+      stations: [t("station.chassis"), t("station.weld"), t("station.paint"), t("station.assembly"), t("station.qc")],
+      plant: t("scene.plant"),
+      est: t("scene.est"),
+    }),
+    [t],
+  );
 
   const owned = useMemo(() => FACTORIES.filter((f) => factories[f.id].owned), [factories]);
   const [picked, setPicked] = useState<FactoryId | null>(null);
@@ -75,17 +97,17 @@ export function FactoryScene() {
         )}
         data-scene
         role="img"
-        aria-label={`${cfg.name} production line`}
+        aria-label={t("scene.aria", { name: names.factory(cfg) })}
       >
         {featured === "garage" ? (
-          <GarageScene car={st.car} accent={cfg.accent} name={cfg.name} city={cfg.city} />
+          <GarageScene car={st.car} accent={cfg.accent} name={names.factory(cfg)} city={names.city(cfg)} labels={labels} />
         ) : (
-          <PlantScene key={featured} factory={featured} tier={cfg.maxTier} car={st.car} accent={cfg.accent} name={cfg.name} city={cfg.city} />
+          <PlantScene key={featured} factory={featured} tier={cfg.maxTier} car={st.car} accent={cfg.accent} name={names.factory(cfg)} city={names.city(cfg)} labels={labels} />
         )}
 
         <div className="absolute left-3 top-3 flex items-center gap-2 rounded-full bg-black/55 px-3 py-1 text-[11px] font-bold text-white ring-1 ring-white/10 backdrop-blur sm:text-xs">
           <span className="size-2 animate-pulse-soft rounded-full" style={{ background: cfg.accent, boxShadow: `0 0 8px ${cfg.accent}` }} />
-          <span data-fx="label">{manual ? "Idle — tap BUILD" : "Chassis & frame"}</span>
+          <span data-fx="label">{manual ? t("stage.idle") : t("stage.chassis")}</span>
         </div>
 
         {/* Vignette */}
@@ -93,10 +115,10 @@ export function FactoryScene() {
 
         <div className="absolute right-3 top-3 flex flex-col items-end gap-1.5">
           <span className="rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-semibold tabular-nums text-white/85 ring-1 ring-white/10 backdrop-blur">
-            {st.car.emoji} {st.car.name} ×{st.carsPerCycle} · {formatNumber(st.carsPerSec * 60)}/min
+            {st.car.emoji} {names.car(st.car)} ×{st.carsPerCycle} · {formatNumber(st.carsPerSec * 60)}{t("unit.perMin")}
           </span>
           {manual && (
-            <span className="rounded-full bg-electric/25 px-2.5 py-1 text-[11px] font-semibold text-sky-100 ring-1 ring-electric/50 backdrop-blur">Tap to rush ⚡</span>
+            <span className="rounded-full bg-electric/25 px-2.5 py-1 text-[11px] font-semibold text-sky-100 ring-1 ring-electric/50 backdrop-blur">{t("scene.rush")}</span>
           )}
         </div>
 
@@ -112,7 +134,7 @@ export function FactoryScene() {
               style={{ left: `${p.x}%`, textShadow: "0 2px 10px rgba(0,0,0,.8)" }}
             >
               +{formatMoney(p.amount)}
-              {p.premium && <span className="ml-1 text-[10px] uppercase">premium</span>}
+              {p.premium && <span className="ml-1 text-[10px] uppercase">{t("scene.premium")}</span>}
             </motion.div>
           ))}
         </AnimatePresence>
@@ -129,7 +151,7 @@ export function FactoryScene() {
                 f.id === featured ? "bg-white/10 text-white ring-white/25" : "bg-white/[0.03] text-white/50 ring-white/10 hover:text-white",
               )}
             >
-              {f.emoji} {f.name}
+              {f.emoji} {names.factory(f)}
             </button>
           ))}
         </div>

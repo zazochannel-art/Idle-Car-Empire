@@ -5,7 +5,7 @@ import type { CarConfig } from "@/game/config/cars";
 import type { FactoryId } from "@/game/types";
 import { CarSprite } from "./car-sprite";
 import { Bloom, Dust, FloorReflection, Mist, Robot, Worker } from "./props";
-import { applyStage, stageOf } from "./stages";
+import { applyStage, stageOf, type SceneLabels } from "./stages";
 import { useBuildAnimation } from "./use-build-animation";
 
 const FLOOR = 378;
@@ -47,7 +47,7 @@ function along(p: number): { x: number; moving: boolean } {
  * assembly → QC light tunnel. A second line runs in the background for
  * depth; bigger plants get white robots and a brighter, cleaner hall.
  */
-export function PlantScene({ factory, tier, car, accent, name, city }: { factory: FactoryId; tier: number; car: CarConfig; accent: string; name: string; city: string }) {
+export function PlantScene({ factory, tier, car, accent, name, city, labels }: { factory: FactoryId; tier: number; car: CarConfig; accent: string; name: string; city: string; labels: SceneLabels }) {
   const carRef = useRef<SVGGElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const robots = tier >= 6 ? 3 : 2;
@@ -61,16 +61,10 @@ export function PlantScene({ factory, tier, car, accent, name, city }: { factory
       const a = along(p);
       return { x: a.x - CAR_W / 2, y: LINE_Y - 72 * CAR_SCALE, rolling: a.moving };
     },
-    (p, active) => applyStage(svgRef.current, stageOf(p), active),
+    (p, active) => applyStage(svgRef.current, stageOf(p), active, labels.stages),
   );
 
-  const stations: [number, string][] = [
-    [110, "CHASSIS"],
-    [320, "BODY WELD"],
-    [530, "PAINT"],
-    [725, "ASSEMBLY"],
-    [880, "QC"],
-  ];
+  const stations: [number, string][] = [110, 320, 530, 725, 880].map((x, i) => [x, labels.stations[i].toUpperCase()]);
 
   return (
     <svg ref={svgRef} viewBox="0 0 1000 440" className="h-full w-full" preserveAspectRatio="xMidYMid slice" aria-hidden>
@@ -173,7 +167,7 @@ export function PlantScene({ factory, tier, car, accent, name, city }: { factory
         </text>
       </g>
       <text x="500" y="212" textAnchor="middle" fontSize="9" letterSpacing="5" fill="#94a3b8">
-        {city.toUpperCase()} ASSEMBLY PLANT
+        {city.toUpperCase()} {labels.plant.toUpperCase()}
       </text>
 
       {/* ── Background line (depth) ── */}

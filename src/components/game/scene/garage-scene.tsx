@@ -4,7 +4,7 @@ import { useRef } from "react";
 import type { CarConfig } from "@/game/config/cars";
 import { CarSprite } from "./car-sprite";
 import { Bloom, Dust, FloorReflection, Mist, Worker } from "./props";
-import { applyStage, stageOf } from "./stages";
+import { applyStage, stageOf, type SceneLabels } from "./stages";
 import { useBuildAnimation } from "./use-build-animation";
 
 const ease = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
@@ -21,7 +21,7 @@ const DOOR_X = 770;
  * roll-up door to a street at sunset. The car is built on the lift in front
  * of you, reflected in the epoxy floor, and drives out when it is finished.
  */
-export function GarageScene({ car, accent, name, city }: { car: CarConfig; accent: string; name: string; city: string }) {
+export function GarageScene({ car, accent, name, city, labels }: { car: CarConfig; accent: string; name: string; city: string; labels: SceneLabels }) {
   const carRef = useRef<SVGGElement>(null);
   const liftRef = useRef<SVGGElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -37,7 +37,7 @@ export function GarageScene({ car, accent, name, city }: { car: CarConfig; accen
     (p, active) => {
       const lift = ramp(p, 0.12, 0.2) - ramp(p, 0.82, 0.88);
       liftRef.current?.setAttribute("transform", `translate(0 ${(-lift * LIFT).toFixed(1)})`);
-      applyStage(svgRef.current, stageOf(p), active);
+      applyStage(svgRef.current, stageOf(p), active, labels.stages);
     },
   );
 
@@ -221,7 +221,7 @@ export function GarageScene({ car, accent, name, city }: { car: CarConfig; accen
           {name.toUpperCase()}
         </text>
         <text x="490" y="126" textAnchor="middle" fontSize="10" letterSpacing="6" fill="#fde68a">
-          {city.toUpperCase()} · EST. 2026
+          {city.toUpperCase()} · {labels.est}
         </text>
       </g>
 
