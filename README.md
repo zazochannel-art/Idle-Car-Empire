@@ -9,6 +9,8 @@ Built with Next.js (App Router, static export), TypeScript, Tailwind CSS v4,
 shadcn/ui-style components, Lucide icons, Framer Motion and Zustand. Saves go
 to `localStorage`, with optional Supabase cloud saves.
 
+**Play:** https://zazochannel-art.github.io/Idle-Car-Empire/
+
 ## Run it
 
 ```bash
@@ -65,6 +67,12 @@ src/components/
 
 The UI never contains economy numbers; tune the game in `src/game/config/` and
 check the pacing with `npm run simulate`.
+
+## Deploy
+
+Every push to `main` builds the static site and publishes it to GitHub Pages
+(`.github/workflows/pages.yml`). In the repository settings, **Pages → Build
+and deployment → Source** must be set to **GitHub Actions**.
 
 ## Cloud saves (optional)
 
