@@ -40,7 +40,4 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# The repo root ignores these for the Kultura app; this project needs them.
-!package.json
-!package-lock.json
 !.env.example
