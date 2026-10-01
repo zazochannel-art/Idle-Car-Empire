@@ -97,27 +97,6 @@ export function Robot({ x, y, scale = 1, delay = 0, color = "#f97316" }: { x: nu
   );
 }
 
-/** Hanging industrial lamp with a soft light cone. */
-export function Lamp({ x, y, cone = 300, idPrefix }: { x: number; y: number; cone?: number; idPrefix: string }) {
-  return (
-    <g transform={`translate(${x} ${y})`}>
-      <line x1="0" y1={-y} x2="0" y2="-10" stroke="#1f2937" strokeWidth="2" />
-      <path d={`M-70 4 L70 4 L${cone / 2} ${cone} L${-cone / 2} ${cone} Z`} fill={`url(#${idPrefix}-cone)`} className="lamp-cone" />
-      <path d="M-20 4 Q-18 -12 0 -12 Q18 -12 20 4 Z" fill="#334155" />
-      <ellipse cx="0" cy="4" rx="16" ry="3.5" fill="#fef9c3" />
-    </g>
-  );
-}
-
-export function LampDefs({ idPrefix, color = "#fef3c7" }: { idPrefix: string; color?: string }) {
-  return (
-    <linearGradient id={`${idPrefix}-cone`} x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stopColor={color} stopOpacity="0.22" />
-      <stop offset="1" stopColor={color} stopOpacity="0" />
-    </linearGradient>
-  );
-}
-
 /** Spray mist particles for the paint stage. */
 export function Mist({ x, y, color }: { x: number; y: number; color: string }) {
   return (
@@ -131,6 +110,62 @@ export function Mist({ x, y, color }: { x: number; y: number; color: string }) {
           fill={color}
           className="mist"
           style={{ animationDelay: `${(i * 0.17) % 1.2}s` }}
+        />
+      ))}
+    </g>
+  );
+}
+
+/** Soft bloom for light sources (static elements only — filters are costly to animate). */
+export function Bloom({ id, radius = 6 }: { id: string; radius?: number }) {
+  return (
+    <filter id={id} x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation={radius} result="b" />
+      <feMerge>
+        <feMergeNode in="b" />
+        <feMergeNode in="b" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  );
+}
+
+/**
+ * Mirror of an element on a glossy floor: <use> follows the live car, so the
+ * reflection animates for free. Fades out with distance from the floor line.
+ */
+export function FloorReflection({ href, floor, idPrefix, opacity = 0.32 }: { href: string; floor: number; idPrefix: string; opacity?: number }) {
+  return (
+    <g>
+      <defs>
+        <linearGradient id={`${idPrefix}-refl-grad`} x1="0" y1={floor} x2="0" y2={floor + 70} gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="white" stopOpacity="1" />
+          <stop offset="1" stopColor="white" stopOpacity="0" />
+        </linearGradient>
+        <mask id={`${idPrefix}-refl`} maskUnits="userSpaceOnUse" x="0" y={floor} width="1000" height="120">
+          <rect x="0" y={floor} width="1000" height="120" fill={`url(#${idPrefix}-refl-grad)`} />
+        </mask>
+      </defs>
+      <g mask={`url(#${idPrefix}-refl)`} opacity={opacity}>
+        <use href={href} transform={`translate(0 ${2 * floor}) scale(1 -1)`} />
+      </g>
+    </g>
+  );
+}
+
+/** Floating dust motes caught in a light beam. */
+export function Dust({ x, y, w, h, count = 14 }: { x: number; y: number; w: number; h: number; count?: number }) {
+  return (
+    <g>
+      {Array.from({ length: count }).map((_, i) => (
+        <circle
+          key={i}
+          cx={x + ((i * 53) % w)}
+          cy={y + ((i * 37) % h)}
+          r={0.8 + (i % 3) * 0.5}
+          fill="#fff7d6"
+          className="dust"
+          style={{ animationDelay: `${(i * 0.7) % 9}s` }}
         />
       ))}
     </g>

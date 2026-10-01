@@ -396,3 +396,50 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+.car-sheen {
+  animation: car-sheen 5s ease-in-out infinite;
+}
+@keyframes car-sheen {
+  0%,
+  55% {
+    transform: skewX(-20deg) translateX(0);
+  }
+  100% {
+    transform: skewX(-20deg) translateX(330px);
+  }
+}
+.dust {
+  animation: dust 9s linear infinite;
+}
+@keyframes dust {
+  0% {
+    transform: translate(0, 0);
+    opacity: 0;
+  }
+  15%,
+  85% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate(40px, -70px);
+    opacity: 0;
+  }
+}
+.bg-car {
+  animation: bg-car 14s linear infinite;
+}
+@keyframes bg-car {
+  from {
+    transform: translateX(-160px);
+  }
+  to {
+    transform: translateX(1160px);
+  }
+}
+.screen-blink {
+  animation: pulse-soft 3s ease-in-out infinite;
+}
+.clock-hand {
+  animation: scene-spin 60s steps(60) infinite;
+}
