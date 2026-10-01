@@ -225,6 +225,168 @@ body {
   animation: var(--animate-shimmer);
 }
 
+/* ───────────── factory scenes (SVG) ───────────── */
+
+.wheel-spin.is-rolling {
+  animation: scene-spin 0.45s linear infinite;
+}
+.worker-arm {
+  animation: worker-arm 0.9s ease-in-out infinite alternate;
+}
+.worker-busy.is-idle .worker-arm,
+.is-idle .worker-arm {
+  animation: none;
+}
+.robot-shoulder,
+.robot-elbow,
+.robot-wrist {
+  transform-origin: 0 0;
+}
+.robot-cell .robot-shoulder {
+  animation: robot-shoulder 2.6s ease-in-out infinite;
+}
+.robot-cell .robot-elbow {
+  animation: robot-elbow 2.6s ease-in-out infinite;
+}
+.robot-cell .robot-wrist {
+  animation: robot-wrist 2.6s ease-in-out infinite;
+}
+.robot-cell:not(.is-running) .robot-shoulder,
+.robot-cell:not(.is-running) .robot-elbow,
+.robot-cell:not(.is-running) .robot-wrist {
+  animation-play-state: paused;
+}
+.robot-cell:not(.is-welding) .weld-spark {
+  visibility: hidden;
+}
+.weld-spark {
+  animation: weld 0.18s steps(2) infinite;
+}
+.spark-flicker {
+  animation: weld 0.25s steps(2) infinite;
+}
+.mist {
+  animation: mist 1.2s ease-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.lamp-cone {
+  animation: pulse-soft 4s ease-in-out infinite;
+}
+.neon-flicker {
+  animation: neon 7s linear infinite;
+}
+.conveyor-rollers {
+  animation: rollers 0.6s linear infinite;
+  animation-play-state: paused;
+}
+.is-running .conveyor-rollers {
+  animation-play-state: running;
+}
+.hoist {
+  animation: hoist 5s ease-in-out infinite;
+}
+.forklift {
+  animation: forklift 16s ease-in-out infinite;
+}
+.qc-scan {
+  animation: rollers 0.5s linear infinite;
+}
+
+@keyframes scene-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes worker-arm {
+  from {
+    transform: rotate(-12deg);
+  }
+  to {
+    transform: rotate(16deg);
+  }
+}
+@keyframes robot-shoulder {
+  0%,
+  100% {
+    transform: rotate(-8deg);
+  }
+  50% {
+    transform: rotate(22deg);
+  }
+}
+@keyframes robot-elbow {
+  0%,
+  100% {
+    transform: rotate(38deg);
+  }
+  50% {
+    transform: rotate(62deg);
+  }
+}
+@keyframes robot-wrist {
+  0%,
+  100% {
+    transform: rotate(-30deg);
+  }
+  50% {
+    transform: rotate(-70deg);
+  }
+}
+@keyframes weld {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes mist {
+  from {
+    opacity: 0.55;
+    transform: translateY(-10px) scale(0.5);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(26px) scale(1.4);
+  }
+}
+@keyframes neon {
+  0%,
+  92%,
+  96%,
+  100% {
+    opacity: 1;
+  }
+  94% {
+    opacity: 0.4;
+  }
+}
+@keyframes rollers {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+@keyframes hoist {
+  0%,
+  100% {
+    transform: translateX(-40px);
+  }
+  50% {
+    transform: translateX(30px);
+  }
+}
+@keyframes forklift {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  45%,
+  55% {
+    transform: translateX(160px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
