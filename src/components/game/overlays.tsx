@@ -5,7 +5,9 @@ import { Clock, Download, RotateCcw, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { formatDuration, formatMoney, formatNumber } from "@/game/format";
+import { formatDuration, formatHours, formatMoney, formatNumber } from "@/game/format";
+import { LANGS } from "@/i18n";
+import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { uiEvents, type UiEvent } from "@/store/events";
 import { useGame } from "@/store/game-store";
@@ -14,6 +16,7 @@ import { useGame } from "@/store/game-store";
 export function OfflineDialog() {
   const report = useGame((g) => g.state.pendingOffline);
   const collect = useGame((g) => g.collectOffline);
+  const { t } = useT();
   const offlineCap = useGame((g) => g.snap.gm.offlineCapHours);
   if (!report) return null;
   const capped = report.seconds > report.cappedSeconds + 1;
@@ -24,30 +27,30 @@ export function OfflineDialog() {
         <motion.div initial={{ scale: 0.6, rotate: -8 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring", stiffness: 260, damping: 14 }} className="mx-auto mb-2 text-6xl">
           🏭
         </motion.div>
-        <DialogTitle className="text-2xl">Welcome Back!</DialogTitle>
-        <DialogDescription className="mt-1">Your factories kept working while you were away.</DialogDescription>
+        <DialogTitle className="text-2xl">{t("offline.title")}</DialogTitle>
+        <DialogDescription className="mt-1">{t("offline.subtitle")}</DialogDescription>
 
         <div className="mt-5 grid grid-cols-2 gap-2 text-left">
           <div className="rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.07]">
             <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-white/45">
-              <Clock className="size-3" /> Offline time
+              <Clock className="size-3" /> {t("offline.time")}
             </div>
             <div className="mt-1 text-lg font-bold tabular-nums">{formatDuration(report.seconds)}</div>
           </div>
           <div className="rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.07]">
-            <div className="text-[11px] uppercase tracking-wider text-white/45">Cars produced</div>
+            <div className="text-[11px] uppercase tracking-wider text-white/45">{t("offline.cars")}</div>
             <div className="mt-1 text-lg font-bold tabular-nums">{formatNumber(report.cars)}</div>
           </div>
         </div>
         <div className="mt-2 rounded-2xl bg-gradient-to-br from-gold/15 to-transparent p-4 ring-1 ring-gold/30">
-          <div className="text-[11px] uppercase tracking-wider text-gold/70">Money earned</div>
+          <div className="text-[11px] uppercase tracking-wider text-gold/70">{t("offline.money")}</div>
           <div className="text-3xl font-black tabular-nums text-gradient-gold">{formatMoney(report.money)}</div>
-          {report.rp > 0 && <div className="text-xs text-violet-300">+{formatNumber(report.rp)} research points</div>}
+          {report.rp > 0 && <div className="text-xs text-violet-300">{t("offline.rp", { n: formatNumber(report.rp) })}</div>}
         </div>
-        {capped && <p className="mt-2 text-[11px] text-white/40">Offline earnings are capped at {offlineCap}h. Research AI Factory and Empire perks to extend it.</p>}
+        {capped && <p className="mt-2 text-[11px] text-white/40">{t("offline.capped", { hours: formatHours(offlineCap) })}</p>}
 
         <Button variant="gold" size="lg" className="mt-5 w-full text-base" onClick={collect}>
-          COLLECT {formatMoney(report.money)}
+          {t("offline.collect", { amount: formatMoney(report.money) })}
         </Button>
       </DialogContent>
     </Dialog>
@@ -107,6 +110,7 @@ export function Toasts() {
 
 /** Full-screen celebration after a Global Expansion. */
 export function PrestigeOverlay() {
+  const { t } = useT();
   const [points, setPoints] = useState<number | null>(null);
   useEffect(
     () =>
@@ -137,9 +141,9 @@ export function PrestigeOverlay() {
             <motion.div animate={{ rotate: 360 }} transition={{ duration: 6, repeat: Infinity, ease: "linear" }} className="mx-auto text-8xl">
               🌍
             </motion.div>
-            <div className="mt-4 text-xs font-semibold uppercase tracking-[0.3em] text-gold/80">Global Expansion</div>
+            <div className="mt-4 text-xs font-semibold uppercase tracking-[0.3em] text-gold/80">{t("nav.prestige")}</div>
             <div className="mt-1 text-5xl font-black text-gradient-gold">+{formatNumber(points)} ⭐</div>
-            <div className="mt-2 text-sm text-white/60">Your empire restarts stronger.</div>
+            <div className="mt-2 text-sm text-white/60">{t("prestige.restart")}</div>
           </motion.div>
           {Array.from({ length: 18 }).map((_, i) => (
             <motion.span
@@ -159,7 +163,9 @@ export function PrestigeOverlay() {
 }
 
 export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
-  const { exportSave, importSave, resetGame, backend } = useGame.getState();
+  const { exportSave, importSave, resetGame, backend, setLang } = useGame.getState();
+  const lang = useGame((g) => g.state.settings.lang);
+  const { t } = useT();
   const [text, setText] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -176,8 +182,19 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
       }}
     >
       <DialogContent>
-        <DialogTitle>Settings</DialogTitle>
-        <DialogDescription className="mt-1">Progress saves automatically every few seconds ({backend}).</DialogDescription>
+        <DialogTitle>{t("settings.title")}</DialogTitle>
+        <DialogDescription className="mt-1">{t("settings.autosave", { backend })}</DialogDescription>
+
+        <div className="mt-4">
+          <div className="mb-1.5 text-xs font-semibold text-white/60">{t("settings.language")}</div>
+          <div className="grid grid-cols-3 gap-1.5">
+            {LANGS.map((l) => (
+              <Button key={l.id} size="sm" variant={l.id === lang ? "default" : "secondary"} onClick={() => setLang(l.id)}>
+                <span>{l.flag}</span> {l.label}
+              </Button>
+            ))}
+          </div>
+        </div>
 
         <div className="mt-4 space-y-2">
           <Button
@@ -188,27 +205,27 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
               setText(code);
               try {
                 await navigator.clipboard.writeText(code);
-                setMsg("Save code copied to clipboard.");
+                setMsg(t("settings.copied"));
               } catch {
-                setMsg("Copy the save code below.");
+                setMsg(t("settings.copyBelow"));
               }
             }}
           >
-            <Download /> Export save
+            <Download /> {t("settings.export")}
           </Button>
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Paste a save code here to import it"
+            placeholder={t("settings.pastePlaceholder")}
             className="h-24 w-full resize-none rounded-xl bg-black/40 p-3 font-mono text-[11px] text-white/80 ring-1 ring-white/10 outline-none focus:ring-electric/50"
           />
           <Button
             variant="secondary"
             className="w-full"
             disabled={!text.trim()}
-            onClick={() => setMsg(importSave(text) ? "Save imported." : "That save code is not valid.")}
+            onClick={() => setMsg(importSave(text) ? t("settings.imported") : t("settings.invalid"))}
           >
-            <Upload /> Import save
+            <Upload /> {t("settings.import")}
           </Button>
           {msg && <p className="text-center text-xs text-sky-300">{msg}</p>}
         </div>
@@ -217,7 +234,7 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
           {confirmReset ? (
             <div className="flex gap-2">
               <Button variant="secondary" className="flex-1" onClick={() => setConfirmReset(false)}>
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button
                 className="flex-1 bg-none bg-rose-600 shadow-none"
@@ -227,12 +244,12 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
                   onOpenChange(false);
                 }}
               >
-                Erase everything
+                {t("settings.erase")}
               </Button>
             </div>
           ) : (
             <Button variant="ghost" className="w-full text-rose-300" onClick={() => setConfirmReset(true)}>
-              <RotateCcw /> Reset game
+              <RotateCcw /> {t("settings.reset")}
             </Button>
           )}
         </div>

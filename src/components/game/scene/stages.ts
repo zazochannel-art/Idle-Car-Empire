@@ -1,5 +1,13 @@
 export type Stage = "chassis" | "weld" | "paint" | "assembly" | "qc" | "delivery";
 
+/** Texts the scenes need, already translated by the caller. */
+export interface SceneLabels {
+  stages: Record<Stage | "idle", string>;
+  stations: [string, string, string, string, string];
+  plant: string;
+  est: string;
+}
+
 /** Build stages along a batch's progress — matches partOpacities in car-sprite. */
 export function stageOf(p: number): Stage {
   if (p < 0.16) return "chassis";
@@ -10,14 +18,6 @@ export function stageOf(p: number): Stage {
   return "delivery";
 }
 
-export const STAGE_LABEL: Record<Stage, string> = {
-  chassis: "Chassis & frame",
-  weld: "Body welding",
-  paint: "Paint shop",
-  assembly: "Wheels & interior",
-  qc: "Quality check",
-  delivery: "Off to the dealer",
-};
 
 type Fx = "weld" | "paint" | "assembly" | "qc" | "helper" | "label" | "line" | "robots";
 
@@ -26,9 +26,10 @@ type Fx = "weld" | "paint" | "assembly" | "qc" | "helper" | "label" | "line" | "
  * the stage changes, so the per-frame cost stays tiny. Effect groups are
  * marked with data-fx="…" inside the scene's <svg>.
  */
-export function applyStage(svg: SVGSVGElement | null, stage: Stage, active: boolean) {
+/** `labels` maps each stage (and "idle") to its text in the current language. */
+export function applyStage(svg: SVGSVGElement | null, stage: Stage, active: boolean, labels: Record<Stage | "idle", string>) {
   if (!svg) return;
-  const key = `${stage}:${active}`;
+  const key = `${stage}:${active}:${labels.idle}`;
   if (svg.dataset.stage === key) return;
   svg.dataset.stage = key;
   const scope: Element = svg.closest("[data-scene]") ?? svg;
@@ -46,5 +47,5 @@ export function applyStage(svg: SVGSVGElement | null, stage: Stage, active: bool
   el("robots")?.classList.toggle("is-welding", active && stage === "weld");
   el("robots")?.classList.toggle("is-running", active);
   const label = el("label");
-  if (label) label.textContent = active ? STAGE_LABEL[stage] : "Idle — tap BUILD";
+  if (label) label.textContent = active ? labels[stage] : labels.idle;
 }

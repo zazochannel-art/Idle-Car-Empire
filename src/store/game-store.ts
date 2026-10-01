@@ -15,7 +15,9 @@ import { cloneState, createInitialState } from "@/game/engine/state";
 import { tick as engineTick } from "@/game/engine/tick";
 import { formatMoney } from "@/game/format";
 import { decodeSave, encodeSave, SaveManager } from "@/game/save";
-import type { BuyAmount, CarId, DealerId, FactoryId, GameState, ManagerId, UpgradeCategory } from "@/game/types";
+import type { BuyAmount, CarId, DealerId, FactoryId, GameState, Lang, ManagerId, UpgradeCategory } from "@/game/types";
+import { applyLanguage, detectLanguage, translate, type MessageKey, type Vars } from "@/i18n";
+import { contentFor } from "@/i18n/content";
 import { uiEvents } from "./events";
 
 export type View =
@@ -64,6 +66,7 @@ interface GameStore {
   collectOffline: () => void;
   prestige: () => void;
   setBuyAmount: (a: BuyAmount) => void;
+  setLang: (lang: Lang) => void;
   exportSave: () => string;
   importSave: (text: string) => boolean;
   resetGame: () => Promise<void>;
@@ -77,6 +80,9 @@ let lastSave = 0;
 const initial = createInitialState(0);
 
 export const useGame = create<GameStore>((set, get) => {
+  const tr = (key: MessageKey, vars?: Vars) => translate(get().state.settings.lang, key, vars);
+  const names = () => contentFor(get().state.settings.lang);
+
   /** Recomputes derived data, unlocks achievements and publishes the new state. */
   function commit(next: GameState, prevSnap?: EconomySnapshot) {
     let snap = snapshot(next);
@@ -85,7 +91,7 @@ export const useGame = create<GameStore>((set, get) => {
       snap = snapshot(next);
       for (const id of fresh) {
         const a = ACHIEVEMENT_BY_ID[id];
-        uiEvents.emit({ type: "toast", tone: "gold", icon: a.icon, title: `Achievement: ${a.name}`, body: `${a.description} · +2% income forever` });
+        uiEvents.emit({ type: "toast", tone: "gold", icon: a.icon, title: tr("toast.achievement", { name: names().achievement(a) }), body: tr("toast.achievementBody", { desc: names().achievementDesc(a) }) });
       }
     }
     if (prevSnap) {
@@ -93,7 +99,7 @@ export const useGame = create<GameStore>((set, get) => {
       for (const id of unlockedCarIds(next, snap.gm)) {
         if (!before.has(id)) {
           const car = CAR_BY_ID[id];
-          uiEvents.emit({ type: "toast", tone: "info", icon: car.emoji, title: `New car unlocked: ${car.name}`, body: car.tagline });
+          uiEvents.emit({ type: "toast", tone: "info", icon: car.emoji, title: tr("toast.newCar", { name: names().car(car) }), body: names().carTagline(car) });
         }
       }
     }
@@ -125,7 +131,7 @@ export const useGame = create<GameStore>((set, get) => {
     const events = engineTick(next, dt, Math.random, snap);
     next.lastActiveAt = now;
     if (refreshDaily(next, now, snap)) {
-      uiEvents.emit({ type: "toast", tone: "info", icon: "📋", title: "New daily missions", body: "Three fresh goals are waiting." });
+      uiEvents.emit({ type: "toast", tone: "info", icon: "📋", title: tr("toast.daily"), body: tr("toast.dailyBody") });
     }
     for (const e of events) if (e.type === "sale") uiEvents.emit(e);
     commit(next);
@@ -158,10 +164,12 @@ export const useGame = create<GameStore>((set, get) => {
       let state = (await saves?.load(now)) ?? null;
       if (!state) {
         state = createInitialState(now);
+        state.settings.lang = detectLanguage();
       } else {
         settleOffline(state, now);
       }
       refreshDaily(state, now);
+      applyLanguage(state.settings.lang);
       lastTick = Date.now();
       lastSave = lastTick;
       set({ ready: true, state, snap: snapshot(state) });
@@ -184,7 +192,7 @@ export const useGame = create<GameStore>((set, get) => {
       const ok = act((s) => A.buyFactory(s, id));
       if (ok) {
         const f = FACTORY_BY_ID[id];
-        uiEvents.emit({ type: "toast", tone: "success", icon: f.emoji, title: `${f.name} acquired!`, body: `${f.city} · ${f.continent}` });
+        uiEvents.emit({ type: "toast", tone: "success", icon: f.emoji, title: tr("toast.factory", { name: names().factory(f) }), body: `${names().city(f)} · ${names().continent(f.continent)}` });
         persist(true);
       }
       return ok;
@@ -197,7 +205,7 @@ export const useGame = create<GameStore>((set, get) => {
       const after = get().state.factories[id].level;
       const milestone = LEVEL_MILESTONES.find((m) => before < m && after >= m);
       if (milestone) {
-        uiEvents.emit({ type: "toast", tone: "gold", icon: "⚡", title: `${FACTORY_BY_ID[id].name} reached level ${milestone}!`, body: "Milestone bonus: ×2 production speed" });
+        uiEvents.emit({ type: "toast", tone: "gold", icon: "⚡", title: tr("toast.milestone", { name: names().factory(FACTORY_BY_ID[id]), level: milestone }), body: tr("toast.milestoneBody") });
       }
       return n;
     },
@@ -210,7 +218,7 @@ export const useGame = create<GameStore>((set, get) => {
       const ok = act((s) => A.hireManager(s, id, assignTo));
       if (ok) {
         const m = MANAGER_BY_ID[id];
-        uiEvents.emit({ type: "toast", tone: "success", icon: m.avatar, title: `${m.name} joined the company`, body: m.role });
+        uiEvents.emit({ type: "toast", tone: "success", icon: m.avatar, title: tr("toast.hired", { name: m.name }), body: names().role(m) });
       }
       return ok;
     },
@@ -225,7 +233,7 @@ export const useGame = create<GameStore>((set, get) => {
       const ok = act((s) => A.doResearch(s, id));
       if (ok) {
         const r = RESEARCH_BY_ID[id];
-        uiEvents.emit({ type: "toast", tone: "info", icon: "🔬", title: `Research complete: ${r.name}`, body: r.description });
+        uiEvents.emit({ type: "toast", tone: "info", icon: "🔬", title: tr("toast.research", { name: names().research(r) }), body: names().researchDesc(r) });
       }
       return ok;
     },
@@ -238,7 +246,7 @@ export const useGame = create<GameStore>((set, get) => {
     collectOffline: () => {
       const amount = get().state.pendingOffline?.money ?? 0;
       act((s) => collectOffline(s) > 0 || s.pendingOffline === null);
-      if (amount > 0) uiEvents.emit({ type: "toast", tone: "gold", icon: "💰", title: `Collected ${formatMoney(amount)}`, body: "Your factories never sleep." });
+      if (amount > 0) uiEvents.emit({ type: "toast", tone: "gold", icon: "💰", title: tr("toast.collected", { amount: formatMoney(amount) }), body: tr("toast.collectedBody") });
       persist(true);
     },
     prestige: () => {
@@ -253,6 +261,14 @@ export const useGame = create<GameStore>((set, get) => {
         s.settings.buyAmount = a;
         return true;
       });
+    },
+    setLang: (lang) => {
+      applyLanguage(lang);
+      act((s) => {
+        s.settings.lang = lang;
+        return true;
+      });
+      persist(true);
     },
     exportSave: () => encodeSave(get().state),
     importSave: (text) => {

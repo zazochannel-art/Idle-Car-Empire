@@ -89,7 +89,7 @@ export function createInitialState(now: number): GameState {
     run: createStats(),
     lifetime: createStats(),
     pendingOffline: null,
-    settings: { buyAmount: 1 },
+    settings: { buyAmount: 1, lang: "en" },
     createdAt: now,
     runStartedAt: now,
     lastActiveAt: now,

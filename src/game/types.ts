@@ -160,6 +160,8 @@ export interface OfflineReport {
 
 export type BuyAmount = 1 | 10 | 100 | "max";
 
+export type Lang = "en" | "ro" | "ru";
+
 export interface GameState {
   version: number;
   cash: number;
@@ -182,7 +184,7 @@ export interface GameState {
   run: Stats;
   lifetime: Stats;
   pendingOffline: OfflineReport | null;
-  settings: { buyAmount: BuyAmount };
+  settings: { buyAmount: BuyAmount; lang: Lang };
   createdAt: number;
   runStartedAt: number;
   lastActiveAt: number;

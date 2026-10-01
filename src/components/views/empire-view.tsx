@@ -2,6 +2,7 @@
 
 import { FACTORIES } from "@/game/config/factories";
 import type { BuyAmount } from "@/game/types";
+import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { useGame } from "@/store/game-store";
 import { FactoryCard, LockedFactoryCard } from "../game/factory-card";
@@ -14,6 +15,7 @@ const AMOUNTS: BuyAmount[] = [1, 10, 100, "max"];
 export function BuyAmountToggle() {
   const amount = useGame((g) => g.state.settings.buyAmount);
   const setBuyAmount = useGame((g) => g.setBuyAmount);
+  const { t } = useT();
   return (
     <div className="inline-flex rounded-xl bg-white/[0.04] p-1 ring-1 ring-white/[0.07]">
       {AMOUNTS.map((a) => (
@@ -25,7 +27,7 @@ export function BuyAmountToggle() {
             amount === a ? "bg-electric text-white shadow-[0_0_12px_rgba(59,130,246,.6)]" : "text-white/50 hover:text-white",
           )}
         >
-          {a === "max" ? "MAX" : `×${a}`}
+          {a === "max" ? t("common.max") : `×${a}`}
         </button>
       ))}
     </div>
@@ -34,6 +36,7 @@ export function BuyAmountToggle() {
 
 export function EmpireView() {
   const factories = useGame((g) => g.state.factories);
+  const { t } = useT();
   const owned = FACTORIES.filter((f) => factories[f.id].owned);
   const locked = FACTORIES.filter((f) => !factories[f.id].owned);
 
@@ -44,7 +47,7 @@ export function EmpireView() {
       <MissionStrip />
 
       <div className="flex items-end justify-between gap-3">
-        <SectionTitle title="Factories" subtitle={`${owned.length} of ${FACTORIES.length} plants`} />
+        <SectionTitle title={t("hud.factories")} subtitle={t("empire.plants", { n: owned.length, total: FACTORIES.length })} />
         <BuyAmountToggle />
       </div>
       <div className="grid gap-3 xl:grid-cols-2">

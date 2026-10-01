@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { FACTORY_BY_ID, LEVEL_MILESTONES } from "@/game/config/factories";
-import { describeBonus, MANAGERS } from "@/game/config/managers";
+import { MANAGERS } from "@/game/config/managers";
 import { UPGRADES } from "@/game/config/upgrades";
 import { isManagerUnlocked } from "@/game/engine/actions";
 import { buildableCars, factoryTierCap, levelPurchase, lineCost, nextMilestone, upgradeCost } from "@/game/engine/economy";
@@ -15,6 +15,8 @@ import { managerAt } from "@/game/engine/modifiers";
 import { factoryRequirement } from "@/game/engine/insights";
 import { formatMoney, formatNumber, formatTime } from "@/game/format";
 import type { FactoryId, UpgradeCategory } from "@/game/types";
+import { useContent } from "@/i18n/content";
+import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { uiEvents } from "@/store/events";
 import { useGame } from "@/store/game-store";
@@ -33,6 +35,8 @@ export const FactoryCard = memo(function FactoryCard({ id }: { id: FactoryId }) 
   const state = useGame((g) => g.state);
   const snap = useGame((g) => g.snap);
   const { build, rush, buyLevels } = useGame.getState();
+  const { t, lang } = useT();
+  const n = useContent(lang);
   const [open, setOpen] = useState(id === "garage");
   const [flash, setFlash] = useState(0);
 
@@ -85,35 +89,35 @@ export const FactoryCard = memo(function FactoryCard({ id }: { id: FactoryId }) 
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="truncate text-base font-semibold">{cfg.name}</h3>
+              <h3 className="truncate text-base font-semibold">{n.factory(cfg)}</h3>
               <motion.span key={f.level} initial={{ scale: 1.35 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 500, damping: 18 }}>
-                <Badge>Lv {f.level}</Badge>
+                <Badge>{t("common.lv", { level: f.level })}</Badge>
               </motion.span>
               {manager && (
-                <Badge variant="muted" title={`${manager.name} — ${manager.role}`}>
+                <Badge variant="muted" title={`${manager.name} — ${n.role(manager)}`}>
                   {manager.avatar} {manager.name}
                 </Badge>
               )}
             </div>
             <div className="text-xs text-white/45">
-              {cfg.city} · {cfg.continent} · {f.lines} line{f.lines > 1 ? "s" : ""}
+              {n.city(cfg)} · {n.continent(cfg.continent)} · {t("factory.lines", { n: f.lines })}
             </div>
           </div>
           <div className="text-right">
-            <div className="text-sm font-bold tabular-nums text-emerald-300">{formatMoney(st.automated || f.running ? income : 0)}/s</div>
-            <div className="text-[11px] text-white/40 tabular-nums">{formatNumber(st.carsPerSec * 60)} cars/min</div>
+            <div className="text-sm font-bold tabular-nums text-emerald-300">{formatMoney(st.automated || f.running ? income : 0)}{t("unit.perSec")}</div>
+            <div className="text-[11px] text-white/40 tabular-nums">{formatNumber(st.carsPerSec * 60)} {t("factory.carsPerMin")}</div>
           </div>
         </div>
 
         {/* Production */}
         <div className="mt-3 flex items-center gap-3">
-          <span className="text-2xl" title={st.car.name}>
+          <span className="text-2xl" title={n.car(st.car)}>
             {st.car.emoji}
           </span>
           <div className="min-w-0 flex-1">
             <div className="mb-1 flex items-center justify-between text-[11px] text-white/50">
               <span className="truncate">
-                {st.car.name} ×{st.carsPerCycle} · {formatMoney(st.valuePerCar * snap.dealers.multiplier)} each
+                {n.car(st.car)} ×{st.carsPerCycle} · {t("factory.each", { price: formatMoney(st.valuePerCar * snap.dealers.multiplier) })}
               </span>
               <span className="tabular-nums">{formatTime(st.cycleTime)}</span>
             </div>
@@ -137,7 +141,7 @@ export const FactoryCard = memo(function FactoryCard({ id }: { id: FactoryId }) 
               onClick={() => (isIdleManual ? build(id) : rush(id))}
             >
               {isIdleManual ? <Hammer /> : <Zap />}
-              {isIdleManual ? "BUILD" : "RUSH"}
+              {isIdleManual ? t("factory.build") : t("factory.rush")}
             </Button>
           )}
           <CostButton
@@ -147,17 +151,17 @@ export const FactoryCard = memo(function FactoryCard({ id }: { id: FactoryId }) 
             onBuy={() => buyLevels(id)}
             label={
               <>
-                Level up ×{purchase.count}
-                {nextMs && <span className="normal-case opacity-70">· ×2 speed at {nextMs}</span>}
+                {t("factory.levelUp", { n: purchase.count })}
+                {nextMs && <span className="normal-case opacity-70">· {t("factory.nextMilestone", { level: nextMs })}</span>}
               </>
             }
           />
         </div>
         {nextMs && (
           <div className="mt-2 flex items-center gap-2 text-[10px] text-white/40">
-            <span className="whitespace-nowrap">Lv {prevMs}</span>
+            <span className="whitespace-nowrap">{t("common.lv", { level: prevMs })}</span>
             <Progress value={msProgress} className="h-1" indicatorClassName="from-gold to-amber-300" />
-            <span className="whitespace-nowrap">Lv {nextMs}</span>
+            <span className="whitespace-nowrap">{t("common.lv", { level: nextMs })}</span>
           </div>
         )}
 
@@ -165,7 +169,7 @@ export const FactoryCard = memo(function FactoryCard({ id }: { id: FactoryId }) 
           onClick={() => setOpen((o) => !o)}
           className="mt-3 flex w-full items-center justify-between rounded-xl bg-white/[0.03] px-3 py-2 text-xs font-semibold text-white/70 ring-1 ring-white/[0.06] transition hover:bg-white/[0.06]"
         >
-          <span>Upgrades, lines, cars & manager</span>
+          <span>{t("factory.details")}</span>
           <ChevronDown className={cn("size-4 transition-transform", open && "rotate-180")} />
         </button>
       </div>
@@ -191,6 +195,8 @@ function FactoryDetails({ id }: { id: FactoryId }) {
   const state = useGame((g) => g.state);
   const snap = useGame((g) => g.snap);
   const { buyUpgrade, buyLine, selectCar } = useGame.getState();
+  const { t, lang } = useT();
+  const n = useContent(lang);
   const cfg = FACTORY_BY_ID[id];
   const f = state.factories[id];
   const st = snap.factories[id]!;
@@ -208,13 +214,13 @@ function FactoryDetails({ id }: { id: FactoryId }) {
             <div key={u.id} className={cn("flex flex-col rounded-xl bg-white/[0.03] p-2.5 ring-1 ring-white/[0.06]", unlocksTier && "ring-gold/30")}>
               <div className="flex items-center gap-1.5">
                 <Icon className="size-3.5 text-sky-300" />
-                <span className="text-xs font-semibold">{u.name}</span>
+                <span className="text-xs font-semibold">{n.upgrade(u)}</span>
                 <span className="ml-auto text-[10px] tabular-nums text-white/40">
                   {lvl}/{u.maxLevel}
                 </span>
               </div>
               <p className="mt-1 min-h-[2.4em] text-[10px] leading-tight text-white/45">
-                {unlocksTier ? `Unlocks tier ${cap + 1} cars here.` : u.description}
+                {unlocksTier ? t("factory.unlocksTier", { tier: cap + 1 }) : n.upgradeDesc(u)}
               </p>
               <CostButton size="sm" className="mt-2 w-full" variant={unlocksTier ? "gold" : "default"} cost={upgradeCost(state, id, u.id, snap.gm)} onBuy={() => buyUpgrade(id, u.id)} />
             </div>
@@ -225,36 +231,36 @@ function FactoryDetails({ id }: { id: FactoryId }) {
       <div className="grid gap-2 sm:grid-cols-2">
         <div className="rounded-xl bg-white/[0.03] p-3 ring-1 ring-white/[0.06]">
           <div className="flex items-center justify-between text-xs">
-            <span className="font-semibold">Production lines</span>
+            <span className="font-semibold">{t("factory.productionLines")}</span>
             <span className="tabular-nums text-white/50">
               {f.lines}/{cfg.maxLines}
             </span>
           </div>
-          <p className="mt-1 text-[10px] text-white/45">Each line builds one more car per batch.</p>
-          <CostButton size="sm" className="mt-2 w-full" cost={lineCost(state, id)} onBuy={() => buyLine(id)} label={<><Plus className="!size-3" /> Add line</>} />
+          <p className="mt-1 text-[10px] text-white/45">{t("factory.linesHelp")}</p>
+          <CostButton size="sm" className="mt-2 w-full" cost={lineCost(state, id)} onBuy={() => buyLine(id)} label={<><Plus className="!size-3" /> {t("factory.addLine")}</>} />
         </div>
         <ManagerSlot id={id} />
       </div>
 
       <div>
         <div className="mb-2 flex items-center justify-between text-xs">
-          <span className="font-semibold">Production model</span>
+          <span className="font-semibold">{t("factory.model")}</span>
           <span className="text-white/40">
-            Build {formatTime(st.buildTime)} + delivery {formatTime(st.deliveryTime)}
+            {t("factory.timing", { build: formatTime(st.buildTime), delivery: formatTime(st.deliveryTime) })}
           </span>
         </div>
         <div className="flex flex-wrap gap-1.5">
           <CarChip active={f.carId === null} onClick={() => selectCar(id, null)}>
-            Auto (best)
+            {t("factory.auto")}
           </CarChip>
           {cars.map((c) => (
             <CarChip key={c.id} active={f.carId === c.id} onClick={() => selectCar(id, c.id)}>
-              {c.emoji} {c.name}
+              {c.emoji} {n.car(c)}
             </CarChip>
           ))}
           {cap < cfg.maxTier && (
             <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] text-white/35 ring-1 ring-dashed ring-white/10">
-              <Lock className="size-3" /> Tier {cap + 1} via Technology
+              <Lock className="size-3" /> {t("factory.tierVia", { tier: cap + 1 })}
             </span>
           )}
         </div>
@@ -280,44 +286,46 @@ function CarChip({ active, onClick, children }: { active: boolean; onClick: () =
 function ManagerSlot({ id }: { id: FactoryId }) {
   const state = useGame((g) => g.state);
   const { hireManager, assignManager, setView } = useGame.getState();
+  const { t, lang } = useT();
+  const n = useContent(lang);
   const current = managerAt(state, id);
   const idle = MANAGERS.filter((m) => state.managers[m.id].hired && !state.managers[m.id].assignedTo);
   const hireable = MANAGERS.find((m) => !state.managers[m.id].hired && isManagerUnlocked(state, m.id));
 
   return (
     <div className="rounded-xl bg-white/[0.03] p-3 ring-1 ring-white/[0.06]">
-      <div className="text-xs font-semibold">Manager</div>
+      <div className="text-xs font-semibold">{t("manager.title")}</div>
       {current ? (
         <div className="mt-1.5 flex items-center gap-2">
           <span className="text-2xl">{current.avatar}</span>
           <div className="min-w-0 flex-1">
             <div className="text-xs font-semibold">
-              {current.name} <span className="font-normal text-white/40">Lv {state.managers[current.id].level}</span>
+              {current.name} <span className="font-normal text-white/40">{t("common.lv", { level: state.managers[current.id].level })}</span>
             </div>
-            <div className="text-[10px] text-emerald-300">{describeBonus(current.bonus, state.managers[current.id].level)}</div>
+            <div className="text-[10px] text-emerald-300">{n.bonus(current.bonus, state.managers[current.id].level)}</div>
           </div>
           <Button size="sm" variant="ghost" onClick={() => assignManager(current.id, null)}>
-            Unassign
+            {t("manager.unassign")}
           </Button>
         </div>
       ) : idle.length > 0 ? (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {idle.map((m) => (
             <Button key={m.id} size="sm" variant="secondary" onClick={() => assignManager(m.id, id)}>
-              {m.avatar} Assign {m.name}
+              {m.avatar} {t("manager.assignName", { name: m.name })}
             </Button>
           ))}
         </div>
       ) : hireable ? (
         <div className="mt-1.5">
           <p className="text-[10px] text-white/45">
-            {hireable.avatar} {hireable.name} · {describeBonus(hireable.bonus, 1)}. Managers also automate a plant.
+            {hireable.avatar} {hireable.name} · {n.bonus(hireable.bonus, 1)}. {t("manager.alsoAutomate")}
           </p>
-          <CostButton size="sm" className="mt-2 w-full" cost={hireable.cost} onBuy={() => hireManager(hireable.id, id)} label={<><UserPlus className="!size-3" /> Hire & assign</>} />
+          <CostButton size="sm" className="mt-2 w-full" cost={hireable.cost} onBuy={() => hireManager(hireable.id, id)} label={<><UserPlus className="!size-3" /> {t("manager.hireAssign")}</>} />
         </div>
       ) : (
         <button onClick={() => setView("managers")} className="mt-1.5 text-[11px] text-sky-300 underline-offset-2 hover:underline">
-          All managers busy — view team
+          {t("manager.allBusy")}
         </button>
       )}
     </div>
@@ -329,7 +337,10 @@ export function LockedFactoryCard({ id, highlight }: { id: FactoryId; highlight:
   const snap = useGame((g) => g.snap);
   const buyFactory = useGame((g) => g.buyFactory);
   const cfg = FACTORY_BY_ID[id];
-  const req = factoryRequirement(snap, id);
+  const { t, lang } = useT();
+  const n = useContent(lang);
+  const requirement = factoryRequirement(snap, id);
+  const req = requirement ? n.requirement(requirement) : null;
   const pct = Math.min(100, (cash / cfg.cost) * 100);
 
   if (!highlight) {
@@ -337,9 +348,9 @@ export function LockedFactoryCard({ id, highlight }: { id: FactoryId; highlight:
       <div className="flex items-center gap-3 rounded-2xl bg-white/[0.02] p-3 opacity-60 ring-1 ring-white/[0.05]">
         <span className="text-xl grayscale">{cfg.emoji}</span>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold text-white/70">{cfg.name}</div>
+          <div className="truncate text-sm font-semibold text-white/70">{n.factory(cfg)}</div>
           <div className="text-[11px] text-white/35">
-            {cfg.city} · {formatMoney(cfg.cost)}
+            {n.city(cfg)} · {formatMoney(cfg.cost)}
           </div>
         </div>
         <Lock className="size-4 text-white/30" />
@@ -353,11 +364,11 @@ export function LockedFactoryCard({ id, highlight }: { id: FactoryId; highlight:
         <div className="flex size-12 items-center justify-center rounded-xl bg-white/5 text-2xl ring-1 ring-white/10">{cfg.emoji}</div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h3 className="text-base font-semibold">{cfg.name}</h3>
-            <Badge variant="gold">Next</Badge>
+            <h3 className="text-base font-semibold">{n.factory(cfg)}</h3>
+            <Badge variant="gold">{t("common.next")}</Badge>
           </div>
           <div className="text-xs text-white/50">
-            {cfg.city} · {cfg.continent} · {cfg.baseLines} lines · ×{cfg.valueMult} value · ×{cfg.speedMult} speed
+            {n.city(cfg)} · {n.continent(cfg.continent)} · {t("factory.lockedStats", { lines: cfg.baseLines, value: cfg.valueMult, speed: cfg.speedMult })}
           </div>
         </div>
       </div>
@@ -365,7 +376,7 @@ export function LockedFactoryCard({ id, highlight }: { id: FactoryId; highlight:
         <Progress value={pct} className="h-2.5" indicatorClassName="from-gold to-amber-300" />
         <span className="w-12 text-right text-xs tabular-nums text-white/60">{Math.floor(pct)}%</span>
       </div>
-      <CostButton className="mt-3 w-full" size="lg" variant="gold" cost={cfg.cost} locked={!!req} onBuy={() => buyFactory(id)} label={req ?? "Buy factory"} />
+      <CostButton className="mt-3 w-full" size="lg" variant="gold" cost={cfg.cost} locked={!!req} onBuy={() => buyFactory(id)} label={req ?? t("factory.buy")} />
     </div>
   );
 }

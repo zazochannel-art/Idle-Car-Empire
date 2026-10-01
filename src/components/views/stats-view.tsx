@@ -5,6 +5,8 @@ import { DEALERS } from "@/game/config/dealerships";
 import { FACTORIES } from "@/game/config/factories";
 import { formatDuration, formatHours, formatMoney, formatNumber, formatPercent } from "@/game/format";
 import type { CarId } from "@/game/types";
+import { useContent } from "@/i18n/content";
+import { useT } from "@/i18n/use-t";
 import { useGame } from "@/store/game-store";
 import { ViewHeader } from "./section-title";
 
@@ -12,6 +14,8 @@ export function StatsView() {
   const state = useGame((g) => g.state);
   const snap = useGame((g) => g.snap);
   const L = state.lifetime;
+  const { t, lang } = useT();
+  const n = useContent(lang);
 
   const mostProduced = CARS.reduce<{ id: CarId; n: number } | null>(
     (best, c) => (L.carsByType[c.id] > (best?.n ?? 0) ? { id: c.id, n: L.carsByType[c.id] } : best),
@@ -25,30 +29,30 @@ export function StatsView() {
   }
 
   const rows: [string, string][] = [
-    ["Total cars produced", formatNumber(Math.floor(L.carsProduced))],
-    ["Total money earned", formatMoney(L.moneyEarned)],
-    ["This run earned", formatMoney(state.run.moneyEarned)],
-    ["Factories owned", `${FACTORIES.filter((f) => state.factories[f.id].owned).length} / ${FACTORIES.length}`],
-    ["Dealerships owned", `${DEALERS.filter((d) => state.dealers[d.id].owned).length} / ${DEALERS.length}`],
-    ["Current profit/sec", `${formatMoney(snap.incomePerSec)}/s`],
-    ["Highest profit/sec", `${formatMoney(L.highestIncome)}/s`],
-    ["Total play time", formatDuration(L.playTime)],
-    ["Offline earnings", formatMoney(L.offlineEarned)],
-    ["Offline efficiency", `${formatPercent(snap.gm.offline)} · up to ${formatHours(snap.gm.offlineCapHours)}`],
-    ["Global Expansions", formatNumber(state.prestigeCount)],
-    ["Empire Points", formatNumber(state.empirePoints)],
-    ["Most produced car", mostProduced ? `${CAR_BY_ID[mostProduced.id].emoji} ${CAR_BY_ID[mostProduced.id].name} (${formatNumber(mostProduced.n)})` : "—"],
-    ["Most valuable car", mostValuable ? `${CAR_BY_ID[mostValuable.id].emoji} ${CAR_BY_ID[mostValuable.id].name} (${formatMoney(mostValuable.v)})` : "—"],
-    ["Research completed", formatNumber(L.researchDone)],
-    ["Upgrades bought", formatNumber(L.upgradesBought)],
-    ["Factory levels bought", formatNumber(L.levelsBought)],
-    ["Managers hired", formatNumber(L.managersHired)],
-    ["Achievements", formatNumber(state.achievements.length)],
+    [t("stats.cars"), formatNumber(Math.floor(L.carsProduced))],
+    [t("stats.money"), formatMoney(L.moneyEarned)],
+    [t("stats.run"), formatMoney(state.run.moneyEarned)],
+    [t("stats.factories"), `${FACTORIES.filter((f) => state.factories[f.id].owned).length} / ${FACTORIES.length}`],
+    [t("stats.dealers"), `${DEALERS.filter((d) => state.dealers[d.id].owned).length} / ${DEALERS.length}`],
+    [t("stats.profit"), `${formatMoney(snap.incomePerSec)}${t("unit.perSec")}`],
+    [t("stats.highest"), `${formatMoney(L.highestIncome)}${t("unit.perSec")}`],
+    [t("stats.playTime"), formatDuration(L.playTime)],
+    [t("stats.offline"), formatMoney(L.offlineEarned)],
+    [t("stats.offlineEff"), t("stats.offlineEffValue", { pct: formatPercent(snap.gm.offline), hours: formatHours(snap.gm.offlineCapHours) })],
+    [t("stats.expansions"), formatNumber(state.prestigeCount)],
+    [t("stats.ep"), formatNumber(state.empirePoints)],
+    [t("stats.mostProduced"), mostProduced ? `${CAR_BY_ID[mostProduced.id].emoji} ${n.car(CAR_BY_ID[mostProduced.id])} (${formatNumber(mostProduced.n)})` : "—"],
+    [t("stats.mostValuable"), mostValuable ? `${CAR_BY_ID[mostValuable.id].emoji} ${n.car(CAR_BY_ID[mostValuable.id])} (${formatMoney(mostValuable.v)})` : "—"],
+    [t("stats.research"), formatNumber(L.researchDone)],
+    [t("stats.upgrades"), formatNumber(L.upgradesBought)],
+    [t("stats.levels"), formatNumber(L.levelsBought)],
+    [t("stats.managers"), formatNumber(L.managersHired)],
+    [t("stats.achievements"), formatNumber(state.achievements.length)],
   ];
 
   return (
     <div className="space-y-4">
-      <ViewHeader icon="📊" title="Statistics" subtitle={`Empire founded ${new Date(state.createdAt).toLocaleDateString()}`} />
+      <ViewHeader icon="📊" title={t("nav.stats")} subtitle={t("stats.founded", { date: new Date(state.createdAt).toLocaleDateString(lang) })} />
       <div className="glass divide-y divide-white/[0.05] overflow-hidden rounded-2xl">
         {rows.map(([k, v]) => (
           <div key={k} className="flex items-center justify-between gap-4 px-4 py-3 text-sm">
@@ -59,19 +63,19 @@ export function StatsView() {
       </div>
 
       <div className="glass rounded-2xl p-4">
-        <h3 className="mb-3 text-sm font-semibold">Cars by model</h3>
+        <h3 className="mb-3 text-sm font-semibold">{t("stats.byModel")}</h3>
         <div className="space-y-2">
           {CARS.map((c) => {
-            const n = L.carsByType[c.id];
-            const pct = L.carsProduced > 0 ? (n / L.carsProduced) * 100 : 0;
+            const count = L.carsByType[c.id];
+            const pct = L.carsProduced > 0 ? (count / L.carsProduced) * 100 : 0;
             return (
               <div key={c.id} className="flex items-center gap-3 text-xs">
                 <span className="w-6 text-base">{c.emoji}</span>
-                <span className="w-36 truncate text-white/60">{c.name}</span>
+                <span className="w-36 truncate text-white/60">{n.car(c)}</span>
                 <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
                   <div className="h-full rounded-full" style={{ width: `${pct}%`, background: c.color }} />
                 </div>
-                <span className="w-16 text-right tabular-nums">{formatNumber(n)}</span>
+                <span className="w-16 text-right tabular-nums">{formatNumber(count)}</span>
               </div>
             );
           })}

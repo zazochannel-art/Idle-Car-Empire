@@ -8,6 +8,7 @@ import { RESEARCH } from "@/game/config/research";
 import { canResearch, isManagerUnlocked } from "@/game/engine/actions";
 import { canPrestige } from "@/game/engine/prestige";
 import { claimableCount } from "@/game/engine/progress";
+import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { useGame, type View } from "@/store/game-store";
 import { AchievementsView } from "../views/achievements-view";
@@ -24,28 +25,27 @@ import { OfflineDialog, PrestigeOverlay, SettingsDialog, Toasts } from "./overla
 
 type Icon = React.ComponentType<{ className?: string }>;
 
-const NAV: { view: View; label: string; icon: Icon }[] = [
-  { view: "empire", label: "Empire", icon: Factory },
-  { view: "dealers", label: "Dealerships", icon: Store },
-  { view: "cars", label: "Cars", icon: Car },
-  { view: "research", label: "Research", icon: FlaskConical },
-  { view: "managers", label: "Managers", icon: Users },
-  { view: "missions", label: "Missions", icon: ListChecks },
-  { view: "achievements", label: "Achievements", icon: Trophy },
-  { view: "stats", label: "Statistics", icon: BarChart3 },
-  { view: "prestige", label: "Global Expansion", icon: Star },
+const NAV: { view: View; icon: Icon }[] = [
+  { view: "empire", icon: Factory },
+  { view: "dealers", icon: Store },
+  { view: "cars", icon: Car },
+  { view: "research", icon: FlaskConical },
+  { view: "managers", icon: Users },
+  { view: "missions", icon: ListChecks },
+  { view: "achievements", icon: Trophy },
+  { view: "stats", icon: BarChart3 },
+  { view: "prestige", icon: Star },
 ];
 
 /** Phone navigation: five tabs; the first and last group several screens. */
-const MOBILE_TABS: { label: string; icon: Icon; views: View[] }[] = [
-  { label: "Empire", icon: Factory, views: ["empire", "dealers"] },
-  { label: "Cars", icon: Car, views: ["cars"] },
-  { label: "Research", icon: FlaskConical, views: ["research"] },
-  { label: "Managers", icon: Users, views: ["managers"] },
-  { label: "Prestige", icon: Star, views: ["prestige", "missions", "achievements", "stats"] },
+const MOBILE_TABS: { id: "empire" | "cars" | "research" | "managers" | "prestige"; icon: Icon; views: View[] }[] = [
+  { id: "empire", icon: Factory, views: ["empire", "dealers"] },
+  { id: "cars", icon: Car, views: ["cars"] },
+  { id: "research", icon: FlaskConical, views: ["research"] },
+  { id: "managers", icon: Users, views: ["managers"] },
+  { id: "prestige", icon: Star, views: ["prestige", "missions", "achievements", "stats"] },
 ];
 
-const LABEL: Record<View, string> = Object.fromEntries(NAV.map((n) => [n.view, n.label])) as Record<View, string>;
 
 function useBadges(): Partial<Record<View, number>> {
   const state = useGame((g) => g.state);
@@ -86,7 +86,8 @@ function Shell() {
   const setView = useGame((g) => g.setView);
   const [settings, setSettings] = useState(false);
   const badges = useBadges();
-  const mobileGroup = MOBILE_TABS.find((t) => t.views.includes(view)) ?? MOBILE_TABS[0];
+  const { t } = useT();
+  const mobileGroup = MOBILE_TABS.find((tab) => tab.views.includes(view)) ?? MOBILE_TABS[0];
 
   return (
     <div className="min-h-dvh">
@@ -105,12 +106,12 @@ function Shell() {
                 key={n.view}
                 onClick={() => setView(n.view)}
                 className={cn(
-                  "group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition",
+                  "group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition",
                   view === n.view ? "bg-electric/15 text-white ring-1 ring-electric/40" : "text-white/55 hover:bg-white/[0.04] hover:text-white",
                 )}
               >
                 <n.icon className={cn("size-4", view === n.view ? "text-sky-300" : n.view === "prestige" ? "text-gold" : "")} />
-                {n.label}
+                {t(`nav.${n.view}`)}
                 <NavBadge n={badges[n.view]} gold={n.view === "prestige"} className="ml-auto" />
               </button>
             ))}
@@ -129,7 +130,7 @@ function Shell() {
                     view === v ? "bg-electric/20 text-white ring-electric/50" : "bg-white/[0.03] text-white/55 ring-white/10",
                   )}
                 >
-                  {LABEL[v]}
+                  {t(`nav.${v}`)}
                   {(badges[v] ?? 0) > 0 && <span className="ml-1.5 inline-block size-1.5 rounded-full bg-gold align-middle" />}
                 </button>
               ))}
@@ -146,21 +147,21 @@ function Shell() {
       {/* Mobile bottom navigation */}
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.07] bg-ink/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden">
         <div className="mx-auto grid max-w-lg grid-cols-5">
-          {MOBILE_TABS.map((t) => {
-            const active = t.views.includes(view);
-            const badge = t.views.reduce((sum, v) => sum + (badges[v] ?? 0), 0);
+          {MOBILE_TABS.map((tab) => {
+            const active = tab.views.includes(view);
+            const badge = tab.views.reduce((sum, v) => sum + (badges[v] ?? 0), 0);
             return (
               <button
-                key={t.label}
-                onClick={() => setView(t.views.includes(view) ? view : t.views[0])}
+                key={tab.id}
+                onClick={() => setView(tab.views.includes(view) ? view : tab.views[0])}
                 className={cn("relative flex flex-col items-center gap-1 py-2.5 text-[10px] font-semibold transition", active ? "text-white" : "text-white/45")}
               >
                 {active && <motion.span layoutId="tab-glow" className="absolute inset-x-4 top-0 h-0.5 rounded-full bg-electric shadow-[0_0_12px_#3b82f6]" />}
                 <span className="relative">
-                  <t.icon className={cn("size-5", active && (t.label === "Prestige" ? "text-gold" : "text-sky-300"))} />
-                  <NavBadge n={badge} gold={t.label === "Prestige"} className="absolute -right-2.5 -top-1.5" />
+                  <tab.icon className={cn("size-5", active && (tab.id === "prestige" ? "text-gold" : "text-sky-300"))} />
+                  <NavBadge n={badge} gold={tab.id === "prestige"} className="absolute -right-2.5 -top-1.5" />
                 </span>
-                {t.label}
+                {t(`tab.${tab.id}`)}
               </button>
             );
           })}

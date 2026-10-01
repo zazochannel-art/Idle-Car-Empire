@@ -46,23 +46,3 @@ export const MANAGER_BY_ID: Record<ManagerId, ManagerConfig> = Object.fromEntrie
 ) as Record<ManagerId, ManagerConfig>;
 
 export const MANAGER_IDS = MANAGERS.map((m) => m.id);
-
-export function describeBonus(b: ManagerBonus, level: number): string {
-  const pct = Math.round(b.pct * Math.max(1, level) * 100);
-  switch (b.stat) {
-    case "speed":
-      return `+${pct}% production speed`;
-    case "value":
-      return b.minTier ? `+${pct}% value (tier ${b.minTier}+)` : `+${pct}% selling price`;
-    case "delivery":
-      return `+${pct}% delivery speed`;
-    case "offline":
-      return `+${pct}% offline output`;
-    case "rp":
-      return `+${pct}% research speed`;
-    case "income":
-      return `+${pct}% global income`;
-    case "dealerCap":
-      return `+${pct}% dealer capacity`;
-  }
-}

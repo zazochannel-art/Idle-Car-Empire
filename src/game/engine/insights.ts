@@ -1,25 +1,27 @@
 // Read-only helpers that explain the game to the player: what to aim for next
-// and why something is locked. Used by the UI, never mutate state.
+// and why something is locked. They return data, not text — the UI words it
+// in the player's language. Never mutate state.
 import { CARS, type CarConfig } from "../config/cars";
 import { FACTORIES, FACTORY_BY_ID } from "../config/factories";
 import { MANAGERS } from "../config/managers";
-import { RESEARCH_BY_ID } from "../config/research";
-import type { FactoryId, GameState } from "../types";
+import type { CarId, FactoryId, GameState, ManagerId } from "../types";
 import { isFactoryAvailable, unlockedCarIds, upgradeCost, type EconomySnapshot } from "./economy";
 import { canPrestige, pendingPoints } from "./prestige";
 import { isManagerUnlocked } from "./actions";
 
-export type GoalKind = "build" | "automate" | "factory" | "car" | "manager" | "prestige";
+export type Requirement =
+  | { kind: "research"; research: string }
+  | { kind: "buyFactory"; factory: FactoryId }
+  | { kind: "technology"; factory: FactoryId; level: number }
+  | { kind: "unavailable" };
 
-export interface Goal {
-  kind: GoalKind;
-  title: string;
-  detail: string;
-  icon: string;
-  cost?: number;
-  factory?: FactoryId;
-  target?: string;
-}
+export type Goal =
+  | { kind: "build"; icon: string; factory: FactoryId }
+  | { kind: "automate"; icon: string; cost: number; factory: FactoryId; manager: ManagerId }
+  | { kind: "factory"; icon: string; cost: number; factory: FactoryId; requirement: Requirement | null }
+  | { kind: "car"; icon: string; cost?: number; factory: FactoryId; car: CarId }
+  | { kind: "manager"; icon: string; cost: number; manager: ManagerId }
+  | { kind: "prestige"; icon: string; points: number };
 
 /** Which factory, with how many Technology levels, could build this car. */
 export function carUnlockPath(s: GameState, car: CarConfig): { factory: FactoryId; techNeeded: number; owned: boolean } | null {
@@ -35,47 +37,35 @@ export function carUnlockPath(s: GameState, car: CarConfig): { factory: FactoryI
   return best;
 }
 
-export function carRequirement(s: GameState, car: CarConfig, snap: EconomySnapshot): string | null {
-  if (car.requiresResearch && !snap.gm.unlockedCars.has(car.id)) {
-    return `Research ${RESEARCH_BY_ID[car.requiresResearch]?.name ?? car.requiresResearch}`;
-  }
+/** Why a car is still locked, or null when it is unlocked. */
+export function carRequirement(s: GameState, car: CarConfig, snap: EconomySnapshot): Requirement | null {
+  if (car.requiresResearch && !snap.gm.unlockedCars.has(car.id)) return { kind: "research", research: car.requiresResearch };
   if (unlockedCarIds(s, snap.gm).has(car.id)) return null;
   const path = carUnlockPath(s, car);
-  if (!path) return "Not buildable yet";
-  const f = FACTORY_BY_ID[path.factory];
-  if (!path.owned) return `Buy the ${f.name}`;
-  return `Technology Lv ${s.factories[path.factory].upgrades.technology + path.techNeeded} in ${f.name}`;
+  if (!path) return { kind: "unavailable" };
+  if (!path.owned) return { kind: "buyFactory", factory: path.factory };
+  return { kind: "technology", factory: path.factory, level: s.factories[path.factory].upgrades.technology + path.techNeeded };
 }
 
-export function factoryRequirement(snap: EconomySnapshot, id: FactoryId): string | null {
+export function factoryRequirement(snap: EconomySnapshot, id: FactoryId): Requirement | null {
   const cfg = FACTORY_BY_ID[id];
   if (isFactoryAvailable(snap.gm, id)) return null;
-  return `Research ${RESEARCH_BY_ID[cfg.requiresResearch!]?.name}`;
+  return { kind: "research", research: cfg.requiresResearch! };
 }
 
 export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] {
   const goals: Goal[] = [];
   const garage = snap.factories.garage;
 
-  if (s.lifetime.carsProduced === 0) {
-    goals.push({ kind: "build", icon: "🔧", title: "Build your first car", detail: "Tap BUILD on the Small Garage. Each City Compact earns $50.", factory: "garage" });
-  }
+  if (s.lifetime.carsProduced === 0) goals.push({ kind: "build", icon: "🔧", factory: "garage" });
   if (garage && !garage.automated && s.factories.garage.owned) {
     const mike = MANAGERS[0];
-    goals.push({ kind: "automate", icon: mike.avatar, title: "Automate the garage", detail: `Hire ${mike.name} so cars keep rolling without tapping — even offline.`, cost: mike.cost, factory: "garage", target: mike.id });
+    goals.push({ kind: "automate", icon: mike.avatar, cost: mike.cost, factory: "garage", manager: mike.id });
   }
 
   const nextFactory = FACTORIES.find((f) => !s.factories[f.id].owned);
   if (nextFactory) {
-    const req = factoryRequirement(snap, nextFactory.id);
-    goals.push({
-      kind: "factory",
-      icon: nextFactory.emoji,
-      title: `Open the ${nextFactory.name}`,
-      detail: req ? `Needs: ${req}` : `${nextFactory.city} · ${nextFactory.baseLines} lines · ×${nextFactory.valueMult} value`,
-      cost: nextFactory.cost,
-      factory: nextFactory.id,
-    });
+    goals.push({ kind: "factory", icon: nextFactory.emoji, cost: nextFactory.cost, factory: nextFactory.id, requirement: factoryRequirement(snap, nextFactory.id) });
   }
 
   const unlocked = unlockedCarIds(s, snap.gm);
@@ -83,24 +73,15 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
   if (nextCar) {
     const path = carUnlockPath(s, nextCar);
     if (path?.owned && path.techNeeded > 0 && (!nextCar.requiresResearch || snap.gm.unlockedCars.has(nextCar.id))) {
-      goals.push({
-        kind: "car",
-        icon: nextCar.emoji,
-        title: `Unlock the ${nextCar.name}`,
-        detail: `Technology upgrade in ${FACTORY_BY_ID[path.factory].name}`,
-        cost: upgradeCost(s, path.factory, "technology", snap.gm) ?? undefined,
-        factory: path.factory,
-      });
+      goals.push({ kind: "car", icon: nextCar.emoji, cost: upgradeCost(s, path.factory, "technology", snap.gm) ?? undefined, factory: path.factory, car: nextCar.id });
     }
   }
 
   const nextManager = MANAGERS.find((m) => !s.managers[m.id].hired && isManagerUnlocked(s, m.id));
   if (nextManager && goals.every((g) => g.kind !== "automate")) {
-    goals.push({ kind: "manager", icon: nextManager.avatar, title: `Hire ${nextManager.name}`, detail: nextManager.role, cost: nextManager.cost, target: nextManager.id });
+    goals.push({ kind: "manager", icon: nextManager.avatar, cost: nextManager.cost, manager: nextManager.id });
   }
 
-  if (canPrestige(s)) {
-    goals.unshift({ kind: "prestige", icon: "⭐", title: `Global Expansion ready: +${pendingPoints(s)} EP`, detail: "Reset for permanent Empire Points." });
-  }
+  if (canPrestige(s)) goals.unshift({ kind: "prestige", icon: "⭐", points: pendingPoints(s) });
   return goals.slice(0, max);
 }

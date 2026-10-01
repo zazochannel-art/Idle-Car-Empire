@@ -36,21 +36,28 @@ export function formatCash(n: number): string {
   return formatMoney(n);
 }
 
+/** Duration unit letters; switched with the UI language (see i18n). */
+const UNITS = { d: "d", h: "h", m: "m", s: "s" };
+export function setDurationUnits(units: typeof UNITS) {
+  Object.assign(UNITS, units);
+}
+
 export function formatDuration(seconds: number): string {
   seconds = Math.max(0, Math.floor(seconds));
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = seconds % 60;
-  if (d > 0) return `${d}d ${h}h`;
-  if (h > 0) return `${h}h ${m}m`;
-  if (m > 0) return `${m}m ${s}s`;
-  return `${s}s`;
+  const u = UNITS;
+  if (d > 0) return `${d}${u.d} ${h}${u.h}`;
+  if (h > 0) return `${h}${u.h} ${m}${u.m}`;
+  if (m > 0) return `${m}${u.m} ${s}${u.s}`;
+  return `${s}${u.s}`;
 }
 
 export function formatTime(seconds: number): string {
-  if (seconds < 1) return `${seconds.toFixed(2)}s`;
-  if (seconds < 60) return `${seconds.toFixed(seconds < 10 ? 1 : 0)}s`;
+  if (seconds < 1) return `${seconds.toFixed(2)}${UNITS.s}`;
+  if (seconds < 60) return `${seconds.toFixed(seconds < 10 ? 1 : 0)}${UNITS.s}`;
   return formatDuration(seconds);
 }
 
@@ -67,5 +74,5 @@ export function timeToAfford(cash: number, cost: number, rate: number): number |
 }
 
 export function formatHours(hours: number): string {
-  return `${Number(hours.toFixed(1))}h`;
+  return `${Number(hours.toFixed(1))}${UNITS.h}`;
 }
