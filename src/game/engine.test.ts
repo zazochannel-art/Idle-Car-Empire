@@ -27,6 +27,8 @@ function run(s: GameState, seconds: number, step = 0.5): GameEvent[] {
 }
 
 function build(s: GameState, plot: string, type: PlantType) {
+  // the Engine Factory unlocks after 25 bodies
+  s.lifetime.parts.body = Math.max(s.lifetime.parts.body, 25);
   s.cash += Ch.plantBuildCost(s, type);
   expect(C.buildStructure(s, plot, type)).toBe(true);
 }
@@ -121,6 +123,9 @@ describe("growing the chain", () => {
   it("plants unlock in order: engine after body works, then tyres, then assembly…", () => {
     const s = createInitialState(T0);
     const [a, b] = freePlots();
+    // the Engine Factory needs 25 bodies first
+    expect(Ch.plantLock(s, "engineFactory")).toEqual({ kind: "made", item: "body", n: 25, have: 0 });
+    s.lifetime.parts.body = 25;
     expect(Ch.plantLock(s, "engineFactory")).toBeNull();
     expect(Ch.plantLock(s, "tireFactory")).toEqual({ kind: "plant", plant: "engineFactory" });
     expect(Ch.plantLock(s, "interiorFactory")).toEqual({ kind: "plant", plant: "assemblyPlant" });
@@ -155,6 +160,39 @@ function fullChain() {
   types.forEach((ty, i) => build(s, plots[i], ty));
   return { s, assembly: plots[2] };
 }
+
+describe("motorized chassis", () => {
+  it("an engine factory can fit engines into bodies and sell them for more", () => {
+    const s = createInitialState(T0);
+    const [a] = freePlots();
+    build(s, a, "engineFactory");
+    s.cash = 1e6;
+    const st0 = snapshot(s).chain.plants[a];
+    expect(st0.combine).toBe(false);
+    expect(Ch.setCombine(s, a, true)).toBe(true);
+    const st = snapshot(s).chain.plants[a];
+    expect(st.combine).toBe(true);
+    expect(st.unitValue).toBeCloseTo((st0.engineValue + 150) * 1.3);
+    // without bodies it waits for them
+    run(s, 40);
+    const p = s.city.buildings[a].plant!;
+    expect(p.status === "noParts" || (p.inputs.body ?? 0) > 0 || p.made > 0).toBe(true);
+    // bodies drive to the engine factory, chassis drive to the market
+    const events = run(s, 400);
+    expect(s.chain.shipments.some((sh) => sh.to === a && sh.item === "body") || p.made > 0).toBe(true);
+    expect(p.made).toBeGreaterThan(0);
+    expect(events.some((e) => e.type === "sale" && e.item === "chassis")).toBe(true);
+  });
+
+  it("once an assembly plant exists, engines go to it again", () => {
+    const { s, assembly } = fullChain();
+    const engine = Ch.plantsOf(s).find(([, b]) => b.type === "engineFactory")![0];
+    Ch.setCombine(s, engine, true);
+    expect(snapshot(s).chain.plants[engine].combine).toBe(false);
+    run(s, 300);
+    expect(s.city.buildings[assembly].plant!.made).toBeGreaterThan(0);
+  });
+});
 
 describe("assembly and sales", () => {
   it("an assembly plant waits for missing parts, then builds the first car", () => {

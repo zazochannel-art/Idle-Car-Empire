@@ -46,6 +46,8 @@ export interface PlantConfig {
   requires: PlantType | null;
   /** Research needed first. */
   research?: string;
+  /** A production milestone needed first (lifetime units of a component). */
+  unlockMade?: { item: ComponentId; n: number };
   color: string;
   roof: string;
 }
@@ -53,7 +55,7 @@ export interface PlantConfig {
 export const PLANTS: PlantConfig[] = [
   // the first car: body + engine + tyres, put together by the assembly plant
   { id: "bodyWorks", emoji: "🚙", item: "body", raw: "steel", rawPer: 10, time: 20, cost: 5_000, requires: null, color: "#e2e8f0", roof: "#64748b" },
-  { id: "engineFactory", emoji: "⚙️", item: "engine", raw: "metal", rawPer: 10, time: 30, cost: 3_000, requires: "bodyWorks", color: "#e7e5e4", roof: "#b91c1c" },
+  { id: "engineFactory", emoji: "⚙️", item: "engine", raw: "metal", rawPer: 10, time: 30, cost: 3_000, requires: "bodyWorks", unlockMade: { item: "body", n: 25 }, color: "#e7e5e4", roof: "#b91c1c" },
   { id: "tireFactory", emoji: "🛞", item: "tires", raw: "rubber", rawPer: 10, time: 30, cost: 60_000, requires: "engineFactory", color: "#d4d4d8", roof: "#27272a" },
   { id: "assemblyPlant", emoji: "🏭", item: null, raw: "", rawPer: 0, time: 60, cost: 600_000, requires: "tireFactory", color: "#f1f5f9", roof: "#1d4ed8" },
   // better cars need more parts
@@ -75,6 +77,13 @@ export const MAKER: Record<ComponentId, PlantType> = Object.fromEntries(
 
 /** Each extra plant of the same type costs this many times the previous. */
 export const PLANT_COPY_COST = 6;
+
+/**
+ * Before an assembly plant exists, an engine factory can fit each engine into
+ * a car body and sell the motorized chassis: worth this many times a body and
+ * an engine sold separately, but it stops when bodies run out.
+ */
+export const CHASSIS_BONUS = 1.3;
 
 // ───────────────────────────── growth ─────────────────────────────
 

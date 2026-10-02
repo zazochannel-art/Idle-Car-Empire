@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { CARS, CAR_BY_ID } from "@/game/config/cars";
-import { AUTOMATION, COMPONENTS, COMPONENT_BY_ID, GRADES, PLANTS, PLANT_BY_ID, PLANT_LEVELS, PLANT_TRUCKS, SPEED } from "@/game/config/chain";
+import { AUTOMATION, CHASSIS_BONUS, COMPONENTS, COMPONENT_BY_ID, GRADES, PLANTS, PLANT_BY_ID, PLANT_LEVELS, PLANT_TRUCKS, SPEED } from "@/game/config/chain";
 import { DEALER_BY_ID } from "@/game/config/dealerships";
 import { MANAGERS } from "@/game/config/managers";
 import { DEPOT, MARKET, plotOf } from "@/game/city/layout";
@@ -79,7 +79,9 @@ export function PlantPanel({ id }: { id: string }) {
   const hasAssembly = plantsOf(state).some(([, o]) => o.type === "assemblyPlant");
   const steps = processSteps(st.type, t);
   const step = Math.min(steps.length - 1, Math.floor(p.progress * (steps.length - 1)));
-  const unitCost = cfg.item ? st.rawPrice * cfg.rawPer : st.car ? carPartsValue(st.car) * gm.value[1] * gm.income : 0;
+  // a motorized chassis also uses up a body (counted at its market value)
+  const bodyCost = st.combine && st.chassisValue !== null ? st.chassisValue / CHASSIS_BONUS - st.engineValue : 0;
+  const unitCost = cfg.item ? st.rawPrice * cfg.rawPer + bodyCost : st.car ? carPartsValue(st.car) * gm.value[1] * gm.income : 0;
 
   return (
     <div className="space-y-3 pb-2">
@@ -99,7 +101,7 @@ export function PlantPanel({ id }: { id: string }) {
         <div className="mb-2 flex items-center justify-between text-[11px] text-white/55">
           <span className="font-bold uppercase tracking-wider">{t("plant.production")}</span>
           <span className="tabular-nums">
-            {t("plant.rate", { n: formatNumber(st.lines), item: itemName(item, t), time: formatDuration(st.cycle) })}
+            {t("plant.rate", { n: formatNumber(st.lines), item: itemName(st.combine ? "chassis" : item, t), time: formatDuration(st.cycle) })}
           </span>
         </div>
         <div className="mb-2 flex flex-wrap items-center gap-1 text-[10px]">
@@ -124,6 +126,9 @@ export function PlantPanel({ id }: { id: string }) {
         </div>
       </div>
 
+      {/* engine factory before assembly: sell engines, or motorized chassis */}
+      {st.type === "engineFactory" && <EngineStrategy id={id} />}
+
       {/* assembly: what car is on the line */}
       {!cfg.item && <ModelPicker id={id} />}
 
@@ -132,10 +137,11 @@ export function PlantPanel({ id }: { id: string }) {
         <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-white/55">{t("plant.stock")}</div>
         <div className="space-y-2">
           {cfg.item && <StockBar label={`${rawName(st.type, t)}`} value={p.raw} cap={st.rawCap} color="#a8a29e" />}
+          {st.combine && <StockBar label={`${COMPONENT_BY_ID.body.emoji} ${itemName("body", t)}`} value={p.inputs.body ?? 0} cap={st.inCap} color={COMPONENT_BY_ID.body.color} warn={p.missing === "body"} />}
           {!cfg.item &&
             st.car &&
             recipe(st.car).map((c) => <StockBar key={c} label={`${COMPONENT_BY_ID[c].emoji} ${itemName(c, t)}`} value={p.inputs[c] ?? 0} cap={st.inCap} color={COMPONENT_BY_ID[c].color} warn={p.missing === c} />)}
-          <StockBar label={`📦 ${itemName(item, t)}`} value={p.out} cap={st.outCap} color="#38bdf8" />
+          <StockBar label={`📦 ${itemName(st.combine ? "chassis" : item, t)}`} value={p.out} cap={st.outCap} color="#38bdf8" />
         </div>
       </div>
 
@@ -184,6 +190,70 @@ export function PlantPanel({ id }: { id: string }) {
       <Button variant="secondary" className="w-full" onClick={() => openFloor(id)}>
         <Factory /> {t("plant.floor")}
       </Button>
+    </div>
+  );
+}
+
+/**
+ * The first strategic choice: sell engines as they are, or fit each one into
+ * a car body and sell the motorized chassis (worth more, needs bodies).
+ * The game recommends one from your body and engine output.
+ */
+function EngineStrategy({ id }: { id: string }) {
+  const state = useGame((g) => g.state);
+  const snap = useGame((g) => g.snap);
+  const setCombine = useGame((g) => g.setCombine);
+  const { t } = useT();
+  const st = snap.chain.plants[id];
+  const p = state.city.buildings[id]?.plant;
+  if (!st || !p || st.chassisValue === null) return null;
+  const hasAssembly = plantsOf(state).some(([, b]) => b.type === "assemblyPlant");
+  if (hasAssembly)
+    return (
+      <div className="rounded-2xl bg-white/[0.04] p-3 text-[11px] text-white/55 ring-1 ring-white/[0.07]">
+        <div className="mb-1 text-[11px] font-bold uppercase tracking-wider text-white/55">{t("strategy.title")}</div>
+        {t("strategy.assembly")}
+      </div>
+    );
+  const bodyRate = Object.values(snap.chain.plants).reduce((a, o) => (o.type === "bodyWorks" ? a + o.unitsPerSec : a), 0);
+  const engineRate = st.unitsPerSec;
+  const bodyValue = st.chassisValue / CHASSIS_BONUS - st.engineValue;
+  const extra = (st.chassisValue - st.engineValue - bodyValue) * Math.min(engineRate, bodyRate) * 60;
+  const recommend = bodyRate >= engineRate * 0.95;
+  const options = [
+    { on: false, icon: "⚙️", title: t("strategy.sell"), value: st.engineValue, hint: t("strategy.sellHint") },
+    { on: true, icon: "🚙⚙️", title: t("strategy.combine"), value: st.chassisValue, hint: t("strategy.combineHint", { pct: formatPercent(CHASSIS_BONUS - 1) }) },
+  ];
+  return (
+    <div className="rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.07]">
+      <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-white/55">{t("strategy.title")}</div>
+      <div className="grid grid-cols-2 gap-2">
+        {options.map((o) => {
+          const active = !!p.combine === o.on;
+          const best = recommend === o.on;
+          return (
+            <button
+              key={String(o.on)}
+              onClick={() => setCombine(id, o.on)}
+              className={cn(
+                "relative rounded-xl p-2.5 text-left ring-1 transition",
+                active ? "bg-electric/20 ring-electric/60" : "bg-white/[0.03] ring-white/10 hover:bg-white/[0.07]",
+              )}
+            >
+              {best && <span className="absolute -top-2 right-2 rounded-full bg-gold px-1.5 py-0.5 text-[9px] font-black uppercase text-black">{t("strategy.best")}</span>}
+              <div className="text-lg leading-none">{o.icon}</div>
+              <div className="mt-1 text-xs font-bold">{o.title}</div>
+              <div className="text-sm font-black tabular-nums text-gold">{formatMoney(o.value)}</div>
+              <div className="text-[10px] leading-tight text-white/50">{o.hint}</div>
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-2 text-[11px] text-white/55">
+        {recommend
+          ? t("strategy.why", { bodies: formatNumber(bodyRate * 60), engines: formatNumber(engineRate * 60), extra: formatMoney(extra) })
+          : t("strategy.whyNot", { bodies: formatNumber(bodyRate * 60), engines: formatNumber(engineRate * 60) })}
+      </p>
     </div>
   );
 }

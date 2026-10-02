@@ -7,6 +7,7 @@ import { CARS, CAR_BY_ID, CAR_MODEL, type CarConfig } from "../config/cars";
 import {
   AUTOMATION,
   BASE_RECIPE,
+  CHASSIS_BONUS,
   CARRIER_CAPACITY,
   COMPONENT_BY_ID,
   DEALER_SALE,
@@ -46,6 +47,7 @@ import type {
   DealerStock,
   GameEvent,
   GameState,
+  ItemId,
   PlantData,
   PlantType,
   Shipment,
@@ -104,12 +106,18 @@ export function plantNumber(s: GameState, plotId: string): number {
 
 // ───────────────────────────── unlocks & costs ─────────────────────────────
 
-export type PlantLock = { kind: "plant"; plant: PlantType } | { kind: "research"; research: string } | null;
+export type PlantLock =
+  | { kind: "plant"; plant: PlantType }
+  | { kind: "research"; research: string }
+  | { kind: "made"; item: ComponentId; n: number; have: number }
+  | null;
 
 /** What must happen before a plant type can be built (null = ready). */
 export function plantLock(s: GameState, type: PlantType): PlantLock {
   const cfg = PLANT_BY_ID[type];
   if (cfg.requires && !hasPlant(s, cfg.requires)) return { kind: "plant", plant: cfg.requires };
+  if (cfg.unlockMade && s.lifetime.parts[cfg.unlockMade.item] < cfg.unlockMade.n)
+    return { kind: "made", item: cfg.unlockMade.item, n: cfg.unlockMade.n, have: Math.floor(s.lifetime.parts[cfg.unlockMade.item]) };
   if (cfg.research && !s.research.includes(cfg.research)) return { kind: "research", research: cfg.research };
   return null;
 }
@@ -135,6 +143,11 @@ export function automationCost(b: BuildingState, gm: GlobalMods): number | null 
   const p = b.plant!;
   if (p.automation >= AUTOMATION.length - 1) return null;
   return base(b) * AUTOMATION[p.automation + 1].cost * gm.costMult;
+}
+
+/** Whether an engine factory is making motorized chassis (only before the first assembly plant). */
+export function combines(s: GameState, b: BuildingState): boolean {
+  return b.type === "engineFactory" && !!b.plant?.combine && !hasPlant(s, "assemblyPlant");
 }
 
 /** Trucks a plant runs: they come with its level (older saves keep the ones they bought). */
@@ -216,6 +229,11 @@ export interface PlantStats {
   capacity: number;
   /** Assembly: model on the line. */
   car: CarConfig | null;
+  /** Engine factory: making motorized chassis, and what one is worth (null on other plants). */
+  combine: boolean;
+  chassisValue: number | null;
+  /** Engine factory: what a plain engine is worth. */
+  engineValue: number;
   /** Seconds per tile for this plant's trucks. */
   pace: number;
   offline: number;
@@ -273,11 +291,15 @@ export function plantStats(s: GameState, plotId: string, gm: GlobalMods, cars: C
   const baseTime = cfg.item ? cfg.time * GRADES[p.grade - 1].time : (car?.time ?? cfg.time);
   const cycle = baseTime / speed;
   const lines = lv.lines;
-  const unitValue = cfg.item
+  const itemValue = cfg.item
     ? componentBase(cfg.item, p.grade) * gm.value[1] * gm.income * mm.value
     : car
       ? carValue(s, car, gm) * mm.value
       : 0;
+  // engine + the best body you make, worth more together
+  const chassisValue = b.type === "engineFactory" ? (itemValue + componentBase("body", Math.max(1, bestGrade(s, "body"))) * gm.value[1] * gm.income) * CHASSIS_BONUS : null;
+  const combine = combines(s, b);
+  const unitValue = combine && chassisValue !== null ? chassisValue : itemValue;
   const rawPrice = cfg.item ? (componentBase(cfg.item, p.grade) * MATERIAL_SHARE) / cfg.rawPer : 0;
   const vehicle = cfg.item ? PLANT_VEHICLE[b.level - 1] : "carrier";
   const capacity = cfg.item ? VEHICLE_CAPACITY[vehicle] : CARRIER_CAPACITY[b.level - 1];
@@ -297,6 +319,9 @@ export function plantStats(s: GameState, plotId: string, gm: GlobalMods, cars: C
     vehicle,
     capacity,
     car,
+    combine,
+    chassisValue,
+    engineValue: itemValue,
     pace: 1 / (TRUCK_SPEED * gm.delivery * mm.delivery),
     offline: gm.offline + AUTOMATION[p.automation].offline + mm.offline,
     rp: (cfg.item ? (COMPONENT_BY_ID[cfg.item].value / 5_000) * p.grade : (car?.rp ?? 0)) * gm.rp,
@@ -366,8 +391,10 @@ export interface ChainTickOut {
 }
 
 /** Where a finished load from this plant should go now, or null to wait. */
-function destination(s: GameState, snap: ChainSnapshot, b: BuildingState & { plant: PlantData }): { to: string; room: number } | null {
+function destination(s: GameState, snap: ChainSnapshot, id: string, b: BuildingState & { plant: PlantData }): { to: string; room: number } | null {
   const cfg = PLANT_BY_ID[b.type as PlantType];
+  // motorized chassis are sold at the market
+  if (snap.plants[id]?.combine) return { to: MARKET, room: Infinity };
   if (!cfg.item) {
     // cars: to the dealer with the best markup that has room
     let best: { to: string; room: number; markup: number } | null = null;
@@ -389,6 +416,14 @@ function destination(s: GameState, snap: ChainSnapshot, b: BuildingState & { pla
     const room = ost.inCap - (other.plant.inputs[cfg.item] ?? 0) - incoming(s, id, cfg.item);
     if (room > 0 && (!best || room > best.room)) best = { to: id, room };
   }
+  // before assembly: bodies go to engine factories that make motorized chassis
+  if (!best && cfg.item === "body")
+    for (const [id, other] of plantsOf(s)) {
+      const ost = snap.plants[id];
+      if (!ost?.combine) continue;
+      const room = ost.inCap - (other.plant.inputs.body ?? 0) - incoming(s, id, "body");
+      if (room > 0 && (!best || room > best.room)) best = { to: id, room };
+    }
   return best ?? { to: MARKET, room: Infinity };
 }
 
@@ -440,6 +475,15 @@ export function chainTick(
       if (n <= 0) return { n: 0, why: "full" as const };
       if (cfg.item) {
         n = Math.min(n, Math.floor(p.raw / cfg.rawPer));
+        if (n > 0 && st.combine) {
+          // a motorized chassis needs a body from the Body Works
+          const bodies = Math.floor(p.inputs.body ?? 0);
+          if (bodies < 1) {
+            p.missing = "body";
+            return { n: 0, why: "noParts" as const };
+          }
+          n = Math.min(n, bodies);
+        }
         return { n, why: "noRaw" as const };
       }
       if (!st.car) return { n: 0, why: "noModel" as const };
@@ -473,6 +517,7 @@ export function chainTick(
         const n = can.n;
         if (cfg.item) {
           p.raw -= n * cfg.rawPer;
+          if (st.combine) p.inputs.body = (p.inputs.body ?? 0) - n;
           p.out += n;
           p.outValue += n * st.unitValue;
           out.components += n;
@@ -505,13 +550,13 @@ export function chainTick(
     if (p.out >= 1 && busyTrucks(s, id) < trucksOf(b)) {
       p.wait += dt;
       if (p.out >= st.capacity || p.wait >= MAX_WAIT) {
-        const dest = destination(s, snap, b);
+        const dest = destination(s, snap, id, b);
         if (dest) {
           const qty = Math.min(Math.floor(p.out), st.capacity, dest.room);
           if (qty >= 1) {
             const value = (p.outValue / p.out) * qty;
             const models = cfg.item ? undefined : (Array.from({ length: qty }, () => st.car?.id ?? "city") as CarId[]);
-            ship(s, { from: id, to: dest.to, item: cfg.item ?? "car", qty, value, dur: legTime(id, dest.to, st.pace), vehicle: st.vehicle, models });
+            ship(s, { from: id, to: dest.to, item: cfg.item ? (st.combine ? "chassis" : cfg.item) : "car", qty, value, dur: legTime(id, dest.to, st.pace), vehicle: st.vehicle, models });
             p.out -= qty;
             p.outValue -= value;
             p.wait = 0;
@@ -578,7 +623,7 @@ export function chainTick(
 function arrive(s: GameState, sh: Shipment, snap: ChainSnapshot, earn: (n: number) => void, events?: GameEvent[]) {
   if (sh.to === MARKET) {
     earn(sh.value);
-    events?.push({ type: "sale", plot: MARKET, item: sh.item as ComponentId, count: sh.qty, amount: sh.value });
+    events?.push({ type: "sale", plot: MARKET, item: sh.item as ItemId, count: sh.qty, amount: sh.value });
     return;
   }
   if (sh.to.startsWith("d:")) {
@@ -593,7 +638,7 @@ function arrive(s: GameState, sh: Shipment, snap: ChainSnapshot, earn: (n: numbe
   const p = s.city.buildings[sh.to]?.plant;
   if (!p) return;
   if (sh.item === "raw") p.raw += sh.qty;
-  else if (sh.item !== "car") p.inputs[sh.item] = (p.inputs[sh.item] ?? 0) + sh.qty;
+  else if (sh.item !== "car" && sh.item !== "chassis") p.inputs[sh.item] = (p.inputs[sh.item] ?? 0) + sh.qty;
 }
 
 // ───────────────────────────── offline ─────────────────────────────
@@ -676,6 +721,14 @@ export function upgradeGrade(s: GameState, plotId: string, gm: GlobalMods): bool
   return true;
 }
 
+/** Engine factory strategy before assembly: sell engines, or motorized chassis. */
+export function setCombine(s: GameState, plotId: string, on: boolean): boolean {
+  const b = plantAt(s, plotId);
+  if (!b || b.type !== "engineFactory" || !!b.plant.combine === on) return false;
+  b.plant.combine = on;
+  return true;
+}
+
 export function setPlantCar(s: GameState, plotId: string, car: CarId | null, gm: GlobalMods): boolean {
   const b = plantAt(s, plotId);
   if (!b || b.type !== "assemblyPlant") return false;
@@ -701,6 +754,7 @@ export function migratePlant(type: PlantType, raw: unknown): PlantData {
   p.grade = int(raw.grade, 1, MAX_GRADE, 1);
   // routing is automatic now: parts go where they are needed
   p.route = "use";
+  if (raw.combine === true) p.combine = true;
   p.progress = Math.min(0.999, num(raw.progress));
   p.raw = num(raw.raw, p.raw);
   p.out = num(raw.out);

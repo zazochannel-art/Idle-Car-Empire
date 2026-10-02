@@ -77,7 +77,7 @@ function shipViews(s: GameState): ShipView[] {
     const from = siteOf(sh.from);
     const to = siteOf(sh.to);
     if (!from || !to) continue;
-    const color = sh.item === "raw" ? "#a8a29e" : sh.item === "car" ? "#f8fafc" : COMPONENT_BY_ID[sh.item].color;
+    const color = sh.item === "raw" ? "#a8a29e" : sh.item === "car" ? "#f8fafc" : sh.item === "chassis" ? COMPONENT_BY_ID.engine.color : COMPONENT_BY_ID[sh.item].color;
     out.push({ id: sh.id, from, to, t: sh.t, dur: sh.dur, back: sh.back, vehicle: sh.vehicle, color, item: sh.item, models: sh.models?.map((m) => CAR_MODEL_FOR[m]) });
   }
   return out;

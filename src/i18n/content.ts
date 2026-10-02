@@ -35,6 +35,8 @@ export function contentFor(lang: Lang) {
         return t("req.zone", { name: t(`zone.${r.zone}`) });
       case "firstCar":
         return t("req.firstCar");
+      case "made":
+        return t("req.made", { n: r.n, item: t(`item.${r.item}`), have: Math.min(r.have, r.n) });
       case "unavailable":
         return t("req.unavailable");
     }

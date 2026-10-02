@@ -48,6 +48,8 @@ export function goalText(g: Goal, t: (k: MessageKey, v?: Vars) => string, n: Con
       return { title: t("goal.worker"), detail: t("goal.workerDetail", { n: g.idle }) };
     case "zone":
       return { title: t("goal.zone", { name: t(`zone.${g.zone}`) }), detail: t("goal.zoneDetail") };
+    case "made":
+      return { title: t("goal.made", { n: g.n, item: t(`item.${g.item}`) }), detail: t("goal.madeDetail", { have: Math.min(g.have, g.n), n: g.n, name: t(`structure.${g.plant}`) }) };
   }
 }
 
@@ -99,6 +101,9 @@ export function runGoal(g: Goal, ready: boolean) {
       if (ready) game.unlockZone(g.zone);
       ui.selectZone(g.zone);
       break;
+    case "made":
+      if (g.plot) ui.selectPlot(g.plot);
+      break;
   }
 }
 
@@ -115,7 +120,7 @@ export function NextGoals() {
     <div className="grid gap-2 @sm:grid-cols-2">
       {goals.map((g) => {
         const cost = "cost" in g ? g.cost : undefined;
-        const pct = cost ? Math.min(100, (state.cash / cost) * 100) : 100;
+        const pct = g.kind === "made" ? Math.min(100, (g.have / g.n) * 100) : cost ? Math.min(100, (state.cash / cost) * 100) : 100;
         const ready = !cost || state.cash >= cost;
         const eta = cost && !ready && snap.incomePerSec > 0 && (cost - state.cash) / snap.incomePerSec < 86400 * 30 ? (cost - state.cash) / snap.incomePerSec : null;
         const text = goalText(g, t, n);
@@ -135,6 +140,14 @@ export function NextGoals() {
               </div>
               <div className="truncate text-sm font-semibold">{text.title}</div>
               <div className="truncate text-[11px] text-white/45">{text.detail}</div>
+              {g.kind === "made" && (
+                <div className="mt-1.5 flex items-center gap-2">
+                  <Progress value={pct} className="h-1.5" />
+                  <span className="shrink-0 text-[10px] tabular-nums text-white/50">
+                    {formatNumber(Math.min(g.have, g.n))}/{formatNumber(g.n)}
+                  </span>
+                </div>
+              )}
               {cost !== undefined && (
                 <div className="mt-1.5 flex items-center gap-2">
                   <Progress value={pct} className="h-1.5" indicatorClassName={ready ? "from-gold to-amber-300" : undefined} />

@@ -13,7 +13,8 @@ export type CarId =
 
 /** Parts that plants make and the Car Assembly Plant puts together. */
 export type ComponentId = "body" | "engine" | "interior" | "glass" | "tires" | "paint" | "electronics" | "battery";
-export type ItemId = ComponentId | "car";
+/** What trucks carry: a component, a motorized chassis (body + engine) or a car. */
+export type ItemId = ComponentId | "car" | "chassis";
 
 /** Production buildings of the supply chain. */
 export type PlantType =
@@ -232,6 +233,8 @@ export interface PlantData {
   grade: number;
   /** Where finished goods go: next plant in the chain, the market, or stay. */
   route: Route;
+  /** Engine factory before assembly: fit every engine into a car body and sell motorized chassis. */
+  combine?: boolean;
   /** Progress of the current batch, 0..1. */
   progress: number;
   /** Raw material on site (steel, rubber…). */

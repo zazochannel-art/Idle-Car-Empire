@@ -13,7 +13,7 @@ import { levelCost } from "@/game/engine/chain";
 import { nextGoals } from "@/game/engine/insights";
 import { canPrestige } from "@/game/engine/prestige";
 import { claimableCount } from "@/game/engine/progress";
-import { formatDuration, formatMoney } from "@/game/format";
+import { formatDuration, formatMoney, formatNumber } from "@/game/format";
 import { useContent } from "@/i18n/content";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
@@ -314,7 +314,7 @@ function GoalTracker() {
   if (!goal) return null;
   const cost = "cost" in goal ? goal.cost : undefined;
   const ready = !cost || state.cash >= cost;
-  const pct = cost ? Math.min(100, (state.cash / cost) * 100) : 100;
+  const pct = goal.kind === "made" ? Math.min(100, (goal.have / goal.n) * 100) : cost ? Math.min(100, (state.cash / cost) * 100) : 100;
   const eta = cost && !ready && snap.incomePerSec > 0 && (cost - state.cash) / snap.incomePerSec < 86400 * 30 ? (cost - state.cash) / snap.incomePerSec : null;
   const text = goalText(goal, t, n);
   return (
@@ -330,7 +330,14 @@ function GoalTracker() {
         <span className="min-w-0 flex-1">
           <span className="block text-[9px] font-bold uppercase tracking-[0.18em] text-white/40">{t("goal.next")}</span>
           <span className="block truncate text-sm font-bold">{text.title}</span>
-          {cost !== undefined ? (
+          {goal.kind === "made" ? (
+            <span className="mt-1 flex items-center gap-2">
+              <Progress value={pct} className="h-1.5" />
+              <span className="shrink-0 text-[10px] tabular-nums text-white/55">
+                {formatNumber(Math.min(goal.have, goal.n))}/{formatNumber(goal.n)}
+              </span>
+            </span>
+          ) : cost !== undefined ? (
             <span className="mt-1 flex items-center gap-2">
               <Progress value={pct} className="h-1.5" indicatorClassName={ready ? "from-gold to-amber-300" : undefined} />
               <span className="shrink-0 text-[10px] tabular-nums text-white/55">{ready ? formatMoney(cost) : eta !== null ? `~${formatDuration(eta)}` : formatMoney(cost)}</span>
