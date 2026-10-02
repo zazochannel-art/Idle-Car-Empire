@@ -30,6 +30,7 @@ export function StatsView() {
 
   const rows: [string, string][] = [
     [t("stats.cars"), formatNumber(Math.floor(L.carsProduced))],
+    [t("stats.serviced"), formatNumber(Math.floor(state.city.carsServiced))],
     [t("stats.money"), formatMoney(L.moneyEarned)],
     [t("stats.run"), formatMoney(state.run.moneyEarned)],
     [t("stats.factories"), `${FACTORIES.filter((f) => state.factories[f.id].owned).length} / ${FACTORIES.length}`],

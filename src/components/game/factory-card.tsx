@@ -20,6 +20,7 @@ import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { uiEvents } from "@/store/events";
 import { useGame } from "@/store/game-store";
+import { useUi } from "@/store/ui-store";
 import { CostButton } from "./cost-button";
 
 const UPGRADE_ICONS: Record<UpgradeCategory, React.ComponentType<{ className?: string }>> = {
@@ -205,7 +206,7 @@ function FactoryDetails({ id }: { id: FactoryId }) {
 
   return (
     <div className="space-y-4 border-t border-white/[0.06] p-4">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2 @md:grid-cols-3">
         {UPGRADES.map((u) => {
           const Icon = UPGRADE_ICONS[u.id];
           const lvl = f.upgrades[u.id];
@@ -228,7 +229,7 @@ function FactoryDetails({ id }: { id: FactoryId }) {
         })}
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="grid gap-2 @sm:grid-cols-2">
         <div className="rounded-xl bg-white/[0.03] p-3 ring-1 ring-white/[0.06]">
           <div className="flex items-center justify-between text-xs">
             <span className="font-semibold">{t("factory.productionLines")}</span>
@@ -285,7 +286,8 @@ function CarChip({ active, onClick, children }: { active: boolean; onClick: () =
 
 function ManagerSlot({ id }: { id: FactoryId }) {
   const state = useGame((g) => g.state);
-  const { hireManager, assignManager, setView } = useGame.getState();
+  const { hireManager, assignManager } = useGame.getState();
+  const setView = useUi.getState().setView;
   const { t, lang } = useT();
   const n = useContent(lang);
   const current = managerAt(state, id);
@@ -339,7 +341,8 @@ export function LockedFactoryCard({ id, highlight }: { id: FactoryId; highlight:
   const cfg = FACTORY_BY_ID[id];
   const { t, lang } = useT();
   const n = useContent(lang);
-  const requirement = factoryRequirement(snap, id);
+  const state = useGame((g) => g.state);
+  const requirement = factoryRequirement(state, snap, id);
   const req = requirement ? n.requirement(requirement) : null;
   const pct = Math.min(100, (cash / cfg.cost) * 100);
 

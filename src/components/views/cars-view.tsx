@@ -31,7 +31,7 @@ export function CarsView() {
   return (
     <div className="space-y-4">
       <ViewHeader icon="🚗" title={t("cars.title")} subtitle={t("cars.subtitle", { n: unlocked.size, total: CARS.length })} />
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-3 @sm:grid-cols-2 @3xl:grid-cols-3">
         {CARS.map((car) => {
           const isUnlocked = unlocked.has(car.id);
           const requirement = isUnlocked ? null : carRequirement(state, car, snap);

@@ -40,6 +40,11 @@ export function OfflineDialog() {
           <div className="rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.07]">
             <div className="text-[11px] uppercase tracking-wider text-white/45">{t("offline.cars")}</div>
             <div className="mt-1 text-lg font-bold tabular-nums">{formatNumber(report.cars)}</div>
+            {(report.serviced ?? 0) > 0 && (
+              <div className="text-[11px] text-sky-300">
+                +{formatNumber(report.serviced ?? 0)} {t("offline.serviced").toLowerCase()}
+              </div>
+            )}
           </div>
         </div>
         <div className="mt-2 rounded-2xl bg-gradient-to-br from-gold/15 to-transparent p-4 ring-1 ring-gold/30">

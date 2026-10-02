@@ -26,7 +26,7 @@ export function AchievementsView() {
       >
         <Progress value={(count / ACHIEVEMENTS.length) * 100} indicatorClassName="from-gold to-amber-300" />
       </ViewHeader>
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-2 @sm:grid-cols-2 @3xl:grid-cols-3">
         {ACHIEVEMENTS.map((a) => {
           const unlocked = state.achievements.includes(a.id);
           const p = conditionProgress(state, a.condition, snap);

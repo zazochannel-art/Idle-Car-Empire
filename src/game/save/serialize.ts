@@ -1,3 +1,4 @@
+import { migrateCity, unlockOwnedZones } from "../engine/city";
 import { createInitialState, SAVE_VERSION } from "../engine/state";
 import type { GameState } from "../types";
 
@@ -39,6 +40,9 @@ export function migrate(raw: unknown, now: number): GameState {
     const saved = (raw.managers as Json | undefined)?.[id];
     m.assignedTo = isObject(saved) && typeof saved.assignedTo === "string" ? (saved.assignedTo as typeof m.assignedTo) : null;
   }
+  // The city has open-ended keys (plot ids), so it is validated on its own.
+  state.city = migrateCity(raw.city);
+  unlockOwnedZones(state);
   state.version = SAVE_VERSION;
   return state;
 }

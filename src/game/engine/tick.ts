@@ -1,5 +1,6 @@
 import { FACTORIES } from "../config/factories";
 import type { CarId, GameEvent, GameState } from "../types";
+import { cityTick } from "./city";
 import { snapshot, type EconomySnapshot } from "./economy";
 
 /** Adds money to the wallet and to the earnings stats. */
@@ -65,6 +66,8 @@ export function tick(s: GameState, dt: number, rng: () => number = Math.random, 
     s.rp += count * st.car.rp * eco.gm.rp;
     events.push({ type: "sale", factory: cfg.id, car: st.car.id, count, amount, premium: premium >= 1 });
   }
+
+  cityTick(s, dt, eco.city, (amount) => credit(s, amount));
 
   s.run.playTime += dt;
   s.lifetime.playTime += dt;

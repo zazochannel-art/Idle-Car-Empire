@@ -50,7 +50,7 @@ export function EmpireView() {
         <SectionTitle title={t("hud.factories")} subtitle={t("empire.plants", { n: owned.length, total: FACTORIES.length })} />
         <BuyAmountToggle />
       </div>
-      <div className="grid gap-3 xl:grid-cols-2">
+      <div className="grid gap-3 @3xl:grid-cols-2">
         {owned.map((f) => (
           <div key={f.id} id={`factory-${f.id}`}>
             <FactoryCard id={f.id} />
@@ -61,7 +61,7 @@ export function EmpireView() {
       {locked.length > 0 && (
         <div className="space-y-2">
           <LockedFactoryCard id={locked[0].id} highlight />
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid gap-2 @sm:grid-cols-2">
             {locked.slice(1).map((f) => (
               <LockedFactoryCard key={f.id} id={f.id} highlight={false} />
             ))}

@@ -25,6 +25,7 @@ import {
   upgradeCurve,
 } from "../config/upgrades";
 import type { BuyAmount, CarId, DealerId, FactoryId, GameState, ManagerId, UpgradeCategory } from "../types";
+import { citySnapshot, type CitySnapshot } from "./city";
 import { computeFactoryMods, computeGlobalMods, managerAt, type GlobalMods } from "./modifiers";
 
 // ───────────────────────────── costs ─────────────────────────────
@@ -275,9 +276,10 @@ export interface EconomySnapshot {
   factories: Partial<Record<FactoryId, FactoryStats>>;
   dealers: DealerAllocation;
   carsPerSec: number;
-  /** Income per second from automated production. */
+  /** Income per second from production plus the Empire Map (garages…). */
   incomePerSec: number;
   rpPerSec: number;
+  city: CitySnapshot;
 }
 
 /**
@@ -302,7 +304,8 @@ export function snapshot(s: GameState): EconomySnapshot {
     }
   }
   const dealers = allocateDealers(s, carsPerSec, gm);
-  return { gm, factories, dealers, carsPerSec, incomePerSec: before * dealers.multiplier, rpPerSec };
+  const city = citySnapshot(s, gm.income);
+  return { gm, factories, dealers, carsPerSec, incomePerSec: before * dealers.multiplier + city.incomePerSec, rpPerSec, city };
 }
 
 /** Automated-only income — what keeps running while you are away. */
@@ -311,5 +314,5 @@ export function passiveIncome(snap: EconomySnapshot): number {
   for (const st of Object.values(snap.factories)) {
     if (st && st.automated) total += st.incomeBeforeDealers;
   }
-  return total * snap.dealers.multiplier;
+  return total * snap.dealers.multiplier + snap.city.incomePerSec;
 }

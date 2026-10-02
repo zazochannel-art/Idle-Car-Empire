@@ -153,6 +153,8 @@ export interface OfflineReport {
   seconds: number;
   cappedSeconds: number;
   cars: number;
+  /** Cars serviced by garages while away. */
+  serviced?: number;
   money: number;
   rp: number;
   carsByType: Partial<Record<CarId, number>>;
@@ -161,6 +163,83 @@ export interface OfflineReport {
 export type BuyAmount = 1 | 10 | 100 | "max";
 
 export type Lang = "en" | "ro" | "ru";
+
+// ───────────────────────────── city (Empire Map) ─────────────────────────────
+
+export type ZoneId = "town" | "industrial" | "downtown" | "automotive" | "luxury" | "supercar" | "mega" | "global";
+
+/** Buildings the player can put on an empty plot. */
+export type StructureType =
+  | "garage"
+  | "carWash"
+  | "parking"
+  | "serviceCenter"
+  | "warehouse"
+  | "partsFactory"
+  | "logistics"
+  | "truckDepot"
+  | "researchCenter"
+  | "exportTerminal"
+  | "hq"
+  | "airport";
+
+/** Things built inside a garage, on its tile grid. */
+export type FacilityType =
+  | "serviceBay"
+  | "carLift"
+  | "storage"
+  | "office"
+  | "partsWorkshop"
+  | "paintBooth"
+  | "engineWorkshop"
+  | "tuningArea"
+  | "dyno"
+  | "performanceWorkshop"
+  | "advancedPaint"
+  | "supercarWorkshop"
+  | "carbonWorkshop"
+  | "advancedTuning"
+  | "vipArea";
+
+export type Specialization = "repair" | "painting" | "tuning" | "performance" | "supercar";
+
+export interface PlacedFacility {
+  uid: number;
+  type: FacilityType;
+  /** Top-left tile on the garage grid. */
+  x: number;
+  y: number;
+  /** 1 = rotated 90° (footprint width and depth swapped). */
+  rot: 0 | 1;
+}
+
+export interface GarageData {
+  /** Display number: Garage #01, #02… */
+  no: number;
+  spec: Specialization;
+  workers: number;
+  facilities: PlacedFacility[];
+  /** Fractional cars serviced, carried between ticks. */
+  carry: number;
+  serviced: number;
+  earned: number;
+}
+
+export interface BuildingState {
+  type: StructureType;
+  level: number;
+  /** Present when type === "garage". */
+  garage?: GarageData;
+}
+
+export interface CityState {
+  zones: ZoneId[];
+  /** Keyed by plot id (see game/city/layout.ts). */
+  buildings: Record<string, BuildingState>;
+  nextUid: number;
+  nextGarageNo: number;
+  carsServiced: number;
+}
 
 export interface GameState {
   version: number;
@@ -183,6 +262,7 @@ export interface GameState {
   };
   run: Stats;
   lifetime: Stats;
+  city: CityState;
   pendingOffline: OfflineReport | null;
   settings: { buyAmount: BuyAmount; lang: Lang };
   createdAt: number;

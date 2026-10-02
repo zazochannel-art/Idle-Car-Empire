@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CAR_BY_ID } from "./config/cars";
 import { OFFLINE, PRESTIGE } from "./config/prestige";
 import * as A from "./engine/actions";
+import { ensureZonesUpTo } from "./engine/city";
 import { geometricCost, isAutomated, maxAffordable, snapshot, unlockedCarIds, upgradeCost } from "./engine/economy";
 import { computeOffline, collectOffline, settleOffline } from "./engine/offline";
 import { canPrestige, pendingPoints, prestige } from "./engine/prestige";
@@ -94,6 +95,9 @@ describe("production", () => {
     s.cash = 1e30;
     expect(A.buyFactory(s, "electricFactory")).toBe(false);
     s.research.push("battery_cells", "advanced_engines", "electric_motors");
+    // Its lot is in Supercar Valley, which must be unlocked on the map first.
+    expect(A.buyFactory(s, "electricFactory")).toBe(false);
+    ensureZonesUpTo(s, "supercar");
     expect(A.buyFactory(s, "electricFactory")).toBe(true);
   });
 });

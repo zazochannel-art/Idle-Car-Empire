@@ -24,7 +24,7 @@ export interface EmpirePerk {
 /** Permanent perks unlocked by how many Empire Points you hold. */
 export const EMPIRE_PERKS: EmpirePerk[] = [
   { points: 1, name: "Seed Capital", description: "Start every run with $1,000.", effects: [], startCash: 1_000 },
-  { points: 5, name: "Turnkey Garage", description: "Your garage starts automated.", effects: [], startAutomation: true },
+  { points: 5, name: "Turnkey Garage", description: "Your Assembly Workshop starts automated.", effects: [], startAutomation: true },
   { points: 15, name: "Investor Network", description: "Start with $25,000 and +25% speed.", effects: [{ kind: "speed", mult: 1.25 }], startCash: 25_000 },
   { points: 40, name: "Night Shift", description: "+4h offline limit, +25% offline income.", effects: [{ kind: "offlineCap", hours: 4 }, { kind: "offline", add: 0.25 }] },
   { points: 100, name: "Franchise", description: "Start with a Local Factory. Research +50%.", effects: [{ kind: "rp", mult: 1.5 }], startFactory: "local" },
