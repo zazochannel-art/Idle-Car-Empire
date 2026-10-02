@@ -6,7 +6,7 @@ import { ZONES, ZONE_BY_ID } from "@/game/config/city";
 import { DEALER_BY_ID } from "@/game/config/dealerships";
 import { FACTORY_BY_ID } from "@/game/config/factories";
 import { BLOCKS, WORLD_MAP, dealerPlot, factoryPlot, plotOf } from "@/game/city/layout";
-import { zoneBlocker } from "@/game/engine/city";
+import { structureCost, zoneBlocker } from "@/game/engine/city";
 import type { EconomySnapshot } from "@/game/engine/economy";
 import { formatMoney } from "@/game/format";
 import type { GameState, ZoneId } from "@/game/types";
@@ -148,6 +148,39 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
     if (engineRef.current) engineRef.current.selected = plot;
   }, [plot]);
 
+  const timeMode = useUi((u) => u.timeMode);
+  const preview = useUi((u) => u.preview);
+  const view = useUi((u) => u.view);
+  useEffect(() => {
+    if (engineRef.current) engineRef.current.timeMode = timeMode;
+  }, [timeMode]);
+  useEffect(() => {
+    if (engineRef.current) engineRef.current.preview = preview;
+  }, [preview]);
+
+  // BUILD mode: colour every free plot by whether it can be built on now
+  const buildKey = view === "build" ? `${state.city.zones.join()}|${Object.keys(state.city.buildings).length}|${Math.floor(Math.log10(state.cash + 1) * 4)}` : "";
+  useEffect(() => {
+    const e = engineRef.current;
+    if (!e) return;
+    if (view !== "build") {
+      e.buildInfo = null;
+      return;
+    }
+    const s = useGame.getState().state;
+    const info = new Map<string, "green" | "yellow" | "red">();
+    for (const p of WORLD_MAP.plots) {
+      if (p.kind !== "plot" || s.city.buildings[p.id]) continue;
+      if (!s.city.zones.includes(p.zone)) {
+        info.set(p.id, "red");
+        continue;
+      }
+      const cheapest = Math.min(...ZONE_BY_ID[p.zone].builds.map((type) => structureCost(s, p.id, type)));
+      info.set(p.id, s.cash >= cheapest ? "green" : "yellow");
+    }
+    e.buildInfo = info;
+  }, [view, buildKey]);
+
   useEffect(() => {
     const e = engineRef.current;
     if (!e || !command) return;
@@ -173,7 +206,7 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
           <ZoneCard key={z.id} id={z.id} full={z.id === nextLocked?.id} />
         ))}
       </div>
-      <div className="pointer-events-none absolute right-2 top-[6.75rem] z-20 md:right-3 md:top-[5.5rem]">
+      <div className="pointer-events-none absolute right-2 top-[9.25rem] z-20 md:right-3 md:top-[5.5rem]">
         <Minimap engine={engineRef} />
       </div>
     </div>

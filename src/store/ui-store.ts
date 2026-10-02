@@ -1,7 +1,18 @@
 "use client";
 
 import { create } from "zustand";
-import type { ZoneId } from "@/game/types";
+import type { StructureType, ZoneId } from "@/game/types";
+import type { TimeMode } from "@/components/map/lighting";
+
+const TIME_KEY = "idle-car-empire:time";
+function savedTime(): TimeMode {
+  try {
+    const v = typeof localStorage !== "undefined" ? localStorage.getItem(TIME_KEY) : null;
+    return v === "day" || v === "evening" || v === "night" ? v : "auto";
+  } catch {
+    return "auto";
+  }
+}
 
 /** Screens that open as a panel over the map. */
 export type View =
@@ -35,6 +46,12 @@ interface UiStore {
   /** Plot id of the garage whose interior is open. */
   garage: string | null;
   command: MapCommand | null;
+  /** Map lighting: automatic day/night cycle or a fixed time of day. */
+  timeMode: TimeMode;
+  /** A building shown translucent on a plot before it is bought. */
+  preview: { plot: string; type: StructureType } | null;
+  setTimeMode: (m: TimeMode) => void;
+  setPreview: (p: { plot: string; type: StructureType } | null) => void;
   setView: (v: View | null) => void;
   selectPlot: (id: string | null, focus?: boolean) => void;
   selectZone: (id: ZoneId | null, focus?: boolean) => void;
@@ -55,9 +72,20 @@ export const useUi = create<UiStore>((set) => ({
   zone: null,
   garage: null,
   command: null,
-  setView: (view) => set({ view, plot: null, zone: null }),
+  timeMode: savedTime(),
+  preview: null,
+  setTimeMode: (timeMode) => {
+    try {
+      localStorage.setItem(TIME_KEY, timeMode);
+    } catch {
+      /* storage unavailable: keep it for this session */
+    }
+    set({ timeMode });
+  },
+  setPreview: (preview) => set({ preview }),
+  setView: (view) => set({ view, plot: null, zone: null, preview: null }),
   selectPlot: (plot, focus = true) =>
-    set(() => ({ plot, zone: null, view: null, ...(plot && focus ? { command: { kind: "plot" as const, id: plot, n: ++n } } : {}) })),
+    set(() => ({ plot, zone: null, view: null, preview: null, ...(plot && focus ? { command: { kind: "plot" as const, id: plot, n: ++n } } : {}) })),
   selectZone: (zone, focus = true) =>
     set(() => ({ zone, plot: null, view: null, ...(zone && focus ? { command: { kind: "zone" as const, id: zone, n: ++n } } : {}) })),
   enterGarage: (garage) => {
@@ -68,6 +96,6 @@ export const useUi = create<UiStore>((set) => ({
   },
   // back out to the normal map zoom, centred on the garage we left
   exitGarage: () => set((s) => ({ garage: null, command: s.garage ? { kind: "plot", id: s.garage, zoom: -1, n: ++n } : s.command })),
-  closeAll: () => set({ view: null, plot: null, zone: null }),
+  closeAll: () => set({ view: null, plot: null, zone: null, preview: null }),
   map: (cmd) => set({ command: { ...cmd, n: ++n } as MapCommand }),
 }));

@@ -1,7 +1,8 @@
 "use client";
 
-import { Car, Factory, Settings, Star, TrendingUp } from "lucide-react";
-import { useState } from "react";
+import { Car, Factory, Moon, Settings, Star, Sun, Sunset, SunMoon, TrendingUp } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { TIME_MODES } from "@/components/map/lighting";
 import { FACTORIES } from "@/game/config/factories";
 import { formatMoney, formatNumber } from "@/game/format";
 import { LANGS } from "@/i18n";
@@ -27,7 +28,8 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
     <header className="pointer-events-none absolute inset-x-0 top-0 z-30 pt-[env(safe-area-inset-top)]">
       <div className="flex items-start gap-2 p-2 sm:p-3">
         <div className="pointer-events-auto flex min-w-0 flex-1 flex-wrap items-center gap-1.5 rounded-2xl border border-white/10 bg-ink/75 p-1.5 shadow-[0_10px_40px_-12px_rgba(0,0,0,.9)] backdrop-blur-xl md:flex-nowrap md:gap-2 md:p-2">
-          <div className="flex min-w-0 items-center gap-2 pl-1 pr-2">
+          <div className="relative flex min-w-0 items-center gap-2 pl-1 pr-2">
+            <CashFlash cash={cash} />
             <span className="text-xl md:text-2xl">💰</span>
             <div className="min-w-0">
               <div className="hidden text-[9px] font-semibold uppercase tracking-[0.18em] text-white/40 md:block">{t("hud.cash")}</div>
@@ -44,6 +46,7 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
           </button>
         </div>
         <div className="pointer-events-auto flex shrink-0 flex-col gap-1.5 md:flex-row">
+          <TimeButton />
           <LanguageSwitch />
           <button
             onClick={onSettings}
@@ -104,5 +107,41 @@ function LanguageSwitch() {
         </div>
       )}
     </div>
+  );
+}
+
+/** A soft golden glow behind the cash counter whenever money comes in. */
+function CashFlash({ cash }: { cash: number }) {
+  const last = useRef(cash);
+  const lastPulse = useRef(0);
+  const [pulse, setPulse] = useState(0);
+  useEffect(() => {
+    // at most one glow every 1.5 s, so steady income doesn't flicker
+    const now = performance.now();
+    if (cash > last.current + 0.5 && now - lastPulse.current > 1500) {
+      lastPulse.current = now;
+      setPulse((n) => n + 1);
+    }
+    last.current = cash;
+  }, [cash]);
+  return <span key={pulse} className="cash-flash pointer-events-none absolute inset-0 rounded-xl" aria-hidden />;
+}
+
+const TIME_ICONS = { auto: SunMoon, day: Sun, evening: Sunset, night: Moon } as const;
+
+function TimeButton() {
+  const mode = useUi((u) => u.timeMode);
+  const setTimeMode = useUi((u) => u.setTimeMode);
+  const { t } = useT();
+  const Icon = TIME_ICONS[mode];
+  return (
+    <button
+      onClick={() => setTimeMode(TIME_MODES[(TIME_MODES.indexOf(mode) + 1) % TIME_MODES.length])}
+      className="flex size-10 items-center justify-center rounded-xl border border-white/10 bg-ink/75 text-amber-200/80 backdrop-blur-xl transition hover:text-amber-100"
+      aria-label={t(`time.${mode}`)}
+      title={t(`time.${mode}`)}
+    >
+      <Icon className="size-5" />
+    </button>
   );
 }

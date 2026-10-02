@@ -81,7 +81,8 @@ function BuildMenu({ id }: { id: string }) {
   const plot = plotOf(id)!;
   const state = useGame((g) => g.state);
   const buildStructure = useGame((g) => g.buildStructure);
-  const enterGarage = useUi((u) => u.enterGarage);
+  const preview = useUi((u) => u.preview);
+  const setPreview = useUi((u) => u.setPreview);
   const { t } = useT();
   const zone = ZONE_BY_ID[plot.zone];
   return (
@@ -93,8 +94,17 @@ function BuildMenu({ id }: { id: string }) {
         const cfg = STRUCTURE_BY_ID[type];
         const cost = structureCost(state, id, type);
         const taken = type !== "garage" && builtInZone(state, plot.zone, type);
+        // first tap shows the building on the plot, the second one builds it
+        const previewing = preview?.plot === id && preview.type === type;
         return (
-          <div key={type} className={cn("flex items-center gap-3 rounded-2xl p-3 ring-1", taken ? "bg-white/[0.02] opacity-50 ring-white/[0.05]" : "bg-white/[0.04] ring-white/[0.07]")}>
+          <div
+            key={type}
+            onClick={() => !taken && setPreview({ plot: id, type })}
+            className={cn(
+              "flex cursor-pointer items-center gap-3 rounded-2xl p-3 ring-1 transition",
+              taken ? "cursor-default bg-white/[0.02] opacity-50 ring-white/[0.05]" : previewing ? "bg-emerald-500/[0.1] ring-emerald-400/50" : "bg-white/[0.04] ring-white/[0.07] hover:bg-white/[0.07]",
+            )}
+          >
             <div className="flex size-12 shrink-0 items-center justify-center rounded-xl text-2xl ring-1 ring-white/10" style={{ background: `${cfg.roof}22` }}>
               {cfg.emoji}
             </div>
@@ -108,9 +118,10 @@ function BuildMenu({ id }: { id: string }) {
               variant={type === "garage" ? "gold" : "default"}
               cost={cost}
               locked={taken}
-              label={taken ? t("map.onePerZone") : t("map.build")}
+              label={taken ? t("map.onePerZone") : previewing ? t("map.confirm") : t("map.build")}
               onBuy={() => {
-                if (buildStructure(id, type) && type === "garage") enterGarage(id);
+                if (!previewing) setPreview({ plot: id, type });
+                else if (buildStructure(id, type)) setPreview(null);
               }}
             />
           </div>
