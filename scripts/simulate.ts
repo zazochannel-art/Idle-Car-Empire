@@ -51,7 +51,6 @@ function options(g: GameState): Option[] {
     push("level", Ch.levelCost(b, gm), (x) => Ch.upgradePlantLevel(x, id, snapshot(x).gm));
     push("speed", Ch.speedCost(b, gm), (x) => Ch.upgradePlantSpeed(x, id, snapshot(x).gm));
     push("auto", Ch.automationCost(b, gm), (x) => Ch.upgradeAutomation(x, id, snapshot(x).gm));
-    if (b.plant.fleet < 3) push("truck", Ch.fleetCost(b, gm), (x) => Ch.buyTruck(x, id, snapshot(x).gm), 2);
     // grades that unlock the next car model come first
     const nextCar = CARS.find((c) => Ch.carLock(g, c, gm) !== null);
     const needed = nextCar && Ch.hasPlant(g, "assemblyPlant") && b.plant.grade < nextCar.grade;

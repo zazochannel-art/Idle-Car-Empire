@@ -29,32 +29,34 @@ npm run simulate -- 3   # balance bot: plays 3 hours and logs milestones
 
 ## How to play
 
-1. **Car bodies.** The Small Car Body Works turns steel into a car body every
-   30 s. A truck takes the bodies to the **Parts Market** ($150 each). When the
-   steel runs low, a supply truck brings more from the **Materials Depot**,
-   paid when it leaves. With no cash for steel, production stops.
-2. **Upgrade the plant.** Each plant has five upgrades:
+1. **Car bodies.** You start with $250 and a Small Car Body Works that turns
+   steel into a car body every 20 s. A truck takes the bodies to the **Parts
+   Market** ($150 each). When the steel runs low, a supply truck brings more
+   from the **Materials Depot**, paid when it leaves. With no cash for steel,
+   production stops.
+2. **Upgrade the plant.** Each plant has four upgrades:
    - **Levels** (Small → Basic → Industrial → … → Mega Factory) add
-     production lines, storage and bigger trucks, and change the building.
+     production lines, storage and trucks, and change the building.
    - **Speed** shortens each batch.
    - **Automation** (Manual → AI Factory) raises speed and offline output.
-   - **Trucks** adds vehicles to the fleet.
    - **Grades** (Standard → Lightweight → … → Carbon) raise the value of
      each part and unlock better cars.
-3. **Extend the chain.** Build the plants in order, on any plot in an unlocked
-   district: Engine Factory ($25K), Interior, Glass, Tyre and Paint factories,
-   then the **Car Assembly Plant**. Industrial lots (a whole block) double a
-   plant's output and storage. Each plant sends its goods by truck: **USE**
-   (to the assembly plant), **SELL** (to the market) or **STORE**.
+3. **Your first car needs three parts.** Build the Engine Factory ($3K), the
+   Tyre Factory ($60K) and the **Car Assembly Plant** ($600K), on any plot in
+   an unlocked district. Industrial lots (a whole block) double a plant's
+   output and storage. Deliveries are automatic: parts go to the assembly
+   plant when it needs them, and the rest is sold at the market.
 4. **Assemble cars.** The assembly line has nine stations: body, engine,
    suspension, interior, glass, wheels, paint, final assembly and quality
    control. When a part is missing, the line stops (⚠️ NOT ENOUGH ENGINES).
-   Your first car gets its own celebration.
-5. **Sell them.** Dealerships open after the first car. Car transporters fill
-   the showroom, customers come in and drive off in your cars. Later models
-   need better grades: City Car and Sedan, then SUV, Sports Car (with the
-   Electronics Factory), Luxury Sedan, Performance SUV, Supercar and Hypercar.
-   Electric Performance cars need the Battery Factory.
+   Your first car gets its own celebration and opens the **Local Dealer** for
+   free.
+5. **Sell them, then build better cars.** Car transporters fill the showroom,
+   customers come in and drive off in your cars. Each better model needs one
+   more plant and better grades: City Car (body, engine, tyres) → Sedan
+   (+ Interior Factory) → SUV (+ Glass) → Sports Car (+ Paint) → Luxury Sedan,
+   Performance SUV, Supercar and Hypercar (+ Electronics) → Electric
+   Performance (+ Battery Factory). More dealerships add customers and markup.
 6. **Grow the empire.** You can also:
    - unlock districts for more plots;
    - hire **managers** (one per plant);

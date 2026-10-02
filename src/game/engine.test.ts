@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { CAR_BY_ID } from "./config/cars";
 import { MAX_WAIT, PLANT_BY_ID } from "./config/chain";
 import { PRESTIGE } from "./config/prestige";
 import { DEPOT, MARKET, STARTER_PLOT, WORLD_MAP } from "./city/layout";
@@ -55,13 +56,13 @@ describe("the start: a small car body works", () => {
     expect(b.level).toBe(1);
     expect(Ch.plantsOf(s)).toHaveLength(1);
     expect(b.plant!.raw).toBeGreaterThan(0);
-    expect(s.cash).toBe(0);
+    expect(s.cash).toBe(250);
     expect(Object.values(s.dealers).some((d) => d.owned)).toBe(false);
   });
 
-  it("makes a body every 30s and a truck sells it at the Body Market for $150", () => {
+  it("makes a body every 20s and a truck sells it at the Body Market for $150", () => {
     const s = createInitialState(T0);
-    run(s, 29);
+    run(s, 19);
     expect(s.lifetime.parts.body).toBe(0);
     run(s, 2);
     expect(s.lifetime.parts.body).toBe(1);
@@ -70,9 +71,9 @@ describe("the start: a small car body works", () => {
     run(s, MAX_WAIT + 1);
     const truck = s.chain.shipments.find((sh) => sh.from === STARTER_PLOT);
     expect(truck).toMatchObject({ to: MARKET, item: "body", qty: 1, back: false });
-    expect(s.cash).toBe(0);
+    expect(s.cash).toBe(250);
     const events = run(s, truck!.dur - truck!.t + 0.6);
-    expect(s.cash).toBeCloseTo(150);
+    expect(s.cash).toBeCloseTo(400);
     expect(events.some((e) => e.type === "sale" && e.plot === MARKET && e.amount === 150)).toBe(true);
     expect(s.lifetime.deliveries).toBe(1);
     // and comes back empty
@@ -82,9 +83,9 @@ describe("the start: a small car body works", () => {
   it("buys steel from the depot when it runs low, and stops without cash", () => {
     const s = createInitialState(T0);
     const p = s.city.buildings[STARTER_PLOT].plant!;
-    p.raw = 30; // three bodies' worth
-    Ch.setRoute(s, STARTER_PLOT, "store"); // no sales, so no cash
-    run(s, 100);
+    s.cash = 0;
+    p.raw = 0;
+    run(s, 5);
     expect(s.chain.shipments.some((sh) => sh.from === DEPOT)).toBe(false); // couldn't pay
     expect(p.raw).toBe(0);
     expect(p.status).toBe("noRaw");
@@ -99,22 +100,7 @@ describe("the start: a small car body works", () => {
     expect(p.status).toBe("ok");
   });
 
-  it("STORE keeps goods at the plant and pauses production when full", () => {
-    const s = createInitialState(T0);
-    expect(Ch.setRoute(s, STARTER_PLOT, "store")).toBe(true);
-    s.cash = 1e6;
-    const st = snapshot(s).chain.plants[STARTER_PLOT];
-    run(s, st.cycle * (st.outCap + 2));
-    const p = s.city.buildings[STARTER_PLOT].plant!;
-    expect(p.out).toBe(st.outCap);
-    expect(p.status).toBe("full");
-    expect(s.chain.shipments.some((sh) => sh.from === STARTER_PLOT)).toBe(false);
-    Ch.setRoute(s, STARTER_PLOT, "sell");
-    run(s, 2);
-    expect(s.chain.shipments.some((sh) => sh.from === STARTER_PLOT && sh.to === MARKET)).toBe(true);
-  });
-
-  it("upgrades: levels add lines, speed shortens the cycle, trucks and grades", () => {
+  it("upgrades: levels add lines and trucks, speed shortens the cycle, grades add value", () => {
     const s = createInitialState(T0);
     s.cash = 1e12;
     const gm = snapshot(s).gm;
@@ -122,31 +108,31 @@ describe("the start: a small car body works", () => {
     expect(Ch.upgradePlantLevel(s, STARTER_PLOT, gm)).toBe(true);
     expect(Ch.upgradePlantSpeed(s, STARTER_PLOT, gm)).toBe(true);
     expect(Ch.upgradeAutomation(s, STARTER_PLOT, gm)).toBe(true);
-    expect(Ch.buyTruck(s, STARTER_PLOT, gm)).toBe(true);
     expect(Ch.upgradeGrade(s, STARTER_PLOT, gm)).toBe(true);
     const after = snapshot(s).chain.plants[STARTER_PLOT];
     expect(after.lines).toBe(2);
     expect(after.unitsPerSec).toBeGreaterThan(before.unitsPerSec * 2);
     expect(after.unitValue).toBeCloseTo(before.unitValue * 2.5);
-    expect(s.city.buildings[STARTER_PLOT].plant!.fleet).toBe(2);
+    expect(Ch.trucksOf(s.city.buildings[STARTER_PLOT])).toBe(2);
   });
 });
 
 describe("growing the chain", () => {
-  it("plants unlock in order: engine after body works, then interior…", () => {
+  it("plants unlock in order: engine after body works, then tyres, then assembly…", () => {
     const s = createInitialState(T0);
     const [a, b] = freePlots();
     expect(Ch.plantLock(s, "engineFactory")).toBeNull();
-    expect(Ch.plantLock(s, "interiorFactory")).toEqual({ kind: "plant", plant: "engineFactory" });
-    expect(Ch.plantBuildCost(s, "engineFactory")).toBe(25_000);
-    s.cash = 24_999;
+    expect(Ch.plantLock(s, "tireFactory")).toEqual({ kind: "plant", plant: "engineFactory" });
+    expect(Ch.plantLock(s, "interiorFactory")).toEqual({ kind: "plant", plant: "assemblyPlant" });
+    expect(Ch.plantBuildCost(s, "engineFactory")).toBe(3_000);
+    s.cash = 2_999;
     expect(C.buildStructure(s, a, "engineFactory")).toBe(false);
-    s.cash = 25_000;
+    s.cash = 3_000;
     expect(C.buildStructure(s, a, "engineFactory")).toBe(true);
     expect(s.cash).toBe(0);
-    expect(Ch.plantLock(s, "interiorFactory")).toBeNull();
+    expect(Ch.plantLock(s, "tireFactory")).toBeNull();
     // a second engine factory costs more
-    expect(Ch.plantBuildCost(s, "engineFactory")).toBe(25_000 * 6);
+    expect(Ch.plantBuildCost(s, "engineFactory")).toBe(3_000 * 6);
     expect(Ch.plantLock(s, "batteryFactory")).not.toBeNull();
     expect(C.buildStructure(s, b, "assemblyPlant")).toBe(false);
   });
@@ -161,13 +147,13 @@ describe("growing the chain", () => {
   });
 });
 
-/** A company with every plant of the base recipe and an assembly plant. */
+/** A company with every plant of the base recipe (body, engine, tyres) and an assembly plant. */
 function fullChain() {
   const s = createInitialState(T0);
   const plots = freePlots();
-  const types: PlantType[] = ["engineFactory", "interiorFactory", "glassFactory", "tireFactory", "paintFactory", "assemblyPlant"];
+  const types: PlantType[] = ["engineFactory", "tireFactory", "assemblyPlant"];
   types.forEach((ty, i) => build(s, plots[i], ty));
-  return { s, assembly: plots[5] };
+  return { s, assembly: plots[2] };
 }
 
 describe("assembly and sales", () => {
@@ -179,20 +165,20 @@ describe("assembly and sales", () => {
     expect(p.missing).toBeDefined();
     // every part arrives by truck…
     const events = run(s, 400);
-    for (const c of ["body", "engine", "interior", "glass", "tires", "paint"] as const) expect(s.lifetime.parts[c]).toBeGreaterThan(0);
+    for (const c of ["body", "engine", "tires"] as const) expect(s.lifetime.parts[c]).toBeGreaterThan(0);
     expect(s.lifetime.carsProduced).toBeGreaterThan(0);
     expect(events.filter((e) => e.type === "carBuilt" && e.first)).toHaveLength(1);
     expect(s.chain.firstCar).toBe(true);
-    // no dealership yet: the cars wait at the plant
-    expect(p.out).toBeGreaterThan(0);
+    // the first car opens the Local Dealer
+    expect(s.dealers.local.owned).toBe(true);
   });
 
   it("dealerships open after the first car; transporters deliver and customers buy", () => {
     const { s } = fullChain();
     s.cash = 1e12;
-    expect(A.buyDealer(s, "local")).toBe(false); // no car yet
+    expect(A.buyDealer(s, "city")).toBe(false); // no car yet
     run(s, 400);
-    expect(A.buyDealer(s, "local")).toBe(true);
+    expect(s.dealers.local.owned).toBe(true); // opened by the first car, for free
     const earned = s.lifetime.moneyEarned;
     run(s, 300);
     expect(s.lifetime.carsSold).toBeGreaterThan(0);
@@ -203,7 +189,9 @@ describe("assembly and sales", () => {
   it("better cars need better component grades", () => {
     const { s } = fullChain();
     const gm = snapshot(s).gm;
-    expect(Ch.availableCars(s, gm).map((c) => c.id)).toEqual(["city", "sedan"]);
+    expect(Ch.availableCars(s, gm).map((c) => c.id)).toEqual(["city"]);
+    // the sedan also needs seats from an interior factory
+    expect(Ch.carLock(s, CAR_BY_ID.sedan, gm)).toEqual({ kind: "plant", plant: "interiorFactory" });
     expect(Ch.carLock(s, { ...Ch.availableCars(s, gm)[0], grade: 2 }, gm)?.kind).toBe("grade");
   });
 });
@@ -261,7 +249,7 @@ describe("achievements and missions", () => {
     s.lifetime.parts.body = 1;
     expect(checkAchievements(s)).toContain("first_body");
     expect(checkAchievements(s)).toEqual([]);
-    expect(s.cash).toBe(100);
+    expect(s.cash).toBe(350);
   });
 
   it("daily missions count progress from when they were handed out", () => {
@@ -297,6 +285,6 @@ describe("save system", () => {
     expect(s.settings.lang).toBe("ro");
     expect(s.research).toEqual(["advanced_engines"]);
     expect(s.city.buildings[STARTER_PLOT].type).toBe("bodyWorks");
-    expect(PLANT_BY_ID.bodyWorks.time).toBe(30);
+    expect(PLANT_BY_ID.bodyWorks.time).toBe(20);
   });
 });

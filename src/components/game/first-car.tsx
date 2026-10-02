@@ -49,8 +49,8 @@ export function FirstCarOverlay() {
   const value = carValue(state, car, snap.gm);
   const close = () => {
     setCelebrate(null);
-    // next step: a dealership to sell it
-    if (!Object.values(state.dealers).some((d) => d.owned)) useUi.getState().selectPlot("d:local");
+    // show the Local Dealer the first car just opened
+    useUi.getState().selectPlot("d:local");
   };
 
   return (

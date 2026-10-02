@@ -57,10 +57,10 @@ export function CostButton({
         if (affordable) onBuy();
       }}
       aria-disabled={!affordable}
-      className={cn("flex-col gap-0 leading-tight", size === "sm" ? "h-auto py-1.5" : "h-auto py-2", className)}
+      className={cn("max-w-full flex-col gap-0 whitespace-normal leading-tight", size === "sm" ? "h-auto py-1.5" : "h-auto py-2", className)}
       {...rest}
     >
-      {label && <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide opacity-80">{label}</span>}
+      {label && <span className="flex items-center justify-center gap-1.5 text-center text-[11px] font-medium uppercase tracking-wide opacity-80">{label}</span>}
       <span className="flex items-center gap-1 tabular-nums">
         {locked && <Lock className="!size-3" />}
         {fmt}

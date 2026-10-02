@@ -19,7 +19,7 @@ import { cloneState, createInitialState } from "@/game/engine/state";
 import { tick as engineTick } from "@/game/engine/tick";
 import { formatMoney } from "@/game/format";
 import { decodeSave, encodeSave, SaveManager } from "@/game/save";
-import type { BuyAmount, CarId, DealerId, FacilityType, GameState, Lang, ManagerId, Route, Specialization, StructureType, ZoneId } from "@/game/types";
+import type { BuyAmount, CarId, DealerId, FacilityType, GameState, Lang, ManagerId, Specialization, StructureType, ZoneId } from "@/game/types";
 import { applyLanguage, detectLanguage, translate, type MessageKey, type Vars } from "@/i18n";
 import { contentFor } from "@/i18n/content";
 import { uiEvents } from "./events";
@@ -41,9 +41,7 @@ interface GameStore {
   plantLevel: (plot: string) => boolean;
   plantSpeed: (plot: string) => boolean;
   plantAutomation: (plot: string) => boolean;
-  plantTruck: (plot: string) => boolean;
   plantGrade: (plot: string) => boolean;
-  setRoute: (plot: string, route: Route) => void;
   setPlantCar: (plot: string, car: CarId | null) => void;
   hireManager: (id: ManagerId, assignTo?: string) => boolean;
   upgradeManager: (id: ManagerId) => boolean;
@@ -189,11 +187,7 @@ export const useGame = create<GameStore>((set, get) => {
     },
     plantSpeed: (plot) => act((s) => Ch.upgradePlantSpeed(s, plot, get().snap.gm)),
     plantAutomation: (plot) => act((s) => Ch.upgradeAutomation(s, plot, get().snap.gm)),
-    plantTruck: (plot) => act((s) => Ch.buyTruck(s, plot, get().snap.gm)),
     plantGrade: (plot) => act((s) => Ch.upgradeGrade(s, plot, get().snap.gm)),
-    setRoute: (plot, route) => {
-      act((s) => Ch.setRoute(s, plot, route));
-    },
     setPlantCar: (plot, car) => {
       act((s) => Ch.setPlantCar(s, plot, car, get().snap.gm));
     },
