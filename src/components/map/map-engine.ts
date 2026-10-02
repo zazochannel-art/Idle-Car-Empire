@@ -1,8 +1,7 @@
 // Runs the Empire Map: owns the canvas, camera, scene and traffic, renders
 // every animation frame and turns taps into selections. React only feeds it
 // state and listens to its callbacks.
-import { ZONES } from "@/game/config/city";
-import { WORLD_MAP, type Plot } from "@/game/city/layout";
+import { ROAD_STEP, WORLD, WORLD_MAP, zoneOfBlock, type Plot } from "@/game/city/layout";
 import type { ZoneId } from "@/game/types";
 import { attachControls, Camera } from "./camera";
 import { Painter, sx, sy, toTile } from "./iso";
@@ -61,13 +60,14 @@ export class MapEngine {
     };
   }
 
-  private defaultZoom() {
-    return Math.max(0.62, Math.min(1.05, this.cam.w / 1100 + 0.2));
+  defaultZoom() {
+    return Math.max(0.85, Math.min(1.35, this.cam.w / 1000 + 0.3));
   }
 
   /** Where the camera starts: the first garage and its neighbours. */
   private homeTile(): [number, number] {
-    return this.cam.w < 700 ? [5.5, 5.5] : [8.5, 8.5];
+    // around Garage #01 in the Small Town
+    return this.cam.w < 700 ? [24, 17] : [25, 18];
   }
 
   resize() {
@@ -193,11 +193,8 @@ export class MapEngine {
       }
     }
     const tile = toTile(wx, wy);
-    for (const z of ZONES) {
-      if (this.unlocked.has(z.id)) continue;
-      const c = zoneCenter(z.id);
-      if (Math.abs(tile.x - c.x) < 10.5 && Math.abs(tile.y - c.y) < 10.5) return { kind: "zone", id: z.id };
-    }
+    const zone = zoneOfBlock(Math.floor(tile.x / ROAD_STEP), Math.floor(tile.y / ROAD_STEP));
+    if (zone && !this.unlocked.has(zone)) return { kind: "zone", id: zone };
     return null;
   }
 
@@ -211,6 +208,69 @@ export class MapEngine {
   }
 
   // ───────────────────────── rendering ─────────────────────────
+
+  /** Cargo ships and boats sailing around the island. */
+  private drawShips() {
+    const p = this.painter;
+    const routes: { x0: number; y0: number; x1: number; y1: number; speed: number; color: string; big: boolean }[] = [
+      { x0: 80, y0: WORLD + 6, x1: -20, y1: WORLD + 6, speed: 0.9, color: "#b91c1c", big: true },
+      { x0: -7, y0: -10, x1: -7, y1: WORLD + 14, speed: 0.7, color: "#1d4ed8", big: true },
+      { x0: -16, y0: WORLD + 14, x1: 80, y1: WORLD + 14, speed: 1.4, color: "#f8fafc", big: false },
+      { x0: WORLD + 8, y0: 80, x1: WORLD + 8, y1: -16, speed: 1.1, color: "#0f766e", big: true },
+    ];
+    for (const [i, r] of routes.entries()) {
+      const len = Math.abs(r.x1 - r.x0) + Math.abs(r.y1 - r.y0);
+      const k = ((this.t * r.speed + i * 37) % len) / len;
+      const x = r.x0 + (r.x1 - r.x0) * k;
+      const y = r.y0 + (r.y1 - r.y0) * k;
+      const alongX = r.y0 === r.y1;
+      const L = r.big ? 4.2 : 1.4;
+      const Wd = r.big ? 1.1 : 0.6;
+      const w = alongX ? L : Wd;
+      const d = alongX ? Wd : L;
+      // wake
+      const back = alongX ? Math.sign(r.x1 - r.x0) * -1 : Math.sign(r.y1 - r.y0) * -1;
+      for (let s = 1; s <= 4; s++) {
+        const wx = alongX ? x + back * (L / 2 + s * 0.9) : x;
+        const wy = alongX ? y : y + back * (L / 2 + s * 0.9);
+        p.ellipse(wx, wy, 0, 6 + s * 4, `rgba(255,255,255,${0.22 - s * 0.045})`, 0.5);
+      }
+      p.box(x - w / 2, y - d / 2, w, d, -2, r.big ? 7 : 4, r.color, "#475569");
+      if (r.big) {
+        // containers and the bridge
+        const colors = ["#f59e0b", "#2563eb", "#16a34a", "#dc2626"];
+        for (let c = 0; c < 4; c++) {
+          const cx = alongX ? x - w / 2 + 0.35 + c * 0.75 : x - w / 2 + 0.15;
+          const cy = alongX ? y - d / 2 + 0.15 : y - d / 2 + 0.35 + c * 0.75;
+          p.box(cx, cy, alongX ? 0.65 : w - 0.3, alongX ? d - 0.3 : 0.65, 5, 6, colors[(c + i) % 4]);
+        }
+        const bx = alongX ? x + (back > 0 ? w / 2 - 0.7 : -w / 2 + 0.2) : x - w / 2 + 0.2;
+        const by = alongX ? y - d / 2 + 0.2 : y + (back > 0 ? d / 2 - 0.7 : -d / 2 + 0.2);
+        p.box(bx, by, alongX ? 0.5 : w - 0.4, alongX ? d - 0.4 : 0.5, 5, 12, "#f8fafc");
+      } else {
+        p.box(x - w / 4, y - d / 4, w / 2, d / 2, 2, 4, "#e2e8f0");
+      }
+    }
+  }
+
+  /** Soft cloud shadows drifting over the map. */
+  private drawClouds() {
+    const c = this.ctx;
+    for (let i = 0; i < 5; i++) {
+      const tx = ((this.t * (0.5 + i * 0.12) + i * 23) % (WORLD + 50)) - 25;
+      const ty = (i * 17 + 9) % WORLD;
+      const px = sx(tx, ty);
+      const py = sy(tx, ty);
+      const r = 160 + i * 30;
+      const g = c.createRadialGradient(px, py, 0, px, py, r);
+      g.addColorStop(0, "rgba(15,23,42,0.13)");
+      g.addColorStop(1, "rgba(15,23,42,0)");
+      c.fillStyle = g;
+      c.beginPath();
+      c.ellipse(px, py, r, r * 0.55, 0, 0, Math.PI * 2);
+      c.fill();
+    }
+  }
 
   private render(dt: number) {
     const { ctx, painter: p, cam } = this;
@@ -230,8 +290,8 @@ export class MapEngine {
     const H = this.canvas.height;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     const bg = ctx.createLinearGradient(0, 0, 0, H);
-    bg.addColorStop(0, "#0b2a45");
-    bg.addColorStop(1, "#06121f");
+    bg.addColorStop(0, "#0f4f7a");
+    bg.addColorStop(1, "#0a3352");
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, H);
 
@@ -253,7 +313,8 @@ export class MapEngine {
       ctx.stroke();
     }
 
-    drawGround(p, this.unlocked, view);
+    this.drawShips();
+    drawGround(p, this.unlocked, view, this.t);
 
     const info: DrawInfo = { zoom: cam.zoom, selected: this.selected, t: this.t };
     const inView = (b: [number, number, number, number]) => b[2] >= view[0] && b[0] <= view[2] && b[3] >= view[1] && b[1] <= view[3];
@@ -282,6 +343,7 @@ export class MapEngine {
     drawMoving(Infinity);
     p.dim = false;
     drawFog(p, this.unlocked, this.t);
+    this.drawClouds();
 
     // labels and pops in screen pixels
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);

@@ -18,8 +18,8 @@ describe("world layout", () => {
     expect(factoryPlot("mega")?.zone).toBe("global");
     expect(WORLD_MAP.plots.filter((p) => p.kind === "factory")).toHaveLength(10);
     expect(WORLD_MAP.plots.filter((p) => p.kind === "dealer")).toHaveLength(6);
-    expect(STARTER_PLOT.startsWith("town:")).toBe(true);
-    for (const z of ZONES) expect(z.layout.join("")).toHaveLength(36);
+    expect(WORLD_MAP.plotById[STARTER_PLOT].zone).toBe("town");
+    for (const z of ZONES) expect(WORLD_MAP.plots.filter((p) => p.zone === z.id && p.kind === "plot").length).toBeGreaterThanOrEqual(4);
   });
 
   it("plots never overlap roads and every entry is on a road", () => {
@@ -32,9 +32,11 @@ describe("world layout", () => {
 
   it("only roads next to unlocked zones carry traffic", () => {
     const open = new Set(["town"] as const);
-    expect(segmentOpen("x", 0, 0, open)).toBe(true);
-    expect(segmentOpen("x", 3, 0, open)).toBe(true); // border with Downtown
-    expect(segmentOpen("x", 5, 5, open)).toBe(false);
+    expect(segmentOpen("x", 0, 2, open)).toBe(true);
+    expect(segmentOpen("x", 2, 3, open)).toBe(true); // border with Downtown
+    expect(segmentOpen("x", 6, 5, open)).toBe(false); // Supercar Valley
+    expect(segmentOpen("x", 0, 0, open)).toBe(false); // hills: no road
+    expect(segmentOpen("y", 5, 0, open)).toBe(false); // the river
   });
 });
 
@@ -162,6 +164,12 @@ describe("zones and plots", () => {
     const migrated = migrate(old, T0);
     expect(migrated.city.zones).toEqual(["town", "industrial"]);
     expect(migrated.city.buildings[STARTER_PLOT].type).toBe("garage");
+
+    // Buildings saved on the first map's plot ids move to free plots.
+    const moved = migrate({ ...old, city: { zones: ["town"], buildings: { "town:0:0": { type: "garage", level: 3, garage: { no: 1, facilities: [] } }, "town:5:0": { type: "carWash", level: 2 } } } }, T0);
+    expect(moved.city.buildings[STARTER_PLOT].level).toBe(3);
+    const wash = Object.entries(moved.city.buildings).find(([, b]) => b.type === "carWash");
+    expect(wash && WORLD_MAP.plotById[wash[0]].zone).toBe("town");
 
     const junk = migrate({ ...old, city: { zones: ["nowhere"], buildings: { "nope:1:1": { type: "garage" }, [STARTER_PLOT]: { type: "garage", level: 99, garage: { facilities: [{ type: "dyno", x: 50, y: 0 }] } } } } }, T0);
     expect(junk.city.buildings[STARTER_PLOT].level).toBe(10);

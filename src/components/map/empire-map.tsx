@@ -50,8 +50,9 @@ function trafficWorld(s: GameState, snap: EconomySnapshot): TrafficWorld {
     const plot = factoryPlot(f);
     if (!plot || !s.factories[f].owned) continue;
     const site = { id: plot.id, entry: plot.entry, weight: 1 };
-    factories.push(site);
     suppliers.push(site);
+    // car carriers only leave plants that produce on their own
+    if (snap.factories[f]?.automated) factories.push(site);
   }
   const dealers: Site[] = [];
   for (const id of Object.keys(DEALER_BY_ID) as (keyof typeof DEALER_BY_ID)[]) {
@@ -150,7 +151,11 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
   useEffect(() => {
     const e = engineRef.current;
     if (!e || !command) return;
-    if (command.kind === "plot") e.focusPlot(command.id, command.zoom ? { x: 0, y: 0 } : offsetRef.current, command.zoom);
+    if (command.kind === "plot") {
+      // zoom -1: the default zoom (coming back out of a garage)
+      const zoom = command.zoom === -1 ? e.defaultZoom() : command.zoom;
+      e.focusPlot(command.id, command.zoom ? { x: 0, y: 0 } : offsetRef.current, zoom);
+    }
     else if (command.kind === "zone") e.focusZone(command.id, offsetRef.current);
     else if (command.kind === "home") e.home();
     else if (command.kind === "zoom") e.zoomBy(command.f);

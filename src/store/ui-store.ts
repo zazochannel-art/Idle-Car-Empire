@@ -66,7 +66,8 @@ export const useUi = create<UiStore>((set) => ({
     clearTimeout(enterTimer);
     enterTimer = setTimeout(() => set({ garage }), 380);
   },
-  exitGarage: () => set({ garage: null }),
+  // back out to the normal map zoom, centred on the garage we left
+  exitGarage: () => set((s) => ({ garage: null, command: s.garage ? { kind: "plot", id: s.garage, zoom: -1, n: ++n } : s.command })),
   closeAll: () => set({ view: null, plot: null, zone: null }),
   map: (cmd) => set({ command: { ...cmd, n: ++n } as MapCommand }),
 }));

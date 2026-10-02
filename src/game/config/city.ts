@@ -8,9 +8,8 @@ import type { DealerId, FacilityType, FactoryId, Specialization, StructureType, 
 export interface ZoneConfig {
   id: ZoneId;
   stage: number;
-  /** Position on the 3×3 world grid of zones. */
-  gx: number;
-  gy: number;
+  /** Letter marking this district's blocks on WORLD_BLOCKS. */
+  letter: string;
   /** Price to unlock. The previous stage must be unlocked first. */
   cost: number;
   /** Richer districts: garage fees and prices here are multiplied by this. */
@@ -20,71 +19,100 @@ export interface ZoneConfig {
   /** What empty plots here can become. */
   builds: StructureType[];
   /**
-   * 6×6 cells of 3×3 tiles, row by row. Legend:
-   *  .  empty plot          G  starter garage (Garage #01)
-   *  h  house  a  apartments  o  office tower  s  shop  i  industry  t  park
-   *  w  water
-   *  L C P X S Z            dealerships (see DEALER_LOT)
-   *  0                      the Assembly Workshop (one cell)
-   *  1-9                    factories; each fills a whole 2×2-cell block
+   * What fills the free cells, as a weighted bag of letters:
+   *  .  empty plot   h  house   a  apartments   o  office tower
+   *  s  shops        i  industry   t  park
    */
-  layout: string[];
+  mix: string;
 }
 
 export const ZONES: ZoneConfig[] = [
   {
-    id: "town", stage: 1, gx: 0, gy: 0, cost: 0, scale: 1, ground: "#6cb35a", accent: "#60a5fa",
+    id: "town", stage: 1, letter: "T", cost: 0, scale: 1, ground: "#6cb35a", accent: "#60a5fa",
     builds: ["garage", "carWash", "parking", "serviceCenter", "warehouse"],
-    layout: ["G.thh.", "L0ahht", "..C.tt", "hh..hh", "tt.h..", "hht.hh"],
+    mix: "....hhhhttsa",
   },
   {
-    id: "industrial", stage: 2, gx: 1, gy: 0, cost: 20_000, scale: 15, ground: "#94a06f", accent: "#38bdf8",
+    id: "industrial", stage: 2, letter: "I", cost: 20_000, scale: 15, ground: "#94a06f", accent: "#38bdf8",
     builds: ["garage", "partsFactory", "warehouse", "logistics", "truckDepot", "parking"],
-    layout: ["11..22", "11ii22", "..i...", "ii.ii.", ".t..i.", "ti.t.."],
+    mix: "....iiiit",
   },
   {
-    id: "downtown", stage: 3, gx: 0, gy: 1, cost: 300_000, scale: 400, ground: "#7fae6e", accent: "#22d3ee",
+    id: "downtown", stage: 3, letter: "D", cost: 300_000, scale: 400, ground: "#7fae6e", accent: "#22d3ee",
     builds: ["garage", "carWash", "parking", "serviceCenter", "researchCenter"],
-    layout: ["oo.Poo", "o..oo.", "33.so.", "33o..o", ".so.aa", "oo..ta"],
+    mix: "....ooooaasst",
   },
   {
-    id: "automotive", stage: 4, gx: 1, gy: 1, cost: 5e7, scale: 1e4, ground: "#8fa77a", accent: "#818cf8",
+    id: "automotive", stage: 4, letter: "A", cost: 5e7, scale: 1e4, ground: "#8fa77a", accent: "#818cf8",
     builds: ["garage", "partsFactory", "researchCenter", "logistics", "warehouse"],
-    layout: ["44..ii", "44.X..", "i.ss.o", "..o..i", ".t..ii", "ii.t.."],
+    mix: "....iiisot",
   },
   {
-    id: "luxury", stage: 5, gx: 2, gy: 0, cost: 2e10, scale: 3e5, ground: "#5fbf74", accent: "#facc15",
+    id: "luxury", stage: 5, letter: "L", cost: 2e10, scale: 3e5, ground: "#5fbf74", accent: "#facc15",
     builds: ["garage", "serviceCenter", "carWash", "parking", "hq"],
-    layout: ["55.S.t", "55t.hh", "..ww..", "h.ww.h", ".h.t..", "tt..ht"],
+    mix: "....hhhttta",
   },
   {
-    id: "supercar", stage: 6, gx: 2, gy: 1, cost: 1e13, scale: 1e7, ground: "#c2a46a", accent: "#fb923c",
+    id: "supercar", stage: 6, letter: "S", cost: 1e13, scale: 1e7, ground: "#b9a46c", accent: "#fb923c",
     builds: ["garage", "researchCenter", "exportTerminal", "warehouse"],
-    layout: ["66..77", "66..77", "..Z.t.", "t..tt.", ".i..i.", "tt.t.."],
+    mix: "....iitto",
   },
   {
-    id: "mega", stage: 7, gx: 1, gy: 2, cost: 5e18, scale: 3e8, ground: "#86a08a", accent: "#e879f9",
+    id: "mega", stage: 7, letter: "M", cost: 5e18, scale: 3e8, ground: "#86a08a", accent: "#e879f9",
     builds: ["garage", "hq", "exportTerminal", "logistics", "truckDepot"],
-    layout: ["oo..88", "o.oo88", ".oo.o.", "oo..oo", "..oo.o", "o.o..o"],
+    mix: "....ooooooaa",
   },
   {
-    id: "global", stage: 8, gx: 2, gy: 2, cost: 5e21, scale: 1e10, ground: "#7aa2a8", accent: "#c084fc",
+    id: "global", stage: 8, letter: "G", cost: 5e21, scale: 1e10, ground: "#7aa2a8", accent: "#c084fc",
     builds: ["garage", "airport", "hq", "exportTerminal"],
-    layout: ["99.oo.", "99.o..", "o..oo.", ".oo...", "oo..o.", ".o.oo."],
+    mix: "....oooost",
   },
 ];
 
-/** The lake in the remaining corner of the world: scenery only. */
-export const NATURE = { gx: 0, gy: 2 };
+/**
+ * The world, block by block (9×9 blocks of 6×6 tiles between roads).
+ * District letters as in ZONES; scenery: w sea, f forest, a farmland,
+ * h hills. A river runs down node column RIVER_LINE, crossed by bridges.
+ */
+export const WORLD_BLOCKS = [
+  "hfTTTIIhh",
+  "fTTTTIIIh",
+  "aaTDDILLh",
+  "aDDDDALLL",
+  "wDDAAAALw",
+  "wwMAASSSw",
+  "wMMMASSSh",
+  "wMMGGGShh",
+  "wwGGGwwww",
+];
+export const RIVER_LINE = 5;
+
+/** Special lots, as global cell coordinates (two cells per block). */
+export const STARTER_CELL: [number, number] = [6, 2];
+export const FACTORY_LOTS: Record<FactoryId, [number, number]> = {
+  // the Assembly Workshop is a single cell; the others fill a whole block
+  garage: [7, 2],
+  local: [12, 0],
+  european: [12, 2],
+  american: [4, 6],
+  asian: [10, 8],
+  luxury: [14, 6],
+  supercarFactory: [12, 10],
+  electricFactory: [14, 12],
+  hypercarFactory: [4, 12],
+  mega: [8, 14],
+};
+export const DEALER_LOTS: Record<DealerId, [number, number]> = {
+  local: [6, 3],
+  city: [8, 2],
+  premium: [6, 6],
+  luxury: [8, 8],
+  supercar: [12, 6],
+  global: [10, 12],
+};
 
 export const ZONE_BY_ID: Record<ZoneId, ZoneConfig> = Object.fromEntries(ZONES.map((z) => [z.id, z])) as Record<ZoneId, ZoneConfig>;
 export const ZONE_IDS = ZONES.map((z) => z.id);
-
-export const FACTORY_LOT: Record<string, FactoryId> = {
-  "0": "garage", "1": "local", "2": "european", "3": "american", "4": "asian",
-  "5": "luxury", "6": "supercarFactory", "7": "electricFactory", "8": "hypercarFactory", "9": "mega",
-};
-export const DEALER_LOT: Record<string, DealerId> = { L: "local", C: "city", P: "premium", X: "luxury", S: "supercar", Z: "global" };
 
 // ───────────────────────────── map structures ─────────────────────────────
 
