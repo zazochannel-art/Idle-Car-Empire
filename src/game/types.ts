@@ -12,7 +12,7 @@ export type CarId =
   | "electric";
 
 /** Parts that plants make and the Car Assembly Plant puts together. */
-export type ComponentId = "body" | "engine" | "interior" | "glass" | "tires" | "paint" | "electronics" | "battery";
+export type ComponentId = "body" | "engine" | "interior" | "suspension" | "glass" | "tires" | "paint" | "electronics" | "battery";
 /** What trucks carry: a component, a motorized chassis (body + engine) or a car. */
 export type ItemId = ComponentId | "car" | "chassis";
 
@@ -21,6 +21,7 @@ export type PlantType =
   | "bodyWorks"
   | "engineFactory"
   | "interiorFactory"
+  | "suspensionFactory"
   | "glassFactory"
   | "tireFactory"
   | "paintFactory"

@@ -9,22 +9,7 @@ import { AUTOMATION, CHASSIS_BONUS, COMPONENTS, COMPONENT_BY_ID, GRADES, PLANTS,
 import { DEALER_BY_ID } from "@/game/config/dealerships";
 import { MANAGERS } from "@/game/config/managers";
 import { DEPOT, MARKET, plotOf } from "@/game/city/layout";
-import {
-  automationCost,
-  bestGrade,
-  carLock,
-  carPartsValue,
-  carValue,
-  componentBase,
-  dealerStats,
-  trucksOf,
-  gradeCost,
-  levelCost,
-  plantNumber,
-  plantsOf,
-  recipe,
-  speedCost,
-} from "@/game/engine/chain";
+import { automationCost, bestGrade, carLock, carPartsValue, carValue, componentBase, dealerStats, trucksOf, gradeCost, levelCost, plantNumber, plantsOf, recipe, speedCost } from "@/game/engine/chain";
 import { isManagerUnlocked } from "@/game/engine/actions";
 import { dealerUpgradeCost, managerUpgradeCost } from "@/game/engine/economy";
 import { dealerRequirement } from "@/game/engine/insights";
@@ -100,18 +85,27 @@ export function PlantPanel({ id }: { id: string }) {
       <div className="rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.07]">
         <div className="mb-2 flex items-center justify-between text-[11px] text-white/55">
           <span className="font-bold uppercase tracking-wider">{t("plant.production")}</span>
-          <span className="tabular-nums">
-            {t("plant.rate", { n: formatNumber(st.lines), item: itemName(st.combine ? "chassis" : item, t), time: formatDuration(st.cycle) })}
-          </span>
+          <span className="tabular-nums">{t("plant.rate", { n: formatNumber(st.lines), item: itemName(st.combine ? "chassis" : item, t), time: formatDuration(st.cycle) })}</span>
         </div>
-        <div className="mb-2 flex flex-wrap items-center gap-1 text-[10px]">
-          {steps.map((s, i) => (
-            <span key={i} className="flex items-center gap-1">
-              <span className={cn("rounded-md px-1.5 py-0.5 font-semibold ring-1", p.status === "ok" && i === step ? "bg-sky-400/20 text-sky-200 ring-sky-400/40" : "bg-white/[0.03] text-white/45 ring-white/10")}>{s}</span>
-              {i < steps.length - 1 && <span className="text-white/25">→</span>}
-            </span>
-          ))}
-        </div>
+        {!cfg.item && st.car ? (
+          <AssemblyLine id={id} steps={steps} step={step} />
+        ) : (
+          <div className="mb-2 flex flex-wrap items-center gap-1 text-[10px]">
+            {steps.map((s, i) => (
+              <span key={i} className="flex items-center gap-1">
+                <span
+                  className={cn(
+                    "rounded-md px-1.5 py-0.5 font-semibold ring-1",
+                    p.status === "ok" && i === step ? "bg-sky-400/20 text-sky-200 ring-sky-400/40" : "bg-white/[0.03] text-white/45 ring-white/10",
+                  )}
+                >
+                  {s}
+                </span>
+                {i < steps.length - 1 && <span className="text-white/25">→</span>}
+              </span>
+            ))}
+          </div>
+        )}
         <Progress value={p.status === "ok" ? p.progress * 100 : 0} className="h-2" />
         {/* the core loop at a glance: how much, how full, how profitable */}
         <div className="mt-2 grid grid-cols-3 gap-2 text-center">
@@ -137,10 +131,14 @@ export function PlantPanel({ id }: { id: string }) {
         <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-white/55">{t("plant.stock")}</div>
         <div className="space-y-2">
           {cfg.item && <StockBar label={`${rawName(st.type, t)}`} value={p.raw} cap={st.rawCap} color="#a8a29e" />}
-          {st.combine && <StockBar label={`${COMPONENT_BY_ID.body.emoji} ${itemName("body", t)}`} value={p.inputs.body ?? 0} cap={st.inCap} color={COMPONENT_BY_ID.body.color} warn={p.missing === "body"} />}
+          {st.combine && (
+            <StockBar label={`${COMPONENT_BY_ID.body.emoji} ${itemName("body", t)}`} value={p.inputs.body ?? 0} cap={st.inCap} color={COMPONENT_BY_ID.body.color} warn={p.missing === "body"} />
+          )}
           {!cfg.item &&
             st.car &&
-            recipe(st.car).map((c) => <StockBar key={c} label={`${COMPONENT_BY_ID[c].emoji} ${itemName(c, t)}`} value={p.inputs[c] ?? 0} cap={st.inCap} color={COMPONENT_BY_ID[c].color} warn={p.missing === c} />)}
+            recipe(st.car).map((c) => (
+              <StockBar key={c} label={`${COMPONENT_BY_ID[c].emoji} ${itemName(c, t)}`} value={p.inputs[c] ?? 0} cap={st.inCap} color={COMPONENT_BY_ID[c].color} warn={p.missing === c} />
+            ))}
           <StockBar label={`📦 ${itemName(st.combine ? "chassis" : item, t)}`} value={p.out} cap={st.outCap} color="#38bdf8" />
         </div>
       </div>
@@ -235,10 +233,7 @@ function EngineStrategy({ id }: { id: string }) {
             <button
               key={String(o.on)}
               onClick={() => setCombine(id, o.on)}
-              className={cn(
-                "relative rounded-xl p-2.5 text-left ring-1 transition",
-                active ? "bg-electric/20 ring-electric/60" : "bg-white/[0.03] ring-white/10 hover:bg-white/[0.07]",
-              )}
+              className={cn("relative rounded-xl p-2.5 text-left ring-1 transition", active ? "bg-electric/20 ring-electric/60" : "bg-white/[0.03] ring-white/10 hover:bg-white/[0.07]")}
             >
               {best && <span className="absolute -top-2 right-2 rounded-full bg-gold px-1.5 py-0.5 text-[9px] font-black uppercase text-black">{t("strategy.best")}</span>}
               <div className="text-lg leading-none">{o.icon}</div>
@@ -254,6 +249,51 @@ function EngineStrategy({ id }: { id: string }) {
           ? t("strategy.why", { bodies: formatNumber(bodyRate * 60), engines: formatNumber(engineRate * 60), extra: formatMoney(extra) })
           : t("strategy.whyNot", { bodies: formatNumber(bodyRate * 60), engines: formatNumber(engineRate * 60) })}
       </p>
+    </div>
+  );
+}
+
+/** Which component each of the nine assembly stations fits (final assembly and QC fit none). */
+const STATION_PART: (ComponentId | null)[] = ["body", "engine", "suspension", "interior", "glass", "tires", "paint", null, null];
+
+/**
+ * The assembly line station by station: what the car gains at each one, and
+ * whether that part is in stock, missing, or not used by this model.
+ */
+function AssemblyLine({ id, steps, step }: { id: string; steps: string[]; step: number }) {
+  const state = useGame((g) => g.state);
+  const st = useGame((g) => g.snap.chain.plants[id]);
+  const { t } = useT();
+  const p = state.city.buildings[id]?.plant;
+  if (!p || !st?.car) return null;
+  const needs = new Set(recipe(st.car));
+  return (
+    <div className="mb-2 grid grid-cols-3 gap-1.5">
+      {steps.map((name, i) => {
+        const part = STATION_PART[i];
+        const used = !part || needs.has(part);
+        const have = part ? Math.floor(p.inputs[part] ?? 0) : 0;
+        const missing = !!part && used && have < 1;
+        const active = p.status === "ok" && i === step;
+        return (
+          <div
+            key={i}
+            className={cn(
+              "rounded-lg px-2 py-1.5 ring-1",
+              active ? "bg-sky-400/20 ring-sky-400/50" : missing ? "bg-amber-500/10 ring-amber-400/40" : used ? "bg-white/[0.04] ring-white/10" : "bg-white/[0.015] opacity-45 ring-white/5",
+            )}
+          >
+            <div className="flex items-center justify-between gap-1 text-[9px] font-bold text-white/40">
+              <span>{i + 1}</span>
+              <span>{part ? COMPONENT_BY_ID[part].emoji : i === 7 ? "🔧" : "✅"}</span>
+            </div>
+            <div className="truncate text-[10px] font-semibold">{name}</div>
+            <div className={cn("text-[9px] tabular-nums", missing ? "text-amber-300" : "text-white/45")}>
+              {!part ? t("line.always") : !used ? t("line.notUsed") : missing ? t("line.missing") : t("line.inStock", { n: formatNumber(have) })}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -348,7 +388,8 @@ function StatusLine({ id }: { id: string }) {
     tone = "bad";
     text = t("status.noModel");
   }
-  const cls = tone === "ok" ? "bg-emerald-500/10 text-emerald-200 ring-emerald-400/30" : tone === "wait" ? "bg-sky-500/10 text-sky-200 ring-sky-400/30" : "bg-amber-500/10 text-amber-200 ring-amber-400/40";
+  const cls =
+    tone === "ok" ? "bg-emerald-500/10 text-emerald-200 ring-emerald-400/30" : tone === "wait" ? "bg-sky-500/10 text-sky-200 ring-sky-400/30" : "bg-amber-500/10 text-amber-200 ring-amber-400/40";
   return (
     <div className={cn("rounded-xl p-2.5 text-xs font-semibold ring-1", cls)}>
       {tone === "ok" ? "✅" : tone === "wait" ? "⏳" : "⚠️"} {text}
@@ -370,10 +411,7 @@ function ModelPicker({ id }: { id: string }) {
     <div className="rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.07]">
       <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-white/55">{t("plant.model")}</div>
       <div className="grid grid-cols-2 gap-1.5">
-        <button
-          onClick={() => setPlantCar(id, null)}
-          className={cn("rounded-xl p-2 text-left text-xs ring-1", chosen === null ? "bg-electric/20 ring-electric/50" : "bg-white/[0.03] ring-white/10")}
-        >
+        <button onClick={() => setPlantCar(id, null)} className={cn("rounded-xl p-2 text-left text-xs ring-1", chosen === null ? "bg-electric/20 ring-electric/50" : "bg-white/[0.03] ring-white/10")}>
           <div className="font-bold">✨ {t("plant.bestModel")}</div>
           <div className="text-[10px] text-white/50">{st?.car ? n.car(st.car) : "—"}</div>
         </button>
