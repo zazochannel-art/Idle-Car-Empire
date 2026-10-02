@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { DEALERS, WHOLESALE_RATE } from "@/game/config/dealerships";
 import { dealerCapacity, dealerMarkup, dealerUpgradeCost } from "@/game/engine/economy";
+import { dealerRequirement } from "@/game/engine/insights";
 import { formatNumber, formatPercent } from "@/game/format";
 import { useContent } from "@/i18n/content";
 import { useT } from "@/i18n/use-t";
@@ -47,7 +48,7 @@ export function DealersView() {
         )}
       </ViewHeader>
 
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-3 @xl:grid-cols-2">
         {DEALERS.map((d) => {
           const st = state.dealers[d.id];
           const slot = alloc.slots.find((x) => x.id === d.id);
@@ -65,7 +66,10 @@ export function DealersView() {
                     </div>
                   </div>
                 </div>
-                {isNext && <CostButton className="mt-3 w-full" variant="gold" cost={d.cost} onBuy={() => buyDealer(d.id)} label={t("dealers.open")} />}
+                {isNext && (() => {
+                  const req = dealerRequirement(state, d.id);
+                  return <CostButton className="mt-3 w-full" variant="gold" cost={d.cost} locked={!!req} onBuy={() => buyDealer(d.id)} label={req ? n.requirement(req) : t("dealers.open")} />;
+                })()}
               </div>
             );
           }

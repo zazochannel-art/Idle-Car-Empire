@@ -36,7 +36,7 @@ export const LEVEL_VALUE_STEP = 0.1;
 export const LEVEL_MILESTONES = [25, 50, 75, 100, 150, 200, 300, 400, 500];
 
 export const FACTORIES: FactoryConfig[] = [
-  { id: "garage", name: "Small Garage", city: "Bucharest", continent: "Europe", emoji: "🔧", cost: 0, baseTier: 1, maxTier: 2, baseLines: 1, maxLines: 3, lineCost: 25_000, levelCost: 25, upgradeBase: 100, speedMult: 1, valueMult: 1, manual: true, accent: "#60a5fa" },
+  { id: "garage", name: "Assembly Workshop", city: "Bucharest", continent: "Europe", emoji: "🔧", cost: 0, baseTier: 1, maxTier: 2, baseLines: 1, maxLines: 3, lineCost: 25_000, levelCost: 25, upgradeBase: 100, speedMult: 1, valueMult: 1, manual: true, accent: "#60a5fa" },
   { id: "local", name: "Local Factory", city: "Pitești", continent: "Europe", emoji: "🏭", cost: 100_000, baseTier: 2, maxTier: 3, baseLines: 2, maxLines: 4, lineCost: 2_000_000, levelCost: 4_000, upgradeBase: 20_000, speedMult: 1.1, valueMult: 3, accent: "#38bdf8" },
   { id: "european", name: "European Factory", city: "Stuttgart", continent: "Europe", emoji: "🇪🇺", cost: 1.5e7, baseTier: 3, maxTier: 4, baseLines: 2, maxLines: 5, lineCost: 2.5e8, levelCost: 5e5, upgradeBase: 2.5e6, speedMult: 1.2, valueMult: 8, accent: "#22d3ee" },
   { id: "american", name: "American Factory", city: "Detroit", continent: "North America", emoji: "🇺🇸", cost: 3e09, baseTier: 4, maxTier: 5, baseLines: 3, maxLines: 6, lineCost: 4.8e10, levelCost: 1e08, upgradeBase: 5e08, speedMult: 1.3, valueMult: 20, accent: "#818cf8" },

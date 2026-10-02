@@ -7,6 +7,8 @@ import { FACTORY_BY_ID, LEVEL_MILESTONES } from "@/game/config/factories";
 import { MANAGER_BY_ID } from "@/game/config/managers";
 import { RESEARCH_BY_ID } from "@/game/config/research";
 import * as A from "@/game/engine/actions";
+import * as C from "@/game/engine/city";
+import { STRUCTURE_BY_ID } from "@/game/config/city";
 import { snapshot, unlockedCarIds, type EconomySnapshot } from "@/game/engine/economy";
 import { collectOffline, settleOffline } from "@/game/engine/offline";
 import { prestige as doPrestige } from "@/game/engine/prestige";
@@ -15,21 +17,10 @@ import { cloneState, createInitialState } from "@/game/engine/state";
 import { tick as engineTick } from "@/game/engine/tick";
 import { formatMoney } from "@/game/format";
 import { decodeSave, encodeSave, SaveManager } from "@/game/save";
-import type { BuyAmount, CarId, DealerId, FactoryId, GameState, Lang, ManagerId, UpgradeCategory } from "@/game/types";
+import type { BuyAmount, CarId, DealerId, FacilityType, FactoryId, GameState, Lang, ManagerId, Specialization, StructureType, UpgradeCategory, ZoneId } from "@/game/types";
 import { applyLanguage, detectLanguage, translate, type MessageKey, type Vars } from "@/i18n";
 import { contentFor } from "@/i18n/content";
 import { uiEvents } from "./events";
-
-export type View =
-  | "empire"
-  | "dealers"
-  | "cars"
-  | "research"
-  | "managers"
-  | "missions"
-  | "achievements"
-  | "stats"
-  | "prestige";
 
 const TICK_MS = 100;
 const SAVE_MS = 5_000;
@@ -40,9 +31,7 @@ interface GameStore {
   ready: boolean;
   state: GameState;
   snap: EconomySnapshot;
-  view: View;
   backend: string;
-  setView: (v: View) => void;
   init: () => Promise<void>;
   /** Runs a player action on a copy of the state and commits it if it succeeded. */
   act: <T>(fn: (s: GameState) => T) => T;
@@ -61,6 +50,14 @@ interface GameStore {
   upgradeDealer: (id: DealerId) => boolean;
   upgradeCarModel: (id: CarId) => boolean;
   research: (id: string) => boolean;
+  unlockZone: (id: ZoneId) => boolean;
+  buildStructure: (plot: string, type: StructureType) => boolean;
+  upgradeBuilding: (plot: string) => boolean;
+  placeFacility: (plot: string, type: FacilityType, x: number, y: number, rot: 0 | 1) => boolean;
+  moveFacility: (plot: string, uid: number, x: number, y: number, rot: 0 | 1) => boolean;
+  removeFacility: (plot: string, uid: number) => boolean;
+  hireWorker: (plot: string) => boolean;
+  setSpecialization: (plot: string, spec: Specialization) => boolean;
   claimDaily: (id: string) => void;
   claimMilestone: (id: string) => void;
   collectOffline: () => void;
@@ -150,12 +147,7 @@ export const useGame = create<GameStore>((set, get) => {
     ready: false,
     state: initial,
     snap: snapshot(initial),
-    view: "empire",
     backend: saves?.backend ?? "memory",
-    setView: (view) => {
-      set({ view });
-      if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
-    },
     act,
 
     init: async () => {
@@ -237,6 +229,28 @@ export const useGame = create<GameStore>((set, get) => {
       }
       return ok;
     },
+    unlockZone: (id) => {
+      const ok = act((s) => C.unlockZone(s, id));
+      if (ok) {
+        uiEvents.emit({ type: "toast", tone: "gold", icon: "🗺️", title: tr("toast.zone", { name: tr(`zone.${id}`) }), body: tr("toast.zoneBody") });
+        persist(true);
+      }
+      return ok;
+    },
+    buildStructure: (plot, type) => {
+      const ok = act((s) => C.buildStructure(s, plot, type));
+      if (ok) {
+        uiEvents.emit({ type: "toast", tone: "success", icon: STRUCTURE_BY_ID[type].emoji, title: tr("toast.built", { name: tr(`structure.${type}`) }), body: tr(`structureDesc.${type}`) });
+        persist(true);
+      }
+      return ok;
+    },
+    upgradeBuilding: (plot) => act((s) => C.upgradeBuilding(s, plot)),
+    placeFacility: (plot, type, x, y, rot) => act((s) => C.placeFacility(s, plot, type, x, y, rot)),
+    moveFacility: (plot, uid, x, y, rot) => act((s) => C.moveFacility(s, plot, uid, x, y, rot)),
+    removeFacility: (plot, uid) => act((s) => C.removeFacility(s, plot, uid)),
+    hireWorker: (plot) => act((s) => C.hireWorker(s, plot)),
+    setSpecialization: (plot, spec) => act((s) => C.setSpecialization(s, plot, spec)),
     claimDaily: (id) => {
       act((s) => claimDaily(s, id));
     },
@@ -287,7 +301,7 @@ export const useGame = create<GameStore>((set, get) => {
       await saves?.clear();
       const state = createInitialState(Date.now());
       refreshDaily(state, Date.now());
-      set({ state, snap: snapshot(state), view: "empire" });
+      set({ state, snap: snapshot(state) });
       persist(true);
     },
   };

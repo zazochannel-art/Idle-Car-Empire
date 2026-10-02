@@ -32,6 +32,8 @@ export function contentFor(lang: Lang) {
           return t("req.buyFactory", { name: factory(FACTORY_BY_ID[r.factory]) });
         case "technology":
           return t("req.technology", { level: r.level, name: factory(FACTORY_BY_ID[r.factory]) });
+        case "zone":
+          return t("req.zone", { name: t(`zone.${r.zone}`) });
         case "unavailable":
           return t("req.unavailable");
       }

@@ -30,7 +30,7 @@ export function ManagersView() {
         title={t("nav.managers")}
         subtitle={t("managers.subtitle", { n: hired, total: MANAGERS.length })}
       />
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-3 @xl:grid-cols-2">
         {MANAGERS.map((m) => {
           const st = state.managers[m.id];
           const unlocked = isManagerUnlocked(state, m.id);

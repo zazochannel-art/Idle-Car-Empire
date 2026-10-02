@@ -4,6 +4,7 @@ import { MANAGERS, type ManagerConfig } from "../config/managers";
 import { EMPIRE_PERKS, OFFLINE, PRESTIGE } from "../config/prestige";
 import { RESEARCH_BY_ID } from "../config/research";
 import type { CarId, Effect, FactoryId, GameState } from "../types";
+import { cityEffects } from "./city";
 
 export const MAX_TIER = 8;
 
@@ -143,6 +144,15 @@ export function computeGlobalMods(s: GameState): GlobalMods {
         break;
     }
   }
+
+  // Buildings on the Empire Map.
+  const city = cityEffects(s);
+  m.speed *= city.speed;
+  m.delivery *= city.delivery;
+  m.dealerCap *= city.dealerCap;
+  m.rp *= city.rp;
+  m.markup += city.markup;
+  m.income *= city.income;
 
   m.income *= 1 + s.achievements.length * ACHIEVEMENT_INCOME_BONUS;
   m.income *= 1 + s.empirePoints * PRESTIGE.incomePerPoint;

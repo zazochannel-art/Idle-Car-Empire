@@ -1,5 +1,7 @@
 import { EMPIRE_PERKS, PRESTIGE } from "../config/prestige";
 import type { GameState } from "../types";
+import { factoryPlot } from "../city/layout";
+import { createCity, ensureZonesUpTo } from "./city";
 import { createDealers, createFactories, createStats, emptyCarCounts } from "./state";
 
 /** Empire Points a player is entitled to in total for these lifetime earnings. */
@@ -41,6 +43,7 @@ export function prestige(s: GameState, now: number): number {
   s.factories = createFactories();
   s.dealers = createDealers();
   s.carModels = emptyCarCounts();
+  s.city = { ...createCity(), carsServiced: s.city.carsServiced };
   s.run = createStats();
   s.runStartedAt = now;
   s.pendingOffline = null;
@@ -55,5 +58,10 @@ export function applyStartPerks(s: GameState) {
   const startCash = Math.max(0, ...perks.map((p) => p.startCash ?? 0));
   s.cash = Math.max(s.cash, startCash);
   if (perks.some((p) => p.startAutomation)) s.factories.garage.upgrades.automation = Math.max(1, s.factories.garage.upgrades.automation);
-  for (const p of perks) if (p.startFactory) s.factories[p.startFactory].owned = true;
+  for (const p of perks) {
+    if (!p.startFactory) continue;
+    s.factories[p.startFactory].owned = true;
+    const plot = factoryPlot(p.startFactory);
+    if (plot) ensureZonesUpTo(s, plot.zone);
+  }
 }

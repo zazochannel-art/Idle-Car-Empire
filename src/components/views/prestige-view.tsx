@@ -44,7 +44,7 @@ export function PrestigeView() {
           </div>
         </div>
 
-        <div className="relative mt-5 grid gap-3 sm:grid-cols-2">
+        <div className="relative mt-5 grid gap-3 @sm:grid-cols-2">
           <div className="rounded-2xl bg-black/30 p-4 ring-1 ring-white/10">
             <div className="text-xs text-white/50">{t("prestige.grants")}</div>
             <div className="mt-1 text-3xl font-bold tabular-nums text-gold">+{formatNumber(pending)} {t("unit.ep")}</div>
@@ -67,7 +67,7 @@ export function PrestigeView() {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 @sm:grid-cols-2">
         <div className="glass rounded-2xl p-4 text-sm">
           <div className="mb-2 font-semibold text-rose-300">{t("prestige.resets")}</div>
           <ul className="space-y-1 text-white/60">
@@ -89,7 +89,7 @@ export function PrestigeView() {
 
       <div>
         <h3 className="mb-2 text-sm font-semibold">{t("prestige.perks")}</h3>
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-2 @sm:grid-cols-2 @3xl:grid-cols-3">
           {EMPIRE_PERKS.map((p) => {
             const active = state.empirePoints >= p.points;
             return (

@@ -17,10 +17,11 @@ import type { MessageKey, Vars } from "@/i18n";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { useGame } from "@/store/game-store";
+import { useUi } from "@/store/ui-store";
 import type { MissionState, Reward } from "@/game/types";
 
 /** Title and one-line detail for a goal, in the player's language. */
-function goalText(g: Goal, t: (k: MessageKey, v?: Vars) => string, n: Content): { title: string; detail: string } {
+export function goalText(g: Goal, t: (k: MessageKey, v?: Vars) => string, n: Content): { title: string; detail: string } {
   switch (g.kind) {
     case "build":
       return { title: t("goal.build"), detail: t("goal.buildDetail") };
@@ -41,6 +42,49 @@ function goalText(g: Goal, t: (k: MessageKey, v?: Vars) => string, n: Content): 
     }
     case "prestige":
       return { title: t("goal.prestige", { n: g.points }), detail: t("goal.prestigeDetail") };
+    case "facility":
+      return { title: t("goal.facility"), detail: t("goal.facilityDetail") };
+    case "worker":
+      return { title: t("goal.worker"), detail: t("goal.workerDetail", { n: g.idle }) };
+    case "zone":
+      return { title: t("goal.zone", { name: t(`zone.${g.zone}`) }), detail: t("goal.zoneDetail") };
+  }
+}
+
+/** What tapping a goal does. */
+export function runGoal(g: Goal, ready: boolean) {
+  const game = useGame.getState();
+  const ui = useUi.getState();
+  switch (g.kind) {
+    case "build":
+      game.build("garage");
+      ui.selectPlot("f:garage");
+      break;
+    case "automate":
+      if (ready) game.hireManager(g.manager, g.factory);
+      else ui.setView("managers");
+      break;
+    case "factory":
+      if (ready && game.buyFactory(g.factory)) ui.selectPlot(`f:${g.factory}`);
+      else ui.selectPlot(`f:${g.factory}`);
+      break;
+    case "prestige":
+      ui.setView("prestige");
+      break;
+    case "manager":
+      ui.setView("managers");
+      break;
+    case "car":
+      ui.selectPlot(`f:${g.factory}`);
+      break;
+    case "facility":
+    case "worker":
+      ui.enterGarage(g.plot);
+      break;
+    case "zone":
+      if (ready) game.unlockZone(g.zone);
+      ui.selectZone(g.zone);
+      break;
   }
 }
 
@@ -48,28 +92,20 @@ function goalText(g: Goal, t: (k: MessageKey, v?: Vars) => string, n: Content): 
 export function NextGoals() {
   const state = useGame((g) => g.state);
   const snap = useGame((g) => g.snap);
-  const { build, hireManager, buyFactory, setView } = useGame.getState();
   const goals = nextGoals(state, snap, 2);
   const { t, lang } = useT();
   const n = useContent(lang);
   if (!goals.length) return null;
 
   return (
-    <div className="grid gap-2 sm:grid-cols-2">
+    <div className="grid gap-2 @sm:grid-cols-2">
       {goals.map((g) => {
         const cost = "cost" in g ? g.cost : undefined;
         const pct = cost ? Math.min(100, (state.cash / cost) * 100) : 100;
         const ready = !cost || state.cash >= cost;
         const eta = cost && !ready && snap.incomePerSec > 0 ? (cost - state.cash) / snap.incomePerSec : null;
         const text = goalText(g, t, n);
-        const onGo = () => {
-          if (g.kind === "build") build("garage");
-          else if (g.kind === "automate" && ready) hireManager(g.manager, g.factory);
-          else if (g.kind === "factory" && ready) buyFactory(g.factory);
-          else if (g.kind === "prestige") setView("prestige");
-          else if (g.kind === "manager") setView("managers");
-          else if (g.kind === "car") document.getElementById(`factory-${g.factory}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-        };
+        const onGo = () => runGoal(g, ready);
         return (
           <div
             key={g.kind}
@@ -160,7 +196,8 @@ export function MissionRow({
 export function MissionStrip() {
   const state = useGame((g) => g.state);
   const snap = useGame((g) => g.snap);
-  const { claimDaily, claimMilestone, setView } = useGame.getState();
+  const { claimDaily, claimMilestone } = useGame.getState();
+  const setView = useUi((u) => u.setView);
   const daily = state.missions.daily.filter((m) => !m.claimed);
   const milestone = openMilestones(state, 1)[0];
   const { t, lang } = useT();
@@ -209,7 +246,7 @@ export function MissionStrip() {
           {t("mission.all", { n: left + daily.length })}
         </button>
       </div>
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="grid gap-2 @sm:grid-cols-2">
         {items.map((i) => (
           <div key={i.key} className="min-w-0">
             {i.node}

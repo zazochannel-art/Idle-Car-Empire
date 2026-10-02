@@ -26,6 +26,10 @@ export function computeOffline(s: GameState, now: number): OfflineReport {
     report.money += st.incomeBeforeDealers * snap.dealers.multiplier * capped * eff;
     report.rp += cars * st.car.rp * snap.gm.rp;
   }
+  // Garages and map buildings keep working too, at the same efficiency.
+  const eff = snap.gm.offline;
+  report.money += snap.city.incomePerSec * capped * eff;
+  report.serviced = Math.floor(snap.city.carsPerSec * capped * eff);
   report.cars = Math.floor(report.cars);
   return report;
 }
@@ -35,6 +39,7 @@ export function applyOffline(s: GameState, report: OfflineReport) {
   s.run.offlineEarned += report.money;
   s.lifetime.offlineEarned += report.money;
   s.rp += report.rp;
+  s.city.carsServiced += report.serviced ?? 0;
   for (const [car, n] of Object.entries(report.carsByType)) {
     recordCars(s, car as keyof typeof s.run.carsByType, Math.floor(n ?? 0));
   }
@@ -47,7 +52,7 @@ export function applyOffline(s: GameState, report: OfflineReport) {
 export function settleOffline(s: GameState, now: number): OfflineReport | null {
   const report = computeOffline(s, now);
   s.lastActiveAt = now;
-  if (report.money <= 0 && report.cars <= 0) return null;
+  if (report.money <= 0 && report.cars <= 0 && !report.serviced) return null;
   if (report.seconds < OFFLINE.minReportSeconds) {
     applyOffline(s, report);
     return null;
@@ -58,6 +63,7 @@ export function settleOffline(s: GameState, now: number): OfflineReport | null {
     p.seconds += report.seconds;
     p.cappedSeconds += report.cappedSeconds;
     p.cars += report.cars;
+    p.serviced = (p.serviced ?? 0) + (report.serviced ?? 0);
     p.money += report.money;
     p.rp += report.rp;
     for (const [car, n] of Object.entries(report.carsByType)) {

@@ -9,7 +9,10 @@ import { FACTORIES } from "../src/game/config/factories";
 import { MANAGERS } from "../src/game/config/managers";
 import { RESEARCH } from "../src/game/config/research";
 import { UPGRADE_IDS } from "../src/game/config/upgrades";
+import { FACILITIES, SPECS, ZONE_BY_ID } from "../src/game/config/city";
+import { WORLD_MAP, factoryPlot } from "../src/game/city/layout";
 import * as A from "../src/game/engine/actions";
+import * as C from "../src/game/engine/city";
 import {
   carModelCost,
   dealerUpgradeCost,
@@ -41,7 +44,17 @@ function options(g: GameState): Option[] {
   for (const f of FACTORIES) {
     const st = g.factories[f.id];
     if (!st.owned) {
-      out.push({ label: `buy ${f.name}`, cost: f.cost, act: (x) => A.buyFactory(x, f.id) });
+      // A factory on a locked district comes with the price of the district.
+      const zone = factoryPlot(f.id)!.zone;
+      const zoneCost = g.city.zones.includes(zone) ? 0 : ZONE_BY_ID[zone].cost;
+      const blocked = zoneCost > 0 && C.zoneBlocker(g, zone);
+      if (!blocked) {
+        out.push({
+          label: zoneCost ? `buy ${f.name} + ${zone}` : `buy ${f.name}`,
+          cost: f.cost + zoneCost,
+          act: (x) => (zoneCost ? C.unlockZone(x, zone) : true) && A.buyFactory(x, f.id),
+        });
+      }
       continue;
     }
     out.push({ label: `level ${f.id}`, cost: levelPurchase(g, f.id, 1).cost, act: (x) => A.buyLevels(x, f.id, 1) });
@@ -67,6 +80,45 @@ function options(g: GameState): Option[] {
       if (c !== null) out.push({ label: `mgr+ ${m.name}`, cost: c, act: (x) => A.upgradeManager(x, m.id) });
     }
   }
+  // The Empire Map: garages, their facilities and plot buildings.
+  for (const [plot, b] of Object.entries(g.city.buildings)) {
+    const up = C.buildingUpgradeCost(g, plot);
+    if (up !== null) out.push({ label: `upgrade ${b.type} ${plot}`, cost: up, act: (x) => C.upgradeBuilding(x, plot) });
+    if (!b.garage) continue;
+    const wc = C.workerCost(g, plot);
+    if (wc !== null) out.push({ label: `worker ${plot}`, cost: wc, act: (x) => C.hireWorker(x, plot) });
+    for (const f of FACILITIES) {
+      if (C.facilityCount(b.garage, f.id) >= C.facilityCap(b.level, f.id)) continue;
+      for (const rot of [0, 1] as const) {
+        const spot = C.findSpot(b.level, b.garage, f.id, rot);
+        if (!spot) continue;
+        out.push({ label: `facility ${f.id} ${plot}`, cost: C.facilityCost(g, plot, f.id), act: (x) => C.placeFacility(x, plot, f.id, spot.x, spot.y, rot) });
+        break;
+      }
+    }
+    for (const sp of SPECS) {
+      if (sp.id !== b.garage.spec && b.level >= sp.level) out.push({ label: `spec ${sp.id} ${plot}`, cost: C.specCost(g, plot), act: (x) => C.setSpecialization(x, plot, sp.id) });
+    }
+  }
+  const tried = new Set<string>();
+  for (const p of WORLD_MAP.plots) {
+    if (!C.canBuildOn(g, p.id) || tried.has(p.zone)) continue;
+    tried.add(p.zone);
+    for (const type of ZONE_BY_ID[p.zone].builds) {
+      if (type !== "garage") {
+        out.push({ label: `build ${type} ${p.zone}`, cost: C.structureCost(g, p.id, type), act: (x) => C.buildStructure(x, p.id, type) });
+        continue;
+      }
+      // An empty garage earns nothing: judge it with its first bay and lift.
+      const scale = ZONE_BY_ID[p.zone].scale;
+      out.push({
+        label: `build garage ${p.zone}`,
+        cost: C.structureCost(g, p.id, "garage") + 200 * scale,
+        act: (x) => C.buildStructure(x, p.id, "garage") && C.placeFacility(x, p.id, "serviceBay", 0, 0, 0) && C.placeFacility(x, p.id, "carLift", 4, 0, 0),
+      });
+    }
+  }
+
   const unlocked = unlockedCarIds(g, snapshot(g).gm);
   for (const c of CARS) {
     if (!unlocked.has(c.id)) continue;
@@ -107,8 +159,9 @@ function botStep() {
     best.o.act(s);
     if (process.env.TRACE) log(`  ${best.o.label} cost ${formatMoney(best.o.cost)} -> ${formatMoney(income(s))}/s cash ${formatMoney(s.cash)}`);
     const key = best.o.label;
-    if (/^(buy|hire|dealer )/.test(key) && !seen.has(key)) {
-      seen.add(key);
+    const milestone = key.replace(/ (town|industrial|downtown|automotive|luxury|supercar|mega|global):\d:\d$/, "");
+    if (/^(buy|hire|dealer |build garage|facility (paintBooth|dyno|supercarWorkshop)|upgrade garage)/.test(key) && !seen.has(milestone)) {
+      seen.add(milestone);
       log(`${key.padEnd(24)}| income ${formatMoney(income(s))}/s`);
     }
   }
@@ -154,6 +207,11 @@ while (t < end) {
   }
   if (t - lastReport >= Number(process.env.REPORT ?? 300)) {
     lastReport = t;
-    log(`--- cash ${formatMoney(s.cash)}  income ${formatMoney(income(s))}/s  RP ${Math.floor(s.rp)}  EP ${s.empirePoints}  achievements ${s.achievements.length}`);
+    if (process.env.CITY) {
+      const kinds: Record<string, string[]> = {};
+      for (const b of Object.values(s.city.buildings)) (kinds[b.type] ??= []).push(String(b.level));
+      log(`    city ${Object.entries(kinds).map(([k, v]) => `${k}[${v.join(",")}]`).join(" ")}  effects ${JSON.stringify(C.cityEffects(s))}`);
+    }
+    log(`--- cash ${formatMoney(s.cash)}  income ${formatMoney(income(s))}/s (map ${formatMoney(snapshot(s).city.incomePerSec)}/s, ${Object.keys(s.city.buildings).length} bldg)  RP ${Math.floor(s.rp)}  EP ${s.empirePoints}  achievements ${s.achievements.length}`);
   }
 }

@@ -3,6 +3,7 @@ import { DEALER_IDS } from "../config/dealerships";
 import { FACTORIES } from "../config/factories";
 import { MANAGER_IDS } from "../config/managers";
 import { UPGRADE_IDS } from "../config/upgrades";
+import { createCity } from "./city";
 import type {
   CarId,
   DealerId,
@@ -16,7 +17,7 @@ import type {
   UpgradeCategory,
 } from "../types";
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 export function emptyUpgrades(): Record<UpgradeCategory, number> {
   return Object.fromEntries(UPGRADE_IDS.map((u) => [u, 0])) as Record<UpgradeCategory, number>;
@@ -88,6 +89,7 @@ export function createInitialState(now: number): GameState {
     missions: { dailyDate: "", daily: [], milestonesClaimed: [] },
     run: createStats(),
     lifetime: createStats(),
+    city: createCity(),
     pendingOffline: null,
     settings: { buyAmount: 1, lang: "en" },
     createdAt: now,

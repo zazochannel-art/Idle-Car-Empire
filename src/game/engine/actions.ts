@@ -18,6 +18,8 @@ import {
   nextLevelCost,
   upgradeCost,
 } from "./economy";
+import { dealerPlot, factoryPlot } from "../city/layout";
+import { isPlotUnlocked } from "./city";
 import { computeGlobalMods } from "./modifiers";
 
 function spend(s: GameState, cost: number | null): boolean {
@@ -46,6 +48,7 @@ export function buyFactory(s: GameState, id: FactoryId): boolean {
   const f = s.factories[id];
   if (f.owned) return false;
   if (!isFactoryAvailable(computeGlobalMods(s), id)) return false;
+  if (!isPlotUnlocked(s, factoryPlot(id))) return false;
   if (!spend(s, FACTORY_BY_ID[id].cost)) return false;
   f.owned = true;
   f.progress = 0;
@@ -125,7 +128,8 @@ export function assignManager(s: GameState, id: ManagerId, factory: FactoryId | 
 
 export function buyDealer(s: GameState, id: DealerId): boolean {
   const d = s.dealers[id];
-  if (d.owned || !spend(s, DEALER_BY_ID[id].cost)) return false;
+  if (d.owned || !isPlotUnlocked(s, dealerPlot(id))) return false;
+  if (!spend(s, DEALER_BY_ID[id].cost)) return false;
   d.owned = true;
   return true;
 }

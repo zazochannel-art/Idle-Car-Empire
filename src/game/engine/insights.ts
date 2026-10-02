@@ -4,7 +4,10 @@
 import { CARS, type CarConfig } from "../config/cars";
 import { FACTORIES, FACTORY_BY_ID } from "../config/factories";
 import { MANAGERS } from "../config/managers";
-import type { CarId, FactoryId, GameState, ManagerId } from "../types";
+import { ZONE_BY_ID } from "../config/city";
+import { dealerPlot, factoryPlot, STARTER_PLOT } from "../city/layout";
+import type { CarId, DealerId, FactoryId, GameState, ManagerId, ZoneId } from "../types";
+import { isPlotUnlocked, nextZone, zoneBlocker } from "./city";
 import { isFactoryAvailable, unlockedCarIds, upgradeCost, type EconomySnapshot } from "./economy";
 import { canPrestige, pendingPoints } from "./prestige";
 import { isManagerUnlocked } from "./actions";
@@ -13,6 +16,7 @@ export type Requirement =
   | { kind: "research"; research: string }
   | { kind: "buyFactory"; factory: FactoryId }
   | { kind: "technology"; factory: FactoryId; level: number }
+  | { kind: "zone"; zone: ZoneId }
   | { kind: "unavailable" };
 
 export type Goal =
@@ -21,7 +25,10 @@ export type Goal =
   | { kind: "factory"; icon: string; cost: number; factory: FactoryId; requirement: Requirement | null }
   | { kind: "car"; icon: string; cost?: number; factory: FactoryId; car: CarId }
   | { kind: "manager"; icon: string; cost: number; manager: ManagerId }
-  | { kind: "prestige"; icon: string; points: number };
+  | { kind: "prestige"; icon: string; points: number }
+  | { kind: "facility"; icon: string; plot: string }
+  | { kind: "worker"; icon: string; plot: string; idle: number }
+  | { kind: "zone"; icon: string; cost: number; zone: ZoneId };
 
 /** Which factory, with how many Technology levels, could build this car. */
 export function carUnlockPath(s: GameState, car: CarConfig): { factory: FactoryId; techNeeded: number; owned: boolean } | null {
@@ -47,17 +54,35 @@ export function carRequirement(s: GameState, car: CarConfig, snap: EconomySnapsh
   return { kind: "technology", factory: path.factory, level: s.factories[path.factory].upgrades.technology + path.techNeeded };
 }
 
-export function factoryRequirement(snap: EconomySnapshot, id: FactoryId): Requirement | null {
+export function factoryRequirement(s: GameState, snap: EconomySnapshot, id: FactoryId): Requirement | null {
   const cfg = FACTORY_BY_ID[id];
-  if (isFactoryAvailable(snap.gm, id)) return null;
-  return { kind: "research", research: cfg.requiresResearch! };
+  if (!isFactoryAvailable(snap.gm, id)) return { kind: "research", research: cfg.requiresResearch! };
+  const plot = factoryPlot(id);
+  if (plot && !isPlotUnlocked(s, plot)) return { kind: "zone", zone: plot.zone };
+  return null;
+}
+
+export function dealerRequirement(s: GameState, id: DealerId): Requirement | null {
+  const plot = dealerPlot(id);
+  return plot && !isPlotUnlocked(s, plot) ? { kind: "zone", zone: plot.zone } : null;
 }
 
 export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] {
   const goals: Goal[] = [];
   const garage = snap.factories.garage;
 
+  // First car by hand (earns the money for the first service bay), then
+  // get Garage #01 running.
   if (s.lifetime.carsProduced === 0) goals.push({ kind: "build", icon: "🔧", factory: "garage" });
+  const starter = s.city.buildings[STARTER_PLOT]?.garage;
+  if (starter && starter.facilities.length === 0) goals.push({ kind: "facility", icon: "🛠️", plot: STARTER_PLOT });
+  for (const [plot, st] of Object.entries(snap.city.garages)) {
+    if (st.workstations > st.staffed && st.workers < st.workerCap) {
+      goals.push({ kind: "worker", icon: "👷", plot, idle: st.workstations - st.staffed });
+      break;
+    }
+  }
+
   if (garage && !garage.automated && s.factories.garage.owned) {
     const mike = MANAGERS[0];
     goals.push({ kind: "automate", icon: mike.avatar, cost: mike.cost, factory: "garage", manager: mike.id });
@@ -65,7 +90,13 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
 
   const nextFactory = FACTORIES.find((f) => !s.factories[f.id].owned);
   if (nextFactory) {
-    goals.push({ kind: "factory", icon: nextFactory.emoji, cost: nextFactory.cost, factory: nextFactory.id, requirement: factoryRequirement(snap, nextFactory.id) });
+    const req = factoryRequirement(s, snap, nextFactory.id);
+    if (req?.kind === "zone") {
+      const z = nextZone(s);
+      if (z && !zoneBlocker(s, z.id)) goals.push({ kind: "zone", icon: "🗺️", cost: ZONE_BY_ID[z.id].cost, zone: z.id });
+    } else {
+      goals.push({ kind: "factory", icon: nextFactory.emoji, cost: nextFactory.cost, factory: nextFactory.id, requirement: req });
+    }
   }
 
   const unlocked = unlockedCarIds(s, snap.gm);

@@ -48,7 +48,7 @@ export function ResearchView() {
                 <span>{cat.emoji}</span>
                 <span style={{ color: cat.color }}>{n.researchCategory(cat)}</span>
               </h3>
-              <div className="scrollbar-none -mx-3 flex snap-x gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 lg:grid-cols-4">
+              <div className="scrollbar-none -mx-3 flex snap-x gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:grid @sm:grid-cols-2 sm:overflow-visible sm:px-0 @4xl:grid-cols-4">
                 {nodes.map((node, i) => {
                   const isDone = state.research.includes(node.id);
                   const available = canResearch(state, node.id);
