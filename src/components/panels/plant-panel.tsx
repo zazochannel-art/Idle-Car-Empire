@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { CARS, CAR_BY_ID } from "@/game/config/cars";
-import { AUTOMATION, COMPONENTS, COMPONENT_BY_ID, GRADES, PLANTS, PLANT_BY_ID, PLANT_LEVELS, SPEED } from "@/game/config/chain";
+import { AUTOMATION, COMPONENTS, COMPONENT_BY_ID, GRADES, PLANTS, PLANT_BY_ID, PLANT_LEVELS, PLANT_TRUCKS, SPEED } from "@/game/config/chain";
 import { DEALER_BY_ID } from "@/game/config/dealerships";
 import { MANAGERS } from "@/game/config/managers";
 import { DEPOT, MARKET, plotOf } from "@/game/city/layout";
@@ -17,7 +17,7 @@ import {
   carValue,
   componentBase,
   dealerStats,
-  fleetCost,
+  trucksOf,
   gradeCost,
   levelCost,
   plantNumber,
@@ -28,7 +28,7 @@ import {
 import { dealerUpgradeCost } from "@/game/engine/economy";
 import { dealerRequirement } from "@/game/engine/insights";
 import { formatDuration, formatMoney, formatNumber, formatPercent } from "@/game/format";
-import type { ComponentId, DealerId, GameState, ItemId, PlantType, Route } from "@/game/types";
+import type { ComponentId, DealerId, GameState, ItemId, PlantType } from "@/game/types";
 import type { MessageKey, Vars } from "@/i18n";
 import { useContent } from "@/i18n/content";
 import { useT } from "@/i18n/use-t";
@@ -75,6 +75,7 @@ export function PlantPanel({ id }: { id: string }) {
   const item: ItemId = cfg.item ?? "car";
   const plot = plotOf(id)!;
   const busy = state.chain.shipments.filter((sh) => sh.from === id).length;
+  const hasAssembly = plantsOf(state).some(([, o]) => o.type === "assemblyPlant");
   const manager = MANAGERS.find((m) => state.managers[m.id].hired && state.managers[m.id].assignedTo === id);
   const steps = processSteps(st.type, t);
   const step = Math.min(steps.length - 1, Math.floor(p.progress * (steps.length - 1)));
@@ -142,10 +143,10 @@ export function PlantPanel({ id }: { id: string }) {
         <div className="mb-2 flex items-center justify-between">
           <span className="text-[11px] font-bold uppercase tracking-wider text-white/55">{t("plant.transport")}</span>
           <span className="flex items-center gap-1 text-[11px] tabular-nums text-white/60">
-            <Truck className="size-3.5" /> {t("plant.trucks", { busy, n: p.fleet, vehicle: t(`vehicle.${st.vehicle}`), cap: st.capacity })}
+            <Truck className="size-3.5" /> {t("plant.trucks", { busy, n: trucksOf(b), vehicle: t(`vehicle.${st.vehicle}`), cap: st.capacity })}
           </span>
         </div>
-        {cfg.item ? <RouteToggle id={id} route={p.route} item={cfg.item} /> : <p className="text-[11px] text-white/55">{t("plant.carsTo")}</p>}
+        <p className="text-[11px] text-white/55">{cfg.item ? (hasAssembly ? t("route.useHint") : t("route.useNoAssembly")) : t("plant.carsTo")}</p>
       </div>
 
       {/* upgrades */}
@@ -153,7 +154,7 @@ export function PlantPanel({ id }: { id: string }) {
         <UpgradeRow
           icon="🏗️"
           title={b.level < PLANT_LEVELS.length ? t("plant.levelUp", { name: t(`plantLevel.${b.level + 1}` as MessageKey) }) : t("plant.levelMax")}
-          detail={b.level < PLANT_LEVELS.length ? t("plant.levelDetail", { a: PLANT_LEVELS[b.level - 1].lines, b: PLANT_LEVELS[b.level].lines }) : ""}
+          detail={b.level < PLANT_LEVELS.length ? t("plant.levelDetail", { a: PLANT_LEVELS[b.level - 1].lines, b: PLANT_LEVELS[b.level].lines, n: Math.max(trucksOf(b), PLANT_TRUCKS[b.level]) }) : ""}
           cost={levelCost(b, gm)}
           onBuy={() => g.plantLevel(id)}
           gold
@@ -166,7 +167,6 @@ export function PlantPanel({ id }: { id: string }) {
           cost={automationCost(b, gm)}
           onBuy={() => g.plantAutomation(id)}
         />
-        <UpgradeRow icon="🚚" title={t("plant.truck", { n: p.fleet + 1 })} detail={t("plant.truckDetail")} cost={fleetCost(b, gm)} onBuy={() => g.plantTruck(id)} />
         {cfg.item && (
           <UpgradeRow
             icon="★"
@@ -201,7 +201,7 @@ function StatusLine({ id }: { id: string }) {
     text = inbound ? t("status.rawComing", { raw: rawName(st.type, t) }) : t("status.noCash", { raw: rawName(st.type, t) });
   } else if (p.status === "full") {
     tone = "wait";
-    text = p.route === "store" ? t("status.stored") : t("status.full");
+    text = t("status.full");
   } else if (p.status === "noParts") {
     tone = "bad";
     text = t("status.noParts", { item: itemName(p.missing ?? "engine", t).toUpperCase() });
@@ -215,36 +215,6 @@ function StatusLine({ id }: { id: string }) {
       {tone === "ok" ? "✅" : tone === "wait" ? "⏳" : "⚠️"} {text}
       {tone === "bad" && <div className="mt-0.5 text-[11px] font-normal opacity-80">{t("status.paused")}</div>}
       {cfg.item && tone !== "bad" && p.status === "ok" && <span className="font-normal opacity-70"> · {t("status.made", { n: formatNumber(p.made) })}</span>}
-    </div>
-  );
-}
-
-function RouteToggle({ id, route, item }: { id: string; route: Route; item: ComponentId }) {
-  const setRoute = useGame((g) => g.setRoute);
-  const hasAssembly = useGame((g) => plantsOf(g.state).some(([, b]) => b.type === "assemblyPlant"));
-  const { t } = useT();
-  const options: { id: Route; label: string; icon: string }[] = [
-    { id: "use", label: t("route.use"), icon: "🏭" },
-    { id: "sell", label: t("route.sell"), icon: "💰" },
-    { id: "store", label: t("route.store"), icon: "📦" },
-  ];
-  const hint = route === "use" ? (hasAssembly ? t("route.useHint") : t("route.useNoAssembly")) : route === "sell" ? t("route.sellHint") : t("route.storeHint");
-  return (
-    <div>
-      <div className="grid grid-cols-3 gap-1 rounded-xl bg-black/20 p-1">
-        {options.map((o) => (
-          <button
-            key={o.id}
-            onClick={() => setRoute(id, o.id)}
-            className={cn("rounded-lg px-1 py-1.5 text-[10px] font-black uppercase tracking-wide transition", route === o.id ? "bg-electric text-white" : "text-white/55 hover:text-white")}
-          >
-            {o.icon} {o.label}
-          </button>
-        ))}
-      </div>
-      <p className="mt-1.5 text-[11px] text-white/50">
-        {hint} · {itemName(item, t)}
-      </p>
     </div>
   );
 }

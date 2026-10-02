@@ -32,7 +32,7 @@ export function DealersView() {
       </ViewHeader>
       <div className="grid gap-3 @xl:grid-cols-2">
         {DEALERS.filter((d) => state.dealers[d.id].owned || d.id === nextLocked?.id).map((d) => (
-          <div key={d.id} className="glass rounded-2xl p-4">
+          <div key={d.id} className="glass min-w-0 rounded-2xl p-4">
             <button onClick={() => selectPlot(`d:${d.id}`)} className="mb-2 flex items-center gap-3 text-left">
               <span className="text-3xl">{d.emoji}</span>
               <span>

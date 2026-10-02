@@ -11,7 +11,6 @@ import {
   COMPONENT_BY_ID,
   DEALER_SALE,
   DOCK_TIME,
-  FLEET,
   GRADES,
   MAKER,
   MATERIAL_SHARE,
@@ -20,8 +19,10 @@ import {
   OUT_STORAGE,
   PLANT_BY_ID,
   PLANT_COPY_COST,
+  MAX_TRUCKS,
   PLANT_LEVELS,
   PLANT_MAX_LEVEL,
+  PLANT_TRUCKS,
   PLANT_VEHICLE,
   RATE_WINDOW,
   RAW_STORAGE,
@@ -47,7 +48,6 @@ import type {
   GameState,
   PlantData,
   PlantType,
-  Route,
   Shipment,
 } from "../types";
 import type { GlobalMods } from "./modifiers";
@@ -137,10 +137,9 @@ export function automationCost(b: BuildingState, gm: GlobalMods): number | null 
   return base(b) * AUTOMATION[p.automation + 1].cost * gm.costMult;
 }
 
-export function fleetCost(b: BuildingState, gm: GlobalMods): number | null {
-  const p = b.plant!;
-  if (p.fleet >= FLEET.max) return null;
-  return base(b) * FLEET.firstCost * Math.pow(FLEET.growth, p.fleet - 1) * gm.costMult;
+/** Trucks a plant runs: they come with its level (older saves keep the ones they bought). */
+export function trucksOf(b: BuildingState): number {
+  return Math.min(MAX_TRUCKS, Math.max(b.plant?.fleet ?? 1, PLANT_TRUCKS[b.level - 1] ?? 1));
 }
 
 export function gradeCost(b: BuildingState, gm: GlobalMods): number | null {
@@ -172,11 +171,9 @@ export type CarLock =
 export function carLock(s: GameState, car: CarConfig, gm: GlobalMods): CarLock {
   if (car.requiresResearch && !gm.unlockedCars.has(car.id)) return { kind: "research", research: car.requiresResearch };
   if (!hasPlant(s, "assemblyPlant")) return { kind: "plant", plant: "assemblyPlant" };
-  for (const c of recipe(car)) {
-    const g = bestGrade(s, c);
-    if (g === 0) return { kind: "plant", plant: MAKER[c] };
-    if (g < car.grade) return { kind: "grade", plant: MAKER[c], grade: car.grade };
-  }
+  // missing plants first (the bigger step), then grades
+  for (const c of recipe(car)) if (bestGrade(s, c) === 0) return { kind: "plant", plant: MAKER[c] };
+  for (const c of recipe(car)) if (bestGrade(s, c) < car.grade) return { kind: "grade", plant: MAKER[c], grade: car.grade };
   return null;
 }
 
@@ -371,8 +368,6 @@ export interface ChainTickOut {
 /** Where a finished load from this plant should go now, or null to wait. */
 function destination(s: GameState, snap: ChainSnapshot, b: BuildingState & { plant: PlantData }): { to: string; room: number } | null {
   const cfg = PLANT_BY_ID[b.type as PlantType];
-  const route: Route = b.plant.route;
-  if (route === "store") return null;
   if (!cfg.item) {
     // cars: to the dealer with the best markup that has room
     let best: { to: string; room: number; markup: number } | null = null;
@@ -385,19 +380,16 @@ function destination(s: GameState, snap: ChainSnapshot, b: BuildingState & { pla
     }
     return best;
   }
-  if (route === "use") {
-    // the assembly plant that needs this part most
-    let best: { to: string; room: number } | null = null;
-    for (const [id, other] of plantsOf(s)) {
-      if (other.type !== "assemblyPlant") continue;
-      const ost = snap.plants[id];
-      if (!ost?.car || !recipe(ost.car).includes(cfg.item)) continue;
-      const room = ost.inCap - (other.plant.inputs[cfg.item] ?? 0) - incoming(s, id, cfg.item);
-      if (room > 0 && (!best || room > best.room)) best = { to: id, room };
-    }
-    if (best) return best;
+  // parts go to the assembly plant that needs them most; the rest is sold
+  let best: { to: string; room: number } | null = null;
+  for (const [id, other] of plantsOf(s)) {
+    if (other.type !== "assemblyPlant") continue;
+    const ost = snap.plants[id];
+    if (!ost?.car || !recipe(ost.car).includes(cfg.item)) continue;
+    const room = ost.inCap - (other.plant.inputs[cfg.item] ?? 0) - incoming(s, id, cfg.item);
+    if (room > 0 && (!best || room > best.room)) best = { to: id, room };
   }
-  return { to: MARKET, room: Infinity };
+  return best ?? { to: MARKET, room: Infinity };
 }
 
 /**
@@ -497,6 +489,11 @@ export function chainTick(
           s.lifetime.carsByType[st.car.id] += n;
           const first = !s.chain.firstCar;
           s.chain.firstCar = true;
+          // the first car opens the Local Dealer, so cars start selling right away
+          if (first && !s.dealers.local.owned) {
+            s.dealers.local.owned = true;
+            s.chain.dealers.local = emptyDealerStock();
+          }
           events?.push({ type: "carBuilt", plot: id, car: st.car.id, first });
         }
         p.made += n;
@@ -505,7 +502,7 @@ export function chainTick(
     }
 
     // 3. loading dock: send a truck when there is a full load (or it waited long enough)
-    if (p.out >= 1 && busyTrucks(s, id) < p.fleet) {
+    if (p.out >= 1 && busyTrucks(s, id) < trucksOf(b)) {
       p.wait += dt;
       if (p.out >= st.capacity || p.wait >= MAX_WAIT) {
         const dest = destination(s, snap, b);
@@ -671,27 +668,11 @@ export function upgradeAutomation(s: GameState, plotId: string, gm: GlobalMods):
   return true;
 }
 
-export function buyTruck(s: GameState, plotId: string, gm: GlobalMods): boolean {
-  const b = plantAt(s, plotId);
-  if (!b || !spend(s, fleetCost(b, gm))) return false;
-  b.plant.fleet += 1;
-  countUpgrade(s);
-  return true;
-}
-
 export function upgradeGrade(s: GameState, plotId: string, gm: GlobalMods): boolean {
   const b = plantAt(s, plotId);
   if (!b || !spend(s, gradeCost(b, gm))) return false;
   b.plant.grade += 1;
   countUpgrade(s);
-  return true;
-}
-
-export function setRoute(s: GameState, plotId: string, route: Route): boolean {
-  const b = plantAt(s, plotId);
-  if (!b || b.plant.route === route) return false;
-  b.plant.route = route;
-  b.plant.wait = MAX_WAIT; // a waiting load leaves right away
   return true;
 }
 
@@ -716,9 +697,10 @@ export function migratePlant(type: PlantType, raw: unknown): PlantData {
   if (!isObj(raw)) return p;
   p.speed = int(raw.speed, 0, SPEED.max, 0);
   p.automation = int(raw.automation, 0, AUTOMATION.length - 1, 0);
-  p.fleet = int(raw.fleet, 1, FLEET.max, 1);
+  p.fleet = int(raw.fleet, 1, MAX_TRUCKS, 1);
   p.grade = int(raw.grade, 1, MAX_GRADE, 1);
-  p.route = raw.route === "sell" || raw.route === "store" ? raw.route : "use";
+  // routing is automatic now: parts go where they are needed
+  p.route = "use";
   p.progress = Math.min(0.999, num(raw.progress));
   p.raw = num(raw.raw, p.raw);
   p.out = num(raw.out);

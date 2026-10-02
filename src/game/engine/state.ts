@@ -48,7 +48,8 @@ export function createStats(): Stats {
 export function createInitialState(now: number): GameState {
   return {
     version: SAVE_VERSION,
-    cash: 0,
+    // enough for the first upgrades right away
+    cash: 250,
     rp: 0,
     empirePoints: 0,
     empirePointsEarned: 0,

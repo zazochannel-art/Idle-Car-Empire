@@ -30,7 +30,7 @@ export const EMPIRE_PERKS: EmpirePerk[] = [
   { points: 40, name: "Night Shift", description: "+4h offline limit, +25% offline income.", effects: [{ kind: "offlineCap", hours: 4 }, { kind: "offline", add: 0.25 }] },
   { points: 100, name: "Franchise", description: "Start with an Engine Factory. Research +50%.", effects: [{ kind: "rp", mult: 1.5 }], startPlants: ["engineFactory"] },
   { points: 250, name: "Brand Power", description: "×2 car value.", effects: [{ kind: "value", mult: 2 }] },
-  { points: 600, name: "Continental", description: "Start with Interior and Glass factories and $10M.", effects: [], startPlants: ["engineFactory", "interiorFactory", "glassFactory"], startCash: 1e7 },
+  { points: 600, name: "Continental", description: "Start with Engine and Tyre factories and $10M.", effects: [], startPlants: ["engineFactory", "tireFactory"], startCash: 1e7 },
   { points: 1_500, name: "Legacy", description: "×2 speed, +8h offline limit.", effects: [{ kind: "speed", mult: 2 }, { kind: "offlineCap", hours: 8 }] },
   { points: 5_000, name: "Icon", description: "×3 global income.", effects: [{ kind: "income", mult: 3 }] },
 ];

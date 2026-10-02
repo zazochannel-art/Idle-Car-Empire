@@ -18,7 +18,7 @@ export interface DealerConfig {
 export const DEALER_MARKUP_PER_LEVEL = 0.02;
 
 export const DEALERS: DealerConfig[] = [
-  { id: "local", name: "Local Dealer", emoji: "🏪", cost: 2e7, customers: 4, markup: 0, upgradeCost: 8e6, upgradeGrowth: 1.6, description: "A forecourt and a handshake." },
+  { id: "local", name: "Local Dealer", emoji: "🏪", cost: 0, customers: 4, markup: 0, upgradeCost: 8e6, upgradeGrowth: 1.6, description: "A forecourt and a handshake." },
   { id: "city", name: "City Dealer", emoji: "🏬", cost: 1e9, customers: 6, markup: 0.1, upgradeCost: 4e8, upgradeGrowth: 1.6, description: "Downtown glass showroom." },
   { id: "premium", name: "Premium Dealer", emoji: "🏢", cost: 1e11, customers: 8, markup: 0.25, upgradeCost: 4e10, upgradeGrowth: 1.65, description: "Espresso while you sign." },
   { id: "luxury", name: "Luxury Dealer", emoji: "🏛️", cost: 1e13, customers: 10, markup: 0.5, upgradeCost: 4e12, upgradeGrowth: 1.7, description: "Appointment only." },
