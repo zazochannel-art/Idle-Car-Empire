@@ -154,6 +154,16 @@ export class Painter {
     c.closePath();
     c.fillStyle = this.col(color, -0.24);
     c.fill();
+    // ambient occlusion: walls darken toward the ground
+    if (h > 6) {
+      const ao = Math.min(9, h * 0.3);
+      this.onLeft(x, y1, z, 0, w, 0, ao, "rgba(15,23,42,0.13)");
+      this.onLeft(x, y1, z, 0, w, 0, ao * 0.45, "rgba(15,23,42,0.1)");
+      this.onRight(x1, y, z, 0, d, 0, ao, "rgba(15,23,42,0.13)");
+      this.onRight(x1, y, z, 0, d, 0, ao * 0.45, "rgba(15,23,42,0.1)");
+      // sunlight catching the upper part of the lit wall
+      this.onLeft(x, y1, z, 0, w, h * 0.7, h, "rgba(255,247,230,0.06)");
+    }
     // top
     this.quad(x, y, w, d, top ? this.col(top) : this.col(color, 0.1), z + h);
     if (edge) {
@@ -289,15 +299,30 @@ export class Painter {
   }
 
   tree(x: number, y: number, size: number, seed: number, autumn = false) {
-    const greens = autumn ? ["#d97706", "#b45309", "#ca8a04"] : ["#2f9e44", "#37b24d", "#2b8a3e", "#40c057"];
+    const greens = autumn ? ["#d97706", "#b45309", "#ca8a04"] : ["#2f9e44", "#37b24d", "#2b8a3e", "#40c057", "#4d7c0f"];
     const g = greens[Math.floor(seed * greens.length) % greens.length];
-    this.ellipse(x + 0.12, y - 0.04, 0, 7 * size, "rgba(10,30,20,0.25)");
+    // cast shadow toward the lower right
+    this.ellipse(x + 0.22, y - 0.08, 0, 9 * size, "rgba(10,30,20,0.22)", 0.45);
     const c = this.ctx;
-    c.fillStyle = this.col("#7c4a24");
-    c.fillRect(sx(x, y) - 1.2 * size, sy(x, y, 9 * size), 2.4 * size, 9 * size);
-    this.circle(x, y, 15 * size, 8.5 * size, this.col(g, -0.12));
-    this.circle(x - 0.03, y - 0.03, 18 * size, 6.5 * size, this.col(g));
-    this.circle(x - 0.06, y - 0.06, 20.5 * size, 3.2 * size, this.col(g, 0.25));
+    const bx = sx(x, y);
+    const by = sy(x, y);
+    c.fillStyle = this.col("#6b3f1d");
+    c.fillRect(bx - 1.3 * size, by - 10 * size, 2.6 * size, 10 * size);
+    c.fillStyle = this.col("#4a2a12");
+    c.fillRect(bx + 0.2 * size, by - 10 * size, 1.1 * size, 10 * size);
+    // layered crown: dark base, mid lobes, sunlit top-left
+    const blob = (dx: number, dz: number, r: number, k: number) => {
+      c.beginPath();
+      c.arc(bx + dx * size, by - dz * size, r * size, 0, Math.PI * 2);
+      c.fillStyle = this.col(g, k);
+      c.fill();
+    };
+    blob(0, 14, 9.5, -0.22);
+    blob(-4.5, 17, 6.5, -0.08);
+    blob(4, 16, 6.8, -0.14);
+    blob(0, 20, 7, 0);
+    blob(-2.5, 22, 4.5, 0.14);
+    blob(-3.5, 23.5, 2.2, 0.3);
   }
 
   pine(x: number, y: number, size: number) {

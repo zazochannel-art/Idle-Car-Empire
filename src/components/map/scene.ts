@@ -4,7 +4,8 @@
 import { SPEC_BY_ID, STRUCTURE_BY_ID, ZONES, ZONE_BY_ID } from "@/game/config/city";
 import { FACTORY_BY_ID } from "@/game/config/factories";
 import { DEALER_BY_ID } from "@/game/config/dealerships";
-import { BLOCKS, NODES, ROAD_STEP, WORLD, WORLD_MAP, ZONE_TILES, zoneOfBlock, zoneRect, type Decor, type Plot } from "@/game/city/layout";
+import { BLOCKS, NODES, RIVER, ROAD_STEP, WORLD, WORLD_MAP, blockKind, hasRoad, hash, segmentSides, zoneCenterTile, zoneOfBlock, type Decor, type Plot, type Scenery } from "@/game/city/layout";
+import { coastline } from "./terrain";
 import { isFactoryAvailable, type EconomySnapshot } from "@/game/engine/economy";
 import type { BuildingState, GameState, StructureType, ZoneId } from "@/game/types";
 import { Painter, rand, sx, sy } from "./iso";
@@ -603,73 +604,150 @@ function decor(p: Painter, dc: Decor, t: number) {
       });
       break;
     }
-    case "water": {
-      const c = p.ctx;
-      p.quad(X - 0.1, Y - 0.1, W + 0.2, D + 0.2, p.col("#e9d8a6"));
-      p.quad(X + 0.1, Y + 0.1, W - 0.2, D - 0.2, p.col("#38bdf8", -0.1));
-      p.quad(X + 0.35, Y + 0.35, W - 0.7, D - 0.7, p.col("#0ea5e9", -0.15));
-      if (!p.dim) {
-        c.strokeStyle = "rgba(255,255,255,0.35)";
-        c.lineWidth = 1;
-        for (let i = 0; i < Math.min(12, Math.round(W * 2)); i++) {
-          const a = rand(seed * 31, i);
-          const b = rand(seed * 17, i + 5);
-          const px = X + 0.5 + a * (W - 1);
-          const py = Y + 0.5 + b * (D - 1);
-          const ph = Math.sin(t * 1.5 + i) * 3;
-          c.beginPath();
-          c.moveTo(sx(px, py) - 5 + ph, sy(px, py));
-          c.lineTo(sx(px, py) + 5 + ph, sy(px, py));
-          c.stroke();
-        }
-      }
-      break;
-    }
   }
 }
 
 // ───────────────────────────── ground ─────────────────────────────
 
-const ASPHALT = "#3f4652";
-const SIDEWALK = "#cfd6de";
+const ASPHALT = "#3d4450";
+const SIDEWALK = "#d3d9e0";
+const GRASS = "#69a955";
 
-export function drawGround(p: Painter, unlocked: ReadonlySet<ZoneId>, view: [number, number, number, number]) {
-  const c = p.ctx;
-  const inView = (b: [number, number, number, number]) => b[2] >= view[0] && b[0] <= view[2] && b[3] >= view[1] && b[1] <= view[3];
-
-  // island slab
-  p.dim = false;
-  p.box(-1, -1, WORLD + 2, WORLD + 2, -30, 30, "#7c5a3a", "#5e9b4c", false);
-  p.quad(-1, -1, WORLD + 2, WORLD + 2, "#e9d8a6");
-  p.quad(-0.4, -0.4, WORLD + 0.8, WORLD + 0.8, "#6aa956");
-
-  for (const z of ZONES) {
-    const r = zoneRect(z);
-    p.dim = !unlocked.has(z.id);
-    p.quad(r.x, r.y, r.w, r.d, p.col(z.ground));
+let grassPattern: CanvasPattern | null | undefined;
+/** A soft speckle texture laid over the grass so it doesn't look flat. */
+function grassTexture(ctx: CanvasRenderingContext2D): CanvasPattern | null {
+  if (grassPattern !== undefined) return grassPattern;
+  if (typeof document === "undefined") return (grassPattern = null);
+  const cv = document.createElement("canvas");
+  cv.width = cv.height = 128;
+  const g = cv.getContext("2d")!;
+  for (let i = 0; i < 520; i++) {
+    const x = rand(i, 1) * 128;
+    const y = rand(i, 2) * 128;
+    const r = 0.8 + rand(i, 3) * 2.6;
+    g.fillStyle = rand(i, 4) > 0.5 ? "rgba(255,255,190,0.07)" : "rgba(10,40,10,0.08)";
+    g.beginPath();
+    g.ellipse(x, y, r * 1.6, r, 0, 0, Math.PI * 2);
+    g.fill();
   }
+  return (grassPattern = ctx.createPattern(cv, "repeat"));
+}
+
+function coastPath(c: CanvasRenderingContext2D) {
+  c.beginPath();
+  for (const loop of coastline()) {
+    loop.forEach(([x, y], i) => (i ? c.lineTo(sx(x, y), sy(x, y)) : c.moveTo(sx(x, y), sy(x, y))));
+    c.closePath();
+  }
+}
+
+const inBox = (b: [number, number, number, number], view: [number, number, number, number]) => b[2] >= view[0] && b[0] <= view[2] && b[3] >= view[1] && b[1] <= view[3];
+
+export function drawGround(p: Painter, unlocked: ReadonlySet<ZoneId>, view: [number, number, number, number], t: number) {
+  const c = p.ctx;
+  const inView = (b: [number, number, number, number]) => inBox(b, view);
   p.dim = false;
 
-  // blocks: sidewalks around every city block
+  // ── shore: shallow water, foam, sand, then the land
+  c.lineJoin = "round";
+  coastPath(c);
+  c.strokeStyle = "rgba(56,189,248,0.16)";
+  c.lineWidth = 120;
+  c.stroke();
+  c.strokeStyle = "rgba(125,211,252,0.22)";
+  c.lineWidth = 60;
+  c.stroke();
+  c.setLineDash([18, 26]);
+  c.lineDashOffset = -t * 6;
+  c.strokeStyle = "rgba(255,255,255,0.35)";
+  c.lineWidth = 34 + Math.sin(t * 0.8) * 3;
+  c.stroke();
+  c.setLineDash([]);
+  c.lineDashOffset = 0;
+  c.strokeStyle = "#e4cf98";
+  c.lineWidth = 26;
+  c.stroke();
+  c.fillStyle = GRASS;
+  c.fill("evenodd");
+  const tex = grassTexture(c);
+  if (tex) {
+    c.fillStyle = tex;
+    c.fill("evenodd");
+  }
+
+  // ── blocks: districts get pavements; scenery gets fields, woods and hills
   for (let by = 0; by < BLOCKS; by++)
     for (let bx = 0; bx < BLOCKS; bx++) {
-      const zone = zoneOfBlock(bx, by);
-      if (!zone) continue;
+      const kind = blockKind(bx, by);
+      if (kind === "sea") continue;
       const x = bx * ROAD_STEP + 1;
       const y = by * ROAD_STEP + 1;
-      if (!inView(bboxOf(x, y, 6, 6, 0))) continue;
-      p.dim = !unlocked.has(zone);
-      p.quad(x, y, 6, 6, p.col(SIDEWALK));
-      p.quad(x + 0.22, y + 0.22, 5.56, 5.56, p.col(ZONE_BY_ID[zone].ground));
+      if (!inView(bboxOf(x - 1, y - 1, 8, 8, 0))) continue;
+      const zone = zoneOfBlock(bx, by);
+      if (zone) {
+        p.dim = !unlocked.has(zone);
+        p.quad(x, y, 6, 6, p.col(SIDEWALK));
+        p.quad(x + 0.22, y + 0.22, 5.56, 5.56, p.col(ZONE_BY_ID[zone].ground));
+        // kerb line
+        p.quadStroke(x + 0.02, y + 0.02, 5.96, 5.96, p.col("#a8b0ba"), 1);
+      } else if (kind === "farm") {
+        const seed = hash(bx, by);
+        const crops = ["#c8b560", "#8fbf4f", "#b6c96b", "#d9b45a", "#7eaa48"];
+        for (let i = 0; i < 2; i++)
+          for (let j = 0; j < 2; j++) {
+            const col = crops[Math.floor(rand(seed * 9 + i, j) * crops.length)];
+            const fx = x + 0.25 + i * 3;
+            const fy = y + 0.25 + j * 3;
+            p.quad(fx, fy, 2.6, 2.6, col);
+            const alongX = rand(seed, i * 2 + j) > 0.5;
+            for (let r = 1; r < 7; r++) {
+              if (alongX) p.line(fx + 0.1, fy + r * 0.37, fx + 2.5, fy + r * 0.37, "rgba(60,45,10,0.22)", 1);
+              else p.line(fx + r * 0.37, fy + 0.1, fx + r * 0.37, fy + 2.5, "rgba(60,45,10,0.22)", 1);
+            }
+          }
+        p.quad(x + 2.85, y, 0.3, 6, "#c9b48a");
+      } else if (kind === "forest") {
+        p.quad(x - 0.5, y - 0.5, 7, 7, "#4f8f44");
+      } else if (kind === "hills") {
+        p.quad(x - 0.5, y - 0.5, 7, 7, "#7d9a5a");
+      }
     }
+  p.dim = false;
 
-  // roads, segment by segment (none inside the lake corner)
+  // ── river with stone embankments
+  const rx = RIVER * ROAD_STEP;
+  const river = bboxOf(rx - 1, -8, 3, WORLD + 16, 0);
+  if (inView(river)) {
+    // only where there is land: the river flows into the sea
+    c.save();
+    coastPath(c);
+    c.clip("evenodd");
+    p.quad(rx - 0.42, -8, 1.84, WORLD + 16, "#9ca3af");
+    const g = c.createLinearGradient(sx(rx - 0.3, 30), 0, sx(rx + 1.3, 30), 0);
+    g.addColorStop(0, "#1e6fa8");
+    g.addColorStop(0.5, "#2b8fd0");
+    g.addColorStop(1, "#1a5f92");
+    p.quad(rx - 0.3, -8, 1.6, WORLD + 16, g);
+    // small glints drifting with the current
+    c.lineWidth = 1;
+    for (let i = 0; i < 70; i++) {
+      const yy = ((i * 1.13 + t * (0.4 + rand(i, 3) * 0.4)) % (WORLD + 14)) - 6;
+      const xx = rx - 0.15 + rand(i, 9) * 1.3;
+      const a = 0.12 + 0.18 * Math.abs(Math.sin(t * 1.7 + i));
+      c.strokeStyle = `rgba(255,255,255,${a})`;
+      c.beginPath();
+      c.arc(sx(xx, yy), sy(xx, yy), 3 + rand(i, 4) * 3, Math.PI * 1.15, Math.PI * 1.85);
+      c.stroke();
+    }
+    c.restore();
+  }
+
+  // ── roads, segment by segment
   for (let line = 0; line < NODES; line++)
     for (let k = 0; k < BLOCKS; k++) {
       for (const axis of ["x", "y"] as const) {
-        const sides = axis === "x" ? [zoneOfBlock(k, line - 1), zoneOfBlock(k, line)] : [zoneOfBlock(line - 1, k), zoneOfBlock(line, k)];
-        if (sides.every((s) => s === null)) continue;
-        const open = sides.some((s) => s !== null && unlocked.has(s));
+        if (!hasRoad(axis, line, k)) continue;
+        const open = segmentSides(axis, line, k).some((s) => s !== null && unlocked.has(s));
         const x = axis === "x" ? k * ROAD_STEP : line * ROAD_STEP;
         const y = axis === "x" ? line * ROAD_STEP : k * ROAD_STEP;
         const w = axis === "x" ? ROAD_STEP + 1 : 1;
@@ -677,49 +755,174 @@ export function drawGround(p: Painter, unlocked: ReadonlySet<ZoneId>, view: [num
         if (!inView(bboxOf(x, y, w, d, 0))) continue;
         p.dim = !open;
         p.quad(x, y, w, d, p.col(ASPHALT));
+        // worn tyre tracks give the asphalt some texture
         if (axis === "x") {
-          p.line(x + 1.3, y + 0.5, x + ROAD_STEP - 0.3, y + 0.5, p.col("#f8fafc", -0.1), 1, 0, [6, 7]);
-          p.line(x + 1, y + 0.04, x + ROAD_STEP, y + 0.04, p.col("#9ca3af"), 1);
-          p.line(x + 1, y + 0.96, x + ROAD_STEP, y + 0.96, p.col("#9ca3af"), 1);
+          p.quad(x + 1, y + 0.22, ROAD_STEP - 1, 0.1, p.col(ASPHALT, -0.08));
+          p.quad(x + 1, y + 0.68, ROAD_STEP - 1, 0.1, p.col(ASPHALT, -0.08));
+          p.line(x + 1.3, y + 0.5, x + ROAD_STEP - 0.3, y + 0.5, p.col("#facc15", -0.15), 1.2, 0, [7, 6]);
+          p.line(x + 1, y + 0.04, x + ROAD_STEP, y + 0.04, p.col("#e5e7eb", -0.2), 1);
+          p.line(x + 1, y + 0.96, x + ROAD_STEP, y + 0.96, p.col("#e5e7eb", -0.2), 1);
         } else {
-          p.line(x + 0.5, y + 1.3, x + 0.5, y + ROAD_STEP - 0.3, p.col("#f8fafc", -0.1), 1, 0, [6, 7]);
-          p.line(x + 0.04, y + 1, x + 0.04, y + ROAD_STEP, p.col("#9ca3af"), 1);
-          p.line(x + 0.96, y + 1, x + 0.96, y + ROAD_STEP, p.col("#9ca3af"), 1);
+          p.quad(x + 0.22, y + 1, 0.1, ROAD_STEP - 1, p.col(ASPHALT, -0.08));
+          p.quad(x + 0.68, y + 1, 0.1, ROAD_STEP - 1, p.col(ASPHALT, -0.08));
+          p.line(x + 0.5, y + 1.3, x + 0.5, y + ROAD_STEP - 0.3, p.col("#facc15", -0.15), 1.2, 0, [7, 6]);
+          p.line(x + 0.04, y + 1, x + 0.04, y + ROAD_STEP, p.col("#e5e7eb", -0.2), 1);
+          p.line(x + 0.96, y + 1, x + 0.96, y + ROAD_STEP, p.col("#e5e7eb", -0.2), 1);
         }
       }
     }
-  // crosswalks at intersections
+
+  // ── intersections: crosswalks, and bridges where they cross the river
   for (let j = 0; j < NODES; j++)
     for (let i = 0; i < NODES; i++) {
-      const zs = [zoneOfBlock(i - 1, j - 1), zoneOfBlock(i, j - 1), zoneOfBlock(i - 1, j), zoneOfBlock(i, j)];
-      if (zs.every((z) => z === null)) continue;
+      const roads = [hasRoad("x", j, i - 1), hasRoad("x", j, i), hasRoad("y", i, j - 1), hasRoad("y", i, j)];
+      if (!roads.some(Boolean)) continue;
       const x = i * ROAD_STEP;
       const y = j * ROAD_STEP;
-      if (!inView(bboxOf(x - 1, y - 1, 3, 3, 0))) continue;
+      if (!inView(bboxOf(x - 1, y - 1, 3, 3, 30))) continue;
+      const zs = [zoneOfBlock(i - 1, j - 1), zoneOfBlock(i, j - 1), zoneOfBlock(i - 1, j), zoneOfBlock(i, j)];
       p.dim = !zs.some((z) => z !== null && unlocked.has(z));
-      p.quad(x, y, 1, 1, p.col(ASPHALT, 0.04));
+      if (i === RIVER) {
+        // bridge deck over the river with parapets
+        p.shadow(x - 0.5, y, 2, 1, 10, 0.3);
+        p.box(x - 0.5, y - 0.02, 2, 1.04, 0, 3, "#9ca3af", p.col(ASPHALT, 0.05));
+        p.box(x - 0.5, y - 0.06, 2, 0.08, 3, 4, "#d1d5db");
+        p.box(x - 0.5, y + 0.98, 2, 0.08, 3, 4, "#d1d5db");
+        p.line(x - 0.4, y + 0.5, x + 1.4, y + 0.5, p.col("#facc15", -0.15), 1.2, 3, [7, 6]);
+        continue;
+      }
+      p.quad(x, y, 1, 1, p.col(ASPHALT, 0.03));
       const stripe = p.col("#f1f5f9", -0.05);
       for (let s = 0; s < 4; s++) {
-        if (i < BLOCKS) p.quad(x + 1.08, y + 0.1 + s * 0.22, 0.32, 0.1, stripe);
-        if (j < BLOCKS) p.quad(x + 0.1 + s * 0.22, y + 1.08, 0.1, 0.32, stripe);
+        if (roads[1]) p.quad(x + 1.08, y + 0.1 + s * 0.22, 0.32, 0.1, stripe);
+        if (roads[3]) p.quad(x + 0.1 + s * 0.22, y + 1.08, 0.1, 0.32, stripe);
       }
     }
   p.dim = false;
   c.globalAlpha = 1;
 }
 
-/** Shade over locked zones so they read as "not yours yet". */
+/** Shade over locked districts, outlined along their real border. */
 export function drawFog(p: Painter, unlocked: ReadonlySet<ZoneId>, t: number) {
   const c = p.ctx;
   for (const z of ZONES) {
     if (unlocked.has(z.id)) continue;
-    const r = zoneRect(z);
-    p.quad(r.x + 0.5, r.y + 0.5, r.w - 1, r.d - 1, "rgba(9,13,24,0.28)");
+    const blocks = WORLD_MAP.zoneBlocks[z.id];
+    for (const [bx, by] of blocks) p.quad(bx * ROAD_STEP, by * ROAD_STEP, ROAD_STEP + 1, ROAD_STEP + 1, "rgba(9,13,24,0.16)");
     c.setLineDash([10, 8]);
     c.lineDashOffset = -t * 12;
-    p.quadStroke(r.x + 0.6, r.y + 0.6, r.w - 1.2, r.d - 1.2, "rgba(251,191,36,0.55)", 2);
+    const mine = (bx: number, by: number) => zoneOfBlock(bx, by) === z.id;
+    for (const [bx, by] of blocks) {
+      const x0 = bx * ROAD_STEP + 0.5;
+      const y0 = by * ROAD_STEP + 0.5;
+      const x1 = x0 + ROAD_STEP;
+      const y1 = y0 + ROAD_STEP;
+      const col = "rgba(251,191,36,0.6)";
+      if (!mine(bx, by - 1)) p.line(x0, y0, x1, y0, col, 2);
+      if (!mine(bx, by + 1)) p.line(x0, y1, x1, y1, col, 2);
+      if (!mine(bx - 1, by)) p.line(x0, y0, x0, y1, col, 2);
+      if (!mine(bx + 1, by)) p.line(x1, y0, x1, y1, col, 2);
+    }
     c.setLineDash([]);
     c.lineDashOffset = 0;
+  }
+}
+
+// ───────────────────────────── scenery ─────────────────────────────
+
+function mountain(p: Painter, x: number, y: number, w: number, d: number, h: number, seed: number) {
+  const c = p.ctx;
+  const px = x + w * (0.45 + rand(seed, 1) * 0.1);
+  const py = y + d * (0.45 + rand(seed, 2) * 0.1);
+  const peak: [number, number] = [sx(px, py), sy(px, py, h)];
+  const corners: [number, number][] = [
+    [sx(x, y), sy(x, y)],
+    [sx(x + w, y), sy(x + w, y)],
+    [sx(x + w, y + d), sy(x + w, y + d)],
+    [sx(x, y + d), sy(x, y + d)],
+  ];
+  const tri = (a: [number, number], b: [number, number], fill: string) => {
+    c.beginPath();
+    c.moveTo(a[0], a[1]);
+    c.lineTo(b[0], b[1]);
+    c.lineTo(peak[0], peak[1]);
+    c.closePath();
+    c.fillStyle = fill;
+    c.fill();
+  };
+  // back faces first, then the two faces toward the viewer
+  tri(corners[0], corners[1], "#7f8a6a");
+  tri(corners[3], corners[0], "#8c9873");
+  tri(corners[1], corners[2], "#5d6b4c");
+  tri(corners[2], corners[3], "#77865c");
+  // snow cap
+  const cap = (a: [number, number], b: [number, number], fill: string) => {
+    const k = 0.3;
+    c.beginPath();
+    c.moveTo(peak[0] + (a[0] - peak[0]) * k, peak[1] + (a[1] - peak[1]) * k + 3);
+    c.lineTo(peak[0] + (b[0] - peak[0]) * k, peak[1] + (b[1] - peak[1]) * k + 3);
+    c.lineTo(peak[0], peak[1]);
+    c.closePath();
+    c.fillStyle = fill;
+    c.fill();
+  };
+  if (h > 70) {
+    cap(corners[1], corners[2], "#dbe4ee");
+    cap(corners[2], corners[3], "#f8fafc");
+  }
+}
+
+function scenery(p: Painter, sc: Scenery) {
+  const { x, y, seed } = sc;
+  if (sc.kind === "forest") {
+    const n = 22;
+    const pts: [number, number, number][] = [];
+    for (let i = 0; i < n; i++) pts.push([x - 0.3 + rand(seed * 13, i) * 6.6, y - 0.3 + rand(seed * 7, i + 40) * 6.6, rand(seed, i)]);
+    pts.sort((a, b) => a[0] + a[1] - (b[0] + b[1]));
+    for (const [tx, ty, r] of pts) {
+      if (r > 0.45) p.pine(tx, ty, 0.95 + r * 0.5);
+      else p.tree(tx, ty, 0.85 + r * 0.6, r);
+    }
+  } else if (sc.kind === "farm") {
+    const fx = x + 3.35;
+    const fy = y + 3.35;
+    p.shadow(fx, fy, 1.3, 0.9, 20);
+    p.box(fx, fy, 1.3, 0.9, 0, 13, "#f5efe0");
+    p.gable(fx, fy, 1.3, 0.9, 13, 8, "#9a3412");
+    p.box(fx + 1.5, fy + 0.2, 1, 1.2, 0, 15, "#b91c1c");
+    p.gable(fx + 1.5, fy + 0.2, 1, 1.2, 15, 7, "#57534e");
+    cyl(p, fx + 0.5, fy + 1.9, 0, 6, 30, "#d6d3d1");
+    p.tree(fx - 0.4, fy + 2.2, 1, seed);
+    p.tree(fx + 2.4, fy - 0.3, 0.9, seed + 0.3);
+  } else {
+    const ox = rand(seed, 5) * 0.8;
+    mountain(p, x - 0.6 + ox, y - 0.4, 4.2, 4.0, 70 + rand(seed, 6) * 40, seed);
+    mountain(p, x + 2.4, y + 2.2, 3.8, 3.8, 50 + rand(seed, 7) * 50, seed + 1);
+    for (let i = 0; i < 6; i++) p.pine(x + rand(seed, i + 20) * 6, y + 4.6 + rand(seed, i + 30) * 1.4, 0.9);
+  }
+}
+
+function lamp(p: Painter, x: number, y: number, t: number) {
+  const c = p.ctx;
+  const px = sx(x, y);
+  const py = sy(x, y);
+  c.fillStyle = "rgba(0,0,0,0.25)";
+  c.beginPath();
+  c.ellipse(px, py, 3, 1.5, 0, 0, Math.PI * 2);
+  c.fill();
+  c.strokeStyle = p.col("#334155");
+  c.lineWidth = 1.4;
+  c.beginPath();
+  c.moveTo(px, py);
+  c.lineTo(px, py - 22);
+  c.lineTo(px + 5, py - 24);
+  c.stroke();
+  if (!p.dim) {
+    const glow = 0.5 + 0.08 * Math.sin(t * 2 + x);
+    c.fillStyle = `rgba(254,240,138,${glow})`;
+    c.beginPath();
+    c.arc(px + 5, py - 23.5, 2, 0, Math.PI * 2);
+    c.fill();
   }
 }
 
@@ -738,6 +941,28 @@ export function buildScene(state: GameState, snap: EconomySnapshot, names: Scene
       draw: (p, info) => decor(p, dc, info.t),
     });
   }
+
+  for (const sc of WORLD_MAP.scenery) {
+    out.push({
+      depth: sc.x + 3 + sc.y + 3,
+      zone: null,
+      bbox: bboxOf(sc.x - 1, sc.y - 1, 8, 8, 130),
+      draw: (p) => scenery(p, sc),
+    });
+  }
+
+  // street lamps on the corners of district blocks
+  for (let by = 0; by < BLOCKS; by++)
+    for (let bx = 0; bx < BLOCKS; bx++) {
+      const zone = zoneOfBlock(bx, by);
+      if (!zone) continue;
+      for (const [lx, ly] of [
+        [bx * ROAD_STEP + 1.12, by * ROAD_STEP + 1.12],
+        [bx * ROAD_STEP + 6.88, by * ROAD_STEP + 6.88],
+      ]) {
+        out.push({ depth: lx + ly, zone, bbox: bboxOf(lx - 0.5, ly - 0.5, 1, 1, 30), draw: (p, info) => lamp(p, lx, ly, info.t) });
+      }
+    }
 
   for (const plot of WORLD_MAP.plots) {
     const seed = rand(plot.x, plot.y);
@@ -853,15 +1078,12 @@ export function buildScene(state: GameState, snap: EconomySnapshot, names: Scene
 }
 
 export const WORLD_BOUNDS = {
-  minX: sx(0, WORLD),
-  maxX: sx(WORLD, 0),
-  minY: sy(0, 0) - 120,
-  maxY: sy(WORLD, WORLD),
+  minX: sx(0, WORLD) - 120,
+  maxX: sx(WORLD, 0) + 120,
+  minY: sy(0, 0) - 200,
+  maxY: sy(WORLD, WORLD) + 80,
 };
 
 export function zoneCenter(id: ZoneId) {
-  const z = ZONE_BY_ID[id];
-  const cx = z.gx * ZONE_TILES + ZONE_TILES / 2 + 0.5;
-  const cy = z.gy * ZONE_TILES + ZONE_TILES / 2 + 0.5;
-  return { x: cx, y: cy };
+  return zoneCenterTile(id);
 }

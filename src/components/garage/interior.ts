@@ -48,6 +48,17 @@ export function drawRoom(p: Painter, gw: number, gd: number, accent: string, t: 
   g.addColorStop(0.5, "rgba(255,255,255,0)");
   g.addColorStop(1, "rgba(255,255,255,0.04)");
   p.quad(0, 0, gw, gd, g);
+  // worn concrete: oil stains and tyre marks
+  for (let i = 0; i < gw * gd * 0.18; i++) {
+    const x = 0.4 + rand(i, 11) * (gw - 0.8);
+    const y = 0.4 + rand(i, 12) * (gd - 0.8);
+    p.ellipse(x, y, 0, 3 + rand(i, 13) * 9, `rgba(15,20,30,${0.06 + rand(i, 14) * 0.08})`, 0.5);
+  }
+  // sunlight falling through the back windows
+  for (let i = 0; i < Math.floor(gw / 3); i++) {
+    const u = 0.8 + i * 3;
+    p.quad(u + 0.3, 0.2, 1.6, 2.4, "rgba(255,244,214,0.07)");
+  }
 
   // entrance with hazard stripes on the front edge
   const ex = Math.max(0.5, gw / 2 - 1.5);
@@ -59,6 +70,13 @@ export function drawRoom(p: Painter, gw: number, gd: number, accent: string, t: 
   // back walls
   p.box(-0.3, -0.3, gw + 0.3, 0.3, 0, WALL_H, "#cbd5e1", "#94a3b8");
   p.box(-0.3, 0, 0.3, gd, 0, WALL_H, "#dbe3ec", "#94a3b8");
+  // brick courses on both walls
+  for (let z = 4; z < WALL_H - 12; z += 5) {
+    p.onLeft(-0.3, 0, 0, 0.3, gw, z, z + 0.6, "rgba(15,23,42,0.07)");
+    p.onRight(0, 0, 0, 0, gd, z, z + 0.6, "rgba(15,23,42,0.07)");
+  }
+  p.onLeft(-0.3, 0, 0, 0.3, gw, 0, 12, "rgba(51,65,85,0.25)");
+  p.onRight(0, 0, 0, 0, gd, 0, 12, "rgba(51,65,85,0.25)");
   // accent band + windows on the back wall (the y = 0 plane, seen from the front)
   p.onLeft(-0.3, 0, 0, 0.3, gw, WALL_H - 10, WALL_H - 5, p.col(accent));
   for (let i = 0; i < Math.floor(gw / 3); i++) {

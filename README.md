@@ -1,8 +1,9 @@
 # Idle Car Empire
 
 An idle / tycoon city-builder about growing a one-bay garage into a global car
-empire. The game is played on an isometric **Empire Map**: eight districts to
-unlock, plots to build on, garages with their own interiors, factories and
+empire. The game is played on an isometric **Empire Map**: an island with a natural
+coastline, beaches, a river crossed by bridges, farmland, forests and
+mountains, eight organically shaped districts to unlock, plots to build on, garages with their own interiors, factories and
 dealerships on their lots, and live traffic carrying parts, customers and new
 cars between them. Plus eight car classes from the City Compact to the Future
 Car, research, managers, offline production and Global Expansion (prestige).
@@ -63,7 +64,8 @@ src/game/
               dealerships, research, achievements, missions, prestige, and
               city.ts (districts + layouts, plot buildings, garage facilities,
               levels, specializations)
-  city/       layout.ts — world geometry: roads, blocks, plots, lots
+  city/       layout.ts — world geometry from WORLD_BLOCKS (config/city.ts):
+              districts, scenery, roads, river, plots, lots
   engine/     pure game logic, no React
     state.ts      initial state
     modifiers.ts  aggregates research / managers / perks / achievements
@@ -82,7 +84,8 @@ src/store/    Zustand stores: game loop + autosave (game-store), panels and
               camera requests (ui-store), UI events
 src/components/
   map/        the Empire Map on a canvas: isometric painter, camera (pan,
-              zoom, inertia, fly-to), scene of buildings, traffic, minimap
+              zoom, inertia, fly-to), terrain (coastline), scene of
+              buildings and scenery, traffic, ships, minimap
   garage/     garage interior: room + facility drawing, placement ghost
   panels/     sheets over the map: build menu, plot/zone info, lists
   ui/         shadcn-style primitives

@@ -2,8 +2,9 @@
 
 import { Home, Minus, Plus } from "lucide-react";
 import { useEffect, useRef, type RefObject } from "react";
-import { STRUCTURE_BY_ID, ZONES } from "@/game/config/city";
-import { WORLD, WORLD_MAP, zoneRect } from "@/game/city/layout";
+import { STRUCTURE_BY_ID, WORLD_BLOCKS, ZONES, ZONE_BY_ID } from "@/game/config/city";
+import { RIVER, WORLD, WORLD_MAP, zoneCenterTile, zoneOfBlock } from "@/game/city/layout";
+import { coastline } from "./terrain";
 import { useT } from "@/i18n/use-t";
 import { useGame } from "@/store/game-store";
 import type { MapEngine } from "./map-engine";
@@ -62,21 +63,36 @@ export function Minimap({ engine }: { engine: RefObject<MapEngine | null> }) {
         }
       };
       const rect = (x: number, y: number, w: number, d: number): [number, number][] => [mm(x, y), mm(x + w, y), mm(x + w, y + d), mm(x, y + d)];
-      poly(rect(0, 0, WORLD, WORLD), "#2b6f45");
-      const lake = WORLD_MAP.decor.find((d) => d.zone === null);
-      if (lake) poly(rect(lake.x, lake.y, lake.w, lake.d), "#0ea5e9");
-      for (const z of ZONES) {
-        const r = zoneRect(z);
-        const open = unlocked.has(z.id);
-        poly(rect(r.x + 0.5, r.y + 0.5, r.w - 1, r.d - 1), open ? z.ground : "#1f2937", open ? "rgba(255,255,255,0.25)" : "rgba(251,191,36,0.4)");
-        if (!open) {
-          const [cx, cy] = mm(r.x + r.w / 2, r.y + r.d / 2);
-          ctx.font = "8px sans-serif";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText("🔒", cx, cy);
-        }
+      ctx.fillStyle = "#0f4f7a";
+      ctx.fillRect(0, 0, W, H);
+      ctx.beginPath();
+      for (const loop of coastline()) {
+        loop.forEach(([x, y], i) => {
+          const [px, py] = mm(x, y);
+          if (i) ctx.lineTo(px, py);
+          else ctx.moveTo(px, py);
+        });
+        ctx.closePath();
       }
+      ctx.fillStyle = "#3f7d3a";
+      ctx.fill("evenodd");
+      for (let by = 0; by < WORLD_BLOCKS.length; by++)
+        for (let bx = 0; bx < WORLD_BLOCKS.length; bx++) {
+          const zone = zoneOfBlock(bx, by);
+          if (!zone) continue;
+          const open = unlocked.has(zone);
+          poly(rect(bx * 7, by * 7, 8, 8), open ? ZONE_BY_ID[zone].ground : "#1f2937");
+        }
+      for (const z of ZONES) {
+        if (unlocked.has(z.id)) continue;
+        const c = zoneCenterTile(z.id);
+        const [cx, cy] = mm(c.x, c.y);
+        ctx.font = "8px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("🔒", cx, cy);
+      }
+      poly(rect(RIVER * 7 - 0.3, 0, 1.6, WORLD), "#2b8fd0");
       for (const p of WORLD_MAP.plots) {
         if (!unlocked.has(p.zone)) continue;
         const b = s.city.buildings[p.id];

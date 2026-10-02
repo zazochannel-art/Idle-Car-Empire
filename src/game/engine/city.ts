@@ -472,9 +472,21 @@ export function migrateCity(raw: unknown): CityState {
     city.buildings = {};
     let maxUid = 0;
     let maxNo = 0;
-    for (const [id, b] of Object.entries(raw.buildings)) {
-      const plot = plotOf(id);
-      if (!plot || plot.kind !== "plot" || !isObj(b) || typeof b.type !== "string" || !(b.type in STRUCTURE_BY_ID)) continue;
+    // Saves from the first map used ids like "town:0:0"; move those
+    // buildings onto free plots of the same district.
+    const entries = Object.entries(raw.buildings).sort(([, a], [, b]) => (isObj(a) && isObj(a.garage) && a.garage.no === 1 ? -1 : isObj(b) && isObj(b.garage) && b.garage.no === 1 ? 1 : 0));
+    const relocate = (oldId: string, b: Json): string | null => {
+      const zone = oldId.split(":")[0] as ZoneId;
+      if (!ZONE_BY_ID[zone]) return null;
+      if (isObj(b.garage) && b.garage.no === 1 && !city.buildings[STARTER_PLOT]) return STARTER_PLOT;
+      const free = WORLD_MAP.plots.find((p) => p.kind === "plot" && p.zone === zone && !p.starter && !city.buildings[p.id]);
+      return free?.id ?? null;
+    };
+    for (const [rawId, b] of entries) {
+      if (!isObj(b)) continue;
+      const id = plotOf(rawId) ? rawId : relocate(rawId, b);
+      const plot = id ? plotOf(id) : undefined;
+      if (!id || !plot || plot.kind !== "plot" || city.buildings[id] || typeof b.type !== "string" || !(b.type in STRUCTURE_BY_ID)) continue;
       const type = b.type as StructureType;
       const maxLevel = type === "garage" ? GARAGE_MAX_LEVEL : STRUCTURE_BY_ID[type].maxLevel;
       const level = int(b.level, 1, maxLevel, 1);

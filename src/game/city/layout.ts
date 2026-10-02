@@ -2,18 +2,19 @@
 //
 // The world is a square of tiles. Roads run along every ROAD_STEP-th tile row
 // and column; between them sit 6×6-tile blocks, each split into 2×2 cells of
-// 3×3 tiles. Zones are 3×3 blocks on a 3×3 grid. Pure data — shared by the
-// engine (plot rules) and the renderer.
-import { DEALER_LOT, FACTORY_LOT, NATURE, ZONES, type ZoneConfig } from "../config/city";
+// 3×3 tiles. WORLD_BLOCKS says which district (or which scenery: sea,
+// forest, farmland, hills) each block belongs to, so districts have organic
+// shapes. A river follows one node column. Pure data — shared by the engine
+// (plot rules) and the renderer.
+import { DEALER_LOTS, FACTORY_LOTS, RIVER_LINE, STARTER_CELL, WORLD_BLOCKS, ZONES } from "../config/city";
 import type { DealerId, FactoryId, ZoneId } from "../types";
 
 export const ROAD_STEP = 7;
 export const CELL = 3;
-export const ZONE_BLOCKS = 3;
-export const BLOCKS = ZONE_BLOCKS * 3;
+export const BLOCKS = WORLD_BLOCKS.length;
 export const NODES = BLOCKS + 1;
 export const WORLD = BLOCKS * ROAD_STEP + 1;
-export const ZONE_TILES = ZONE_BLOCKS * ROAD_STEP;
+export const RIVER = RIVER_LINE;
 
 export type PlotKind = "plot" | "factory" | "dealer";
 
@@ -45,11 +46,13 @@ export interface Plot {
   entry: Entry;
 }
 
-export type DecorKind = "house" | "apartment" | "office" | "shop" | "industry" | "park" | "water";
+export type DecorKind = "house" | "apartment" | "office" | "shop" | "industry" | "park";
+export type SceneryKind = "forest" | "farm" | "hills";
+export type BlockKind = ZoneId | SceneryKind | "sea";
 
 export interface Decor {
   kind: DecorKind;
-  zone: ZoneId | null;
+  zone: ZoneId;
   x: number;
   y: number;
   w: number;
@@ -58,12 +61,22 @@ export interface Decor {
   seed: number;
 }
 
-const DECOR: Record<string, DecorKind> = { h: "house", a: "apartment", o: "office", s: "shop", i: "industry", t: "park", w: "water" };
+export interface Scenery {
+  kind: SceneryKind;
+  bx: number;
+  by: number;
+  x: number;
+  y: number;
+  seed: number;
+}
+
+const DECOR: Record<string, DecorKind> = { h: "house", a: "apartment", o: "office", s: "shop", i: "industry", t: "park" };
+const SCENERY: Record<string, SceneryKind | "sea"> = { w: "sea", f: "forest", a: "farm", h: "hills" };
 
 /** Tile coordinate where cell `c` (global cell index) starts. */
 export const cellOrigin = (c: number) => ROAD_STEP * (c >> 1) + 1 + CELL * (c & 1);
 
-function hash(a: number, b: number) {
+export function hash(a: number, b: number) {
   let h = (a * 374761393 + b * 668265263) | 0;
   h = Math.imul(h ^ (h >>> 13), 1274126177);
   return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
@@ -81,71 +94,98 @@ export interface World {
   plots: Plot[];
   plotById: Record<string, Plot>;
   decor: Decor[];
-  /** Zone of each block, indexed [by][bx]; null = the nature corner. */
+  scenery: Scenery[];
+  /** What each block is, indexed [by][bx]. */
+  blocks: BlockKind[][];
+  /** District of each block, indexed [by][bx]; null for scenery and sea. */
   blockZone: (ZoneId | null)[][];
+  /** Blocks of each district. */
+  zoneBlocks: Record<ZoneId, [number, number][]>;
 }
 
 function build(): World {
   const plots: Plot[] = [];
   const decor: Decor[] = [];
-  const blockZone: (ZoneId | null)[][] = Array.from({ length: BLOCKS }, () => Array<ZoneId | null>(BLOCKS).fill(null));
+  const scenery: Scenery[] = [];
+  const byLetter = new Map(ZONES.map((z) => [z.letter, z]));
+  const zoneBlocks = Object.fromEntries(ZONES.map((z) => [z.id, [] as [number, number][]])) as Record<ZoneId, [number, number][]>;
 
-  const byPos = new Map<string, ZoneConfig>();
-  for (const z of ZONES) byPos.set(`${z.gx},${z.gy}`, z);
+  const blocks: BlockKind[][] = WORLD_BLOCKS.map((row, by) =>
+    [...row].map((ch, bx) => {
+      const z = byLetter.get(ch);
+      if (z) {
+        zoneBlocks[z.id].push([bx, by]);
+        return z.id;
+      }
+      const s = SCENERY[ch] ?? "sea";
+      if (s !== "sea") scenery.push({ kind: s, bx, by, x: bx * ROAD_STEP + 1, y: by * ROAD_STEP + 1, seed: hash(bx * 7 + 3, by * 13 + 5) });
+      return s;
+    }),
+  );
+  const blockZone = blocks.map((row) => row.map((k) => (ZONES.some((z) => z.id === k) ? (k as ZoneId) : null)));
 
-  for (let by = 0; by < BLOCKS; by++)
-    for (let bx = 0; bx < BLOCKS; bx++) {
-      const z = byPos.get(`${Math.floor(bx / ZONE_BLOCKS)},${Math.floor(by / ZONE_BLOCKS)}`);
-      blockZone[by][bx] = z?.id ?? null;
+  // Special lots first, so the fill below skips their cells.
+  const taken = new Set<string>();
+  const key = (cx: number, cy: number) => `${cx},${cy}`;
+  const zoneAt = (cx: number, cy: number) => blockZone[cy >> 1]?.[cx >> 1] ?? null;
+
+  for (const [id, [cx, cy]] of Object.entries(FACTORY_LOTS) as [FactoryId, [number, number]][]) {
+    const zone = zoneAt(cx, cy);
+    if (!zone) throw new Error(`factory lot ${id} is not in a district`);
+    if (id === "garage") {
+      plots.push({ id: `f:${id}`, zone, kind: "factory", factory: id, x: cellOrigin(cx), y: cellOrigin(cy), w: CELL, d: CELL, entry: cellEntry(cx, cy) });
+      taken.add(key(cx, cy));
+      continue;
     }
-
-  for (const z of ZONES) {
-    const factoriesSeen = new Set<string>();
-    z.layout.forEach((row, ly) => {
-      [...row].forEach((ch, lx) => {
-        const gcx = z.gx * ZONE_BLOCKS * 2 + lx;
-        const gcy = z.gy * ZONE_BLOCKS * 2 + ly;
-        const x = cellOrigin(gcx);
-        const y = cellOrigin(gcy);
-        const seed = hash(gcx, gcy);
-        if (ch === "." || ch === "G") {
-          plots.push({ id: `${z.id}:${lx}:${ly}`, zone: z.id, kind: "plot", x, y, w: CELL, d: CELL, starter: ch === "G", entry: cellEntry(gcx, gcy) });
-        } else if (DEALER_LOT[ch]) {
-          plots.push({ id: `d:${DEALER_LOT[ch]}`, zone: z.id, kind: "dealer", dealer: DEALER_LOT[ch], x, y, w: CELL, d: CELL, entry: cellEntry(gcx, gcy) });
-        } else if (ch === "0") {
-          plots.push({ id: "f:garage", zone: z.id, kind: "factory", factory: "garage", x, y, w: CELL, d: CELL, entry: cellEntry(gcx, gcy) });
-        } else if (FACTORY_LOT[ch]) {
-          if (factoriesSeen.has(ch)) return;
-          factoriesSeen.add(ch);
-          // A factory fills its whole block; enter from the road in front (+y).
-          const bx = gcx >> 1;
-          const by = gcy >> 1;
-          const bxT = bx * ROAD_STEP + 1;
-          const byT = by * ROAD_STEP + 1;
-          const id = FACTORY_LOT[ch];
-          plots.push({
-            id: `f:${id}`, zone: z.id, kind: "factory", factory: id, x: bxT, y: byT, w: CELL * 2, d: CELL * 2,
-            entry: { x: bxT + CELL, y: (by + 1) * ROAD_STEP + 0.5, line: by + 1, i0: bx, i1: bx + 1, inward: -1 },
-          });
-        } else if (DECOR[ch]) {
-          decor.push({ kind: DECOR[ch], zone: z.id, x, y, w: CELL, d: CELL, seed });
-        }
-      });
-    });
+    // A factory fills its whole block; enter from the road in front (+y).
+    const bx = cx >> 1;
+    const by = cy >> 1;
+    const x = bx * ROAD_STEP + 1;
+    const y = by * ROAD_STEP + 1;
+    plots.push({ id: `f:${id}`, zone, kind: "factory", factory: id, x, y, w: CELL * 2, d: CELL * 2, entry: { x: x + CELL, y: (by + 1) * ROAD_STEP + 0.5, line: by + 1, i0: bx, i1: bx + 1, inward: -1 } });
+    for (const dx of [0, 1]) for (const dy of [0, 1]) taken.add(key(bx * 2 + dx, by * 2 + dy));
+  }
+  for (const [id, [cx, cy]] of Object.entries(DEALER_LOTS) as [DealerId, [number, number]][]) {
+    const zone = zoneAt(cx, cy);
+    if (!zone) throw new Error(`dealer lot ${id} is not in a district`);
+    plots.push({ id: `d:${id}`, zone, kind: "dealer", dealer: id, x: cellOrigin(cx), y: cellOrigin(cy), w: CELL, d: CELL, entry: cellEntry(cx, cy) });
+    taken.add(key(cx, cy));
   }
 
-  // The nature corner: a lake ringed by woods.
-  const nx = NATURE.gx * ZONE_TILES;
-  const ny = NATURE.gy * ZONE_TILES;
-  decor.push({ kind: "water", zone: null, x: nx + 3, y: ny + 3, w: ZONE_TILES - 5, d: ZONE_TILES - 5, seed: 0.5 });
+  // Every other district cell: a plot or scenery from the district's mix.
+  for (const z of ZONES) {
+    let plotsHere = 0;
+    let cells = 0;
+    for (const [bx, by] of zoneBlocks[z.id]) {
+      for (const dy of [0, 1])
+        for (const dx of [0, 1]) {
+          const cx = bx * 2 + dx;
+          const cy = by * 2 + dy;
+          if (taken.has(key(cx, cy))) continue;
+          const x = cellOrigin(cx);
+          const y = cellOrigin(cy);
+          const seed = hash(cx, cy);
+          const starter = cx === STARTER_CELL[0] && cy === STARTER_CELL[1];
+          cells++;
+          // Keep at least ~40% of the district buildable.
+          const ch = starter || plotsHere * 2.5 < cells - 1 ? "." : z.mix[Math.floor(seed * z.mix.length)];
+          if (ch === ".") {
+            plots.push({ id: `c:${cx}:${cy}`, zone: z.id, kind: "plot", x, y, w: CELL, d: CELL, starter, entry: cellEntry(cx, cy) });
+            plotsHere++;
+          } else {
+            decor.push({ kind: DECOR[ch] ?? "park", zone: z.id, x, y, w: CELL, d: CELL, seed });
+          }
+        }
+    }
+  }
 
   const plotById = Object.fromEntries(plots.map((p) => [p.id, p]));
-  return { plots, plotById, decor, blockZone };
+  return { plots, plotById, decor, scenery, blocks, blockZone, zoneBlocks };
 }
 
 export const WORLD_MAP: World = build();
 
-export const STARTER_PLOT = WORLD_MAP.plots.find((p) => p.starter)!.id;
+export const STARTER_PLOT = `c:${STARTER_CELL[0]}:${STARTER_CELL[1]}`;
 
 export function plotOf(id: string): Plot | undefined {
   return WORLD_MAP.plotById[id];
@@ -164,18 +204,52 @@ export function zoneOfBlock(bx: number, by: number): ZoneId | null {
   return WORLD_MAP.blockZone[by][bx];
 }
 
-/** Tile rectangle covered by a zone (including its border roads). */
-export function zoneRect(z: ZoneConfig) {
-  return { x: z.gx * ZONE_TILES, y: z.gy * ZONE_TILES, w: ZONE_TILES + 1, d: ZONE_TILES + 1 };
+export function blockKind(bx: number, by: number): BlockKind {
+  if (bx < 0 || by < 0 || bx >= BLOCKS || by >= BLOCKS) return "sea";
+  return WORLD_MAP.blocks[by][bx];
 }
 
+/** Centre of a district in tiles (average of its blocks). */
+export function zoneCenterTile(zone: ZoneId) {
+  const list = WORLD_MAP.zoneBlocks[zone];
+  const n = Math.max(1, list.length);
+  const x = list.reduce((a, [bx]) => a + bx * ROAD_STEP + 4, 0) / n;
+  const y = list.reduce((a, [, by]) => a + by * ROAD_STEP + 4, 0) / n;
+  // snap to the nearest of its blocks so the label sits on the district
+  let best = list[0];
+  let bestD = Infinity;
+  for (const b of list) {
+    const d = Math.hypot(b[0] * ROAD_STEP + 4 - x, b[1] * ROAD_STEP + 4 - y);
+    if (d < bestD) {
+      bestD = d;
+      best = b;
+    }
+  }
+  return { x: best[0] * ROAD_STEP + 4, y: best[1] * ROAD_STEP + 4 };
+}
+
+/** Is this segment the river (no road)? Vertical segments on RIVER's column. */
+export const isRiver = (axis: "x" | "y", line: number) => axis === "y" && line === RIVER;
+
 /**
- * A road segment between two neighbouring nodes is open to traffic when a
- * block on either side belongs to an unlocked zone.
+ * Whether a road is built on a segment between two neighbouring nodes:
+ * there is one wherever a district touches it (none along the river or
+ * between fields and woods).
  * axis "x": horizontal road at node row `line`, between columns k and k+1.
  * axis "y": vertical road at node column `line`, between rows k and k+1.
  */
+export function segmentSides(axis: "x" | "y", line: number, k: number): [ZoneId | null, ZoneId | null] {
+  return axis === "x" ? [zoneOfBlock(k, line - 1), zoneOfBlock(k, line)] : [zoneOfBlock(line - 1, k), zoneOfBlock(line, k)];
+}
+
+export function hasRoad(axis: "x" | "y", line: number, k: number): boolean {
+  if (isRiver(axis, line)) return false;
+  const [a, b] = segmentSides(axis, line, k);
+  return a !== null || b !== null;
+}
+
+/** A road is open to traffic when a district on either side is unlocked. */
 export function segmentOpen(axis: "x" | "y", line: number, k: number, unlocked: ReadonlySet<ZoneId>): boolean {
-  const sides = axis === "x" ? [zoneOfBlock(k, line - 1), zoneOfBlock(k, line)] : [zoneOfBlock(line - 1, k), zoneOfBlock(line, k)];
-  return sides.some((z) => z !== null && unlocked.has(z));
+  if (!hasRoad(axis, line, k)) return false;
+  return segmentSides(axis, line, k).some((z) => z !== null && unlocked.has(z));
 }
