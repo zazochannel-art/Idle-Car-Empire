@@ -4,8 +4,9 @@
 // the real production chain on the real road network.
 import { BLOCKS, NODES, ROAD_STEP, segmentOpen, type Entry } from "@/game/city/layout";
 import type { ZoneId } from "@/game/types";
-import { rand, type Painter } from "./iso";
-import { CAR_COLORS, drawCar, drawCarrier, drawTruck, type Dir } from "./vehicles";
+import type { Painter } from "./iso";
+import { CAR_COLORS, CAR_MODELS, drawCarrier, drawModel, drawTruck, type CarModel, type Dir } from "./vehicles";
+import { trafficLight } from "./props";
 
 export interface Site {
   id: string;
@@ -50,6 +51,14 @@ interface Agent {
   target?: Site;
   next?: Site;
   fading: boolean;
+  /** Current speed (eases toward the cruising speed). */
+  cur: number;
+  model: CarModel;
+  /** Drawn position: trails the exact one a little so turns are rounded. */
+  rx: number;
+  ry: number;
+  braking: boolean;
+  puffs: { x: number; y: number; age: number }[];
 }
 
 interface Walker {
@@ -73,6 +82,7 @@ export class Traffic {
   private openNodes: number[] = [];
   private edgeNodes: number[] = [];
   private spawnClock = 0;
+  private clock = 0;
   onArrive: ArriveFn = () => {};
 
   setWorld(w: TrafficWorld) {
@@ -190,6 +200,7 @@ export class Traffic {
     let agent: Agent | null = null;
     const make = (kind: Kind, path: Pt[], speed: number, target?: Site, next?: Site): Agent => ({
       kind, path, seg: 0, pos: 0, speed, color, color2, x: path[0].x, y: path[0].y, dir: 0, alpha: 0, wait: 0, phase: "go", target, next, fading: false,
+      cur: speed * 0.4, model: pickModel(), rx: path[0].x, ry: path[0].y, braking: false, puffs: [],
     });
 
     if (roll < 0.5 && w.garages.length) {
@@ -240,7 +251,15 @@ export class Traffic {
         continue;
       }
       a.alpha = a.fading ? Math.max(0, a.alpha - dt * 2.5) : Math.min(1, a.alpha + dt * 2.5);
-      let move = a.speed * dt * this.clearance(a, moving);
+      // cruise, slow for turns and red lights, queue behind others
+      const target = a.speed * this.clearance(a, moving) * this.ahead(a);
+      const prev = a.cur;
+      a.cur += Math.max(-4.5 * dt, Math.min(1.6 * dt, target - a.cur));
+      a.braking = a.cur < prev - 0.01 || a.cur < 0.15;
+      if (prev < 0.3 && a.cur > prev && a.puffs.length < 4 && Math.random() < dt * 6) a.puffs.push({ x: a.rx, y: a.ry, age: 0 });
+      for (const pf of a.puffs) pf.age += dt;
+      a.puffs = a.puffs.filter((pf) => pf.age < 1.2);
+      let move = a.cur * dt;
       while (move > 0 && a.seg < a.path.length - 1) {
         const p0 = a.path[a.seg];
         const p1 = a.path[a.seg + 1];
@@ -273,10 +292,52 @@ export class Traffic {
       const ly = onDriveway ? 0 : dx * lane;
       a.x = p0.x + (p1.x - p0.x) * t + lx;
       a.y = p0.y + (p1.y - p0.y) * t + ly;
+      const k = Math.min(1, dt * 9);
+      if (Math.abs(a.rx - a.x) + Math.abs(a.ry - a.y) > 1.5) {
+        a.rx = a.x;
+        a.ry = a.y;
+      } else {
+        a.rx += (a.x - a.rx) * k;
+        a.ry += (a.y - a.ry) * k;
+      }
     }
+    this.clock += dt;
     this.agents = this.agents.filter((a) => !(a.fading && a.alpha <= 0));
 
     for (const wk of this.walkers) wk.s = (wk.s + wk.speed * dt + 24) % 24;
+  }
+
+  /** Signal state at a node: which axis has green (or amber between). */
+  signal(i: number, j: number): "x" | "y" | "amber" {
+    const ph = (this.clock + hashNode(i, j) * 10) % 10;
+    return ph < 4.2 ? "x" : ph < 5 ? "amber" : ph < 9.2 ? "y" : "amber";
+  }
+
+  private signalized(i: number, j: number) {
+    return (this.adj[key(i, j)]?.length ?? 0) >= 3;
+  }
+
+  /** Speed factor for what's ahead on the path: a turn or a red light. */
+  private ahead(a: Agent): number {
+    const nxt = a.path[a.seg + 1];
+    if (!nxt) return 1;
+    const dist = Math.abs(nxt.x - a.x) + Math.abs(nxt.y - a.y);
+    const i = Math.round((nxt.x - 0.5) / ROAD_STEP);
+    const j = Math.round((nxt.y - 0.5) / ROAD_STEP);
+    const isNode = Math.abs(i * ROAD_STEP + 0.5 - nxt.x) < 0.01 && Math.abs(j * ROAD_STEP + 0.5 - nxt.y) < 0.01;
+    let k = 1;
+    if (isNode && this.signalized(i, j)) {
+      const axis = a.dir === 0 || a.dir === 2 ? "x" : "y";
+      const s = this.signal(i, j);
+      // stop at the line; past it, keep going
+      if (s !== axis && dist > 0.55 && dist < 1.4) k = Math.min(k, Math.max(0, (dist - 0.65) / 0.75));
+    }
+    const after = a.path[a.seg + 2];
+    if (after && dist < 0.9) {
+      const turning = Math.sign(after.x - nxt.x) !== Math.sign(nxt.x - a.path[a.seg].x) || Math.sign(after.y - nxt.y) !== Math.sign(nxt.y - a.path[a.seg].y);
+      if (turning) k = Math.min(k, 0.45 + dist * 0.5);
+    }
+    return k;
   }
 
   /** 1 = road ahead is clear, 0 = queue behind the vehicle in front. */
@@ -341,18 +402,29 @@ export class Traffic {
     for (const a of this.agents) {
       if (a.phase === "inside" || a.alpha <= 0) continue;
       out.push({
-        depth: a.x + a.y,
-        x: a.x,
-        y: a.y,
+        depth: a.rx + a.ry,
+        x: a.rx,
+        y: a.ry,
         draw: (p) => {
+          // exhaust when pulling away
+          for (const pf of a.puffs) p.circle(pf.x, pf.y, 3 + pf.age * 8, 1.5 + pf.age * 3, `rgba(203,213,225,${0.4 * (1 - pf.age / 1.2)})`);
           p.ctx.globalAlpha = a.alpha;
-          if (a.kind === "truck") drawTruck(p, a.x, a.y, a.dir, a.color2 === a.color ? "#f97316" : "#f8fafc");
-          else if (a.kind === "carrier") drawCarrier(p, a.x, a.y, a.dir, [a.color, a.color2]);
-          else drawCar(p, a.x, a.y, a.dir, a.color, 1, 0, rand(a.color.length, a.speed) > 0.8);
+          if (a.kind === "truck") drawTruck(p, a.rx, a.ry, a.dir, a.color2 === a.color ? "#f97316" : "#f8fafc", 1, a.braking);
+          else if (a.kind === "carrier") drawCarrier(p, a.rx, a.ry, a.dir, [a.color, a.color2], 1, [a.model, CAR_MODELS[(CAR_MODELS.indexOf(a.model) + 3) % CAR_MODELS.length]]);
+          else drawModel(p, a.rx, a.ry, a.dir, a.model, a.color, 1, { brake: a.braking, lights: p.night > 0.35 });
           p.ctx.globalAlpha = 1;
         },
       });
     }
+    // traffic lights on busy junctions
+    for (let j = 0; j < NODES; j++)
+      for (let i = 0; i < NODES; i++) {
+        if (!this.signalized(i, j)) continue;
+        const lx = i * ROAD_STEP + 1.12;
+        const ly = j * ROAD_STEP - 0.12;
+        const s = this.signal(i, j);
+        out.push({ depth: lx + ly, x: lx, y: ly, draw: (p) => trafficLight(p, lx, ly, s) });
+      }
     for (const wk of this.walkers) {
       const { x, y } = ringPoint(wk.bx, wk.by, wk.s);
       out.push({ depth: x + y, x, y, draw: (p) => p.person(x, y, wk.shirt, wk.s * 9) });
@@ -371,4 +443,23 @@ function ringPoint(bx: number, by: number, s: number): Pt {
   if (k < side * 2) return { x: x0 + side, y: y0 + (k - side) };
   if (k < side * 3) return { x: x0 + side - (k - side * 2), y: y0 + side };
   return { x: x0, y: y0 + side - (k - side * 3) };
+}
+
+function hashNode(i: number, j: number) {
+  const s = Math.sin(i * 12.9898 + j * 78.233) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+/** Mostly everyday cars, now and then something special. */
+function pickModel(): CarModel {
+  const r = Math.random();
+  if (r < 0.22) return "city";
+  if (r < 0.48) return "sedan";
+  if (r < 0.66) return "suv";
+  if (r < 0.74) return "sports";
+  if (r < 0.8) return "muscle";
+  if (r < 0.87) return "luxury";
+  if (r < 0.93) return "electric";
+  if (r < 0.98) return "supercar";
+  return "hypercar";
 }

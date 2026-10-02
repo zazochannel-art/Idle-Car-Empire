@@ -3,7 +3,7 @@
 import { FACILITY_BY_ID } from "@/game/config/city";
 import type { FacilityType } from "@/game/types";
 import { Painter, rand, sx, sy } from "../map/iso";
-import { CAR_COLORS, drawCar, type Dir } from "../map/vehicles";
+import { CAR_COLORS, drawModel, type CarModel, type Dir } from "../map/vehicles";
 
 export const WALL_H = 74;
 const CAR_S = 3.6;
@@ -21,6 +21,53 @@ export interface FacilityDraw {
   progress: number;
   /** Colour of the car currently being worked on. */
   car: string;
+  /** Where cars come in and leave (the garage door). */
+  door?: [number, number];
+}
+
+const STATION_MODEL: Partial<Record<FacilityType, CarModel>> = {
+  serviceBay: "sedan",
+  carLift: "suv",
+  paintBooth: "luxury",
+  engineWorkshop: "muscle",
+  tuningArea: "sports",
+  dyno: "muscle",
+  performanceWorkshop: "supercar",
+  advancedPaint: "luxury",
+  supercarWorkshop: "hypercar",
+  advancedTuning: "supercar",
+};
+
+/**
+ * The car at a workstation. Each cycle it drives in through the door,
+ * stays while it is worked on, then drives back out.
+ */
+function stationCar(p: Painter, f: FacilityDraw, cx: number, cy: number, dir: Dir, color: string, s: number, lift = 0) {
+  const model = STATION_MODEL[f.type] ?? (f.uid % 2 ? "city" : "sedan");
+  const ph = f.progress;
+  const door = f.door;
+  const travel = f.workstation && door ? (ph < 0.12 ? ph / 0.12 : ph > 0.9 ? 1 - (ph - 0.9) / 0.1 : 1) : 1;
+  if (travel >= 1 || !door) {
+    drawModel(p, cx, cy, dir, model, color, s, { lift });
+    return;
+  }
+  // L-shaped path: up the aisle from the door, then across into the bay
+  const leaving = ph > 0.9;
+  const legA = Math.abs(door[1] - cy);
+  const legB = Math.abs(door[0] - cx);
+  const along = travel * (legA + legB);
+  let x: number, y: number, d: Dir;
+  if (along <= legA) {
+    x = door[0];
+    y = door[1] - Math.sign(door[1] - cy) * along;
+    d = leaving ? 1 : 3;
+  } else {
+    y = cy;
+    x = door[0] + Math.sign(cx - door[0]) * (along - legA);
+    const toward: Dir = cx >= door[0] ? 0 : 2;
+    d = leaving ? (toward === 0 ? 2 : 0) : toward;
+  }
+  drawModel(p, x, y, d, model, color, s, { brake: !leaving && travel > 0.85 });
 }
 
 export function drawRoom(p: Painter, gw: number, gd: number, accent: string, t: number) {
@@ -77,6 +124,34 @@ export function drawRoom(p: Painter, gw: number, gd: number, accent: string, t: 
   }
   p.onLeft(-0.3, 0, 0, 0.3, gw, 0, 12, "rgba(51,65,85,0.25)");
   p.onRight(0, 0, 0, 0, gd, 0, 12, "rgba(51,65,85,0.25)");
+  // tool cabinets and a pegboard along the back wall
+  for (let i = 0; i < Math.floor(gw / 3); i++) {
+    const u = 2.6 + i * 3;
+    if (u + 0.5 > gw) break;
+    p.onLeft(-0.3, 0, 0, u, u + 0.5, 0, 14, "#b91c1c");
+    for (let k = 1; k < 5; k++) p.onLeft(-0.3, 0, 0, u + 0.03, u + 0.47, k * 2.8, k * 2.8 + 0.5, "#7f1d1d");
+    p.onLeft(-0.3, 0, 0, u, u + 0.5, 14, 15, "#e5e7eb");
+  }
+  // tyre rack on the side wall
+  for (let i = 0; i < Math.floor(gd / 5); i++) {
+    const u = 3.2 + i * 5;
+    if (u + 1 > gd) break;
+    for (let r = 0; r < 2; r++)
+      for (let k = 0; k < 3; k++) {
+        const cx = sx(0, u + k * 0.32 + 0.16);
+        const cy = sy(0, u + k * 0.32 + 0.16, 6 + r * 9);
+        p.ctx.fillStyle = "#111827";
+        p.ctx.beginPath();
+        p.ctx.ellipse(cx, cy, 2.6, 4.2, -0.45, 0, Math.PI * 2);
+        p.ctx.fill();
+        p.ctx.fillStyle = "#6b7280";
+        p.ctx.beginPath();
+        p.ctx.ellipse(cx, cy, 1.1, 1.8, -0.45, 0, Math.PI * 2);
+        p.ctx.fill();
+      }
+    p.onRight(0, u, 0, 0, 1, 1.8, 2.3, "#475569");
+    p.onRight(0, u, 0, 0, 1, 10.8, 11.3, "#475569");
+  }
   // accent band + windows on the back wall (the y = 0 plane, seen from the front)
   p.onLeft(-0.3, 0, 0, 0.3, gw, WALL_H - 10, WALL_H - 5, p.col(accent));
   for (let i = 0; i < Math.floor(gw / 3); i++) {
@@ -144,7 +219,7 @@ export function drawFacility(p: Painter, f: FacilityDraw, t: number) {
     case "serviceBay": {
       p.quad(x + 0.05, y + 0.05, w - 0.1, d - 0.1, "rgba(250,204,21,0.12)");
       p.quadStroke(x + 0.08, y + 0.08, w - 0.16, d - 0.16, "#facc15", 2);
-      if (f.staffed) drawCar(p, cx, cy, dir, f.car, CAR_S * 0.9);
+      if (f.staffed) stationCar(p, f, cx, cy, dir, f.car, CAR_S * 0.9);
       toolCart(p, longX ? x + w - 0.55 : x + 0.1, longX ? y + 0.1 : y + d - 0.45);
       break;
     }
@@ -154,12 +229,12 @@ export function drawFacility(p: Painter, f: FacilityDraw, t: number) {
       const post = (px: number, py: number) => p.box(px, py, 0.18, 0.18, 0, 46, "#2563eb", "#3b82f6");
       if (longX) {
         post(x + w / 2 - 0.09, y + 0.05);
-        if (f.staffed) drawCar(p, cx, cy, dir, f.car, CAR_S * 0.62, lift);
+        if (f.staffed) stationCar(p, f, cx, cy, dir, f.car, CAR_S * 0.62, lift);
         p.box(x + 0.25, y + 0.3, w - 0.5, 0.12, lift, 2.5, "#1e40af");
         post(x + w / 2 - 0.09, y + d - 0.23);
       } else {
         post(x + 0.05, y + d / 2 - 0.09);
-        if (f.staffed) drawCar(p, cx, cy, dir, f.car, CAR_S * 0.62, lift);
+        if (f.staffed) stationCar(p, f, cx, cy, dir, f.car, CAR_S * 0.62, lift);
         post(x + w - 0.23, y + d / 2 - 0.09);
       }
       break;
@@ -193,7 +268,7 @@ export function drawFacility(p: Painter, f: FacilityDraw, t: number) {
       p.quad(x + 0.05, y + 0.05, w - 0.1, d - 0.1, "#1f2937");
       p.box(x + 0.05, y + 0.05, w - 0.1, 0.1, 0, 44, "#e5e7eb");
       p.box(x + 0.05, y + 0.15, 0.1, d - 0.2, 0, 44, "#e5e7eb");
-      if (f.staffed) drawCar(p, cx, cy, dir, working ? mixPaint(f.car, cfg.color, ph) : f.car, CAR_S * 0.72);
+      if (f.staffed) stationCar(p, f, cx, cy, dir, working ? mixPaint(f.car, cfg.color, Math.max(0, (ph - 0.12) / 0.78)) : f.car, CAR_S * 0.72);
       if (working && !p.dim) {
         for (let i = 0; i < 10; i++) {
           const a = (t * 0.9 + i / 10) % 1;
@@ -235,7 +310,7 @@ export function drawFacility(p: Painter, f: FacilityDraw, t: number) {
       p.quad(x + 0.05, y + 0.05, w - 0.1, d - 0.1, "#111827");
       p.quadStroke(x + 0.12, y + 0.12, w - 0.24, d - 0.24, glow, 2);
       if (working) lightRig(p, x, y, w, d, glow, t);
-      if (f.staffed) drawCar(p, cx, cy, dir, f.car, CAR_S * 0.72, 0, true);
+      if (f.staffed) stationCar(p, f, cx, cy, dir, f.car, CAR_S * 0.72);
       p.box(x + w - 0.6, y + 0.15, 0.45, 0.3, 0, 18, "#334155");
       p.box(x + w - 0.62, y + 0.17, 0.5, 0.06, 18, 12, "#0f172a");
       p.onLeft(x + w - 0.62, y + 0.23, 18, 0.04, 0.46, 2, 10, working ? glow : "#1f2937");
@@ -246,7 +321,7 @@ export function drawFacility(p: Painter, f: FacilityDraw, t: number) {
       const rx = longX ? cx - 0.6 : cx;
       p.quad(longX ? rx - 0.3 : x + 0.5, longX ? y + 0.4 : cy - 0.9, longX ? 0.6 : w - 1, longX ? d - 0.8 : 0.6, "#0b1220");
       for (let i = 0; i < 4; i++) p.line(longX ? rx - 0.3 : x + 0.5, longX ? y + 0.5 + i * 0.5 : cy - 0.85 + i * 0.15, longX ? rx + 0.3 : x + w - 0.5, longX ? y + 0.5 + i * 0.5 : cy - 0.85 + i * 0.15, "#475569", 1);
-      if (f.staffed) drawCar(p, cx, cy, dir, f.car, CAR_S * 0.72, Math.sin(t * 40) * (working ? 0.6 : 0), true);
+      if (f.staffed) stationCar(p, f, cx, cy, dir, f.car, CAR_S * 0.72, Math.sin(t * 40) * (working ? 0.6 : 0));
       // exhaust fan and console
       p.box(longX ? x + 0.1 : x + w / 2 - 0.4, longX ? cy - 0.4 : y + 0.1, longX ? 0.3 : 0.8, longX ? 0.8 : 0.3, 0, 26, "#374151");
       if (working && !p.dim)
@@ -261,7 +336,7 @@ export function drawFacility(p: Painter, f: FacilityDraw, t: number) {
     case "performanceWorkshop": {
       p.quad(x + 0.05, y + 0.05, w - 0.1, d - 0.1, "rgba(6,182,212,0.12)");
       p.box(x + 0.5, y + 0.5, w - 1, d - 1, 0, 6, "#164e63", "#0e7490");
-      if (f.staffed) drawCar(p, cx, cy, dir, f.car, CAR_S * 0.78, 6, true);
+      if (f.staffed) stationCar(p, f, cx, cy, dir, f.car, CAR_S * 0.78, 6);
       if (working) {
         p.line(x + 0.3, y + 0.3, cx, cy, "rgba(239,68,68,0.7)", 1, 14);
         p.line(x + w - 0.3, y + 0.3, cx, cy, "rgba(239,68,68,0.7)", 1, 14);
@@ -273,7 +348,7 @@ export function drawFacility(p: Painter, f: FacilityDraw, t: number) {
       p.quad(x + 0.05, y + 0.05, w - 0.1, d - 0.1, "#1c1917");
       p.ellipse(cx, cy, 0, (w + d) * 13, "rgba(250,204,21,0.25)", 0.5);
       p.box(cx - 1.2, cy - 1.2, 2.4, 2.4, 0, 4, "#a16207", "#eab308");
-      if (f.staffed) drawCar(p, cx, cy, dir, working ? f.car : "#f59e0b", CAR_S * 0.8, 4, true);
+      if (f.staffed) stationCar(p, f, cx, cy, dir, working ? f.car : "#f59e0b", CAR_S * 0.8, 4);
       for (const [a, b] of [[0.2, 0.2], [w - 0.3, 0.2]]) {
         p.box(x + a, y + b, 0.1, 0.1, 0, 60, "#d4d4d8");
         p.circle(x + a + 0.05, y + b + 0.05, 62, 3, working ? "#fef08a" : "#71717a");
@@ -297,7 +372,7 @@ export function drawFacility(p: Painter, f: FacilityDraw, t: number) {
       p.box(x + 0.3, y + 0.25, 1.6, 0.1, 8, 7, "#e7e5e4");
       p.box(x + 0.8, y + 0.95, 0.6, 0.4, 0, 6, "#1f2937", "#d4a017");
       p.tree(x + 0.25, y + d - 0.3, 0.6, 0.6);
-      drawCar(p, x + w - 1.0, cy + 0.2, longX ? 1 : 0, "#facc15", CAR_S * 0.6, 3, true);
+      drawModel(p, x + w - 1.0, cy + 0.2, longX ? 1 : 0, "hypercar", "#facc15", CAR_S * 0.6, { lift: 3 });
       p.box(x + w - 1.6, y + d - 0.5, 1.2, 0.3, 0, 3, "#d4a017");
       break;
     }

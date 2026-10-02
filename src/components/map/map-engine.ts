@@ -5,7 +5,9 @@ import { ROAD_STEP, WORLD, WORLD_MAP, zoneOfBlock, type Plot } from "@/game/city
 import type { ZoneId } from "@/game/types";
 import { attachControls, Camera } from "./camera";
 import { Painter, sx, sy, toTile } from "./iso";
-import { drawFog, drawGround, hitBox, WORLD_BOUNDS, zoneCenter, type Drawable, type DrawInfo } from "./scene";
+import { BUILD_ANIM, drawConstruction, drawFog, drawGround, drawPreview, hitBox, WORLD_BOUNDS, zoneCenter, type Drawable, type DrawInfo } from "./scene";
+import type { StructureType } from "@/game/types";
+import { applyLighting, skyAt, type TimeMode } from "./lighting";
 import { Traffic, type TrafficWorld } from "./traffic";
 
 export type MapTarget = { kind: "plot"; id: string } | { kind: "zone"; id: ZoneId } | null;
@@ -24,6 +26,9 @@ export class MapEngine {
   private ctx: CanvasRenderingContext2D;
   private painter: Painter;
   private dpr = 1;
+  /** Lowered automatically when the device can't hold a smooth frame rate. */
+  private maxDpr = 2;
+  private slow = { frames: 0, time: 0 };
   private scene: Drawable[] = [];
   private unlocked = new Set<ZoneId>();
   readonly traffic = new Traffic();
@@ -40,6 +45,15 @@ export class MapEngine {
   money: (n: number) => string = (n) => `$${Math.round(n)}`;
   /** Container whose [data-zone] children are pinned to zone centres (lock cards). */
   overlay: HTMLElement | null = null;
+  /** Day, evening, night or the automatic cycle. */
+  timeMode: TimeMode = "auto";
+  /** BUILD mode: plots to highlight and how (green / yellow / red). */
+  buildInfo: Map<string, "green" | "yellow" | "red"> | null = null;
+  /** A building being previewed on a plot before it is bought. */
+  preview: { plot: string; type: StructureType } | null = null;
+  private sigs = new Map<string, string>();
+  private anims = new Map<string, { start: number; upgrade: boolean; announce?: string }>();
+  private banners: { x: number; y: number; text: string; age: number }[] = [];
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -72,7 +86,7 @@ export class MapEngine {
 
   resize() {
     const r = this.canvas.getBoundingClientRect();
-    this.dpr = Math.min(2, window.devicePixelRatio || 1);
+    this.dpr = Math.min(this.maxDpr, window.devicePixelRatio || 1);
     this.cam.w = Math.max(1, r.width);
     this.cam.h = Math.max(1, r.height);
     this.canvas.width = Math.round(this.cam.w * this.dpr);
@@ -82,6 +96,17 @@ export class MapEngine {
   }
 
   setScene(scene: Drawable[], unlocked: Set<ZoneId>, world: TrafficWorld) {
+    // anything that changed on a plot gets a construction animation
+    const first = this.sigs.size === 0;
+    for (const d of scene) {
+      if (!d.pickId || !d.sig) continue;
+      const old = this.sigs.get(d.pickId);
+      if (!first && old !== undefined && old !== d.sig && d.sig !== "lot") {
+        const upgrade = old !== "lot" && old.split(":")[0] === d.sig.split(":")[0];
+        this.anims.set(d.pickId, { start: this.t, upgrade, announce: d.announce });
+      }
+      this.sigs.set(d.pickId, d.sig);
+    }
     this.scene = scene;
     this.unlocked = unlocked;
     this.traffic.setWorld(world);
@@ -107,6 +132,7 @@ export class MapEngine {
       const dt = Math.min(0.1, (now - this.last) / 1000);
       this.last = now;
       this.render(dt);
+      this.adaptQuality(dt);
       this.raf = requestAnimationFrame(loop);
     };
     this.raf = requestAnimationFrame(loop);
@@ -272,6 +298,22 @@ export class MapEngine {
     }
   }
 
+  /** Drops render resolution step by step while frames stay slow (< ~45 FPS). */
+  private adaptQuality(dt: number) {
+    if (this.dpr <= 1 || document.hidden) return;
+    const s = this.slow;
+    s.frames++;
+    s.time += dt;
+    if (s.frames < 120) return;
+    const avg = s.time / s.frames;
+    s.frames = 0;
+    s.time = 0;
+    if (avg > 1 / 45) {
+      this.maxDpr = Math.max(1, this.dpr - 0.25);
+      this.resize();
+    }
+  }
+
   private render(dt: number) {
     const { ctx, painter: p, cam } = this;
     this.t += dt;
@@ -299,6 +341,10 @@ export class MapEngine {
     ctx.setTransform(z, 0, 0, z, this.dpr * (cam.w / 2 - cam.x * cam.zoom), this.dpr * (cam.h / 2 - cam.y * cam.zoom));
     p.t = this.t;
     p.proj = null;
+    const sky = skyAt(this.timeMode, this.t);
+    p.night = sky.dark;
+    p.zoom = cam.zoom;
+    p.lights.length = 0;
 
     // sea shimmer around the island
     ctx.strokeStyle = "rgba(125,211,252,0.12)";
@@ -337,11 +383,37 @@ export class MapEngine {
       drawMoving(d.depth);
       if (!inView(d.bbox)) continue;
       p.dim = d.zone !== null && !this.unlocked.has(d.zone);
-      d.draw(p, info);
+      const anim = d.pickId ? this.anims.get(d.pickId) : undefined;
+      if (anim) {
+        const age = this.t - anim.start;
+        if (age >= BUILD_ANIM) {
+          this.anims.delete(d.pickId!);
+          const plot = WORLD_MAP.plotById[d.pickId!];
+          if (anim.announce && plot) this.banners.push({ x: plot.x + plot.w / 2, y: plot.y + plot.d / 2, text: anim.announce, age: 0 });
+          d.draw(p, info);
+        } else drawConstruction(p, d.pickId!, age, anim.upgrade, () => d.draw(p, info), d.bbox);
+      } else d.draw(p, info);
+      if (this.preview && this.preview.plot === d.pickId) drawPreview(p, this.preview.plot, this.preview.type, this.t);
       visible.push(d);
     }
     drawMoving(Infinity);
     p.dim = false;
+    applyLighting(ctx, sky, p.lights, view);
+
+    // BUILD mode: dim the city, light up the plots by availability
+    if (this.buildInfo) {
+      ctx.fillStyle = "rgba(2,6,23,0.42)";
+      ctx.fillRect(view[0] - 10, view[1] - 10, view[2] - view[0] + 20, view[3] - view[1] + 20);
+      const pulse = 0.5 + 0.2 * Math.sin(this.t * 3);
+      const fills = { green: `rgba(34,197,94,${pulse * 0.6})`, yellow: `rgba(250,204,21,${pulse * 0.5})`, red: "rgba(239,68,68,0.28)" };
+      const lines = { green: "#4ade80", yellow: "#facc15", red: "#f87171" };
+      for (const [id, st] of this.buildInfo) {
+        const pl = WORLD_MAP.plotById[id];
+        if (!pl) continue;
+        p.quad(pl.x + 0.3, pl.y + 0.3, pl.w - 0.6, pl.d - 0.6, fills[st]);
+        p.quadStroke(pl.x + 0.3, pl.y + 0.3, pl.w - 0.6, pl.d - 0.6, lines[st], 2);
+      }
+    }
     drawFog(p, this.unlocked, this.t);
     this.drawClouds();
 
@@ -368,6 +440,39 @@ export class MapEngine {
     }
     ctx.globalAlpha = 1;
     this.pops = this.pops.filter((q) => q.age < 1.6);
+
+    // "Garage #01 · Lv 4" banners when a construction finishes
+    for (const b of this.banners) {
+      b.age += dt;
+      const k = b.age / 2.6;
+      if (k >= 1) continue;
+      const [px, py0] = p.at(b.x, b.y, 90);
+      const py = py0 - k * 26;
+      const scale = k < 0.12 ? 0.6 + (k / 0.12) * 0.45 : k < 0.2 ? 1.05 - ((k - 0.12) / 0.08) * 0.05 : 1;
+      ctx.save();
+      ctx.globalAlpha = k > 0.8 ? 1 - (k - 0.8) / 0.2 : 1;
+      ctx.translate(px, py);
+      ctx.scale(scale, scale);
+      ctx.font = "900 15px ui-sans-serif, system-ui, sans-serif";
+      const text = `★ ${b.text}`;
+      const tw = ctx.measureText(text).width + 28;
+      const g = ctx.createLinearGradient(0, -16, 0, 16);
+      g.addColorStop(0, "#fde68a");
+      g.addColorStop(1, "#d97706");
+      ctx.beginPath();
+      ctx.roundRect(-tw / 2, -16, tw, 32, 16);
+      ctx.fillStyle = g;
+      ctx.shadowColor = "rgba(251,191,36,0.8)";
+      ctx.shadowBlur = 18;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "#1c1917";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, 0, 1);
+      ctx.restore();
+    }
+    this.banners = this.banners.filter((b) => b.age < 2.6);
     p.proj = null;
 
     // HTML cards over locked zones

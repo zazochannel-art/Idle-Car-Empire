@@ -443,3 +443,19 @@ body {
 .clock-hand {
   animation: scene-spin 60s steps(60) infinite;
 }
+
+/* money coming in: a quick warm glow behind the cash counter */
+@keyframes cash-flash {
+  0% {
+    background: radial-gradient(closest-side, rgba(245, 196, 81, 0.35), transparent);
+    opacity: 1;
+  }
+  100% {
+    background: radial-gradient(closest-side, rgba(245, 196, 81, 0.35), transparent);
+    opacity: 0;
+  }
+}
+.cash-flash {
+  animation: cash-flash 0.7s ease-out;
+  opacity: 0;
+}

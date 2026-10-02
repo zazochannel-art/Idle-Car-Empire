@@ -55,10 +55,22 @@ export class Painter {
    * projection, so they keep a readable size at any zoom.
    */
   proj: ((x: number, y: number, z: number) => [number, number]) | null = null;
+  /** Camera zoom, for level of detail. */
+  zoom = 1;
+  /** 0 = full day … 1 = deep night; lights only show when it's dark. */
+  night = 0;
+  /** Light sources collected while drawing (world px), lit after the scene. */
+  lights: { x: number; y: number; r: number; color: string; a: number }[] = [];
   private cache = new Map<string, string>();
 
   constructor(ctx: CanvasRenderingContext2D) {
     this.ctx = ctx;
+  }
+
+  /** Registers a glow at a world-pixel point (shown in the evening and at night). */
+  light(x: number, y: number, r: number, color: string, a = 1) {
+    if (this.night < 0.05 || this.dim) return;
+    this.lights.push({ x, y, r, color, a });
   }
 
   col(hex: string, k = 0): string {
@@ -155,7 +167,7 @@ export class Painter {
     c.fillStyle = this.col(color, -0.24);
     c.fill();
     // ambient occlusion: walls darken toward the ground
-    if (h > 6) {
+    if (h > 9 && this.zoom > 0.6) {
       const ao = Math.min(9, h * 0.3);
       this.onLeft(x, y1, z, 0, w, 0, ao, "rgba(15,23,42,0.13)");
       this.onLeft(x, y1, z, 0, w, 0, ao * 0.45, "rgba(15,23,42,0.1)");
@@ -208,14 +220,28 @@ export class Painter {
   /** Rows of windows on both visible faces of a box. */
   windows(x: number, y: number, w: number, d: number, z: number, h: number, floors: number, color: string, lit = 0) {
     const fh = h / floors;
+    // at night most offices keep a few floors lit
+    const litN = this.night > 0.3 ? Math.max(lit, 3) : lit;
+    const panes = this.zoom > 0.8;
     for (let f = 0; f < floors; f++) {
       const v0 = f * fh + fh * 0.3;
-      const v1 = f * fh + fh * 0.75;
-      const on = lit > 0 && (f * 7 + Math.floor(x * 3 + y)) % 5 < lit;
-      const lc = on ? this.col("#fde68a") : this.col(color);
-      const rc = on ? this.col("#fcd34d", -0.1) : this.col(color, -0.18);
+      const v1 = f * fh + fh * 0.78;
+      const on = litN > 0 && (f * 7 + Math.floor(x * 3 + y)) % 5 < litN;
+      // glass gets lighter toward the top: sky reflected in it
+      const sky = 0.06 * (f / floors);
+      const lc = on ? this.col("#fde68a") : this.col(color, sky);
+      const rc = on ? this.col("#fcd34d", -0.1) : this.col(color, sky - 0.18);
       this.onLeft(x, y + d, z, 0.12, w - 0.12, v0, v1, lc);
       this.onRight(x + w, y, z, 0.12, d - 0.12, v0, v1, rc);
+      if (on && this.night > 0.3 && f % 2 === 0) {
+        this.light(sx(x + w / 2, y + d), sy(x + w / 2, y + d, z + (v0 + v1) / 2), 10 + w * 8, "#fde68a", 0.35);
+      }
+    }
+    if (panes) {
+      // mullions split the bands into panes: one full-height strip each
+      const mul = this.col(color, -0.35);
+      for (let u = 0.42; u < w - 0.15; u += 0.3) this.onLeft(x, y + d, z, u - 0.015, u + 0.015, fh * 0.3, h, mul);
+      for (let u = 0.42; u < d - 0.15; u += 0.3) this.onRight(x + w, y, z, u - 0.015, u + 0.015, fh * 0.3, h, mul);
     }
   }
 
@@ -310,7 +336,7 @@ export class Painter {
     c.fillRect(bx - 1.3 * size, by - 10 * size, 2.6 * size, 10 * size);
     c.fillStyle = this.col("#4a2a12");
     c.fillRect(bx + 0.2 * size, by - 10 * size, 1.1 * size, 10 * size);
-    // layered crown: dark base, mid lobes, sunlit top-left
+    // layered crown: dark base, mid lobes, sunlit top-left (fewer when far)
     const blob = (dx: number, dz: number, r: number, k: number) => {
       c.beginPath();
       c.arc(bx + dx * size, by - dz * size, r * size, 0, Math.PI * 2);
@@ -318,6 +344,10 @@ export class Painter {
       c.fill();
     };
     blob(0, 14, 9.5, -0.22);
+    if (this.zoom < 0.8) {
+      blob(-1.5, 19, 6.5, 0.05);
+      return;
+    }
     blob(-4.5, 17, 6.5, -0.08);
     blob(4, 16, 6.8, -0.14);
     blob(0, 20, 7, 0);

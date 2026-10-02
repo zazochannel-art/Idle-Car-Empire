@@ -2,14 +2,15 @@
 // one drawable per plot/cell, depth-sorted by the renderer. Ground (zones,
 // roads, sidewalks) is drawn separately and first.
 import { SPEC_BY_ID, STRUCTURE_BY_ID, ZONES, ZONE_BY_ID } from "@/game/config/city";
-import { FACTORY_BY_ID } from "@/game/config/factories";
+import { FACTORIES, FACTORY_BY_ID } from "@/game/config/factories";
 import { DEALER_BY_ID } from "@/game/config/dealerships";
 import { BLOCKS, NODES, RIVER, ROAD_STEP, WORLD, WORLD_MAP, blockKind, hasRoad, hash, segmentSides, zoneCenterTile, zoneOfBlock, type Decor, type Plot, type Scenery } from "@/game/city/layout";
 import { coastline } from "./terrain";
 import { isFactoryAvailable, type EconomySnapshot } from "@/game/engine/economy";
 import type { BuildingState, GameState, StructureType, ZoneId } from "@/game/types";
 import { Painter, rand, sx, sy } from "./iso";
-import { CAR_COLORS, drawCar, drawTruck, type Dir } from "./vehicles";
+import { CAR_COLORS, drawCar, drawModel, drawTruck, type CarModel, type Dir } from "./vehicles";
+import { barrier, beacon, bench, billboard, birds, bush, container, drum, fence, flagPole, flowerBed, forklift, ledStrip, lightPole, planter, robotArm, tireStack, wallLamp } from "./props";
 
 export interface DrawInfo {
   zoom: number;
@@ -28,6 +29,10 @@ export interface Drawable {
   pickId?: string;
   /** Footprint + height, for precise picking. */
   hit?: { x: number; y: number; w: number; d: number; h: number };
+  /** What stands on the plot; a change plays a construction animation. */
+  sig?: string;
+  /** Banner shown when that animation finishes ("Garage #01 · Lv 4"). */
+  announce?: string;
 }
 
 export interface SceneNames {
@@ -103,6 +108,7 @@ function doors(p: Painter, x: number, y1: number, w: number, n: number, h: numbe
     p.onLeft(x, y1, 0, u0, u0 + dw, 0, h, p.col("#94a3b8", -0.15));
     for (let k = 1; k < 5; k++) p.onLeft(x, y1, 0, u0, u0 + dw, (h * k) / 5 - 0.5, (h * k) / 5, p.col("#64748b"));
     if (lit) {
+      p.light(sx(x + u0 + dw / 2, y1), sy(x + u0 + dw / 2, y1, h * 0.3), 18, "#ffcf70", 0.35);
       const open = 0.45 + 0.15 * Math.sin(t * 1.3 + i);
       p.onLeft(x, y1, 0, u0, u0 + dw, 0, h * open, "rgba(251,191,36,0.85)");
       p.onLeft(x, y1, 0, u0, u0 + dw, 0, h * open * 0.25, "rgba(30,41,59,0.6)");
@@ -157,6 +163,26 @@ function emptyPlot(p: Painter, plot: Plot, info: DrawInfo, buildable: boolean) {
   p.quadStroke(x + M + 0.1, y + M + 0.1, w - 2 * M - 0.2, d - 2 * M - 0.2, sel ? "#fbbf24" : buildable ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.35)", sel ? 2.5 : 1.4, [6, 5]);
   // corner foundation pegs
   for (const [a, b] of [[0.45, 0.45], [w - 0.45, 0.45], [0.45, d - 0.45], [w - 0.45, d - 0.45]]) p.box(x + a - 0.05, y + b - 0.05, 0.1, 0.1, 0, 4, "#a16207");
+  if (p.zoom < 0.85) return;
+  // a prepared lot: survey stakes, a pallet of materials and a sign
+  p.box(x + 0.55, y + 0.6, 0.35, 0.25, 0, 3, "#b45309", "#d97706");
+  p.box(x + 0.58, y + 0.62, 0.3, 0.2, 3, 2.5, "#9ca3af");
+  for (const [a, b] of [[w - 0.7, d - 0.6], [w - 0.95, d - 0.6]]) {
+    const cx = sx(x + a, y + b);
+    const cy = sy(x + a, y + b);
+    const c = p.ctx;
+    c.fillStyle = p.col("#f97316");
+    c.beginPath();
+    c.moveTo(cx - 2.5, cy);
+    c.lineTo(cx, cy - 7);
+    c.lineTo(cx + 2.5, cy);
+    c.closePath();
+    c.fill();
+    c.fillStyle = "#f8fafc";
+    c.fillRect(cx - 1.3, cy - 4.2, 2.6, 1.2);
+  }
+  p.box(x + 0.5, y + d - 0.55, 0.05, 0.05, 0, 12, "#64748b");
+  p.box(x + 0.35, y + d - 0.58, 0.4, 0.06, 12, 7, buildable ? "#2563eb" : "#64748b");
 }
 
 function garage(p: Painter, plot: Plot, b: BuildingState, active: boolean, t: number) {
@@ -179,6 +205,15 @@ function garage(p: Painter, plot: Plot, b: BuildingState, active: boolean, t: nu
 
   for (const part of parts) p.shadow(part.x, part.y, part.w, part.d, part.h);
 
+  // behind the building: fence for small garages, equipment for bigger ones
+  if (L <= 2) {
+    fence(p, X + 0.05, Y + 0.05, W - 0.1, true);
+    fence(p, X + 0.05, Y + 0.05, D - 0.1, false);
+  } else if (L <= 4) {
+    tireStack(p, X + W - 0.2, Y + 1.25, 4);
+    drum(p, X + W - 0.45, Y + 1.35, "#dc2626");
+  }
+
   // front apron: parking bays and cars waiting for service
   const frontY = Y + D - 0.45;
   if (L >= 4) {
@@ -197,6 +232,11 @@ function garage(p: Painter, plot: Plot, b: BuildingState, active: boolean, t: nu
     }
     if (part.kind === "main") {
       p.onLeft(part.x, part.y + part.d, 0, 0, part.w, part.h - 4, part.h - 1, p.col(spec.color));
+      // windows above the doors from level 2, wall lamps everywhere
+      if (L >= 2) p.windows(part.x, part.y, part.w, part.d, part.h - 13, 7, 1, "#93c5fd", active ? 1 : 0);
+      wallLamp(p, part.x, part.y + part.d, 0.1, part.h - 9);
+      wallLamp(p, part.x, part.y + part.d, part.w - 0.1, part.h - 9);
+      if (L >= 5) ledStrip(p, part.x, part.y + part.d, part.w, part.h - 1.5, spec.color, t);
       doors(p, part.x, part.y + part.d, part.w, L <= 1 ? 1 : L <= 4 ? 2 : 3, Math.min(14, part.h - 7), active, t);
       p.onRight(part.x + part.w, part.y, 0, 0.2, part.d - 0.2, part.h * 0.45, part.h * 0.7, p.col("#bae6fd", -0.25));
       if (L >= 2 && L < 5) {
@@ -222,7 +262,24 @@ function garage(p: Painter, plot: Plot, b: BuildingState, active: boolean, t: nu
     p.box(g.x + g.w / 2 - 0.04, g.y + 0.2, 0.08, 0.08, g.h + 3, 16, "#e5e7eb");
     emojiAt(p, spec.emoji, g.x + g.w / 2, g.y + 0.24, g.h + 26, 13);
   }
-  for (let i = 0; i < waiting; i++) drawCar(p, X + 0.4 + i * 0.5, frontY + 0.05, 3, CAR_COLORS[(i * 3 + (b.garage?.no ?? 0)) % CAR_COLORS.length]);
+  // in front: the apron grows into a proper car park and forecourt
+  const models: CarModel[] = L <= 2 ? ["city", "sedan"] : L <= 4 ? ["sedan", "suv", "sports"] : L <= 6 ? ["luxury", "muscle", "sports"] : ["supercar", "hypercar", "electric"];
+  for (let i = 0; i < waiting; i++) {
+    drawModel(p, X + 0.4 + i * 0.5, frontY + 0.05, 3, models[(i + (b.garage?.no ?? 0)) % models.length], CAR_COLORS[(i * 3 + (b.garage?.no ?? 0)) % CAR_COLORS.length], 1, { lights: p.night > 0.35 });
+  }
+  if (L <= 2) bush(p, X + W - 0.2, Y + D - 0.2, 0.8);
+  if (L >= 4) {
+    lightPole(p, X + 0.08, Y + D - 0.08);
+    lightPole(p, X + W - 0.08, Y + D - 0.08);
+  }
+  if (L >= 5) {
+    planter(p, X + W - 0.35, Y + 1.75);
+    planter(p, X + 0.25, Y + 1.75);
+  }
+  if (L >= 6) {
+    flagPole(p, X + W - 0.1, Y + 1.6, spec.color, t);
+    flagPole(p, X + W - 0.1, Y + 1.95, "#f8fafc", t + 1);
+  }
 }
 
 function factoryLot(p: Painter, plot: Plot, owned: boolean, level: number, t: number, seed: number) {
@@ -277,9 +334,11 @@ function factoryLot(p: Painter, plot: Plot, owned: boolean, level: number, t: nu
     return;
   }
 
-  const hall = { x: X + 0.25, y: Y + 0.25, w: 3.3, d: 2.9, h: 34 };
+  // later plants are visibly bigger: taller halls, extra wings, a tower
+  const tierIdx = FACTORIES.findIndex((f) => f.id === id);
+  const hall = { x: X + 0.25, y: Y + 0.25, w: 3.3, d: 2.9, h: 34 + tierIdx * 4 };
   p.shadow(hall.x, hall.y, hall.w, hall.d, hall.h);
-  const big = level >= 25;
+  const big = level >= 25 || tierIdx >= 4;
   if (big) p.shadow(X + 3.75, Y + 0.25, 1.35, 1.9, 26);
   p.shadow(X + 3.75, Y + 2.45, 1.35, 1.2, 44);
   p.box(hall.x, hall.y, hall.w, hall.d, 0, hall.h, "#e5e7eb", "#94a3b8");
@@ -304,12 +363,42 @@ function factoryLot(p: Painter, plot: Plot, owned: boolean, level: number, t: nu
   if (level >= 100) {
     cyl(p, X + 4.6, Y + 4.6, 0, 7, 24, "#e5e7eb");
   }
-  // yard with trucks at the docks
-  for (let i = 0; i < 3; i++) p.line(X + 0.4 + i * 1.0, Y + 3.4, X + 0.4 + i * 1.0, Y + 4.4, p.col("#f8fafc"), 1);
-  drawTruck(p, X + 0.9, Y + 3.95, 3, cfg.accent);
-  drawTruck(p, X + 1.9, Y + 3.95, 3, "#f8fafc");
-  parkedCars(p, X + 0.6, Y + 4.9, 5, seed, 1, 0.6);
+  beacon(p, hall.x + 0.1, hall.y + hall.d - 0.1, hall.h + 2, t);
+  beacon(p, hall.x + hall.w - 0.1, hall.y + hall.d - 0.1, hall.h + 2, t + 1.3);
+  if (tierIdx >= 8) {
+    // the global plants get a headquarters tower
+    p.shadow(X + 4.4, Y + 4.3, 0.8, 0.8, 120);
+    p.box(X + 4.4, Y + 4.3, 0.8, 0.8, 0, 110, "#93c5fd", "#1e3a8a");
+    p.windows(X + 4.4, Y + 4.3, 0.8, 0.8, 0, 110, 12, "#1d4ed8", 2);
+    beacon(p, X + 4.8, Y + 4.7, 112, t, "#ef4444");
+  }
+
+  // production line: finished cars roll out of the hall on a conveyor,
+  // robots work on them, then they're loaded onto trucks
+  const model = FACTORY_MODEL[Math.min(FACTORY_MODEL.length - 1, cfg.baseTier - 1)];
+  const beltY = Y + 3.35;
+  p.box(X + 0.3, beltY - 0.2, 3.2, 0.4, 0, 3, "#334155", "#1f2937");
+  for (let i = 0; i < 16; i++) {
+    const u = (i / 16 + t * 0.05) % 1;
+    p.line(X + 0.3 + u * 3.2, beltY - 0.19, X + 0.3 + u * 3.2, beltY + 0.19, "rgba(148,163,184,0.5)", 1, 3);
+  }
+  for (let i = 0; i < 3; i++) {
+    const u = (i / 3 + t * 0.05) % 1;
+    drawModel(p, X + 0.5 + u * 2.9, beltY, 0, model, CAR_COLORS[(i * 3 + tierIdx) % CAR_COLORS.length], 0.95, { lift: 3, noShadow: true });
+  }
+  robotArm(p, X + 1.2, beltY - 0.45, t, true);
+  robotArm(p, X + 2.3, beltY - 0.45, t + 0.7, true);
+  robotArm(p, X + 1.75, beltY + 0.48, t + 1.4, true);
+  container(p, X + 3.9, Y + 3.9, true, cfg.accent);
+  container(p, X + 3.9, Y + 4.35, true, "#64748b");
+  container(p, X + 3.9, Y + 3.9, true, "#e5e7eb", 8);
+  drawTruck(p, X + 0.9, Y + 4.4, 3, cfg.accent);
+  drawTruck(p, X + 1.9, Y + 4.4, 3, "#f8fafc");
+  forklift(p, X + 2.7, Y + 4.25, X + 3.6, Y + 4.25, t, seed);
+  parkedCars(p, X + 0.6, Y + 5.0, 5, seed, 1, 0.6);
 }
+
+const FACTORY_MODEL: CarModel[] = ["city", "sedan", "suv", "sports", "supercar", "hypercar", "electric", "hypercar"];
 
 function dealerLot(p: Painter, plot: Plot, owned: boolean, t: number, seed: number) {
   const id = plot.dealer!;
@@ -334,13 +423,27 @@ function dealerLot(p: Painter, plot: Plot, owned: boolean, t: number, seed: numb
   for (let k = 1; k < 3; k++) p.onRight(X + 2.25, Y + 0.15, 0, (1.1 * k) / 3 - 0.012, (1.1 * k) / 3 + 0.012, 0, h, p.col("#e2e8f0", -0.2));
   p.box(X + 0.1, Y + 0.1, 2.2, 1.2, h, 3, "#f8fafc");
   p.onLeft(X + 0.1, Y + 1.3, h, 0.3, 1.9, 0.2, 2.8, p.col(tiers >= 3 ? "#eab308" : "#2563eb"));
-  drawCar(p, X + 0.7, Y + 0.7, 0, CAR_COLORS[(tiers + 1) % CAR_COLORS.length], 1, 0, tiers >= 3);
-  parkedCars(p, X + 0.35, Y + 1.85, 4, seed + tiers, 1, 0.55);
+  // the showroom glows at night; better dealers show better cars
+  p.light(sx(X + 1.2, Y + 1.25), sy(X + 1.2, Y + 1.25, h / 2), 40, "#bfe3ff", 0.55);
+  const lineup = DEALER_MODELS[Math.max(0, tiers)];
+  drawModel(p, X + 0.7, Y + 0.7, 0, lineup[0], CAR_COLORS[(tiers + 1) % CAR_COLORS.length], 1);
+  drawModel(p, X + 1.6, Y + 0.75, 0, lineup[1], CAR_COLORS[(tiers + 4) % CAR_COLORS.length], 1);
+  for (let i = 0; i < 4; i++) drawModel(p, X + 0.35 + i * 0.55, Y + 1.85, 1, lineup[i % lineup.length], CAR_COLORS[(i * 3 + Math.floor(seed * 10) + tiers) % CAR_COLORS.length], 1, { lights: false });
+  lightPole(p, X + W - 0.05, Y + D - 0.6);
   flag(p, X + 0.05, Y + D - 0.1, tiers >= 3 ? "#eab308" : "#ef4444", t);
   flag(p, X + W - 0.1, Y + D - 0.1, "#3b82f6", t + 1);
   p.box(X + W - 0.3, Y + 0.2, 0.16, 0.16, 0, 30, "#1e293b");
   emojiAt(p, cfg.emoji, X + W - 0.22, Y + 0.28, 40, 13);
 }
+
+const DEALER_MODELS: CarModel[][] = [
+  ["city", "sedan"],
+  ["sedan", "suv"],
+  ["luxury", "sports"],
+  ["luxury", "muscle"],
+  ["supercar", "sports"],
+  ["hypercar", "electric"],
+];
 
 function structure(p: Painter, plot: Plot, b: BuildingState, t: number, seed: number) {
   const X = plot.x + M;
@@ -495,10 +598,18 @@ function decor(p: Painter, dc: Decor, t: number) {
   const Y = y + M;
   const W = w - 2 * M;
   const D = d - 2 * M;
+  const zone = dc.zone;
+  // small props only when close enough to read them
+  const near = p.zoom >= 0.9;
   switch (dc.kind) {
     case "house": {
+      if (zone === "luxury") {
+        villa(p, X, Y, W, D, seed, t);
+        break;
+      }
       p.quad(X, Y, W, D, p.col("#86c06c"));
       p.quad(X + 0.85, Y + 1.6, 0.35, 0.8, p.col("#d6d3d1"));
+      if (near) fence(p, X + 0.05, Y + 0.05, W - 0.1, true, "#f5f5f4");
       const homes = [
         [0.15, 0.2],
         [1.35, 0.25],
@@ -516,27 +627,38 @@ function decor(p: Painter, dc: Decor, t: number) {
         p.shadow(X + a, Y + b, hw, hd, h + 6);
         p.box(X + a, Y + b, hw, hd, 0, h, HOUSE_WALLS[Math.floor(r * HOUSE_WALLS.length)]);
         p.onLeft(X + a, Y + b + hd, 0, hw * 0.4, hw * 0.4 + 0.16, 0, 7, p.col("#7c2d12"));
-        p.onLeft(X + a, Y + b + hd, 0, 0.1, 0.28, 4, 8, p.col("#bae6fd", -0.1));
-        p.onRight(X + a + hw, Y + b, 0, 0.2, 0.45, 4, 8, p.col("#bae6fd", -0.25));
+        const win = p.night > 0.3 && r > 0.3 ? "#fde68a" : p.col("#bae6fd", -0.1);
+        p.onLeft(X + a, Y + b + hd, 0, 0.1, 0.28, 4, 8, win);
+        p.onRight(X + a + hw, Y + b, 0, 0.2, 0.45, 4, 8, p.night > 0.3 ? "#fcd34d" : p.col("#bae6fd", -0.25));
+        if (p.night > 0.3 && r > 0.3) p.light(sx(X + a + 0.2, Y + b + hd), sy(X + a + 0.2, Y + b + hd, 6), 14, "#fde68a", 0.5);
         p.gable(X + a, Y + b, hw, hd, h, 8, HOUSE_ROOFS[Math.floor(r * 17) % HOUSE_ROOFS.length]);
+        // chimney
+        if (!near) return;
+        p.box(X + a + hw * 0.7, Y + b + 0.12, 0.1, 0.1, h + 2, 7, "#9a3412");
+        bush(p, X + a + hw + 0.08, Y + b + hd + 0.08, 0.6);
       });
+      if (near) flowerBed(p, X + 1.35, Y + 1.35, 0.5, 0.25, seed);
       p.tree(X + 2.1, Y + 1.9, 0.75, seed);
       break;
     }
     case "apartment": {
       p.quad(X, Y, W, D, p.col("#a3b18a"));
-      const h = 44 + Math.floor(seed * 4) * 8;
+      const h = (44 + Math.floor(seed * 4) * 8) * (zone === "mega" ? 1.4 : 1);
       p.shadow(X + 0.25, Y + 0.25, 1.8, 1.6, h);
       const wall = ["#fde68a", "#fecaca", "#e9d5ff", "#cffafe"][Math.floor(seed * 4)];
       p.box(X + 0.25, Y + 0.25, 1.8, 1.6, 0, h, wall, "#94a3b8");
       p.windows(X + 0.25, Y + 0.25, 1.8, 1.6, 0, h, Math.round(h / 11), "#bae6fd", 1);
+      // balconies
+      for (let f = 1; f < Math.round(h / 11); f += 2) p.box(X + 0.4, Y + 1.85, 0.6, 0.12, f * 11, 1.5, "#f8fafc");
       p.box(X + 0.5, Y + 0.5, 0.35, 0.3, h, 5, "#cbd5e1");
+      if (near) bench(p, X + 1.5, Y + 2.15, true);
       p.tree(X + 2.2, Y + 2.2, 0.7, seed);
       break;
     }
     case "office": {
       p.quad(X, Y, W, D, p.col("#cbd5e1"));
-      const h = 70 + Math.floor(seed * 6) * 14;
+      const tall = zone === "mega" ? 1.75 : zone === "global" ? 1.4 : zone === "downtown" ? 1.1 : 0.85;
+      const h = (70 + Math.floor(seed * 6) * 14) * tall;
       const glass = GLASS[Math.floor(seed * 13) % GLASS.length];
       const twin = seed > 0.55;
       const towers = twin
@@ -547,14 +669,24 @@ function decor(p: Painter, dc: Decor, t: number) {
         : [{ x: X + 0.35, y: Y + 0.35, w: 1.6, d: 1.5, h }];
       for (const tw of towers) p.shadow(tw.x, tw.y, tw.w, tw.d, tw.h);
       for (const tw of towers) {
-        p.box(tw.x, tw.y, tw.w, tw.d, 0, tw.h, glass, "#475569");
-        p.windows(tw.x, tw.y, tw.w, tw.d, 0, tw.h, Math.round(tw.h / 8), "#1e3a8a", 1);
+        // podium, glass shaft with floor bands, crown
+        p.box(tw.x - 0.08, tw.y - 0.08, tw.w + 0.16, tw.d + 0.16, 0, 9, "#e2e8f0", "#94a3b8");
+        p.box(tw.x, tw.y, tw.w, tw.d, 9, tw.h - 9, glass, "#475569");
+        p.windows(tw.x, tw.y, tw.w, tw.d, 9, tw.h - 9, Math.round(tw.h / 8), "#1e3a8a", 1);
+        // vertical sky reflection
+        p.onLeft(tw.x, tw.y + tw.d, 9, tw.w * 0.15, tw.w * 0.3, 0, tw.h - 9, "rgba(255,255,255,0.08)");
         p.box(tw.x + tw.w * 0.3, tw.y + tw.d * 0.3, tw.w * 0.4, tw.d * 0.4, tw.h, 6, "#64748b");
+        if (zone === "mega" && tw.h > 150) {
+          // helipad on the tallest towers
+          p.box(tw.x + 0.1, tw.y + 0.1, tw.w - 0.2, tw.d - 0.2, tw.h + 6, 1.5, "#334155", "#334155");
+          p.ellipse(tw.x + tw.w / 2, tw.y + tw.d / 2, tw.h + 8, 6, "rgba(250,204,21,0.9)", 0.5);
+        }
       }
       if (!twin) {
         p.box(X + 1.1, Y + 1.1, 0.05, 0.05, h + 6, 20, "#e5e7eb");
-        if (!p.dim && Math.sin(t * 2 + seed * 7) > 0.3) p.circle(X + 1.12, Y + 1.12, h + 27, 1.8, "#ef4444");
+        beacon(p, X + 1.12, Y + 1.12, h + 27, t + seed * 3, "#ef4444");
       }
+      if (near && seed > 0.7) birds(p, X + 1, Y + 1, t, seed);
       break;
     }
     case "shop": {
@@ -565,19 +697,32 @@ function decor(p: Painter, dc: Decor, t: number) {
         const col = colors[Math.floor(seed * 4 + i) % 4];
         p.shadow(bx, Y + 0.2, 1.0, 1.2, 16);
         p.box(bx, Y + 0.2, 1.0, 1.2, 0, 16, "#f5f5f4", "#a8a29e");
-        p.onLeft(bx, Y + 1.4, 0, 0.1, 0.9, 0, 9, p.col("#bae6fd", -0.15));
-        p.onLeft(bx, Y + 1.4, 0, 0, 1.0, 10, 13, p.col(col));
+        p.onLeft(bx, Y + 1.4, 0, 0.1, 0.9, 0, 9, p.night > 0.3 ? "#fde68a" : p.col("#bae6fd", -0.15));
+        if (p.night > 0.3) p.light(sx(bx + 0.5, Y + 1.4), sy(bx + 0.5, Y + 1.4, 5), 22, "#fde68a", 0.5);
+        // striped awning
+        for (let k = 0; k < 5; k++) p.onLeft(bx, Y + 1.4, 0, k * 0.2, k * 0.2 + 0.1, 9.5, 12.5, p.col(col));
+        p.onLeft(bx, Y + 1.4, 0, 0, 1.0, 12.5, 15, p.col(col, -0.15));
       }
+      if (near && seed > 0.5) billboard(p, X + 1.4, Y + 0.05, ["#7c3aed", "#0ea5e9", "#e11d48"][Math.floor(seed * 3)], ["TURBO", "DRIVE", "V8"][Math.floor(seed * 3)]);
       parkedCars(p, X + 0.35, Y + 2.05, 3, seed, 1, 0.6);
       break;
     }
     case "industry": {
+      if (zone === "global" || zone === "mega") {
+        port(p, X, Y, W, D, seed, t);
+        break;
+      }
       p.quad(X, Y, W, D, p.col("#a8a29e"));
       p.shadow(X + 0.2, Y + 0.2, 1.4, 1.6, 22);
       p.box(X + 0.2, Y + 0.2, 1.4, 1.6, 0, 20, "#d6d3d1");
       p.sawtooth(X + 0.2, Y + 0.2, 1.4, 1.6, 20, 2, 6, "#a8a29e");
       cyl(p, X + 2.0, Y + 0.6, 0, 8, 26, "#e7e5e4");
       cyl(p, X + 2.0, Y + 1.5, 0, 8, 26, "#e7e5e4");
+      container(p, X + 0.2, Y + 2.0, true, "#2563eb");
+      if (near) {
+        drum(p, X + 1.4, Y + 2.2, "#16a34a");
+        drum(p, X + 1.55, Y + 2.3, "#16a34a");
+      }
       if (seed > 0.5) {
         cyl(p, X + 0.5, Y + 0.5, 20, 3, 24, "#78716c");
         smoke(p, X + 0.5, Y + 0.5, 44, t, seed);
@@ -585,6 +730,10 @@ function decor(p: Painter, dc: Decor, t: number) {
       break;
     }
     case "park": {
+      if (zone === "automotive" || zone === "supercar") {
+        testTrack(p, X, Y, W, D, seed, t);
+        break;
+      }
       p.quad(X, Y, W, D, p.col("#7ccf6a"));
       p.quad(X + 1.05, Y, 0.3, D, p.col("#e7d7b5"));
       p.quad(X, Y + 1.05, W, 0.3, p.col("#e7d7b5"));
@@ -592,6 +741,13 @@ function decor(p: Painter, dc: Decor, t: number) {
         cyl(p, X + 1.2, Y + 1.2, 0, 12, 3, "#cbd5e1");
         p.ellipse(X + 1.2, Y + 1.2, 3, 10, p.col("#38bdf8"), 0.5);
         if (!p.dim) p.circle(X + 1.2, Y + 1.2, 6 + Math.abs(Math.sin(t * 3)) * 6, 2, "rgba(186,230,253,0.9)");
+      } else if (near) {
+        flowerBed(p, X + 1.0, Y + 1.0, 0.4, 0.4, seed);
+      }
+      if (near) {
+        bench(p, X + 0.45, Y + 1.4, true);
+        bench(p, X + 1.45, Y + 0.5, false);
+        flowerBed(p, X + 1.5, Y + 1.5, 0.7, 0.25, seed + 1);
       }
       const spots = [
         [0.35, 0.35], [0.6, 2.0], [2.0, 0.4], [2.05, 2.05], [0.4, 0.9], [1.8, 0.85],
@@ -600,11 +756,82 @@ function decor(p: Painter, dc: Decor, t: number) {
         const r = rand(seed * 7, i);
         if (r < 0.15) return;
         if (r > 0.75) p.pine(X + a, Y + b, 0.9);
+        else if (r < 0.3) bush(p, X + a, Y + b, 0.9);
         else p.tree(X + a, Y + b, 0.7 + r * 0.4, r);
       });
+      if (near && seed > 0.5) birds(p, X + 1.2, Y + 1.2, t, seed);
       break;
     }
   }
+}
+
+/** Luxury District: a modern villa with a pool. */
+function villa(p: Painter, X: number, Y: number, W: number, D: number, seed: number, t: number) {
+  p.quad(X, Y, W, D, p.col("#7fd07a"));
+  // pool with a deck
+  p.quad(X + 1.3, Y + 1.35, 0.95, 0.85, p.col("#e7e5e4"));
+  p.quad(X + 1.4, Y + 1.45, 0.75, 0.65, p.col("#22d3ee"));
+  if (!p.dim) p.ellipse(X + 1.75 + Math.sin(t) * 0.1, Y + 1.75, 0, 5, "rgba(255,255,255,0.35)", 0.4);
+  p.light(sx(X + 1.75, Y + 1.75), sy(X + 1.75, Y + 1.75), 26, "#67e8f9", 0.5);
+  p.box(X + 1.35, Y + 2.25, 0.25, 0.1, 0, 1.5, "#f8fafc");
+  p.box(X + 1.7, Y + 2.25, 0.25, 0.1, 0, 1.5, "#f8fafc");
+  // two stacked volumes with a glass ground floor
+  p.shadow(X + 0.15, Y + 0.15, 1.6, 1.0, 24);
+  p.box(X + 0.15, Y + 0.15, 1.6, 1.0, 0, 11, "#93c5fd", "#f8fafc");
+  for (let k = 1; k < 4; k++) p.onLeft(X + 0.15, Y + 1.15, 0, k * 0.4 - 0.01, k * 0.4 + 0.01, 0, 11, "#e5e7eb");
+  p.box(X + 0.35, Y + 0.1, 1.1, 0.8, 11, 10, "#fafaf9", "#e7e5e4");
+  p.onLeft(X + 0.35, Y + 0.9, 11, 0.15, 0.95, 3, 7, p.night > 0.3 ? "#fde68a" : p.col("#7dd3fc", -0.1));
+  p.light(sx(X + 0.9, Y + 1.15), sy(X + 0.9, Y + 1.15, 6), 30, "#fde68a", 0.5);
+  p.tree(X + 2.15, Y + 0.35, 0.9, seed);
+  planter(p, X + 0.2, Y + 1.5);
+  drawModel(p, X + 0.6, Y + 1.85, 1, seed > 0.5 ? "supercar" : "luxury", CAR_COLORS[Math.floor(seed * 10)], 1);
+}
+
+/** Automotive District: a test track with a car lapping it. */
+function testTrack(p: Painter, X: number, Y: number, W: number, D: number, seed: number, t: number) {
+  p.quad(X, Y, W, D, p.col("#6fb35d"));
+  p.quad(X + 0.15, Y + 0.15, W - 0.3, D - 0.3, p.col("#3f4652"));
+  p.quad(X + 0.6, Y + 0.6, W - 1.2, D - 1.2, p.col("#7ccf6a"));
+  // kerbs
+  for (let i = 0; i < 10; i++) {
+    const u = 0.15 + i * ((W - 0.3) / 10);
+    p.quad(X + u, Y + 0.15, (W - 0.3) / 20, 0.06, i % 2 ? "#ef4444" : "#f8fafc");
+    p.quad(X + u, Y + D - 0.21, (W - 0.3) / 20, 0.06, i % 2 ? "#ef4444" : "#f8fafc");
+  }
+  // start/finish line and a grandstand
+  for (let i = 0; i < 4; i++) p.quad(X + 0.9 + (i % 2) * 0.06, Y + 0.18 + i * 0.1, 0.06, 0.1, "#111827");
+  p.box(X + 0.8, Y + 0.7, 1.0, 0.3, 0, 8, "#e5e7eb", "#2563eb");
+  // the lap: around the rectangle
+  const per = 2 * (W - 0.75) + 2 * (D - 0.75);
+  let k = ((t * 1.6 + seed * 10) % per + per) % per;
+  const a = X + 0.38;
+  const b = Y + 0.38;
+  const lx = W - 0.75;
+  const ly = D - 0.75;
+  let cx: number, cy: number, dir: Dir;
+  if (k < lx) [cx, cy, dir] = [a + k, b, 0];
+  else if ((k -= lx) < ly) [cx, cy, dir] = [a + lx, b + k, 1];
+  else if ((k -= ly) < lx) [cx, cy, dir] = [a + lx - k, b + ly, 2];
+  else [cx, cy, dir] = [a, b + ly - (k - lx), 3];
+  drawModel(p, cx, cy, dir, seed > 0.5 ? "supercar" : "sports", "#ef4444", 1, { lights: p.night > 0.35 });
+}
+
+/** Mega City / Global: a container port with a gantry crane. */
+function port(p: Painter, X: number, Y: number, W: number, D: number, seed: number, t: number) {
+  p.quad(X, Y, W, D, p.col("#9ca3af"));
+  const colors = ["#dc2626", "#2563eb", "#16a34a", "#f59e0b", "#0891b2", "#7c3aed"];
+  for (let r = 0; r < 3; r++)
+    for (let k = 0; k < 2; k++) {
+      const stack = 1 + Math.floor(rand(seed * 5 + r, k) * 3);
+      for (let z = 0; z < stack; z++) container(p, X + 0.15 + k * 1.0, Y + 0.25 + r * 0.6, true, colors[(r * 2 + k + z) % colors.length], z * 8);
+    }
+  // gantry crane sliding along the yard
+  const gx = X + 0.2 + ((Math.sin(t * 0.3 + seed * 5) + 1) / 2) * 1.8;
+  p.box(gx, Y + 0.05, 0.1, 0.1, 0, 46, "#f59e0b");
+  p.box(gx, Y + 2.1, 0.1, 0.1, 0, 46, "#f59e0b");
+  p.box(gx - 0.02, Y + 0.05, 0.14, 2.15, 46, 4, "#f59e0b");
+  p.box(gx + 0.02, Y + 0.9, 0.06, 0.06, 26, 20, "#334155");
+  beacon(p, gx + 0.05, Y + 0.1, 52, t, "#ef4444");
 }
 
 // ───────────────────────────── ground ─────────────────────────────
@@ -918,11 +1145,15 @@ function lamp(p: Painter, x: number, y: number, t: number) {
   c.lineTo(px + 5, py - 24);
   c.stroke();
   if (!p.dim) {
-    const glow = 0.5 + 0.08 * Math.sin(t * 2 + x);
+    const on = p.night > 0.25;
+    const glow = on ? 0.95 : 0.5 + 0.08 * Math.sin(t * 2 + x);
     c.fillStyle = `rgba(254,240,138,${glow})`;
     c.beginPath();
-    c.arc(px + 5, py - 23.5, 2, 0, Math.PI * 2);
+    c.arc(px + 5, py - 23.5, on ? 2.6 : 2, 0, Math.PI * 2);
     c.fill();
+    // a pool of light on the pavement and a halo round the lamp head
+    p.light(px + 5, py - 23.5, 10, "#fff1b8", 0.6);
+    p.light(px + 3, py - 2, 28, "#ffd27a", 0.3);
   }
 }
 
@@ -933,7 +1164,7 @@ export function buildScene(state: GameState, snap: EconomySnapshot, names: Scene
   const unlocked = new Set(state.city.zones);
 
   for (const dc of WORLD_MAP.decor) {
-    const h = dc.kind === "office" ? 160 : dc.kind === "apartment" ? 80 : 40;
+    const h = dc.kind === "office" ? 290 : dc.kind === "apartment" ? 110 : 60;
     out.push({
       depth: dc.x + dc.w / 2 + dc.y + dc.d / 2,
       zone: dc.zone,
@@ -971,7 +1202,7 @@ export function buildScene(state: GameState, snap: EconomySnapshot, names: Scene
     const base = {
       depth: plot.x + plot.w / 2 + plot.y + plot.d / 2,
       zone: plot.zone,
-      bbox: bboxOf(plot.x, plot.y, plot.w, plot.d, plot.kind === "factory" ? 100 : 60),
+      bbox: bboxOf(plot.x, plot.y, plot.w, plot.d, plot.kind === "factory" ? 160 : 70),
       pickId: plot.id,
       hit: { x: plot.x + 0.2, y: plot.y + 0.2, w: plot.w - 0.4, d: plot.d - 0.4, h: hitH },
     };
@@ -981,6 +1212,8 @@ export function buildScene(state: GameState, snap: EconomySnapshot, names: Scene
       const available = isFactoryAvailable(snap.gm, id);
       out.push({
         ...base,
+        sig: f.owned ? "built" : "lot",
+        announce: names.factory(id),
         draw: (p, info) => {
           factoryLot(p, plot, f.owned, f.level, info.t, seed);
           if (info.selected === plot.id) p.quadStroke(plot.x + 0.15, plot.y + 0.15, plot.w - 0.3, plot.d - 0.3, "#fbbf24", 2.5);
@@ -998,6 +1231,8 @@ export function buildScene(state: GameState, snap: EconomySnapshot, names: Scene
       const dl = state.dealers[id];
       out.push({
         ...base,
+        sig: dl.owned ? "built" : "lot",
+        announce: names.dealer(id),
         draw: (p, info) => {
           dealerLot(p, plot, dl.owned, info.t, seed);
           if (info.selected === plot.id) p.quadStroke(plot.x + 0.2, plot.y + 0.2, plot.w - 0.4, plot.d - 0.4, "#fbbf24", 2.5);
@@ -1015,6 +1250,7 @@ export function buildScene(state: GameState, snap: EconomySnapshot, names: Scene
       if (!b) {
         out.push({
           ...base,
+          sig: "lot",
           draw: (p, info) => emptyPlot(p, plot, info, isOpen),
           label: (p, info) => {
             if (!isOpen || info.zoom < 0.38) return;
@@ -1044,6 +1280,8 @@ export function buildScene(state: GameState, snap: EconomySnapshot, names: Scene
         const active = (st?.incomePerSec ?? 0) > 0;
         out.push({
           ...base,
+          sig: `garage:${b.level}`,
+          announce: `${names.garage(b.garage?.no ?? 1)} · ${names.level(b.level)}`,
           draw: (p, info) => {
             garage(p, plot, b, active, info.t);
             if (info.selected === plot.id) p.quadStroke(plot.x + 0.2, plot.y + 0.2, plot.w - 0.4, plot.d - 0.4, "#fbbf24", 2.5);
@@ -1061,6 +1299,8 @@ export function buildScene(state: GameState, snap: EconomySnapshot, names: Scene
       } else {
         out.push({
           ...base,
+          sig: `${b.type}:${b.level}`,
+          announce: `${names.structure(b.type)} · ${names.level(b.level)}`,
           draw: (p, info) => {
             structure(p, plot, b, info.t, seed);
             if (info.selected === plot.id) p.quadStroke(plot.x + 0.2, plot.y + 0.2, plot.w - 0.4, plot.d - 0.4, "#fbbf24", 2.5);
@@ -1086,4 +1326,83 @@ export const WORLD_BOUNDS = {
 
 export function zoneCenter(id: ZoneId) {
   return zoneCenterTile(id);
+}
+
+// ───────────────────────────── construction ─────────────────────────────
+
+export const BUILD_ANIM = 3.2;
+
+/**
+ * Draws a plot while it is being built or upgraded: barriers, a crane,
+ * workers and dust while the finished building rises out of the ground.
+ * `age` runs from 0 to BUILD_ANIM seconds.
+ */
+export function drawConstruction(p: Painter, plotId: string, age: number, upgrade: boolean, drawFinal: () => void, bbox: [number, number, number, number]) {
+  const plot = WORLD_MAP.plotById[plotId];
+  if (!plot) return drawFinal();
+  const c = p.ctx;
+  const { x, y, w, d } = plot;
+  const k = Math.min(1, age / (BUILD_ANIM * 0.8));
+  // the building grows from the ground: clip its drawing from the bottom up
+  const start = upgrade ? 0.55 : 0;
+  const grow = start + (1 - start) * (k * k * (3 - 2 * k));
+  c.save();
+  c.beginPath();
+  const bottom = bbox[3] + 4;
+  c.rect(bbox[0] - 20, bottom - (bottom - bbox[1] + 20) * grow, bbox[2] - bbox[0] + 40, (bottom - bbox[1] + 20) * grow + 20);
+  c.clip();
+  if (grow > 0.02) drawFinal();
+  c.restore();
+  if (k >= 1) return;
+  // foundation slab while nothing stands yet
+  if (!upgrade && grow < 0.2) p.box(x + 0.4, y + 0.4, w - 0.8, d - 0.8, 0, 2 + grow * 10, "#cbd5e1", "#9ca3af");
+  // scaffolding poles around the rising walls
+  const hgt = 26 * grow + 8;
+  for (const [a, b2] of [[0.45, 0.45], [w - 0.45, 0.45], [0.45, d - 0.45], [w - 0.45, d - 0.45]]) p.box(x + a - 0.03, y + b2 - 0.03, 0.06, 0.06, 0, hgt, "#f59e0b");
+  p.line(x + 0.45, y + d - 0.45, x + w - 0.45, y + d - 0.45, "#f59e0b", 1.5, hgt * 0.5);
+  p.line(x + w - 0.45, y + 0.45, x + w - 0.45, y + d - 0.45, "#f59e0b", 1.5, hgt * 0.5);
+  // barriers along the front
+  barrier(p, x + 0.3, y + d - 0.25, true);
+  barrier(p, x + 1.1, y + d - 0.25, true);
+  barrier(p, x + w - 0.25, y + 0.3, false);
+  // a little crane swinging
+  const cx = x + w - 0.5;
+  const cy = y + 0.5;
+  p.box(cx - 0.05, cy - 0.05, 0.1, 0.1, 0, 60, "#facc15");
+  const ang = Math.sin(age * 1.4) * 0.5;
+  c.strokeStyle = "#eab308";
+  c.lineWidth = 2;
+  c.beginPath();
+  c.moveTo(sx(cx, cy), sy(cx, cy, 60));
+  c.lineTo(sx(cx, cy) - 40 * Math.cos(ang), sy(cx, cy, 60) + 6 * Math.sin(ang));
+  c.stroke();
+  // workers in hard hats
+  for (let i = 0; i < 3; i++) {
+    const wx = x + 0.6 + ((Math.sin(age * 1.7 + i * 2) + 1) / 2) * (w - 1.2);
+    p.person(wx, y + d - 0.45, i % 2 ? "#f97316" : "#facc15", age * 8 + i);
+  }
+  // dust
+  for (let i = 0; i < 8; i++) {
+    const ph = (age * 0.8 + i / 8) % 1;
+    const dx = x + w * (0.2 + ((i * 37) % 60) / 100);
+    const dy = y + d * (0.3 + ((i * 23) % 50) / 100);
+    c.fillStyle = `rgba(214,198,170,${0.35 * (1 - ph)})`;
+    c.beginPath();
+    c.arc(sx(dx, dy) + ph * 10, sy(dx, dy, 4 + ph * 22), 3 + ph * 8, 0, Math.PI * 2);
+    c.fill();
+  }
+}
+
+/** Translucent preview of what a plot would look like with `type` on it. */
+export function drawPreview(p: Painter, plotId: string, type: StructureType, t: number) {
+  const plot = WORLD_MAP.plotById[plotId];
+  if (!plot) return;
+  const c = p.ctx;
+  c.save();
+  c.globalAlpha = 0.55 + 0.15 * Math.sin(t * 4);
+  const b: BuildingState = type === "garage" ? { type, level: 1, garage: { no: 0, spec: "repair", workers: 0, facilities: [], carry: 0, serviced: 0, earned: 0 } } : { type, level: 1 };
+  if (type === "garage") garage(p, plot, b, false, t);
+  else structure(p, plot, b, t, 0.5);
+  c.restore();
+  p.quadStroke(plot.x + 0.2, plot.y + 0.2, plot.w - 0.4, plot.d - 0.4, "#4ade80", 2.5);
 }

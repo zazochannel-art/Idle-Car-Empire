@@ -251,6 +251,7 @@ export class GarageEngine {
         workstation: !!FACILITY_BY_ID[f.type].fee,
         progress,
         car: carColorFor(f.uid, cycle),
+        door: [gw / 2, gd + 0.6],
       };
       const sel = this.selected === f.uid;
       items.push({
@@ -271,6 +272,31 @@ export class GarageEngine {
     }
     items.sort((a, b) => a.depth - b.depth);
     for (const it of items) it.draw();
+
+    // ceiling lamps hanging over the floor
+    for (let i = 2; i < gw; i += 4)
+      for (let j = 2; j < gd; j += 4) {
+        const lx = sx(i, j);
+        const ly = sy(i, j, WALL_H + 8);
+        ctx.strokeStyle = "rgba(148,163,184,0.5)";
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.moveTo(lx, ly - 18);
+        ctx.lineTo(lx, ly);
+        ctx.stroke();
+        ctx.fillStyle = "#334155";
+        ctx.beginPath();
+        ctx.moveTo(lx - 7, ly + 4);
+        ctx.lineTo(lx - 3, ly);
+        ctx.lineTo(lx + 3, ly);
+        ctx.lineTo(lx + 7, ly + 4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "rgba(255,247,214,0.95)";
+        ctx.beginPath();
+        ctx.ellipse(lx, ly + 4, 6, 1.6, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
     // placement ghost
     const g = this.ghost;

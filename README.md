@@ -5,7 +5,10 @@ empire. The game is played on an isometric **Empire Map**: an island with a natu
 coastline, beaches, a river crossed by bridges, farmland, forests and
 mountains, eight organically shaped districts to unlock, plots to build on, garages with their own interiors, factories and
 dealerships on their lots, and live traffic carrying parts, customers and new
-cars between them. Plus eight car classes from the City Compact to the Future
+cars between them. Day, evening and night lighting (or an automatic cycle),
+buildings that visibly grow with every level, construction animations, and
+detailed car models (city cars to hypercars) that brake, stop at traffic
+lights and park. Plus eight car classes from the City Compact to the Future
 Car, research, managers, offline production and Global Expansion (prestige).
 
 Built with Next.js (App Router, static export), TypeScript, Tailwind CSS v4,
@@ -85,7 +88,8 @@ src/store/    Zustand stores: game loop + autosave (game-store), panels and
 src/components/
   map/        the Empire Map on a canvas: isometric painter, camera (pan,
               zoom, inertia, fly-to), terrain (coastline), scene of
-              buildings and scenery, traffic, ships, minimap
+              buildings and scenery, props, vehicle models, lighting
+              (time of day), traffic, ships, minimap
   garage/     garage interior: room + facility drawing, placement ghost
   panels/     sheets over the map: build menu, plot/zone info, lists
   ui/         shadcn-style primitives
