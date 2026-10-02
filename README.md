@@ -103,6 +103,10 @@ src/components/
               zoom, inertia, fly-to), terrain (coastline), scene of
               buildings and scenery, plants, props, vehicle models,
               lighting (time of day), traffic and shipments, ships, minimap
+  three/      the 3D models (Three.js, loaded lazily): cars, trucks and
+              transporters (car-models), plant buildings (building-models),
+              factory machines and robots (industrial-models), and the sprite
+              factory that renders them into isometric sprites (sprites.ts)
   garage/     garage interior: room + facility drawing, placement ghost
   plant/      the factory floor: a live production line inside each plant
   panels/     sheets over the map: build menu, plant/market/depot/dealer
@@ -111,6 +115,27 @@ src/components/
   game/       shell, HUD, goals, first-car celebration, dialogs, toasts
   views/      supply chain, dealers, research, cars, managers, missions…
 ```
+
+### 3D graphics
+
+The map stays a fast 2D canvas, but cars, trucks, car transporters, plant
+buildings and factory machines are real 3D models. `three/sprites.ts` renders
+each model once, with an orthographic camera locked to the map's projection
+(30° elevation, 45° yaw), PBR materials (clear-coat paint, glass, rubber,
+metal), an environment map, a soft-shadowed sun and a contact shadow, and
+caches the result as a sprite:
+
+- vehicles in 16 headings, with steered front wheels and wheel-spin phases
+  when they are large on screen; headlights and tail lights glow at night;
+- resolution follows the zoom (2×/4×/6× sprites), at most ~7 ms of rendering
+  per frame, a 96 MB cache that forgets the oldest sprites;
+- until a sprite is ready, or where WebGL is missing, the vector drawings
+  are used, so the game never waits on the GPU.
+
+Tap a car or truck on the map to open the showroom: the camera follows it
+close up and the card shows the same model live on a turntable, with its
+build level and installed components. On the assembly line the car gains
+its engine, seats, glass, wheels, paint and lights station by station.
 
 The UI never contains economy numbers; tune the game in `src/game/config/` and
 check the pacing with `npm run simulate`.

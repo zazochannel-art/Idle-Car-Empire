@@ -8,6 +8,7 @@ import type { CarId, PlantData, PlantType } from "@/game/types";
 import { Painter, sx, sy } from "./iso";
 import { beacon, container, drum, flagPole, forklift, ledStrip, lightPole, robotArm, tireStack, wallLamp } from "./props";
 import { CAR_COLORS, CAR_MODEL_FOR, drawModel, drawTruck, type Dir } from "./vehicles";
+import { sprites3d, tierFor } from "../three/sprites";
 
 const M = 0.3;
 
@@ -121,6 +122,23 @@ export interface PlantLook {
   car: CarId | null;
 }
 
+/** Draws the plant's 3D model as a sprite; false until it is rendered. */
+function plantSprite(p: Painter, look: PlantLook, X: number, Y: number, W: number, D: number, big: boolean, dockFront: boolean, wall: string, roof: string): boolean {
+  const k = Math.min(4, tierFor((p.zoom ?? 1) * (p.dpr ?? 1)));
+  const span = W + D;
+  const size = { w: span * 32 + 40, h: span * 16 + 170, ax: span * 16 + 20, ay: span * 8 + 140 };
+  const accent = PLANT_BY_ID[look.type].roof;
+  const key = `plant|${look.type}|${look.level}|${big ? 1 : 0}|${dockFront ? 1 : 0}|${W.toFixed(2)}|${D.toFixed(2)}`;
+  const spr = sprites3d.get(key, size, k, (T, { kit, buildings }) =>
+    buildings.buildPlant(T, kit, { type: look.type, level: look.level, big, dockFront, wall, roof, accent }, W, D),
+  );
+  if (!spr) return false;
+  const cx = X + W / 2;
+  const cy = Y + D / 2;
+  p.ctx.drawImage(spr.img, sx(cx, cy) - size.ax, sy(cx, cy, 0) - size.ay, size.w, size.h);
+  return true;
+}
+
 /** Draws a plant on its lot. `live` is null for previews and construction. */
 export function drawPlant(p: Painter, plot: Plot, look: PlantLook, t: number, seed: number) {
   const { type, level } = look;
@@ -134,10 +152,14 @@ export function drawPlant(p: Painter, plot: Plot, look: PlantLook, t: number, se
   const active = !look.plant || look.plant.status === "ok";
   const dockFront = plot.entry.inward === -1;
 
+  // the 3D model of the plant (hall, roof, doors, office, tanks, tower…)
+  const has3d = !p.dim && plantSprite(p, look, X, Y, W, D, big, dockFront, cfg.color, cfg.roof);
   // concrete yard with painted bays
-  p.quad(X, Y, W, D, p.col("#9ca3af"));
-  p.quad(X + 0.08, Y + 0.08, W - 0.16, D - 0.16, p.col("#a8b0bb"));
-  if (p.zoom > 0.7) for (let i = 1; i < 4; i++) p.line(X + (W * i) / 4, Y + D - 0.55, X + (W * i) / 4, Y + D - 0.1, p.col("#f8fafc", -0.1), 1);
+  if (!has3d) {
+    p.quad(X, Y, W, D, p.col("#9ca3af"));
+    p.quad(X + 0.08, Y + 0.08, W - 0.16, D - 0.16, p.col("#a8b0bb"));
+    if (p.zoom > 0.7) for (let i = 1; i < 4; i++) p.line(X + (W * i) / 4, Y + D - 0.55, X + (W * i) / 4, Y + D - 0.1, p.col("#f8fafc", -0.1), 1);
+  }
 
   // main hall: grows wider and taller with every level
   const hw = Math.min(W - 0.5, (1.25 + level * 0.12) * s);
@@ -146,38 +168,47 @@ export function drawPlant(p: Painter, plot: Plot, look: PlantLook, t: number, se
   const hy = Y + (dockFront ? 0.25 : D - hd - 0.25);
   const h = (12 + level * 4) * (big ? 1.25 : 1);
   const wall = level >= 7 ? "#dbeafe" : cfg.color;
-  p.shadow(hx, hy, hw, hd, h + 6);
-  p.box(hx, hy, hw, hd, 0, h, wall, "#94a3b8");
-  if (level >= 5) p.sawtooth(hx, hy, hw, hd, h, Math.round(hw * 2), 7, p.col(cfg.roof, 0.25));
-  else p.gable(hx, hy, hw, hd, h, 6 + level, cfg.roof);
-  // coloured band and big doors on the dock side
-  const doorY = dockFront ? hy + hd : hy + hd;
-  p.onLeft(hx, doorY, 0, 0, hw, h - 4, h - 1.5, p.col(cfg.roof));
-  const doorsN = Math.min(4, 1 + Math.floor(level / 2));
-  for (let i = 0; i < doorsN; i++) {
-    const u0 = 0.1 + (i * (hw - 0.2)) / doorsN;
-    const u1 = u0 + (hw - 0.2) / doorsN - 0.08;
-    p.onLeft(hx, doorY, 0, u0, u1, 0, Math.min(10, h * 0.55), active ? "#facc15" : "#57534e");
-    if (active && p.night > 0.3) p.light(sx(hx + (u0 + u1) / 2, doorY), sy(hx + (u0 + u1) / 2, doorY, 4), 16, "#fde68a", 0.5);
-  }
-  if (level >= 7) {
-    // high-tech glass facade with an LED strip
-    p.windows(hx, hy, hw, hd, 0, h, 3, "#38bdf8", 3);
-    ledStrip(p, hx, doorY, hw, h - 1, cfg.roof, t);
-  } else if (level >= 3) {
-    p.windows(hx, hy, hw, hd, 0, h, Math.max(1, Math.floor(level / 2)), "#bae6fd", level >= 4 ? 2 : 1);
-  }
-  wallLamp(p, hx, doorY, 0.15, h * 0.6);
+  const doorY = hy + hd;
+  if (!has3d) {
+    p.shadow(hx, hy, hw, hd, h + 6);
+    p.box(hx, hy, hw, hd, 0, h, wall, "#94a3b8");
+    if (level >= 5) p.sawtooth(hx, hy, hw, hd, h, Math.round(hw * 2), 7, p.col(cfg.roof, 0.25));
+    else p.gable(hx, hy, hw, hd, h, 6 + level, cfg.roof);
+    // coloured band and big doors on the dock side
+    p.onLeft(hx, doorY, 0, 0, hw, h - 4, h - 1.5, p.col(cfg.roof));
+    const doorsN = Math.min(4, 1 + Math.floor(level / 2));
+    for (let i = 0; i < doorsN; i++) {
+      const u0 = 0.1 + (i * (hw - 0.2)) / doorsN;
+      const u1 = u0 + (hw - 0.2) / doorsN - 0.08;
+      p.onLeft(hx, doorY, 0, u0, u1, 0, Math.min(10, h * 0.55), active ? "#facc15" : "#57534e");
+    }
+    if (level >= 7) {
+      // high-tech glass facade with an LED strip
+      p.windows(hx, hy, hw, hd, 0, h, 3, "#38bdf8", 3);
+      ledStrip(p, hx, doorY, hw, h - 1, cfg.roof, t);
+    } else if (level >= 3) {
+      p.windows(hx, hy, hw, hd, 0, h, Math.max(1, Math.floor(level / 2)), "#bae6fd", level >= 4 ? 2 : 1);
+    }
+    wallLamp(p, hx, doorY, 0.15, h * 0.6);
 
-  // office block from Industrial (3) on
-  if (level >= 3) {
-    const ox = hx + hw + 0.12;
-    const ow = Math.min(0.75 * s, X + W - ox - 0.1);
-    if (ow > 0.3) {
-      const oh = 14 + level * 3;
-      p.shadow(ox, hy, ow, 0.7 * s, oh);
-      p.box(ox, hy, ow, 0.7 * s, 0, oh, "#f8fafc", "#cbd5e1");
-      p.windows(ox, hy, ow, 0.7 * s, 0, oh, Math.max(2, Math.floor(oh / 9)), "#60a5fa", 2);
+    // office block from Industrial (3) on
+    if (level >= 3) {
+      const ox = hx + hw + 0.12;
+      const ow = Math.min(0.75 * s, X + W - ox - 0.1);
+      if (ow > 0.3) {
+        const oh = 14 + level * 3;
+        p.shadow(ox, hy, ow, 0.7 * s, oh);
+        p.box(ox, hy, ow, 0.7 * s, 0, oh, "#f8fafc", "#cbd5e1");
+        p.windows(ox, hy, ow, 0.7 * s, 0, oh, Math.max(2, Math.floor(oh / 9)), "#60a5fa", 2);
+      }
+    }
+  }
+  // lit doors and windows in the evening
+  if (active && p.night > 0.3) {
+    const doorsN = Math.min(5, 1 + Math.floor(level / 2)) * (has3d && big ? 2 : 1);
+    for (let i = 0; i < doorsN; i++) {
+      const u = 0.1 + ((i + 0.45) * (hw - 0.2)) / doorsN;
+      p.light(sx(hx + u, doorY), sy(hx + u, doorY, 4), 16, "#fde68a", 0.5);
     }
   }
   // automated plants: robots and a conveyor bridge outside
@@ -189,10 +220,12 @@ export function drawPlant(p: Painter, plot: Plot, look: PlantLook, t: number, se
   if (level >= 8) {
     const tx = X + W - 0.55 * s;
     const ty = Y + 0.15;
-    p.shadow(tx, ty, 0.5 * s, 0.5 * s, 90);
-    p.box(tx, ty, 0.5 * s, 0.5 * s, 0, 80, "#bfdbfe", "#1e3a8a");
-    p.windows(tx, ty, 0.5 * s, 0.5 * s, 0, 80, 9, "#1d4ed8", 2);
-    beacon(p, tx + 0.25 * s, ty + 0.25 * s, 82, t, "#ef4444");
+    if (!has3d) {
+      p.shadow(tx, ty, 0.5 * s, 0.5 * s, 90);
+      p.box(tx, ty, 0.5 * s, 0.5 * s, 0, 80, "#bfdbfe", "#1e3a8a");
+      p.windows(tx, ty, 0.5 * s, 0.5 * s, 0, 80, 9, "#1d4ed8", 2);
+    }
+    beacon(p, tx + 0.25 * s, ty + 0.25 * s, has3d ? 88 : 82, t, "#ef4444");
     flagPole(p, X + 0.1, Y + D - 0.1, cfg.roof, t);
   }
   if (level >= 4) {
@@ -200,7 +233,7 @@ export function drawPlant(p: Painter, plot: Plot, look: PlantLook, t: number, se
     beacon(p, hx + hw - 0.08, doorY - 0.08, h + 1, t + 1.1);
   }
 
-  signature(p, type, hx, hy, hw, h, t, active, seed);
+  if (!has3d) signature(p, type, hx, hy, hw, h, t, active, seed);
 
   // assembly: finished cars wait on the lot, a conveyor brings them out
   if (type === "assemblyPlant") {
@@ -221,7 +254,7 @@ export function drawPlant(p: Painter, plot: Plot, look: PlantLook, t: number, se
 
   // smoke from the roof while it works
   if (active && level >= 2) smoke(p, hx + hw * 0.6, hy + hd * 0.4, h + 4, t, seed);
-  if (big) {
+  if (big && !has3d) {
     container(p, X + W - 0.9, Y + D - 1.2, true, cfg.roof);
     container(p, X + W - 0.9, Y + D - 0.8, true, "#64748b");
   }

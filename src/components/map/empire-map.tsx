@@ -18,6 +18,8 @@ import { uiEvents } from "@/store/events";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { MapEngine } from "./map-engine";
+import { Showcase } from "./showcase";
+import { sprites3d } from "../three/sprites";
 import { Minimap } from "./minimap";
 import { plantName } from "../panels/plant-panel";
 import { buildScene } from "./scene";
@@ -76,7 +78,7 @@ function shipViews(s: GameState): ShipView[] {
     const to = siteOf(sh.to);
     if (!from || !to) continue;
     const color = sh.item === "raw" ? "#a8a29e" : sh.item === "car" ? "#f8fafc" : COMPONENT_BY_ID[sh.item].color;
-    out.push({ id: sh.id, from, to, t: sh.t, dur: sh.dur, back: sh.back, vehicle: sh.vehicle, color, models: sh.models?.map((m) => CAR_MODEL_FOR[m]) });
+    out.push({ id: sh.id, from, to, t: sh.t, dur: sh.dur, back: sh.back, vehicle: sh.vehicle, color, item: sh.item, models: sh.models?.map((m) => CAR_MODEL_FOR[m]) });
   }
   return out;
 }
@@ -89,6 +91,7 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
   const snap = useGame((g) => g.snap);
   const plot = useUi((u) => u.plot);
   const command = useUi((u) => u.command);
+  const showcase = useUi((u) => u.showcase);
   const { t, lang } = useT();
   const n = useContent(lang);
   const offsetRef = useRef(panelOffset);
@@ -101,12 +104,13 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
       const ui = useUi.getState();
       if (!target) ui.closeAll();
       else if (target.kind === "zone") ui.selectZone(target.id);
+      else if (target.kind === "vehicle") ui.setShowcase(target.v);
       else ui.selectPlot(target.id);
     });
     engine.money = (v) => formatMoney(v);
     engine.overlay = overlayRef.current;
     engineRef.current = engine;
-    if (process.env.NODE_ENV !== "production") Object.assign(window, { __map: engine, __game: useGame, __ui: useUi });
+    if (process.env.NODE_ENV !== "production") Object.assign(window, { __map: engine, __game: useGame, __ui: useUi, __sprites: sprites3d });
     const onVis = () => (document.visibilityState === "hidden" ? engine.stop() : engine.start());
     document.addEventListener("visibilitychange", onVis);
     const off = uiEvents.on((e) => {
@@ -135,6 +139,11 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
       engineRef.current = null;
     };
   }, []);
+
+  // the camera glides after the vehicle in the showroom
+  useEffect(() => {
+    engineRef.current?.track(showcase?.ref ?? null);
+  }, [showcase]);
 
   useEffect(() => {
     const e = engineRef.current;
@@ -238,6 +247,7 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
       <div className="pointer-events-none absolute right-2 top-[9.25rem] z-20 md:right-3 md:top-[5.5rem]">
         <Minimap engine={engineRef} />
       </div>
+      <Showcase />
     </div>
   );
 }

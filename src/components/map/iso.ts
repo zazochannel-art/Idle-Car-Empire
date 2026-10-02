@@ -57,6 +57,8 @@ export class Painter {
   proj: ((x: number, y: number, z: number) => [number, number]) | null = null;
   /** Camera zoom, for level of detail. */
   zoom = 1;
+  /** Device pixel ratio, to pick the resolution of 3D sprites. */
+  dpr = 1;
   /** 0 = full day … 1 = deep night; lights only show when it's dark. */
   night = 0;
   /** Light sources collected while drawing (world px), lit after the scene. */
