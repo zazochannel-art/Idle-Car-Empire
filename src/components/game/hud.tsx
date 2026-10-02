@@ -12,15 +12,15 @@ import { useUi } from "@/store/ui-store";
 import { AnimatedNumber } from "./animated-number";
 
 const money = (n: number) => formatMoney(n);
-const count = (n: number) => formatNumber(Math.floor(n));
 
-/** Top bar floating over the map: cash, profit/s, cars, factories, Empire Points. */
+/** Top bar floating over the map: cash, profit/s, production rate, factories, Empire Points. */
 export function Hud({ onSettings }: { onSettings: () => void }) {
   const cash = useGame((g) => g.state.cash);
   const income = useGame((g) => g.snap.incomePerSec);
   // before the first car, count the parts the plants have made
-  const cars = useGame((g) => g.state.lifetime.carsProduced);
-  const parts = useGame((g) => Object.values(g.state.lifetime.parts).reduce((a, b) => a + b, 0));
+  // production rate: cars per minute once an assembly plant runs, parts before
+  const carsRate = useGame((g) => g.snap.carsPerSec * 60);
+  const partsRate = useGame((g) => Object.values(g.snap.chain.plants).reduce((a, p) => (p.type === "assemblyPlant" ? a : a + p.unitsPerSec), 0) * 60);
   const owned = useGame((g) => plantsOf(g.state).length);
   const trucks = useGame((g) => g.state.chain.shipments.length);
   const ep = useGame((g) => g.state.empirePoints);
@@ -40,7 +40,7 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
             </div>
           </div>
           <Pill icon={<TrendingUp className="size-3.5 text-emerald-400" />} label={t("hud.profit")} value={`${formatMoney(income)}${t("unit.perSec")}`} />
-          <Pill icon={<Car className="size-3.5 text-sky-400" />} label={cars > 0 ? t("hud.cars") : t("hud.parts")} value={<AnimatedNumber value={cars > 0 ? cars : parts} format={count} />} />
+          <Pill icon={<Car className="size-3.5 text-sky-400" />} label={carsRate > 0 ? t("hud.carsRate") : t("hud.partsRate")} value={`${formatNumber(carsRate > 0 ? carsRate : partsRate)}${t("unit.perMin")}`} />
           <div className="hidden sm:block">
             <Pill icon={<Factory className="size-3.5 text-cyan-300" />} label={t("hud.factories")} value={`${owned} · 🚚${trucks}`} />
           </div>

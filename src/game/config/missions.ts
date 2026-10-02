@@ -18,7 +18,7 @@ export const MILESTONES: MilestoneMission[] = [
   { id: "m_factory_4", title: "Own 4 factories", metric: "factoriesOwned", target: 4, reward: { rp: 50 } },
   { id: "m_research_1", title: "Complete a research project", metric: "researchDone", target: 1, reward: { incomeSeconds: 300 } },
   { id: "m_earn_10m", title: "Earn $10M", metric: "moneyEarned", target: 1e7, reward: { incomeSeconds: 600 } },
-  { id: "m_assembly", title: "Build your first assembly factory", metric: "plantTypes", target: 7, reward: { rp: 300 } },
+  { id: "m_assembly", title: "Build your first assembly factory", metric: "plantTypes", target: 4, reward: { rp: 300 } },
   { id: "m_car_1", title: "Complete your first car", metric: "carsProduced", target: 1, reward: { incomeSeconds: 600 } },
   { id: "m_dealer_1", title: "Build your first dealership", metric: "dealersOwned", target: 1, reward: { rp: 300 } },
   { id: "m_sold_1", title: "Sell your first car", metric: "carsSold", target: 1, reward: { incomeSeconds: 600 } },
