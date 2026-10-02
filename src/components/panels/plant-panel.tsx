@@ -25,7 +25,8 @@ import {
   recipe,
   speedCost,
 } from "@/game/engine/chain";
-import { dealerUpgradeCost } from "@/game/engine/economy";
+import { isManagerUnlocked } from "@/game/engine/actions";
+import { dealerUpgradeCost, managerUpgradeCost } from "@/game/engine/economy";
 import { dealerRequirement } from "@/game/engine/insights";
 import { formatDuration, formatMoney, formatNumber, formatPercent } from "@/game/format";
 import type { ComponentId, DealerId, GameState, ItemId, PlantType } from "@/game/types";
@@ -76,7 +77,6 @@ export function PlantPanel({ id }: { id: string }) {
   const plot = plotOf(id)!;
   const busy = state.chain.shipments.filter((sh) => sh.from === id).length;
   const hasAssembly = plantsOf(state).some(([, o]) => o.type === "assemblyPlant");
-  const manager = MANAGERS.find((m) => state.managers[m.id].hired && state.managers[m.id].assignedTo === id);
   const steps = processSteps(st.type, t);
   const step = Math.min(steps.length - 1, Math.floor(p.progress * (steps.length - 1)));
   const unitCost = cfg.item ? st.rawPrice * cfg.rawPer : st.car ? carPartsValue(st.car) * gm.value[1] * gm.income : 0;
@@ -90,11 +90,6 @@ export function PlantPanel({ id }: { id: string }) {
         <Badge variant="muted">🤖 {t(`automation.${p.automation}` as MessageKey)}</Badge>
         {cfg.item && <Badge variant="muted">★ {gradeName(cfg.item, p.grade, t)}</Badge>}
         <Badge variant="muted">📍 {t(`zone.${plot.zone}`)}</Badge>
-        {manager && (
-          <Badge variant="muted">
-            {manager.avatar} {manager.name}
-          </Badge>
-        )}
       </div>
 
       <StatusLine id={id} />
@@ -116,6 +111,12 @@ export function PlantPanel({ id }: { id: string }) {
           ))}
         </div>
         <Progress value={p.status === "ok" ? p.progress * 100 : 0} className="h-2" />
+        {/* the core loop at a glance: how much, how full, how profitable */}
+        <div className="mt-2 grid grid-cols-3 gap-2 text-center">
+          <Stat label={t("plant.perMin")} value={`${formatNumber(st.unitsPerSec * 60)}${t("unit.perMin")}`} />
+          <Stat label={t("plant.capacity")} value={`${formatNumber(Math.floor(p.out))}/${formatNumber(st.outCap)}`} />
+          <Stat label={t("plant.profitMin")} value={formatMoney(st.unitsPerSec * 60 * (st.unitValue - unitCost))} gold />
+        </div>
         <div className="mt-2 grid grid-cols-3 gap-2 text-center">
           <Stat label={t("plant.unitCost")} value={formatMoney(unitCost)} />
           <Stat label={t("plant.unitValue")} value={formatMoney(st.unitValue)} />
@@ -149,7 +150,9 @@ export function PlantPanel({ id }: { id: string }) {
         <p className="text-[11px] text-white/55">{cfg.item ? (hasAssembly ? t("route.useHint") : t("route.useNoAssembly")) : t("plant.carsTo")}</p>
       </div>
 
-      {/* upgrades */}
+      <ManagerSlot id={id} />
+
+      {/* upgrades: capacity, speed, automation, value */}
       <div className="space-y-2">
         <UpgradeRow
           icon="🏗️"
@@ -181,6 +184,72 @@ export function PlantPanel({ id }: { id: string }) {
       <Button variant="secondary" className="w-full" onClick={() => openFloor(id)}>
         <Factory /> {t("plant.floor")}
       </Button>
+    </div>
+  );
+}
+
+/** The factory's manager: who runs it, or hire / assign one right here. */
+function ManagerSlot({ id }: { id: string }) {
+  const state = useGame((g) => g.state);
+  const { hireManager, assignManager, upgradeManager } = useGame.getState();
+  const setView = useUi((u) => u.setView);
+  const { t, lang } = useT();
+  const n = useContent(lang);
+  const here = MANAGERS.find((m) => state.managers[m.id].hired && state.managers[m.id].assignedTo === id);
+  const idle = MANAGERS.filter((m) => m.scope === "factory" && state.managers[m.id].hired && !state.managers[m.id].assignedTo);
+  const hireable = MANAGERS.find((m) => m.scope === "factory" && !state.managers[m.id].hired && isManagerUnlocked(state, m.id));
+  const next = MANAGERS.find((m) => m.scope === "factory" && !state.managers[m.id].hired && !isManagerUnlocked(state, m.id));
+  return (
+    <div className="rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.07]">
+      <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-white/55">{t("plant.manager")}</div>
+      {here ? (
+        <div className="flex items-center gap-3">
+          <span className="text-3xl">{here.avatar}</span>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-bold">
+              {here.name} · {t("common.lv", { level: state.managers[here.id].level })}
+            </div>
+            <div className="truncate text-[11px] text-white/50">{n.role(here)}</div>
+            <div className="truncate text-[11px] text-emerald-300">{n.bonus(here.bonus, state.managers[here.id].level)}</div>
+          </div>
+          <CostButton size="sm" cost={managerUpgradeCost(state, here.id)} onBuy={() => upgradeManager(here.id)} label={t("managers.train")} />
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-[11px] text-white/50">{t("plant.noManager")}</p>
+          {idle.map((m) => (
+            <button
+              key={m.id}
+              onClick={() => assignManager(m.id, id)}
+              className="flex w-full items-center gap-3 rounded-xl bg-white/[0.04] p-2 text-left ring-1 ring-white/10 transition hover:bg-white/[0.08]"
+            >
+              <span className="text-2xl">{m.avatar}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold">{m.name}</span>
+                <span className="block truncate text-[11px] text-emerald-300">{n.bonus(m.bonus, state.managers[m.id].level)}</span>
+              </span>
+              <span className="rounded-lg bg-electric px-2.5 py-1 text-[11px] font-black uppercase text-white">{t("plant.assign")}</span>
+            </button>
+          ))}
+          {hireable && (
+            <CostButton
+              className="w-full"
+              variant="gold"
+              cost={hireable.cost}
+              onBuy={() => hireManager(hireable.id, id)}
+              label={`${hireable.avatar} ${t("plant.hire", { name: hireable.name })} · ${n.bonus(hireable.bonus, 1)}`}
+            />
+          )}
+          {!hireable && !idle.length && next && (
+            <p className="text-[11px] text-white/40">
+              {next.avatar} {t("managers.unlockAt", { amount: formatMoney(next.unlockAt) })}
+            </p>
+          )}
+          <button onClick={() => setView("managers")} className="text-[11px] font-semibold text-sky-300 hover:text-sky-200">
+            {t("plant.allManagers")} →
+          </button>
+        </div>
+      )}
     </div>
   );
 }
