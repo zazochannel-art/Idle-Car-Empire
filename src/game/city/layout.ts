@@ -6,8 +6,8 @@
 // forest, farmland, hills) each block belongs to, so districts have organic
 // shapes. A river follows one node column. Pure data — shared by the engine
 // (plot rules) and the renderer.
-import { DEALER_LOTS, FACTORY_LOTS, RIVER_LINE, STARTER_CELL, WORLD_BLOCKS, ZONES } from "../config/city";
-import type { DealerId, FactoryId, ZoneId } from "../types";
+import { BIG_LOTS, DEALER_LOTS, DEPOT_CELL, MARKET_CELL, RIVER_LINE, STARTER_CELL, WORLD_BLOCKS, ZONES } from "../config/city";
+import type { DealerId, ZoneId } from "../types";
 
 export const ROAD_STEP = 7;
 export const CELL = 3;
@@ -16,7 +16,11 @@ export const NODES = BLOCKS + 1;
 export const WORLD = BLOCKS * ROAD_STEP + 1;
 export const RIVER = RIVER_LINE;
 
-export type PlotKind = "plot" | "factory" | "dealer";
+/** Plot ids of the Parts Market and the Materials Depot. */
+export const MARKET = "m:market";
+export const DEPOT = "s:depot";
+
+export type PlotKind = "plot" | "dealer" | "market" | "depot";
 
 export interface Entry {
   /** Point on the road centre line in front of the plot. */
@@ -40,9 +44,10 @@ export interface Plot {
   y: number;
   w: number;
   d: number;
-  factory?: FactoryId;
   dealer?: DealerId;
   starter?: boolean;
+  /** A whole-block industrial lot. */
+  big?: boolean;
   entry: Entry;
 }
 
@@ -129,20 +134,21 @@ function build(): World {
   const key = (cx: number, cy: number) => `${cx},${cy}`;
   const zoneAt = (cx: number, cy: number) => blockZone[cy >> 1]?.[cx >> 1] ?? null;
 
-  for (const [id, [cx, cy]] of Object.entries(FACTORY_LOTS) as [FactoryId, [number, number]][]) {
+  for (const [kind, [cx, cy]] of [["market", MARKET_CELL], ["depot", DEPOT_CELL]] as const) {
     const zone = zoneAt(cx, cy);
-    if (!zone) throw new Error(`factory lot ${id} is not in a district`);
-    if (id === "garage") {
-      plots.push({ id: `f:${id}`, zone, kind: "factory", factory: id, x: cellOrigin(cx), y: cellOrigin(cy), w: CELL, d: CELL, entry: cellEntry(cx, cy) });
-      taken.add(key(cx, cy));
-      continue;
-    }
-    // A factory fills its whole block; enter from the road in front (+y).
+    if (!zone) throw new Error(`${kind} lot is not in a district`);
+    plots.push({ id: kind === "market" ? MARKET : DEPOT, zone, kind, x: cellOrigin(cx), y: cellOrigin(cy), w: CELL, d: CELL, entry: cellEntry(cx, cy) });
+    taken.add(key(cx, cy));
+  }
+  for (const [cx, cy] of BIG_LOTS) {
+    const zone = zoneAt(cx, cy);
+    if (!zone) throw new Error(`industrial lot ${cx},${cy} is not in a district`);
+    // A big lot fills its whole block; enter from the road in front (+y).
     const bx = cx >> 1;
     const by = cy >> 1;
     const x = bx * ROAD_STEP + 1;
     const y = by * ROAD_STEP + 1;
-    plots.push({ id: `f:${id}`, zone, kind: "factory", factory: id, x, y, w: CELL * 2, d: CELL * 2, entry: { x: x + CELL, y: (by + 1) * ROAD_STEP + 0.5, line: by + 1, i0: bx, i1: bx + 1, inward: -1 } });
+    plots.push({ id: `b:${bx}:${by}`, zone, kind: "plot", big: true, x, y, w: CELL * 2, d: CELL * 2, entry: { x: x + CELL, y: (by + 1) * ROAD_STEP + 0.5, line: by + 1, i0: bx, i1: bx + 1, inward: -1 } });
     for (const dx of [0, 1]) for (const dy of [0, 1]) taken.add(key(bx * 2 + dx, by * 2 + dy));
   }
   for (const [id, [cx, cy]] of Object.entries(DEALER_LOTS) as [DealerId, [number, number]][]) {
@@ -189,10 +195,6 @@ export const STARTER_PLOT = `c:${STARTER_CELL[0]}:${STARTER_CELL[1]}`;
 
 export function plotOf(id: string): Plot | undefined {
   return WORLD_MAP.plotById[id];
-}
-
-export function factoryPlot(id: FactoryId): Plot | undefined {
-  return WORLD_MAP.plotById[`f:${id}`];
 }
 
 export function dealerPlot(id: DealerId): Plot | undefined {

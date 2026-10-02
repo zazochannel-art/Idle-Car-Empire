@@ -1,26 +1,14 @@
 // Player actions. Each mutates the state it is given and returns whether it
-// happened, so the store can clone → act → commit.
+// happened, so the store can clone → act → commit. Plant actions live in
+// engine/chain.ts, map buildings in engine/city.ts.
 import { DEALER_BY_ID } from "../config/dealerships";
-import { FACTORY_BY_ID, LEVEL_GROWTH } from "../config/factories";
 import { MANAGER_BY_ID } from "../config/managers";
 import { RESEARCH_BY_ID } from "../config/research";
-import type { BuyAmount, CarId, DealerId, FactoryId, GameState, ManagerId, UpgradeCategory } from "../types";
-import {
-  buildableCars,
-  carModelCost,
-  dealerUpgradeCost,
-  geometricCost,
-  isAutomated,
-  isFactoryAvailable,
-  lineCost,
-  managerUpgradeCost,
-  maxAffordable,
-  nextLevelCost,
-  upgradeCost,
-} from "./economy";
-import { dealerPlot, factoryPlot } from "../city/layout";
+import type { CarId, DealerId, GameState, ManagerId } from "../types";
+import { dealerPlot } from "../city/layout";
+import { emptyDealerStock } from "./chain";
 import { isPlotUnlocked } from "./city";
-import { computeGlobalMods } from "./modifiers";
+import { carModelCost, dealerUpgradeCost, managerUpgradeCost } from "./economy";
 
 function spend(s: GameState, cost: number | null): boolean {
   if (cost === null || !Number.isFinite(cost) || s.cash < cost) return false;
@@ -28,75 +16,11 @@ function spend(s: GameState, cost: number | null): boolean {
   return true;
 }
 
-export function startProduction(s: GameState, id: FactoryId): boolean {
-  const f = s.factories[id];
-  if (!f.owned || f.running || isAutomated(s, id)) return false;
-  f.running = true;
-  return true;
-}
-
-/** Tapping a running manual line pushes it forward. */
-export function rush(s: GameState, id: FactoryId, amount = 0.08): boolean {
-  const f = s.factories[id];
-  if (!f.owned || isAutomated(s, id)) return false;
-  if (!f.running) f.running = true;
-  f.progress = Math.min(0.999, f.progress + amount);
-  return true;
-}
-
-export function buyFactory(s: GameState, id: FactoryId): boolean {
-  const f = s.factories[id];
-  if (f.owned) return false;
-  if (!isFactoryAvailable(computeGlobalMods(s), id)) return false;
-  if (!isPlotUnlocked(s, factoryPlot(id))) return false;
-  if (!spend(s, FACTORY_BY_ID[id].cost)) return false;
-  f.owned = true;
-  f.progress = 0;
-  return true;
-}
-
-export function buyLevels(s: GameState, id: FactoryId, amount: BuyAmount): number {
-  const f = s.factories[id];
-  if (!f.owned) return 0;
-  const first = nextLevelCost(s, id);
-  const count = amount === "max" ? maxAffordable(first, LEVEL_GROWTH, s.cash) : amount;
-  if (count <= 0) return 0;
-  if (!spend(s, geometricCost(first, LEVEL_GROWTH, count))) return 0;
-  f.level += count;
-  s.run.levelsBought += count;
-  s.lifetime.levelsBought += count;
-  return count;
-}
-
-export function buyLine(s: GameState, id: FactoryId): boolean {
-  const f = s.factories[id];
-  if (!f.owned || !spend(s, lineCost(s, id))) return false;
-  f.lines += 1;
-  return true;
-}
-
-export function buyUpgrade(s: GameState, id: FactoryId, cat: UpgradeCategory): boolean {
-  const f = s.factories[id];
-  if (!f.owned || !spend(s, upgradeCost(s, id, cat))) return false;
-  f.upgrades[cat] += 1;
-  s.run.upgradesBought += 1;
-  s.lifetime.upgradesBought += 1;
-  return true;
-}
-
-export function selectCar(s: GameState, id: FactoryId, car: CarId | null): boolean {
-  const f = s.factories[id];
-  if (car && !buildableCars(s, id, computeGlobalMods(s)).some((c) => c.id === car)) return false;
-  f.carId = car;
-  f.progress = 0;
-  return true;
-}
-
 export function isManagerUnlocked(s: GameState, id: ManagerId): boolean {
   return s.lifetime.moneyEarned >= MANAGER_BY_ID[id].unlockAt;
 }
 
-export function hireManager(s: GameState, id: ManagerId, assignTo?: FactoryId): boolean {
+export function hireManager(s: GameState, id: ManagerId, assignTo?: string): boolean {
   const st = s.managers[id];
   if (st.hired || !isManagerUnlocked(s, id)) return false;
   if (!spend(s, MANAGER_BY_ID[id].cost)) return false;
@@ -114,23 +38,29 @@ export function upgradeManager(s: GameState, id: ManagerId): boolean {
   return true;
 }
 
-/** One manager per factory: assigning swaps out whoever was there. */
-export function assignManager(s: GameState, id: ManagerId, factory: FactoryId | null): boolean {
+/** One manager per plant: assigning swaps out whoever was there. */
+export function assignManager(s: GameState, id: ManagerId, plot: string | null): boolean {
   const st = s.managers[id];
   if (!st.hired) return false;
-  if (factory) {
-    if (!s.factories[factory].owned) return false;
-    for (const other of Object.values(s.managers)) if (other.assignedTo === factory) other.assignedTo = null;
+  if (plot) {
+    if (!s.city.buildings[plot]?.plant) return false;
+    for (const other of Object.values(s.managers)) if (other.assignedTo === plot) other.assignedTo = null;
   }
-  st.assignedTo = factory;
+  st.assignedTo = plot;
   return true;
+}
+
+/** Dealerships open once the first car has rolled off an assembly line. */
+export function canOpenDealers(s: GameState): boolean {
+  return s.lifetime.carsProduced > 0 || s.chain.firstCar;
 }
 
 export function buyDealer(s: GameState, id: DealerId): boolean {
   const d = s.dealers[id];
-  if (d.owned || !isPlotUnlocked(s, dealerPlot(id))) return false;
+  if (d.owned || !canOpenDealers(s) || !isPlotUnlocked(s, dealerPlot(id))) return false;
   if (!spend(s, DEALER_BY_ID[id].cost)) return false;
   d.owned = true;
+  s.chain.dealers[id] = emptyDealerStock();
   return true;
 }
 

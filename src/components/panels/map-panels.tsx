@@ -3,16 +3,14 @@
 import { ArrowRight, Lock, LogIn, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { SPEC_BY_ID, STRUCTURE_BY_ID, ZONES, ZONE_BY_ID, type StructureConfig } from "@/game/config/city";
+import { SPEC_BY_ID, STRUCTURE_BY_ID, ZONES, ZONE_BY_ID, buildableIn, type StructureConfig } from "@/game/config/city";
+import { PLANT_BY_ID, isPlantType } from "@/game/config/chain";
 import { DEALER_BY_ID } from "@/game/config/dealerships";
-import { FACTORY_BY_ID } from "@/game/config/factories";
 import { WORLD_MAP, plotOf } from "@/game/city/layout";
+import { levelCost, plantLock } from "@/game/engine/chain";
 import { buildingUpgradeCost, builtInZone, garagePlots, structureCost, zoneBlocker } from "@/game/engine/city";
-import { dealerCapacity, dealerMarkup, dealerUpgradeCost } from "@/game/engine/economy";
-import { dealerRequirement } from "@/game/engine/insights";
 import { formatMoney, formatNumber, formatPercent } from "@/game/format";
-import type { DealerId, StructureType, ZoneId } from "@/game/types";
+import type { StructureType, ZoneId } from "@/game/types";
 import type { MessageKey, Vars } from "@/i18n";
 import { useContent } from "@/i18n/content";
 import { useT } from "@/i18n/use-t";
@@ -20,13 +18,14 @@ import { cn } from "@/lib/utils";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { CostButton } from "../game/cost-button";
-import { FactoryCard, LockedFactoryCard } from "../game/factory-card";
+import { DealerPanel, DepotPanel, MarketPanel, PlantPanel, plantFlow, plantName } from "./plant-panel";
 
 type T = (k: MessageKey, v?: Vars) => string;
 
 /** One line describing what a plot building does, per level. */
 export function structureEffect(cfg: StructureConfig, scale: number, t: T): string {
   if (cfg.id === "garage") return t("effect.garage");
+  if (isPlantType(cfg.id)) return plantFlow(cfg.id, t);
   if (cfg.income) return t("effect.income", { amount: formatMoney(cfg.income * scale) });
   if (cfg.zoneGarageIncome) return t("effect.zoneIncome", { pct: formatPercent(cfg.zoneGarageIncome) });
   if (cfg.zoneGarageSpeed) return t("effect.zoneSpeed", { pct: formatPercent(cfg.zoneGarageSpeed) });
@@ -46,10 +45,8 @@ const lv2 = (n: number) => String(n).padStart(2, "0");
 export function plotTitle(id: string, t: T, n: ReturnType<typeof useContent>, s: ReturnType<typeof useGame.getState>["state"]): { title: string; icon: string } {
   const plot = plotOf(id);
   if (!plot) return { title: "", icon: "" };
-  if (plot.kind === "factory") {
-    const f = FACTORY_BY_ID[plot.factory!];
-    return { title: n.factory(f), icon: f.emoji };
-  }
+  if (plot.kind === "market") return { title: t("market.title"), icon: "💰" };
+  if (plot.kind === "depot") return { title: t("depot.title"), icon: "🏗️" };
   if (plot.kind === "dealer") {
     const d = DEALER_BY_ID[plot.dealer!];
     return { title: n.dealer(d), icon: d.emoji };
@@ -57,6 +54,7 @@ export function plotTitle(id: string, t: T, n: ReturnType<typeof useContent>, s:
   const b = s.city.buildings[id];
   if (!b) return { title: t("map.emptyPlot"), icon: "🏗️" };
   if (b.type === "garage") return { title: t("garage.title", { no: lv2(b.garage?.no ?? 1) }), icon: SPEC_BY_ID[b.garage?.spec ?? "repair"].emoji };
+  if (b.plant) return { title: plantName(s, id, t), icon: STRUCTURE_BY_ID[b.type].emoji };
   return { title: t(`structure.${b.type}`), icon: STRUCTURE_BY_ID[b.type].emoji };
 }
 
@@ -64,17 +62,13 @@ export function PlotPanel({ id }: { id: string }) {
   const plot = plotOf(id);
   const b = useGame((g) => g.state.city.buildings[id]);
   if (!plot) return null;
-  if (plot.kind === "factory") return <FactoryPanel id={id} />;
+  if (plot.kind === "market") return <MarketPanel />;
+  if (plot.kind === "depot") return <DepotPanel />;
   if (plot.kind === "dealer") return <DealerPanel id={plot.dealer!} />;
   if (!b) return <BuildMenu id={id} />;
   if (b.type === "garage") return <GarageSummary id={id} />;
+  if (b.plant) return <PlantPanel id={id} />;
   return <StructurePanel id={id} />;
-}
-
-function FactoryPanel({ id }: { id: string }) {
-  const factory = plotOf(id)!.factory!;
-  const owned = useGame((g) => g.state.factories[factory].owned);
-  return <div className="space-y-3 pb-2">{owned ? <FactoryCard id={factory} /> : <LockedFactoryCard id={factory} highlight />}</div>;
 }
 
 function BuildMenu({ id }: { id: string }) {
@@ -83,17 +77,23 @@ function BuildMenu({ id }: { id: string }) {
   const buildStructure = useGame((g) => g.buildStructure);
   const preview = useUi((u) => u.preview);
   const setPreview = useUi((u) => u.setPreview);
-  const { t } = useT();
+  const { t, lang } = useT();
+  const n = useContent(lang);
   const zone = ZONE_BY_ID[plot.zone];
+  const types = buildableIn(plot.zone, plot.big);
   return (
     <div className="space-y-2 pb-2">
       <p className="px-1 text-xs text-white/50">
         {t("map.buildHere")} · {t(`zone.${plot.zone}`)}
+        {plot.big && ` · ${t("map.bigLot")}`}
       </p>
-      {zone.builds.map((type) => {
+      {types.map((type) => {
         const cfg = STRUCTURE_BY_ID[type];
         const cost = structureCost(state, id, type);
-        const taken = type !== "garage" && builtInZone(state, plot.zone, type);
+        const lock = isPlantType(type) ? plantLock(state, type) : null;
+        // a locked plant is shown only if it is the next step of the chain
+        if (lock && isPlantType(type) && lock.kind === "plant" && PLANT_BY_ID[type].requires && plantLock(state, PLANT_BY_ID[type].requires!)) return null;
+        const taken = !!lock || (type !== "garage" && !isPlantType(type) && builtInZone(state, plot.zone, type));
         // first tap shows the building on the plot, the second one builds it
         const previewing = preview?.plot === id && preview.type === type;
         return (
@@ -112,13 +112,14 @@ function BuildMenu({ id }: { id: string }) {
               <div className="text-sm font-bold">{t(`structure.${type}`)}</div>
               <div className="text-[11px] leading-snug text-white/50">{t(`structureDesc.${type}`)}</div>
               <div className="mt-0.5 text-[11px] font-medium text-emerald-300/90">{structureEffect(cfg, zone.scale, t)}</div>
+              {lock && <div className="mt-0.5 text-[11px] font-semibold text-amber-300/90">🔒 {n.plantLock(lock)}</div>}
             </div>
             <CostButton
               size="sm"
-              variant={type === "garage" ? "gold" : "default"}
+              variant={isPlantType(type) ? "gold" : "default"}
               cost={cost}
               locked={taken}
-              label={taken ? t("map.onePerZone") : previewing ? t("map.confirm") : t("map.build")}
+              label={lock ? "🔒" : taken ? t("map.onePerZone") : previewing ? t("map.confirm") : t("map.build")}
               onBuy={() => {
                 if (!previewing) setPreview({ plot: id, type });
                 else if (buildStructure(id, type)) setPreview(null);
@@ -188,47 +189,6 @@ function StructurePanel({ id }: { id: string }) {
   );
 }
 
-function DealerPanel({ id }: { id: DealerId }) {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
-  const { buyDealer, upgradeDealer } = useGame.getState();
-  const { t, lang } = useT();
-  const n = useContent(lang);
-  const d = DEALER_BY_ID[id];
-  const st = state.dealers[id];
-  const req = dealerRequirement(state, id);
-  if (!st.owned) {
-    return (
-      <div className="space-y-3 pb-2">
-        <p className="text-sm text-white/60">{n.dealerDesc(d)}</p>
-        <div className="text-xs text-white/50">{t("dealers.stats", { n: formatNumber(d.capacity), markup: formatPercent(d.markup) })}</div>
-        <CostButton className="w-full" size="lg" variant="gold" cost={d.cost} locked={!!req} label={req ? n.requirement(req) : t("dealers.open")} onBuy={() => buyDealer(id)} />
-      </div>
-    );
-  }
-  const cap = dealerCapacity(state, id, snap.gm);
-  const slot = snap.dealers.slots.find((x) => x.id === id);
-  return (
-    <div className="space-y-3 pb-2">
-      <div className="flex items-center gap-2">
-        <Badge variant="gold">{t("common.lv", { level: st.level })}</Badge>
-        <span className="text-xs text-white/50">{t("dealers.stats", { n: formatNumber(cap), markup: formatPercent(dealerMarkup(state, id, snap.gm)) })}</span>
-      </div>
-      <div>
-        <div className="mb-1 flex justify-between text-[11px] text-white/50">
-          <span>{t("dealers.selling")}</span>
-          <span className="tabular-nums">
-            {formatNumber(slot?.sold ?? 0)}/{formatNumber(cap)}
-            {t("unit.perSec")}
-          </span>
-        </div>
-        <Progress value={cap > 0 ? ((slot?.sold ?? 0) / cap) * 100 : 0} />
-      </div>
-      <CostButton className="w-full" size="lg" cost={dealerUpgradeCost(state, id)} onBuy={() => upgradeDealer(id)} label={t("dealers.upgrade")} />
-    </div>
-  );
-}
-
 // ───────────────────────────── zones ─────────────────────────────
 
 export function ZonePanel({ id }: { id: ZoneId }) {
@@ -240,7 +200,7 @@ export function ZonePanel({ id }: { id: ZoneId }) {
   const open = state.city.zones.includes(id);
   const blocker = zoneBlocker(state, id);
   const lots = WORLD_MAP.plots.filter((p) => p.zone === id);
-  const factories = lots.filter((p) => p.kind === "factory").map((p) => FACTORY_BY_ID[p.factory!]);
+  const big = lots.filter((p) => p.big).length;
   const dealers = lots.filter((p) => p.kind === "dealer").map((p) => DEALER_BY_ID[p.dealer!]);
   const plots = lots.filter((p) => p.kind === "plot").length;
   return (
@@ -257,11 +217,7 @@ export function ZonePanel({ id }: { id: ZoneId }) {
       <div className="rounded-2xl bg-white/[0.03] p-3 ring-1 ring-white/[0.06]">
         <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-white/40">{t("map.inZone")}</div>
         <div className="flex flex-wrap gap-1.5">
-          {factories.map((f) => (
-            <Badge key={f.id} variant="muted">
-              {f.emoji} {n.factory(f)}
-            </Badge>
-          ))}
+          {big > 0 && <Badge variant="muted">🏭 {t("map.bigLots", { n: big })}</Badge>}
           {dealers.map((d) => (
             <Badge key={d.id} variant="muted">
               {d.emoji} {n.dealer(d)}
@@ -353,7 +309,7 @@ function FreePlotButton({ type }: { type?: StructureType }) {
   const state = useGame((g) => g.state);
   const selectPlot = useUi((u) => u.selectPlot);
   const { t } = useT();
-  const free = WORLD_MAP.plots.find((p) => p.kind === "plot" && state.city.zones.includes(p.zone) && !state.city.buildings[p.id] && (!type || ZONE_BY_ID[p.zone].builds.includes(type)));
+  const free = WORLD_MAP.plots.find((p) => p.kind === "plot" && state.city.zones.includes(p.zone) && !state.city.buildings[p.id] && (!type || buildableIn(p.zone, p.big).includes(type)));
   if (!free) return null;
   return (
     <Button size="sm" variant="secondary" className="mt-2 w-full" onClick={() => selectPlot(free.id)}>
@@ -414,8 +370,10 @@ export function UpgradePanel() {
   const upgradeBuilding = useGame((g) => g.upgradeBuilding);
   const { selectPlot, setView } = useUi.getState();
   const { t } = useT();
+  const gm = useGame((g) => g.snap.gm);
+  const plantLevel = useGame((g) => g.plantLevel);
   const items = Object.entries(state.city.buildings)
-    .map(([id, b]) => ({ id, b, cost: buildingUpgradeCost(state, id) }))
+    .map(([id, b]) => ({ id, b, cost: b.plant ? levelCost(b, gm) : buildingUpgradeCost(state, id) }))
     .filter((x) => x.cost !== null)
     .sort((a, b) => a.cost! - b.cost!);
   return (
@@ -423,7 +381,7 @@ export function UpgradePanel() {
       <p className="px-1 text-xs text-white/50">{t("upgrade.subtitle")}</p>
       {items.length === 0 && <div className="p-4 text-center text-sm text-white/40">{t("upgrade.none")}</div>}
       {items.map(({ id, b, cost }) => {
-        const name = b.type === "garage" ? t("garage.title", { no: lv2(b.garage?.no ?? 1) }) : t(`structure.${b.type}`);
+        const name = b.type === "garage" ? t("garage.title", { no: lv2(b.garage?.no ?? 1) }) : b.plant ? plantName(state, id, t) : t(`structure.${b.type}`);
         const icon = b.type === "garage" ? "🔧" : STRUCTURE_BY_ID[b.type].emoji;
         return (
           <div key={id} className="flex items-center gap-3 rounded-2xl bg-white/[0.04] p-2.5 ring-1 ring-white/[0.07]">
@@ -436,7 +394,7 @@ export function UpgradePanel() {
                 </span>
               </span>
             </button>
-            <CostButton size="sm" cost={cost} label={t("plot.upgrade")} onBuy={() => upgradeBuilding(id)} />
+            <CostButton size="sm" cost={cost} label={t("plot.upgrade")} onBuy={() => (b.plant ? plantLevel(id) : upgradeBuilding(id))} />
           </div>
         );
       })}

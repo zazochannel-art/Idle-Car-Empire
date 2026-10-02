@@ -21,7 +21,10 @@ import {
   WORKER_GROWTH,
   ZONES,
   ZONE_BY_ID,
+  buildableIn,
 } from "../config/city";
+import { PLANT_MAX_LEVEL, isPlantType } from "../config/chain";
+import { migratePlant, newPlant, plantBuildCost, plantLock } from "./chain";
 import { STARTER_PLOT, plotOf, WORLD_MAP, type Plot } from "../city/layout";
 import type {
   BuildingState,
@@ -41,8 +44,9 @@ export function newGarage(no: number): BuildingState {
   return { type: "garage", level: 1, garage: { no, spec: "repair", workers: 1, facilities: [], carry: 0, serviced: 0, earned: 0 } };
 }
 
+/** A new company: the Small Car Body Works and nothing else. */
 export function createCity(): CityState {
-  return { zones: ["town"], buildings: { [STARTER_PLOT]: newGarage(1) }, nextUid: 1, nextGarageNo: 2, carsServiced: 0 };
+  return { zones: ["town"], buildings: { [STARTER_PLOT]: { type: "bodyWorks", level: 1, plant: newPlant("bodyWorks") } }, nextUid: 1, nextGarageNo: 1, carsServiced: 0 };
 }
 
 export const isZoneUnlocked = (s: GameState, zone: ZoneId) => s.city.zones.includes(zone);
@@ -85,6 +89,7 @@ export function zoneBlocker(s: GameState, zone: ZoneId): ZoneId | null {
 export function structureCost(s: GameState, plotId: string, type: StructureType): number {
   const plot = plotOf(plotId);
   if (!plot) return Infinity;
+  if (isPlantType(type)) return plantBuildCost(s, type);
   const scale = scaleOf(plotId);
   if (type === "garage") {
     const inZone = Object.entries(s.city.buildings).filter(([id, b]) => b.type === "garage" && plotOf(id)?.zone === plot.zone).length;
@@ -99,7 +104,7 @@ export function structureCost(s: GameState, plotId: string, type: StructureType)
 /** Next level of a plot building, or null at max. Garages have their own table. */
 export function buildingUpgradeCost(s: GameState, plotId: string): number | null {
   const b = s.city.buildings[plotId];
-  if (!b) return null;
+  if (!b || b.plant) return null;
   const scale = scaleOf(plotId);
   if (b.type === "garage") {
     if (b.level >= GARAGE_MAX_LEVEL) return null;
@@ -221,7 +226,7 @@ function zoneGarageBonus(s: GameState, zone: ZoneId) {
   let income = 0;
   let speed = 0;
   for (const [id, b] of Object.entries(s.city.buildings)) {
-    if (b.type === "garage" || plotOf(id)?.zone !== zone) continue;
+    if (b.type === "garage" || b.plant || plotOf(id)?.zone !== zone) continue;
     const cfg = STRUCTURE_BY_ID[b.type];
     income += (cfg.zoneGarageIncome ?? 0) * b.level;
     speed += (cfg.zoneGarageSpeed ?? 0) * b.level;
@@ -312,7 +317,7 @@ export function citySnapshot(s: GameState, incomeMult: number): CitySnapshot {
       carsPerSec += st.carsPerSec;
     } else {
       const cfg = STRUCTURE_BY_ID[b.type];
-      if (!cfg.income) continue;
+      if (!cfg?.income) continue;
       const inc = cfg.income * scaleOf(id) * b.level * incomeMult;
       structureIncome[id] = inc;
       incomePerSec += inc;
@@ -329,7 +334,7 @@ export function citySnapshot(s: GameState, incomeMult: number): CitySnapshot {
 export function cityEffects(s: GameState) {
   const e = { speed: 1, delivery: 1, dealerCap: 1, rp: 1, markup: 0, income: 1 };
   for (const b of Object.values(s.city.buildings)) {
-    if (b.type === "garage") continue;
+    if (b.type === "garage" || b.plant) continue;
     const cfg = STRUCTURE_BY_ID[b.type];
     e.speed += (cfg.speed ?? 0) * b.level;
     e.delivery += (cfg.delivery ?? 0) * b.level;
@@ -387,7 +392,12 @@ export function builtInZone(s: GameState, zone: ZoneId, type: StructureType): bo
 
 export function buildStructure(s: GameState, plotId: string, type: StructureType): boolean {
   const plot = plotOf(plotId);
-  if (!plot || !canBuildOn(s, plotId) || !ZONE_BY_ID[plot.zone].builds.includes(type)) return false;
+  if (!plot || !canBuildOn(s, plotId) || !buildableIn(plot.zone, plot.big).includes(type)) return false;
+  if (isPlantType(type)) {
+    if (plantLock(s, type) || !spend(s, structureCost(s, plotId, type))) return false;
+    s.city.buildings[plotId] = { type, level: 1, plant: newPlant(type) };
+    return true;
+  }
   if (type !== "garage" && builtInZone(s, plot.zone, type)) return false;
   if (!spend(s, structureCost(s, plotId, type))) return false;
   if (type === "garage") {
@@ -472,22 +482,15 @@ export function migrateCity(raw: unknown): CityState {
     city.buildings = {};
     let maxUid = 0;
     let maxNo = 0;
-    // Saves from the first map used ids like "town:0:0"; move those
-    // buildings onto free plots of the same district.
-    const entries = Object.entries(raw.buildings).sort(([, a], [, b]) => (isObj(a) && isObj(a.garage) && a.garage.no === 1 ? -1 : isObj(b) && isObj(b.garage) && b.garage.no === 1 ? 1 : 0));
-    const relocate = (oldId: string, b: Json): string | null => {
-      const zone = oldId.split(":")[0] as ZoneId;
-      if (!ZONE_BY_ID[zone]) return null;
-      if (isObj(b.garage) && b.garage.no === 1 && !city.buildings[STARTER_PLOT]) return STARTER_PLOT;
-      const free = WORLD_MAP.plots.find((p) => p.kind === "plot" && p.zone === zone && !p.starter && !city.buildings[p.id]);
-      return free?.id ?? null;
-    };
-    for (const [rawId, b] of entries) {
+    for (const [id, b] of Object.entries(raw.buildings)) {
       if (!isObj(b)) continue;
-      const id = plotOf(rawId) ? rawId : relocate(rawId, b);
       const plot = id ? plotOf(id) : undefined;
       if (!id || !plot || plot.kind !== "plot" || city.buildings[id] || typeof b.type !== "string" || !(b.type in STRUCTURE_BY_ID)) continue;
       const type = b.type as StructureType;
+      if (isPlantType(type)) {
+        city.buildings[id] = { type, level: int(b.level, 1, PLANT_MAX_LEVEL, 1), plant: migratePlant(type, b.plant) };
+        continue;
+      }
       const maxLevel = type === "garage" ? GARAGE_MAX_LEVEL : STRUCTURE_BY_ID[type].maxLevel;
       const level = int(b.level, 1, maxLevel, 1);
       if (type !== "garage") {
@@ -516,19 +519,17 @@ export function migrateCity(raw: unknown): CityState {
       }
       city.buildings[id] = building;
     }
-    if (!city.buildings[STARTER_PLOT]) city.buildings[STARTER_PLOT] = newGarage(maxNo + 1);
-    maxNo = Math.max(maxNo, city.buildings[STARTER_PLOT].garage?.no ?? 0);
     city.nextUid = Math.max(int(raw.nextUid, 1, 1e9, 1), maxUid + 1);
-    city.nextGarageNo = Math.max(int(raw.nextGarageNo, 2, 9999, 2), maxNo + 1);
+    city.nextGarageNo = Math.max(int(raw.nextGarageNo, 1, 9999, 1), maxNo + 1);
   }
   city.carsServiced = num(raw.carsServiced);
   return city;
 }
 
-/** Saves from before the map: open the zones that hold what the player owns. */
+/** Open the zones that hold what the player owns (perks, imported saves). */
 export function unlockOwnedZones(s: GameState) {
   for (const p of WORLD_MAP.plots) {
-    const owned = (p.factory && s.factories[p.factory].owned) || (p.dealer && s.dealers[p.dealer].owned);
+    const owned = (p.dealer && s.dealers[p.dealer].owned) || !!s.city.buildings[p.id];
     if (owned) ensureZonesUpTo(s, p.zone);
   }
 }

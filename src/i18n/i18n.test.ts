@@ -2,12 +2,11 @@ import { describe, expect, it } from "vitest";
 import { ACHIEVEMENTS } from "@/game/config/achievements";
 import { CARS } from "@/game/config/cars";
 import { DEALERS } from "@/game/config/dealerships";
-import { FACTORIES } from "@/game/config/factories";
+import { AUTOMATION, COMPONENTS, GRADES, PLANTS, PLANT_LEVELS } from "@/game/config/chain";
 import { MANAGERS } from "@/game/config/managers";
 import { MILESTONES } from "@/game/config/missions";
 import { EMPIRE_PERKS } from "@/game/config/prestige";
 import { RESEARCH, RESEARCH_CATEGORIES } from "@/game/config/research";
-import { UPGRADES } from "@/game/config/upgrades";
 import { en } from "./en";
 import { ro, roContent } from "./ro";
 import { ru, ruContent } from "./ru";
@@ -28,8 +27,6 @@ describe("translations", () => {
   it("translates all game content to Romanian and Russian", () => {
     const keys = [
       ...CARS.flatMap((c) => [`car.${c.id}.name`, `car.${c.id}.tagline`]),
-      ...FACTORIES.map((f) => `factory.${f.id}.name`),
-      ...UPGRADES.flatMap((u) => [`upgrade.${u.id}.name`, `upgrade.${u.id}.desc`]),
       ...MANAGERS.map((m) => `manager.${m.id}.role`),
       ...DEALERS.flatMap((d) => [`dealer.${d.id}.name`, `dealer.${d.id}.desc`]),
       ...RESEARCH.flatMap((r) => [`research.${r.id}.name`, `research.${r.id}.desc`]),
@@ -42,6 +39,22 @@ describe("translations", () => {
       expect(roContent[key], `ro:${key}`).toBeTruthy();
       expect(ruContent[key], `ru:${key}`).toBeTruthy();
     }
+  });
+
+  it("has every generated key (plants, items, grades, levels)", () => {
+    const keys = [
+      ...PLANTS.flatMap((p) => [`structure.${p.id}`, `structureDesc.${p.id}`, `process.${p.id}`, ...(p.raw ? [`raw.${p.raw}`] : [])]),
+      ...COMPONENTS.flatMap((c) => [`item.${c.id}`, ...GRADES.map((_, i) => `grade.${c.id}.${i + 1}`)]),
+      "item.car",
+      ...PLANT_LEVELS.map((_, i) => `plantLevel.${i + 1}`),
+      ...AUTOMATION.map((_, i) => `automation.${i}`),
+      ...["van", "truck", "semi", "trailer", "carrier"].map((v) => `vehicle.${v}`),
+      ...["noRaw", "full", "noModel"].map((v) => `status.${v}`),
+    ];
+    for (const key of keys) expect(key in en, key).toBe(true);
+    // the assembly line has one station per step
+    expect(en["process.assemblyPlant"].split("|")).toHaveLength(9);
+    for (const dict of [ro, ru]) for (const p of PLANTS) expect(dict[`process.${p.id}`].split("|"), p.id).toHaveLength(en[`process.${p.id}`].split("|").length);
   });
 
   it("fills placeholders", () => {

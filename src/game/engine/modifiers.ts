@@ -3,10 +3,10 @@ import { CARS, CAR_MODEL } from "../config/cars";
 import { MANAGERS, type ManagerConfig } from "../config/managers";
 import { EMPIRE_PERKS, OFFLINE, PRESTIGE } from "../config/prestige";
 import { RESEARCH_BY_ID } from "../config/research";
-import type { CarId, Effect, FactoryId, GameState } from "../types";
+import type { CarId, Effect, GameState, PlantType } from "../types";
 import { cityEffects } from "./city";
 
-export const MAX_TIER = 8;
+export const MAX_TIER = 9;
 
 export interface GlobalMods {
   /** Value multiplier per car tier (index = tier). */
@@ -22,14 +22,7 @@ export interface GlobalMods {
   rp: number;
   costMult: number;
   unlockedCars: Set<CarId>;
-  unlockedFactories: Set<FactoryId>;
-}
-
-export interface FactoryMods {
-  value: number[];
-  speed: number;
-  delivery: number;
-  offline: number;
+  unlockedPlants: Set<PlantType>;
 }
 
 const tierArray = () => Array.from({ length: MAX_TIER + 1 }, () => 1);
@@ -73,8 +66,8 @@ export function applyEffect(m: GlobalMods, e: Effect) {
     case "unlockCar":
       m.unlockedCars.add(e.car);
       break;
-    case "unlockFactory":
-      m.unlockedFactories.add(e.factory);
+    case "unlockPlant":
+      m.unlockedPlants.add(e.plant);
       break;
   }
 }
@@ -97,7 +90,7 @@ export function computeGlobalMods(s: GameState): GlobalMods {
     rp: 1,
     costMult: 1,
     unlockedCars: new Set(),
-    unlockedFactories: new Set(),
+    unlockedPlants: new Set(),
   };
 
   for (const id of s.research) {
@@ -115,7 +108,7 @@ export function computeGlobalMods(s: GameState): GlobalMods {
     if (lvl > 0) m.value[car.tier] *= Math.pow(CAR_MODEL.valuePerLevel, lvl);
   }
 
-  // Global-scope managers work while assigned to any factory.
+  // Global-scope managers work while assigned to any plant.
   for (const cfg of MANAGERS) {
     const st = s.managers[cfg.id];
     if (cfg.scope !== "global" || !st?.hired || !st.assignedTo) continue;
@@ -157,35 +150,4 @@ export function computeGlobalMods(s: GameState): GlobalMods {
   m.income *= 1 + s.achievements.length * ACHIEVEMENT_INCOME_BONUS;
   m.income *= 1 + s.empirePoints * PRESTIGE.incomePerPoint;
   return m;
-}
-
-/** Bonuses from the factory-scope manager assigned to this plant, if any. */
-export function computeFactoryMods(s: GameState, factory: FactoryId): FactoryMods {
-  const f: FactoryMods = { value: tierArray(), speed: 1, delivery: 1, offline: 0 };
-  for (const cfg of MANAGERS) {
-    const st = s.managers[cfg.id];
-    if (cfg.scope !== "factory" || !st?.hired || st.assignedTo !== factory) continue;
-    const mult = managerMult(cfg, st.level);
-    switch (cfg.bonus.stat) {
-      case "speed":
-        f.speed *= mult;
-        break;
-      case "value":
-        applyValue(f.value, mult, cfg.bonus.minTier);
-        break;
-      case "delivery":
-        f.delivery *= mult;
-        break;
-      case "offline":
-        f.offline += (mult - 1) * OFFLINE.baseEfficiency;
-        break;
-      default:
-        break;
-    }
-  }
-  return f;
-}
-
-export function managerAt(s: GameState, factory: FactoryId) {
-  return MANAGERS.find((m) => s.managers[m.id]?.hired && s.managers[m.id].assignedTo === factory) ?? null;
 }

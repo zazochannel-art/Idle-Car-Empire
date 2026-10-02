@@ -1,50 +1,16 @@
 import { CARS } from "../config/cars";
+import { COMPONENTS } from "../config/chain";
 import { DEALER_IDS } from "../config/dealerships";
-import { FACTORIES } from "../config/factories";
 import { MANAGER_IDS } from "../config/managers";
-import { UPGRADE_IDS } from "../config/upgrades";
+import { createChain } from "./chain";
 import { createCity } from "./city";
-import type {
-  CarId,
-  DealerId,
-  DealerState,
-  FactoryId,
-  FactoryState,
-  GameState,
-  ManagerId,
-  ManagerState,
-  Stats,
-  UpgradeCategory,
-} from "../types";
+import type { CarId, ComponentId, DealerId, DealerState, GameState, ManagerId, ManagerState, Stats } from "../types";
 
-export const SAVE_VERSION = 2;
-
-export function emptyUpgrades(): Record<UpgradeCategory, number> {
-  return Object.fromEntries(UPGRADE_IDS.map((u) => [u, 0])) as Record<UpgradeCategory, number>;
-}
-
-export function createFactories(): Record<FactoryId, FactoryState> {
-  return Object.fromEntries(
-    FACTORIES.map((f) => [
-      f.id,
-      {
-        owned: f.cost === 0,
-        level: 1,
-        lines: f.baseLines,
-        upgrades: emptyUpgrades(),
-        carId: null,
-        progress: 0,
-        running: false,
-        produced: 0,
-      } satisfies FactoryState,
-    ]),
-  ) as Record<FactoryId, FactoryState>;
-}
+/** v3: the supply-chain economy (older saves start a new company). */
+export const SAVE_VERSION = 3;
 
 export function createDealers(): Record<DealerId, DealerState> {
-  return Object.fromEntries(
-    DEALER_IDS.map((d) => [d, { owned: d === "local", level: 1 }]),
-  ) as Record<DealerId, DealerState>;
+  return Object.fromEntries(DEALER_IDS.map((d) => [d, { owned: false, level: 1 }])) as Record<DealerId, DealerState>;
 }
 
 export function createManagers(): Record<ManagerId, ManagerState> {
@@ -55,6 +21,10 @@ export function createManagers(): Record<ManagerId, ManagerState> {
 
 export function emptyCarCounts(): Record<CarId, number> {
   return Object.fromEntries(CARS.map((c) => [c.id, 0])) as Record<CarId, number>;
+}
+
+export function emptyParts(): Record<ComponentId, number> {
+  return Object.fromEntries(COMPONENTS.map((c) => [c.id, 0])) as Record<ComponentId, number>;
 }
 
 export function createStats(): Stats {
@@ -69,6 +39,9 @@ export function createStats(): Stats {
     playTime: 0,
     highestIncome: 0,
     carsByType: emptyCarCounts(),
+    parts: emptyParts(),
+    deliveries: 0,
+    carsSold: 0,
   };
 }
 
@@ -80,7 +53,6 @@ export function createInitialState(now: number): GameState {
     empirePoints: 0,
     empirePointsEarned: 0,
     prestigeCount: 0,
-    factories: createFactories(),
     dealers: createDealers(),
     managers: createManagers(),
     carModels: emptyCarCounts(),
@@ -90,6 +62,7 @@ export function createInitialState(now: number): GameState {
     run: createStats(),
     lifetime: createStats(),
     city: createCity(),
+    chain: createChain(),
     pendingOffline: null,
     settings: { buyAmount: 1, lang: "en" },
     createdAt: now,

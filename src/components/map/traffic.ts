@@ -1,10 +1,11 @@
-// Visual traffic on the Empire Map: customers driving to garages, trucks
-// bringing parts, car carriers taking new cars to dealers, and pedestrians.
-// Purely cosmetic — income is computed by the engine — but every trip follows
-// the real production chain on the real road network.
+// Traffic on the Empire Map. The supply-chain trucks are the game's real
+// shipments (engine/chain.ts): each one is drawn driving its route between
+// the two lots, loaded on the way out and empty on the way back. Around
+// them: customers driving to garages, buyers leaving dealerships with their
+// new car, city traffic and pedestrians.
 import { BLOCKS, NODES, ROAD_STEP, segmentOpen, type Entry } from "@/game/city/layout";
 import type { ZoneId } from "@/game/types";
-import type { Painter } from "./iso";
+import { sx, sy, type Painter } from "./iso";
 import { CAR_COLORS, CAR_MODELS, drawCarrier, drawModel, drawTruck, type CarModel, type Dir } from "./vehicles";
 import { trafficLight } from "./props";
 
@@ -26,14 +27,42 @@ export interface TrafficWorld {
   busyBlocks: [number, number][];
 }
 
-type Kind = "customer" | "ambient" | "truck" | "carrier";
+type Kind = "customer" | "ambient" | "truck" | "carrier" | "hero";
+
+/** A real shipment as the map needs it. */
+export interface ShipView {
+  id: number;
+  from: Site;
+  to: Site;
+  t: number;
+  dur: number;
+  back: boolean;
+  vehicle: "van" | "truck" | "semi" | "trailer" | "carrier";
+  /** Cargo colour (component), or car models for transporters. */
+  color: string;
+  models?: CarModel[];
+}
+
+interface Ship extends ShipView {
+  path: Pt[];
+  len: number;
+  /** Local clock, resynced with the engine when it drifts. */
+  lt: number;
+  x: number;
+  y: number;
+  dir: Dir;
+}
+
+const VEHICLE_SCALE = { van: 0.8, truck: 1, semi: 1.12, trailer: 1.25, carrier: 1 };
+/** Matches DOCK_TIME in config/chain.ts: loading and unloading. */
+const DOCK = 2;
 
 interface Pt {
   x: number;
   y: number;
 }
 
-interface Agent {
+export interface Agent {
   kind: Kind;
   path: Pt[];
   seg: number;
@@ -83,6 +112,9 @@ export class Traffic {
   private edgeNodes: number[] = [];
   private spawnClock = 0;
   private clock = 0;
+  private ships = new Map<number, Ship>();
+  /** The first car rolling out of the assembly plant (the camera follows it). */
+  hero: Agent | null = null;
   onArrive: ArriveFn = () => {};
 
   setWorld(w: TrafficWorld) {
@@ -233,9 +265,100 @@ export class Traffic {
     if (agent) this.agents.push(agent);
   }
 
+  /** Syncs the trucks with the engine's shipments (called on every game tick). */
+  setShipments(list: ShipView[]) {
+    const seen = new Set<number>();
+    for (const v of list) {
+      seen.add(v.id);
+      const old = this.ships.get(v.id);
+      if (old && old.back === v.back) {
+        if (Math.abs(old.lt - v.t) > 0.6) old.lt = v.t;
+        old.dur = v.dur;
+        continue;
+      }
+      const path = old?.path ?? this.shipPath(v.from, v.to);
+      const len = path.reduce((a, q, i) => (i ? a + Math.abs(q.x - path[i - 1].x) + Math.abs(q.y - path[i - 1].y) : 0), 0);
+      this.ships.set(v.id, { ...v, path, len, lt: v.t, x: path[0].x, y: path[0].y, dir: 0 });
+    }
+    for (const id of this.ships.keys()) if (!seen.has(id)) this.ships.delete(id);
+  }
+
+  private shipPath(from: Site, to: Site): Pt[] {
+    const target = key(to.entry.i0, to.entry.line);
+    const a = this.adj.length ? this.pathFrom(from, target) : null;
+    const b = a && this.pathTo(target, to);
+    if (a && b) return [...a, ...b.slice(1)];
+    // no road yet: drive straight between the driveways
+    return [
+      { x: from.entry.x, y: from.entry.y + from.entry.inward * 1.25 },
+      { x: from.entry.x, y: from.entry.y },
+      { x: to.entry.x, y: from.entry.y },
+      { x: to.entry.x, y: to.entry.y },
+      { x: to.entry.x, y: to.entry.y + to.entry.inward * 1.25 },
+    ];
+  }
+
+  private moveShips(dt: number) {
+    for (const sh of this.ships.values()) {
+      sh.lt = Math.min(sh.dur, sh.lt + dt);
+      const drive = Math.max(0.1, sh.dur - DOCK);
+      const f = Math.max(0, Math.min(1, (sh.lt - DOCK / 2) / drive));
+      let d = (sh.back ? 1 - f : f) * sh.len;
+      let i = 0;
+      while (i < sh.path.length - 2) {
+        const seg = Math.abs(sh.path[i + 1].x - sh.path[i].x) + Math.abs(sh.path[i + 1].y - sh.path[i].y);
+        if (d <= seg) break;
+        d -= seg;
+        i++;
+      }
+      const p0 = sh.path[i];
+      const p1 = sh.path[i + 1] ?? p0;
+      const seg = Math.abs(p1.x - p0.x) + Math.abs(p1.y - p0.y) || 1;
+      const k = Math.min(1, d / seg);
+      let dx = Math.sign(p1.x - p0.x);
+      let dy = Math.sign(p1.y - p0.y);
+      if (sh.back) {
+        dx = -dx;
+        dy = -dy;
+      }
+      sh.dir = dx > 0 ? 0 : dx < 0 ? 2 : dy > 0 ? 1 : 3;
+      // keep right, except on the driveways at either end
+      const drive2 = i === 0 || i >= sh.path.length - 2;
+      const lane = drive2 ? 0 : 0.2;
+      sh.x = p0.x + (p1.x - p0.x) * k - dy * lane;
+      sh.y = p0.y + (p1.y - p0.y) * k + dx * lane;
+    }
+  }
+
+  /** A buyer drives off from a dealership in the car they just bought. */
+  spawnBuyer(dealer: Site, model: CarModel) {
+    if (!this.openNodes.length) return;
+    const out = this.pathFrom(dealer, this.randomNode(this.edgeNodes.length ? this.edgeNodes : this.openNodes));
+    if (!out) return;
+    const color = CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)];
+    this.agents.push({
+      kind: "customer", path: out, seg: 0, pos: 0, speed: 1.4, color, color2: color, x: out[0].x, y: out[0].y, dir: 0, alpha: 0, wait: 0, phase: "leave", fading: false,
+      cur: 0.2, model, rx: out[0].x, ry: out[0].y, braking: false, puffs: [],
+    });
+  }
+
+  /** The first car rolls slowly out of the assembly plant onto the street. */
+  rollOut(site: Site, model: CarModel, color: string): Agent | null {
+    const e = site.entry;
+    const path: Pt[] = [{ x: e.x, y: e.y + e.inward * 1.6 }, { x: e.x, y: e.y }, { x: e.x + 2.5, y: e.y }];
+    const a: Agent = {
+      kind: "hero", path, seg: 0, pos: 0, speed: 0.55, color, color2: color, x: path[0].x, y: path[0].y, dir: 0, alpha: 1, wait: 0, phase: "leave", fading: false,
+      cur: 0.05, model, rx: path[0].x, ry: path[0].y, braking: false, puffs: [],
+    };
+    this.agents.push(a);
+    this.hero = a;
+    return a;
+  }
+
   update(dt: number) {
     const w = this.world;
     if (!w) return;
+    this.moveShips(dt);
     const cap = Math.min(46, 8 + w.garages.length * 4 + w.factories.length * 3 + w.dealers.length * 2 + w.unlocked.size * 2);
     this.spawnClock -= dt;
     if (this.spawnClock <= 0 && this.agents.length < cap) {
@@ -244,6 +367,7 @@ export class Traffic {
     }
 
     const moving = this.agents.filter((a) => a.phase !== "inside" && !a.fading && a.alpha > 0.3);
+    if (this.hero && !this.agents.includes(this.hero)) this.hero = null;
     for (const a of this.agents) {
       if (a.phase === "inside") {
         a.wait -= dt;
@@ -275,8 +399,15 @@ export class Traffic {
         }
       }
       if (a.seg >= a.path.length - 1) {
-        this.arrive(a);
-        continue;
+        if (a.kind === "hero") {
+          // the first car waits at the kerb for its moment of glory
+          a.cur = 0;
+          a.seg = a.path.length - 2;
+          a.pos = Math.abs(a.path[a.seg + 1].x - a.path[a.seg].x) + Math.abs(a.path[a.seg + 1].y - a.path[a.seg].y);
+        } else {
+          this.arrive(a);
+          continue;
+        }
       }
       const p0 = a.path[a.seg];
       const p1 = a.path[a.seg + 1];
@@ -399,6 +530,21 @@ export class Traffic {
   /** Things to depth-sort with the buildings. */
   drawables(): { depth: number; x: number; y: number; draw: (p: Painter) => void }[] {
     const out: { depth: number; x: number; y: number; draw: (p: Painter) => void }[] = [];
+    for (const sh of this.ships.values()) {
+      out.push({
+        depth: sh.x + sh.y,
+        x: sh.x,
+        y: sh.y,
+        draw: (p) => {
+          const scale = VEHICLE_SCALE[sh.vehicle];
+          if (sh.vehicle === "carrier" && !sh.back && sh.models?.length) {
+            const m = sh.models;
+            drawCarrier(p, sh.x, sh.y, sh.dir, [CAR_COLORS[sh.id % CAR_COLORS.length], CAR_COLORS[(sh.id * 3 + 2) % CAR_COLORS.length]], 1, [m[0], m[1] ?? m[0]]);
+          } else drawTruck(p, sh.x, sh.y, sh.dir, sh.back ? "#e2e8f0" : sh.color, scale);
+          if (p.night > 0.35) p.light(sx(sh.x, sh.y), sy(sh.x, sh.y, 4), 14, "#fef3c7", 0.5);
+        },
+      });
+    }
     for (const a of this.agents) {
       if (a.phase === "inside" || a.alpha <= 0) continue;
       out.push({

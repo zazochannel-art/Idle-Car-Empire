@@ -3,12 +3,14 @@
 import { create } from "zustand";
 import { ACHIEVEMENT_BY_ID } from "@/game/config/achievements";
 import { CAR_BY_ID } from "@/game/config/cars";
-import { FACTORY_BY_ID, LEVEL_MILESTONES } from "@/game/config/factories";
+import { DEALER_BY_ID } from "@/game/config/dealerships";
 import { MANAGER_BY_ID } from "@/game/config/managers";
 import { RESEARCH_BY_ID } from "@/game/config/research";
 import * as A from "@/game/engine/actions";
+import * as Ch from "@/game/engine/chain";
 import * as C from "@/game/engine/city";
 import { STRUCTURE_BY_ID } from "@/game/config/city";
+import { PLANT_LEVELS } from "@/game/config/chain";
 import { snapshot, unlockedCarIds, type EconomySnapshot } from "@/game/engine/economy";
 import { collectOffline, settleOffline } from "@/game/engine/offline";
 import { prestige as doPrestige } from "@/game/engine/prestige";
@@ -17,7 +19,7 @@ import { cloneState, createInitialState } from "@/game/engine/state";
 import { tick as engineTick } from "@/game/engine/tick";
 import { formatMoney } from "@/game/format";
 import { decodeSave, encodeSave, SaveManager } from "@/game/save";
-import type { BuyAmount, CarId, DealerId, FacilityType, FactoryId, GameState, Lang, ManagerId, Specialization, StructureType, UpgradeCategory, ZoneId } from "@/game/types";
+import type { BuyAmount, CarId, DealerId, FacilityType, GameState, Lang, ManagerId, Route, Specialization, StructureType, ZoneId } from "@/game/types";
 import { applyLanguage, detectLanguage, translate, type MessageKey, type Vars } from "@/i18n";
 import { contentFor } from "@/i18n/content";
 import { uiEvents } from "./events";
@@ -36,16 +38,16 @@ interface GameStore {
   /** Runs a player action on a copy of the state and commits it if it succeeded. */
   act: <T>(fn: (s: GameState) => T) => T;
 
-  build: (id: FactoryId) => void;
-  rush: (id: FactoryId) => void;
-  buyFactory: (id: FactoryId) => boolean;
-  buyLevels: (id: FactoryId) => number;
-  buyLine: (id: FactoryId) => boolean;
-  buyUpgrade: (id: FactoryId, cat: UpgradeCategory) => boolean;
-  selectCar: (id: FactoryId, car: CarId | null) => void;
-  hireManager: (id: ManagerId, assignTo?: FactoryId) => boolean;
+  plantLevel: (plot: string) => boolean;
+  plantSpeed: (plot: string) => boolean;
+  plantAutomation: (plot: string) => boolean;
+  plantTruck: (plot: string) => boolean;
+  plantGrade: (plot: string) => boolean;
+  setRoute: (plot: string, route: Route) => void;
+  setPlantCar: (plot: string, car: CarId | null) => void;
+  hireManager: (id: ManagerId, assignTo?: string) => boolean;
   upgradeManager: (id: ManagerId) => boolean;
-  assignManager: (id: ManagerId, factory: FactoryId | null) => void;
+  assignManager: (id: ManagerId, plot: string | null) => void;
   buyDealer: (id: DealerId) => boolean;
   upgradeDealer: (id: DealerId) => boolean;
   upgradeCarModel: (id: CarId) => boolean;
@@ -125,12 +127,15 @@ export const useGame = create<GameStore>((set, get) => {
       return;
     }
 
-    const events = engineTick(next, dt, Math.random, snap);
+    const events = engineTick(next, dt, snap);
     next.lastActiveAt = now;
     if (refreshDaily(next, now, snap)) {
       uiEvents.emit({ type: "toast", tone: "info", icon: "📋", title: tr("toast.daily"), body: tr("toast.dailyBody") });
     }
-    for (const e of events) if (e.type === "sale") uiEvents.emit(e);
+    for (const e of events) {
+      if (e.type === "sale") uiEvents.emit(e);
+      else if (e.type === "carBuilt" && e.first) uiEvents.emit({ type: "firstCar", plot: e.plot, car: e.car });
+    }
     commit(next);
     if (now - lastSave > SAVE_MS) persist();
   }
@@ -174,37 +179,23 @@ export const useGame = create<GameStore>((set, get) => {
       });
     },
 
-    build: (id) => {
-      act((s) => A.startProduction(s, id));
-    },
-    rush: (id) => {
-      act((s) => A.rush(s, id));
-    },
-    buyFactory: (id) => {
-      const ok = act((s) => A.buyFactory(s, id));
+    plantLevel: (plot) => {
+      const ok = act((s) => Ch.upgradePlantLevel(s, plot, get().snap.gm));
       if (ok) {
-        const f = FACTORY_BY_ID[id];
-        uiEvents.emit({ type: "toast", tone: "success", icon: f.emoji, title: tr("toast.factory", { name: names().factory(f) }), body: `${names().city(f)} · ${names().continent(f.continent)}` });
-        persist(true);
+        const b = get().state.city.buildings[plot];
+        uiEvents.emit({ type: "toast", tone: "gold", icon: "🏗️", title: tr("toast.plantLevel", { name: tr(`structure.${b.type}`), level: tr(`plantLevel.${b.level}` as MessageKey) }), body: tr("toast.plantLevelBody", { lines: PLANT_LEVELS[b.level - 1].lines }) });
       }
       return ok;
     },
-    buyLevels: (id) => {
-      const amount = get().state.settings.buyAmount;
-      const before = get().state.factories[id].level;
-      const n = act((s) => A.buyLevels(s, id, amount));
-      if (n > 0) uiEvents.emit({ type: "levelUp", factory: id, levels: n });
-      const after = get().state.factories[id].level;
-      const milestone = LEVEL_MILESTONES.find((m) => before < m && after >= m);
-      if (milestone) {
-        uiEvents.emit({ type: "toast", tone: "gold", icon: "⚡", title: tr("toast.milestone", { name: names().factory(FACTORY_BY_ID[id]), level: milestone }), body: tr("toast.milestoneBody") });
-      }
-      return n;
+    plantSpeed: (plot) => act((s) => Ch.upgradePlantSpeed(s, plot, get().snap.gm)),
+    plantAutomation: (plot) => act((s) => Ch.upgradeAutomation(s, plot, get().snap.gm)),
+    plantTruck: (plot) => act((s) => Ch.buyTruck(s, plot, get().snap.gm)),
+    plantGrade: (plot) => act((s) => Ch.upgradeGrade(s, plot, get().snap.gm)),
+    setRoute: (plot, route) => {
+      act((s) => Ch.setRoute(s, plot, route));
     },
-    buyLine: (id) => act((s) => A.buyLine(s, id)),
-    buyUpgrade: (id, cat) => act((s) => A.buyUpgrade(s, id, cat)),
-    selectCar: (id, car) => {
-      act((s) => A.selectCar(s, id, car));
+    setPlantCar: (plot, car) => {
+      act((s) => Ch.setPlantCar(s, plot, car, get().snap.gm));
     },
     hireManager: (id, assignTo) => {
       const ok = act((s) => A.hireManager(s, id, assignTo));
@@ -215,10 +206,17 @@ export const useGame = create<GameStore>((set, get) => {
       return ok;
     },
     upgradeManager: (id) => act((s) => A.upgradeManager(s, id)),
-    assignManager: (id, factory) => {
-      act((s) => A.assignManager(s, id, factory));
+    assignManager: (id, plot) => {
+      act((s) => A.assignManager(s, id, plot));
     },
-    buyDealer: (id) => act((s) => A.buyDealer(s, id)),
+    buyDealer: (id) => {
+      const ok = act((s) => A.buyDealer(s, id));
+      if (ok) {
+        uiEvents.emit({ type: "toast", tone: "success", icon: "🏪", title: tr("toast.dealer", { name: names().dealer(DEALER_BY_ID[id]) }), body: tr("toast.dealerBody") });
+        persist(true);
+      }
+      return ok;
+    },
     upgradeDealer: (id) => act((s) => A.upgradeDealer(s, id)),
     upgradeCarModel: (id) => act((s) => A.upgradeCarModel(s, id)),
     research: (id) => {

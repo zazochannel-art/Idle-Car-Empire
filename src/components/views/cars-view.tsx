@@ -2,14 +2,16 @@
 
 import { Lock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { CARS, CAR_MODEL, carProfit } from "@/game/config/cars";
+import { CARS, CAR_MODEL } from "@/game/config/cars";
+import { COMPONENT_BY_ID } from "@/game/config/chain";
+import { carLock, carPartsValue, carValue, recipe } from "@/game/engine/chain";
 import { carModelCost, unlockedCarIds } from "@/game/engine/economy";
-import { carRequirement } from "@/game/engine/insights";
 import { formatMoney, formatNumber, formatPercent, formatTime } from "@/game/format";
 import { useContent } from "@/i18n/content";
 import { useT } from "@/i18n/use-t";
 import { useGame } from "@/store/game-store";
 import { CostButton } from "../game/cost-button";
+import { gradeName } from "../panels/plant-panel";
 import { ViewHeader } from "./section-title";
 
 export function CarsView() {
@@ -20,13 +22,8 @@ export function CarsView() {
   const n = useContent(lang);
   const unlocked = unlockedCarIds(state, snap.gm);
 
-  // Best live value per car across factories currently building it.
-  const liveValue = new Map<string, number>();
-  for (const st of Object.values(snap.factories)) {
-    if (!st) continue;
-    const v = st.valuePerCar * snap.dealers.multiplier;
-    liveValue.set(st.car.id, Math.max(liveValue.get(st.car.id) ?? 0, v));
-  }
+  // Models on an assembly line right now.
+  const onLine = new Set(Object.values(snap.chain.plants).map((p) => p.car?.id));
 
   return (
     <div className="space-y-4">
@@ -34,8 +31,10 @@ export function CarsView() {
       <div className="grid gap-3 @sm:grid-cols-2 @3xl:grid-cols-3">
         {CARS.map((car) => {
           const isUnlocked = unlocked.has(car.id);
-          const requirement = isUnlocked ? null : carRequirement(state, car, snap);
-          const req = requirement ? n.requirement(requirement) : null;
+          const lock = isUnlocked ? null : carLock(state, car, snap.gm);
+          const req = lock ? n.carLock(lock) : null;
+          const cost = carPartsValue(car) * snap.gm.value[1] * snap.gm.income;
+          const value = carValue(state, car, snap.gm);
           const lvl = state.carModels[car.id] ?? 0;
           const produced = state.lifetime.carsByType[car.id];
           return (
@@ -59,17 +58,22 @@ export function CarsView() {
               </div>
 
               <div className="relative mt-3 grid grid-cols-3 gap-1.5 text-center">
-                <Spec label={t("cars.cost")} value={formatMoney(car.cost)} />
-                <Spec label={t("cars.price")} value={formatMoney(car.price)} />
-                <Spec label={t("cars.profit")} value={formatMoney(carProfit(car))} accent />
+                <Spec label={t("cars.cost")} value={formatMoney(cost)} />
+                <Spec label={t("cars.price")} value={formatMoney(value)} />
+                <Spec label={t("cars.profit")} value={formatMoney(value - cost)} accent />
+              </div>
+              <div className="relative mt-2 flex flex-wrap gap-1 text-[10px] text-white/55">
+                {recipe(car).map((c) => (
+                  <span key={c} className="rounded bg-white/5 px-1">
+                    {COMPONENT_BY_ID[c].emoji} {gradeName(c, car.grade, t)}
+                  </span>
+                ))}
               </div>
               <div className="relative mt-2 flex justify-between text-[11px] text-white/50">
                 <span>{t("cars.baseTime", { time: formatTime(car.time) })}</span>
                 <span>{t("cars.produced", { n: formatNumber(produced) })}</span>
               </div>
-              {liveValue.has(car.id) && (
-                <div className="relative mt-1 text-[11px] text-emerald-300">{t("cars.sellingNow", { price: formatMoney(liveValue.get(car.id)!) })}</div>
-              )}
+              {onLine.has(car.id) && <div className="relative mt-1 text-[11px] text-emerald-300">{t("cars.onLine")}</div>}
 
               {isUnlocked ? (
                 <CostButton

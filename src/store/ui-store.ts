@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import type { StructureType, ZoneId } from "@/game/types";
+import type { CarId, StructureType, ZoneId } from "@/game/types";
 import type { TimeMode } from "@/components/map/lighting";
 
 const TIME_KEY = "idle-car-empire:time";
@@ -45,6 +45,10 @@ interface UiStore {
   zone: ZoneId | null;
   /** Plot id of the garage whose interior is open. */
   garage: string | null;
+  /** Plot id of the plant whose factory floor is open. */
+  floor: string | null;
+  /** The FIRST CAR COMPLETED moment, while it plays. */
+  celebrate: { plot: string; car: CarId } | null;
   command: MapCommand | null;
   /** Map lighting: automatic day/night cycle or a fixed time of day. */
   timeMode: TimeMode;
@@ -57,6 +61,8 @@ interface UiStore {
   selectZone: (id: ZoneId | null, focus?: boolean) => void;
   enterGarage: (id: string) => void;
   exitGarage: () => void;
+  openFloor: (id: string | null) => void;
+  setCelebrate: (c: { plot: string; car: CarId } | null) => void;
   closeAll: () => void;
   map: (cmd: DistributiveOmit<MapCommand, "n">) => void;
 }
@@ -71,6 +77,8 @@ export const useUi = create<UiStore>((set) => ({
   plot: null,
   zone: null,
   garage: null,
+  floor: null,
+  celebrate: null,
   command: null,
   timeMode: savedTime(),
   preview: null,
@@ -96,6 +104,8 @@ export const useUi = create<UiStore>((set) => ({
   },
   // back out to the normal map zoom, centred on the garage we left
   exitGarage: () => set((s) => ({ garage: null, command: s.garage ? { kind: "plot", id: s.garage, zoom: -1, n: ++n } : s.command })),
+  openFloor: (floor) => set({ floor }),
+  setCelebrate: (celebrate) => set(celebrate ? { celebrate, view: null, plot: null, zone: null, floor: null } : { celebrate }),
   closeAll: () => set({ view: null, plot: null, zone: null, preview: null }),
   map: (cmd) => set({ command: { ...cmd, n: ++n } as MapCommand }),
 }));

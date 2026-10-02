@@ -8,9 +8,10 @@ import { nextGoals } from "@/game/engine/insights";
 import { dailyProgress, metric, openMilestones, rewardCash } from "@/game/engine/progress";
 import { formatDuration, formatMoney, formatNumber } from "@/game/format";
 import { CAR_BY_ID } from "@/game/config/cars";
-import { FACTORY_BY_ID } from "@/game/config/factories";
+import { MAKER } from "@/game/config/chain";
 import { MANAGER_BY_ID } from "@/game/config/managers";
-import type { Goal } from "@/game/engine/insights";
+import { freePlot, type Goal } from "@/game/engine/insights";
+import { plantFlow, plantName } from "../panels/plant-panel";
 import type { Content } from "@/i18n/content";
 import { useContent } from "@/i18n/content";
 import type { MessageKey, Vars } from "@/i18n";
@@ -23,19 +24,18 @@ import type { MissionState, Reward } from "@/game/types";
 /** Title and one-line detail for a goal, in the player's language. */
 export function goalText(g: Goal, t: (k: MessageKey, v?: Vars) => string, n: Content): { title: string; detail: string } {
   switch (g.kind) {
-    case "build":
-      return { title: t("goal.build"), detail: t("goal.buildDetail") };
-    case "automate":
-      return { title: t("goal.automate"), detail: t("goal.automateDetail", { name: MANAGER_BY_ID[g.manager].name }) };
-    case "factory": {
-      const f = FACTORY_BY_ID[g.factory];
-      return {
-        title: t("goal.factory", { name: n.factory(f) }),
-        detail: g.requirement ? t("goal.needs", { req: n.requirement(g.requirement) }) : `${n.city(f)} · ${t("factory.lockedStats", { lines: f.baseLines, value: f.valueMult, speed: f.speedMult })}`,
-      };
+    case "plant":
+      return { title: t("goal.plant", { name: t(`structure.${g.plant}`) }), detail: plantFlow(g.plant, t) };
+    case "upgrade": {
+      const s = useGame.getState().state;
+      return { title: t(g.what === "speed" ? "goal.speed" : "goal.level", { name: plantName(s, g.plot, t) }), detail: t("goal.upgradeDetail") };
     }
+    case "shortage":
+      return { title: t("goal.shortage", { item: t(`item.${g.component}`) }), detail: t("goal.shortageDetail", { name: t(`structure.${MAKER[g.component]}`) }) };
+    case "dealer":
+      return { title: t("goal.dealer"), detail: t("goal.dealerDetail") };
     case "car":
-      return { title: t("goal.car", { name: n.car(CAR_BY_ID[g.car]) }), detail: t("goal.carDetail", { name: n.factory(FACTORY_BY_ID[g.factory]) }) };
+      return { title: t("goal.car", { name: n.car(CAR_BY_ID[g.car]) }), detail: g.requirement ? t("goal.needs", { req: n.requirement(g.requirement) }) : "" };
     case "manager": {
       const m = MANAGER_BY_ID[g.manager];
       return { title: t("goal.manager", { name: m.name }), detail: n.role(m) };
@@ -56,26 +56,40 @@ export function runGoal(g: Goal, ready: boolean) {
   const game = useGame.getState();
   const ui = useUi.getState();
   switch (g.kind) {
-    case "build":
-      game.build("garage");
-      ui.selectPlot("f:garage");
+    case "plant": {
+      // show the plant on the nearest free plot, ready to confirm
+      const plot = freePlot(game.state);
+      if (plot) {
+        ui.selectPlot(plot);
+        ui.setPreview({ plot, type: g.plant });
+      }
       break;
-    case "automate":
-      if (ready) game.hireManager(g.manager, g.factory);
-      else ui.setView("managers");
+    }
+    case "upgrade":
+      if (ready) {
+        if (g.what === "speed") game.plantSpeed(g.plot);
+        else game.plantLevel(g.plot);
+      }
+      ui.selectPlot(g.plot);
       break;
-    case "factory":
-      if (ready && game.buyFactory(g.factory)) ui.selectPlot(`f:${g.factory}`);
-      else ui.selectPlot(`f:${g.factory}`);
+    case "shortage":
+      ui.selectPlot(g.plot);
+      break;
+    case "dealer":
+      if (ready) game.buyDealer(g.dealer);
+      ui.selectPlot(`d:${g.dealer}`);
+      break;
+    case "car":
+      if (g.plot) {
+        if (ready && g.cost !== undefined) game.plantGrade(g.plot);
+        ui.selectPlot(g.plot);
+      } else ui.setView("research");
       break;
     case "prestige":
       ui.setView("prestige");
       break;
     case "manager":
       ui.setView("managers");
-      break;
-    case "car":
-      ui.selectPlot(`f:${g.factory}`);
       break;
     case "facility":
     case "worker":
@@ -103,12 +117,12 @@ export function NextGoals() {
         const cost = "cost" in g ? g.cost : undefined;
         const pct = cost ? Math.min(100, (state.cash / cost) * 100) : 100;
         const ready = !cost || state.cash >= cost;
-        const eta = cost && !ready && snap.incomePerSec > 0 ? (cost - state.cash) / snap.incomePerSec : null;
+        const eta = cost && !ready && snap.incomePerSec > 0 && (cost - state.cash) / snap.incomePerSec < 86400 * 30 ? (cost - state.cash) / snap.incomePerSec : null;
         const text = goalText(g, t, n);
         const onGo = () => runGoal(g, ready);
         return (
           <div
-            key={g.kind}
+            key={`${g.kind}:${"plot" in g ? g.plot : ""}`}
             className={cn(
               "flex min-w-0 items-center gap-3 rounded-2xl p-3 ring-1",
               ready ? "bg-gold/[0.07] ring-gold/30" : "bg-white/[0.03] ring-white/[0.07]",

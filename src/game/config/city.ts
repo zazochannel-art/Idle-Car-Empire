@@ -1,7 +1,8 @@
 // The Empire Map: zones (stages), what can be built on plots, and the garage
 // interior (facilities, levels, specializations). All balance numbers live
 // here; engine/city.ts turns them into income.
-import type { DealerId, FacilityType, FactoryId, Specialization, StructureType, ZoneId } from "../types";
+import type { DealerId, FacilityType, Specialization, StructureType, ZoneId } from "../types";
+import { PLANTS } from "./chain";
 
 // ───────────────────────────── zones ─────────────────────────────
 
@@ -88,20 +89,23 @@ export const WORLD_BLOCKS = [
 export const RIVER_LINE = 5;
 
 /** Special lots, as global cell coordinates (two cells per block). */
+/** Where the Small Car Body Works stands on a new game. */
 export const STARTER_CELL: [number, number] = [6, 2];
-export const FACTORY_LOTS: Record<FactoryId, [number, number]> = {
-  // the Assembly Workshop is a single cell; the others fill a whole block
-  garage: [7, 2],
-  local: [12, 0],
-  european: [12, 2],
-  american: [4, 6],
-  asian: [10, 8],
-  luxury: [14, 6],
-  supercarFactory: [12, 10],
-  electricFactory: [14, 12],
-  hypercarFactory: [4, 12],
-  mega: [8, 14],
-};
+/** The Parts Market buys components; the Materials Depot sells raw material. */
+export const MARKET_CELL: [number, number] = [9, 1];
+export const DEPOT_CELL: [number, number] = [4, 2];
+/** Industrial lots: a whole block each, for big plants (given as any cell of the block). */
+export const BIG_LOTS: [number, number][] = [
+  [12, 0],
+  [12, 2],
+  [4, 6],
+  [10, 8],
+  [14, 6],
+  [12, 10],
+  [14, 12],
+  [4, 12],
+  [8, 14],
+];
 export const DEALER_LOTS: Record<DealerId, [number, number]> = {
   local: [6, 3],
   city: [8, 2],
@@ -156,7 +160,15 @@ export const STRUCTURES: StructureConfig[] = [
   { id: "exportTerminal", emoji: "🚢", cost: 2e6, levelGrowth: 4, maxLevel: 10, markup: 0.02, color: "#cbd5e1", roof: "#0f766e" },
   { id: "hq", emoji: "🏢", cost: 5e6, levelGrowth: 4, maxLevel: 10, income2: 0.02, color: "#bfdbfe", roof: "#1e3a8a" },
   { id: "airport", emoji: "✈️", cost: 2e7, levelGrowth: 4, maxLevel: 10, markup: 0.04, color: "#e2e8f0", roof: "#475569" },
+  // supply-chain plants (their economy lives in config/chain.ts)
+  ...PLANTS.map((p) => ({ id: p.id, emoji: p.emoji, cost: p.cost, levelGrowth: 1, maxLevel: 8, color: p.color, roof: p.roof })),
 ];
+
+/** What a plot in a district can hold: any plant, plus the district's own buildings. */
+export function buildableIn(zone: ZoneId, big = false): StructureType[] {
+  const plants = PLANTS.map((p) => p.id);
+  return big ? plants : [...plants, ...ZONE_BY_ID[zone].builds];
+}
 
 export const STRUCTURE_BY_ID: Record<StructureType, StructureConfig> = Object.fromEntries(
   STRUCTURES.map((s) => [s.id, s]),

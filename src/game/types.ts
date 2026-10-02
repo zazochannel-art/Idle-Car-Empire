@@ -1,26 +1,31 @@
 // Core type definitions shared by the config, the engine and the UI.
 
 export type CarId =
-  | "compact"
+  | "city"
   | "sedan"
   | "suv"
   | "sports"
+  | "luxury"
+  | "perfSuv"
   | "supercar"
   | "hypercar"
-  | "electric"
-  | "future";
+  | "electric";
 
-export type FactoryId =
-  | "garage"
-  | "local"
-  | "european"
-  | "american"
-  | "asian"
-  | "luxury"
-  | "supercarFactory"
-  | "electricFactory"
-  | "hypercarFactory"
-  | "mega";
+/** Parts that plants make and the Car Assembly Plant puts together. */
+export type ComponentId = "body" | "engine" | "interior" | "glass" | "tires" | "paint" | "electronics" | "battery";
+export type ItemId = ComponentId | "car";
+
+/** Production buildings of the supply chain. */
+export type PlantType =
+  | "bodyWorks"
+  | "engineFactory"
+  | "interiorFactory"
+  | "glassFactory"
+  | "tireFactory"
+  | "paintFactory"
+  | "electronicsFactory"
+  | "batteryFactory"
+  | "assemblyPlant";
 
 export type DealerId = "local" | "city" | "premium" | "luxury" | "supercar" | "global";
 
@@ -35,22 +40,6 @@ export type ManagerId =
   | "priya"
   | "viktor"
   | "lena";
-
-export type UpgradeCategory =
-  | "production"
-  | "quality"
-  | "automation"
-  | "marketing"
-  | "logistics"
-  | "technology";
-
-export type Continent =
-  | "Europe"
-  | "North America"
-  | "South America"
-  | "Asia"
-  | "Africa"
-  | "Oceania";
 
 export type ResearchCategory =
   | "engineering"
@@ -78,27 +67,13 @@ export type Effect =
   | { kind: "rp"; mult: number }
   | { kind: "costMult"; mult: number }
   | { kind: "unlockCar"; car: CarId }
-  | { kind: "unlockFactory"; factory: FactoryId };
+  | { kind: "unlockPlant"; plant: PlantType };
 
 export interface Reward {
   cash?: number;
   /** Cash expressed as N seconds of current income (scales with progress). */
   incomeSeconds?: number;
   rp?: number;
-}
-
-export interface FactoryState {
-  owned: boolean;
-  level: number;
-  lines: number;
-  upgrades: Record<UpgradeCategory, number>;
-  /** null = automatically build the best car this factory can make. */
-  carId: CarId | null;
-  /** Progress of the current batch, 0..1. */
-  progress: number;
-  /** Only meaningful for factories that are not automated (manual start). */
-  running: boolean;
-  produced: number;
 }
 
 export interface DealerState {
@@ -109,7 +84,8 @@ export interface DealerState {
 export interface ManagerState {
   hired: boolean;
   level: number;
-  assignedTo: FactoryId | null;
+  /** Plot id of the plant the manager runs. */
+  assignedTo: string | null;
 }
 
 export type MetricId =
@@ -123,7 +99,13 @@ export type MetricId =
   | "dealersOwned"
   | "maxFactoryLevel"
   | "prestigeCount"
-  | "carsUnlocked";
+  | "carsUnlocked"
+  | "bodiesProduced"
+  | "enginesProduced"
+  | "componentsProduced"
+  | "deliveries"
+  | "carsSold"
+  | "plantTypes";
 
 export interface MissionState {
   id: string;
@@ -147,12 +129,20 @@ export interface Stats {
   playTime: number;
   highestIncome: number;
   carsByType: Record<CarId, number>;
+  /** Units made, by component. */
+  parts: Record<ComponentId, number>;
+  /** Units (components and cars) trucks have delivered. */
+  deliveries: number;
+  carsSold: number;
 }
 
 export interface OfflineReport {
   seconds: number;
   cappedSeconds: number;
   cars: number;
+  /** Components made while away. */
+  components?: number;
+  deliveries?: number;
   /** Cars serviced by garages while away. */
   serviced?: number;
   money: number;
@@ -181,7 +171,8 @@ export type StructureType =
   | "researchCenter"
   | "exportTerminal"
   | "hq"
-  | "airport";
+  | "airport"
+  | PlantType;
 
 /** Things built inside a garage, on its tile grid. */
 export type FacilityType =
@@ -225,11 +216,90 @@ export interface GarageData {
   earned: number;
 }
 
+export type Route = "use" | "sell" | "store";
+
+/** Why a plant is not producing right now. */
+export type PlantStatus = "ok" | "noRaw" | "full" | "noParts" | "noModel";
+
+export interface PlantData {
+  /** Speed upgrade level. */
+  speed: number;
+  /** Automation tier: 0 Manual … 4 AI Factory. */
+  automation: number;
+  /** Trucks owned. */
+  fleet: number;
+  /** Component grade (Standard → Carbon…); the assembly plant ignores it. */
+  grade: number;
+  /** Where finished goods go: next plant in the chain, the market, or stay. */
+  route: Route;
+  /** Progress of the current batch, 0..1. */
+  progress: number;
+  /** Raw material on site (steel, rubber…). */
+  raw: number;
+  /** Components waiting at an assembly plant. */
+  inputs: Partial<Record<ComponentId, number>>;
+  /** Finished units waiting for a truck. */
+  out: number;
+  /** Total value of `out` (cars differ by model). */
+  outValue: number;
+  /** Assembly plant: model on the line; null = best available. */
+  car: CarId | null;
+  /** Seconds the loading dock has been waiting for a full load. */
+  wait: number;
+  made: number;
+  status: PlantStatus;
+  /** With status noParts: the first missing component. */
+  missing?: ComponentId;
+}
+
 export interface BuildingState {
   type: StructureType;
   level: number;
   /** Present when type === "garage". */
   garage?: GarageData;
+  /** Present on supply-chain plants. */
+  plant?: PlantData;
+}
+
+export type Vehicle = "van" | "truck" | "semi" | "trailer" | "carrier";
+
+/** A truck on the road: every unit moved in the game travels in one. */
+export interface Shipment {
+  id: number;
+  /** Plot ids: plants, "m:market", "s:depot", "d:<dealer>". */
+  from: string;
+  to: string;
+  item: ItemId | "raw";
+  qty: number;
+  /** Sale value of the load (market and dealers pay this). */
+  value: number;
+  /** Seconds travelled on the current leg, and the leg's length. */
+  t: number;
+  dur: number;
+  /** Driving back empty. */
+  back: boolean;
+  vehicle: Vehicle;
+  /** Car models on a car transporter, for drawing. */
+  models?: CarId[];
+}
+
+export interface DealerStock {
+  cars: number;
+  value: number;
+  models: CarId[];
+  /** Seconds until the next customer walks in. */
+  next: number;
+  sold: number;
+}
+
+export interface ChainState {
+  shipments: Shipment[];
+  nextShip: number;
+  dealers: Partial<Record<DealerId, DealerStock>>;
+  /** Smoothed net income per second, for the HUD. */
+  rate: number;
+  /** The FIRST CAR COMPLETED moment has been shown. */
+  firstCar: boolean;
 }
 
 export interface CityState {
@@ -249,7 +319,6 @@ export interface GameState {
   /** Total empire points ever earned — the prestige formula subtracts it. */
   empirePointsEarned: number;
   prestigeCount: number;
-  factories: Record<FactoryId, FactoryState>;
   dealers: Record<DealerId, DealerState>;
   managers: Record<ManagerId, ManagerState>;
   carModels: Record<CarId, number>;
@@ -263,6 +332,7 @@ export interface GameState {
   run: Stats;
   lifetime: Stats;
   city: CityState;
+  chain: ChainState;
   pendingOffline: OfflineReport | null;
   settings: { buyAmount: BuyAmount; lang: Lang };
   createdAt: number;
@@ -272,6 +342,7 @@ export interface GameState {
 
 /** Things that happened during a tick — consumed by the UI for juice. */
 export type GameEvent =
-  | { type: "sale"; factory: FactoryId; car: CarId; count: number; amount: number; premium: boolean }
+  | { type: "sale"; plot: string; item: ItemId; count: number; amount: number }
+  | { type: "carBuilt"; plot: string; car: CarId; first: boolean }
   | { type: "achievement"; id: string }
   | { type: "carUnlocked"; car: CarId };

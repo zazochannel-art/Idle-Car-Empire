@@ -1,5 +1,4 @@
 import { ACHIEVEMENTS, type Condition } from "../config/achievements";
-import { FACTORIES } from "../config/factories";
 import {
   DAILY_COUNT,
   DAILY_REWARD_SECONDS,
@@ -9,6 +8,7 @@ import {
 } from "../config/missions";
 import { RESEARCH } from "../config/research";
 import type { GameState, MetricId, MissionState, Reward } from "../types";
+import { plantsOf } from "./chain";
 import { passiveIncome, snapshot, unlockedCarIds, type EconomySnapshot } from "./economy";
 import { formatMoney, formatNumber } from "../format";
 
@@ -29,13 +29,25 @@ export function metric(s: GameState, id: MetricId, snap?: EconomySnapshot): numb
     case "prestigeCount":
       return s.prestigeCount;
     case "factoriesOwned":
-      return FACTORIES.filter((f) => s.factories[f.id].owned).length;
+      return plantsOf(s).length;
     case "dealersOwned":
       return Object.values(s.dealers).filter((d) => d.owned).length;
     case "maxFactoryLevel":
-      return Math.max(...FACTORIES.filter((f) => s.factories[f.id].owned).map((f) => s.factories[f.id].level));
+      return Math.max(0, ...plantsOf(s).map(([, b]) => b.level));
     case "carsUnlocked":
       return unlockedCarIds(s, (snap ?? snapshot(s)).gm).size;
+    case "bodiesProduced":
+      return s.lifetime.parts.body;
+    case "enginesProduced":
+      return s.lifetime.parts.engine;
+    case "componentsProduced":
+      return Object.values(s.lifetime.parts).reduce((a, b) => a + b, 0);
+    case "deliveries":
+      return s.lifetime.deliveries;
+    case "carsSold":
+      return s.lifetime.carsSold;
+    case "plantTypes":
+      return new Set(plantsOf(s).map(([, b]) => b.type)).size;
   }
 }
 
@@ -45,10 +57,6 @@ export function conditionProgress(s: GameState, c: Condition, snap: EconomySnaps
       return { value: metric(s, c.metric, snap), target: c.target };
     case "carType":
       return { value: s.lifetime.carsByType[c.car], target: c.target };
-    case "continents": {
-      const set = new Set(FACTORIES.filter((f) => s.factories[f.id].owned).map((f) => f.continent));
-      return { value: set.size, target: c.target };
-    }
     case "income":
       return { value: snap.incomePerSec, target: c.target };
     case "empirePoints":
@@ -113,7 +121,7 @@ export function generateDaily(s: GameState, now: number, snap?: EconomySnapshot)
   const key = dateKey(now);
   const rand = seeded(`${key}:${s.createdAt}`);
   const researchLeft = RESEARCH.some((r) => !s.research.includes(r.id));
-  const pool = DAILY_TEMPLATES.filter((t) => t.metric !== "researchDone" || researchLeft);
+  const pool = DAILY_TEMPLATES.filter((t) => (t.metric !== "researchDone" || researchLeft) && (t.metric !== "carsProduced" || eco.carsPerSec > 0));
   const picked: typeof pool = [];
   while (picked.length < Math.min(DAILY_COUNT, pool.length)) {
     const t = pool[Math.floor(rand() * pool.length)];
@@ -123,7 +131,8 @@ export function generateDaily(s: GameState, now: number, snap?: EconomySnapshot)
   return picked.map((t, i) => {
     let target: number;
     if ("seconds" in t) {
-      const rate = t.metric === "carsProduced" ? Math.max(eco.carsPerSec, 0.1) : income;
+      const parts = Object.values(eco.chain.plants).reduce((a, p) => (p.type === "assemblyPlant" ? a : a + p.unitsPerSec), 0);
+      const rate = t.metric === "carsProduced" ? eco.carsPerSec : t.metric === "moneyEarned" ? income : Math.max(parts, 0.05) * 0.6;
       target = niceNumber(Math.max(t.min, rate * t.seconds));
     } else {
       target = t.amount;

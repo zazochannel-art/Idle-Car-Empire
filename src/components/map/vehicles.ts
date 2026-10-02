@@ -1,4 +1,5 @@
-import { sx, sy, type Painter } from "./iso";
+import type { CarId } from "@/game/types";
+import { shade, sx, sy, type Painter } from "./iso";
 
 /** 0 = +x, 1 = +y, 2 = -x, 3 = -y. */
 export type Dir = 0 | 1 | 2 | 3;
@@ -214,7 +215,8 @@ export function drawTruck(p: Painter, x: number, y: number, dir: Dir, cargo: str
   const drawCargo = () => {
     along(p, cx(back), cy(back), dir, 0.62 * s, 0.3 * s, 0, 2 * s, 9 * s, cargo, "#f1f5f9");
     // ribbed side panels
-    for (let i = 1; i < 6; i++) along(p, cx(back - 0.31 * s + i * 0.1 * s), cy(back - 0.31 * s + i * 0.1 * s), dir, 0.008 * s, 0.305 * s, 0, 2.5 * s, 8 * s, "rgba(0,0,0,0.12)");
+    const rib = shade(cargo, -0.14);
+    for (let i = 1; i < 6; i++) along(p, cx(back - 0.31 * s + i * 0.1 * s), cy(back - 0.31 * s + i * 0.1 * s), dir, 0.008 * s, 0.305 * s, 0, 2.5 * s, 8 * s, rib, rib);
   };
   const drawCab = () => {
     along(p, cx(front), cy(front), dir, 0.2 * s, 0.28 * s, 0, 2 * s, 7.5 * s, "#e2e8f0", "#cbd5e1");
@@ -261,3 +263,16 @@ export function drawCarrier(p: Painter, x: number, y: number, dir: Dir, colors: 
   parts.sort((a, b) => a[0] * sgn - b[0] * sgn);
   for (const [, draw] of parts) draw();
 }
+
+/** How each car model of the game looks on the map. */
+export const CAR_MODEL_FOR: Record<CarId, CarModel> = {
+  city: "city",
+  sedan: "sedan",
+  suv: "suv",
+  sports: "sports",
+  luxury: "luxury",
+  perfSuv: "muscle",
+  supercar: "supercar",
+  hypercar: "hypercar",
+  electric: "electric",
+};
