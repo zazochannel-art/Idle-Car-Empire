@@ -2,15 +2,16 @@
 // one drawable per plot/cell, depth-sorted by the renderer. Ground (zones,
 // roads, sidewalks) is drawn separately and first.
 import { SPEC_BY_ID, STRUCTURE_BY_ID, ZONES, ZONE_BY_ID } from "@/game/config/city";
-import { FACTORIES, FACTORY_BY_ID } from "@/game/config/factories";
 import { DEALER_BY_ID } from "@/game/config/dealerships";
+import { isPlantType } from "@/game/config/chain";
 import { BLOCKS, NODES, RIVER, ROAD_STEP, WORLD, WORLD_MAP, blockKind, hasRoad, hash, segmentSides, zoneCenterTile, zoneOfBlock, type Decor, type Plot, type Scenery } from "@/game/city/layout";
 import { coastline } from "./terrain";
-import { isFactoryAvailable, type EconomySnapshot } from "@/game/engine/economy";
-import type { BuildingState, GameState, StructureType, ZoneId } from "@/game/types";
+import type { EconomySnapshot } from "@/game/engine/economy";
+import type { BuildingState, CarId, GameState, StructureType, ZoneId } from "@/game/types";
+import { drawDepot, drawMarket, drawPlant, plantBadge } from "./plants";
 import { Painter, rand, sx, sy } from "./iso";
-import { CAR_COLORS, drawCar, drawModel, drawTruck, type CarModel, type Dir } from "./vehicles";
-import { barrier, beacon, bench, billboard, birds, bush, container, drum, fence, flagPole, flowerBed, forklift, ledStrip, lightPole, planter, robotArm, tireStack, wallLamp } from "./props";
+import { CAR_COLORS, CAR_MODEL_FOR, drawCar, drawModel, drawTruck, type CarModel, type Dir } from "./vehicles";
+import { barrier, beacon, bench, billboard, birds, bush, container, drum, fence, flagPole, flowerBed, ledStrip, lightPole, planter, tireStack, wallLamp } from "./props";
 
 export interface DrawInfo {
   zoom: number;
@@ -37,7 +38,10 @@ export interface Drawable {
 
 export interface SceneNames {
   garage: (no: number) => string;
-  factory: (id: keyof typeof FACTORY_BY_ID) => string;
+  /** "Engine Factory #2" for the plant on a plot. */
+  plant: (plotId: string) => string;
+  market: string;
+  depot: string;
   dealer: (id: keyof typeof DEALER_BY_ID) => string;
   structure: (type: StructureType) => string;
   level: (n: number) => string;
@@ -282,125 +286,7 @@ function garage(p: Painter, plot: Plot, b: BuildingState, active: boolean, t: nu
   }
 }
 
-function factoryLot(p: Painter, plot: Plot, owned: boolean, level: number, t: number, seed: number) {
-  const id = plot.factory!;
-  const cfg = FACTORY_BY_ID[id];
-  const { x, y, w, d } = plot;
-  const X = x + M;
-  const Y = y + M;
-  const W = w - 2 * M;
-  const D = d - 2 * M;
-  if (!owned) {
-    p.quad(X, Y, W, D, p.col("#b08d5b"));
-    p.quad(X + 0.3, Y + 0.3, W - 0.6, D - 0.6, p.col("#c4a274"));
-    p.quadStroke(X + 0.1, Y + 0.1, W - 0.2, D - 0.2, p.col("#f59e0b"), 1.5, [4, 4]);
-    if (w > 3) {
-      // crane, beams and a foundation slab
-      p.box(X + 0.6, Y + 0.6, W * 0.45, D * 0.4, 0, 3, "#cbd5e1");
-      p.box(X + W - 1.2, Y + 0.5, 0.6, 0.3, 0, 5, "#a16207");
-      p.box(X + W - 1.2, Y + 0.9, 0.6, 0.3, 0, 5, "#a16207");
-      const mx = X + W - 0.8;
-      const my = Y + D - 1.2;
-      p.box(mx, my, 0.18, 0.18, 0, 78, "#facc15");
-      const c = p.ctx;
-      c.strokeStyle = p.col("#eab308");
-      c.lineWidth = 2;
-      c.beginPath();
-      c.moveTo(sx(mx + 0.09, my + 0.09) - 50, sy(mx + 0.09, my + 0.09, 78));
-      c.lineTo(sx(mx + 0.09, my + 0.09) + 18, sy(mx + 0.09, my + 0.09, 78));
-      c.stroke();
-      const swing = p.dim ? 0 : Math.sin(t * 0.6 + seed * 6) * 6;
-      c.strokeStyle = p.col("#334155");
-      c.lineWidth = 0.8;
-      c.beginPath();
-      c.moveTo(sx(mx, my) - 36 + swing, sy(mx, my, 78));
-      c.lineTo(sx(mx, my) - 36 + swing, sy(mx, my, 40));
-      c.stroke();
-    } else {
-      p.box(X + 0.4, Y + 0.4, 1.2, 0.9, 0, 3, "#cbd5e1");
-    }
-    return;
-  }
-
-  p.quad(X, Y, W, D, p.col("#9ca3af"));
-  if (w <= 3) {
-    // Assembly Workshop: a small shed with a gabled roof.
-    p.shadow(X + 0.2, Y + 0.2, 1.9, 1.4, 22);
-    p.box(X + 0.2, Y + 0.2, 1.9, 1.4, 0, 18, "#f1e7d6");
-    p.gable(X + 0.2, Y + 0.2, 1.9, 1.4, 18, 10, "#b45309");
-    doors(p, X + 0.2, Y + 1.6, 1.9, 2, 12, true, t);
-    p.box(X + 0.3, Y + 1.85, 1.6, 0.25, 0, 3, "#475569");
-    drawCar(p, X + 0.7 + ((t * 0.15) % 1) * 0.9, Y + 1.97, 0, cfg.accent);
-    return;
-  }
-
-  // later plants are visibly bigger: taller halls, extra wings, a tower
-  const tierIdx = FACTORIES.findIndex((f) => f.id === id);
-  const hall = { x: X + 0.25, y: Y + 0.25, w: 3.3, d: 2.9, h: 34 + tierIdx * 4 };
-  p.shadow(hall.x, hall.y, hall.w, hall.d, hall.h);
-  const big = level >= 25 || tierIdx >= 4;
-  if (big) p.shadow(X + 3.75, Y + 0.25, 1.35, 1.9, 26);
-  p.shadow(X + 3.75, Y + 2.45, 1.35, 1.2, 44);
-  p.box(hall.x, hall.y, hall.w, hall.d, 0, hall.h, "#e5e7eb", "#94a3b8");
-  p.sawtooth(hall.x, hall.y, hall.w, hall.d, hall.h, 4, 9, "#b6c2d1");
-  p.onLeft(hall.x, hall.y + hall.d, 0, 0, hall.w, hall.h - 5, hall.h - 2, p.col(cfg.accent));
-  doors(p, hall.x, hall.y + hall.d, hall.w, 4, 18, true, t);
-  cyl(p, hall.x + 0.5, hall.y + 0.5, hall.h, 5, 34, "#9ca3af");
-  cyl(p, hall.x + 1.1, hall.y + 0.45, hall.h, 4, 26, "#a1a1aa");
-  smoke(p, hall.x + 0.5, hall.y + 0.5, hall.h + 36, t, seed);
-  smoke(p, hall.x + 1.1, hall.y + 0.45, hall.h + 28, t, seed + 0.4);
-  if (big) {
-    p.box(X + 3.75, Y + 0.25, 1.35, 1.9, 0, 26, "#e2e8f0");
-    p.gable(X + 3.75, Y + 0.25, 1.35, 1.9, 26, 8, "#64748b");
-  } else {
-    cyl(p, X + 4.2, Y + 0.9, 0, 9, 30, "#d1d5db");
-    cyl(p, X + 4.7, Y + 1.5, 0, 9, 30, "#d1d5db");
-  }
-  p.box(X + 3.75, Y + 2.45, 1.35, 1.2, 0, 44, "#f8fafc");
-  p.windows(X + 3.75, Y + 2.45, 1.35, 1.2, 0, 44, 4, "#38bdf8", 2);
-  p.onLeft(X + 3.75, Y + 3.65, 0, 0, 1.35, 40, 44, p.col(cfg.accent));
-  emojiAt(p, cfg.emoji, X + 4.42, Y + 3.0, 58, 16);
-  if (level >= 100) {
-    cyl(p, X + 4.6, Y + 4.6, 0, 7, 24, "#e5e7eb");
-  }
-  beacon(p, hall.x + 0.1, hall.y + hall.d - 0.1, hall.h + 2, t);
-  beacon(p, hall.x + hall.w - 0.1, hall.y + hall.d - 0.1, hall.h + 2, t + 1.3);
-  if (tierIdx >= 8) {
-    // the global plants get a headquarters tower
-    p.shadow(X + 4.4, Y + 4.3, 0.8, 0.8, 120);
-    p.box(X + 4.4, Y + 4.3, 0.8, 0.8, 0, 110, "#93c5fd", "#1e3a8a");
-    p.windows(X + 4.4, Y + 4.3, 0.8, 0.8, 0, 110, 12, "#1d4ed8", 2);
-    beacon(p, X + 4.8, Y + 4.7, 112, t, "#ef4444");
-  }
-
-  // production line: finished cars roll out of the hall on a conveyor,
-  // robots work on them, then they're loaded onto trucks
-  const model = FACTORY_MODEL[Math.min(FACTORY_MODEL.length - 1, cfg.baseTier - 1)];
-  const beltY = Y + 3.35;
-  p.box(X + 0.3, beltY - 0.2, 3.2, 0.4, 0, 3, "#334155", "#1f2937");
-  for (let i = 0; i < 16; i++) {
-    const u = (i / 16 + t * 0.05) % 1;
-    p.line(X + 0.3 + u * 3.2, beltY - 0.19, X + 0.3 + u * 3.2, beltY + 0.19, "rgba(148,163,184,0.5)", 1, 3);
-  }
-  for (let i = 0; i < 3; i++) {
-    const u = (i / 3 + t * 0.05) % 1;
-    drawModel(p, X + 0.5 + u * 2.9, beltY, 0, model, CAR_COLORS[(i * 3 + tierIdx) % CAR_COLORS.length], 0.95, { lift: 3, noShadow: true });
-  }
-  robotArm(p, X + 1.2, beltY - 0.45, t, true);
-  robotArm(p, X + 2.3, beltY - 0.45, t + 0.7, true);
-  robotArm(p, X + 1.75, beltY + 0.48, t + 1.4, true);
-  container(p, X + 3.9, Y + 3.9, true, cfg.accent);
-  container(p, X + 3.9, Y + 4.35, true, "#64748b");
-  container(p, X + 3.9, Y + 3.9, true, "#e5e7eb", 8);
-  drawTruck(p, X + 0.9, Y + 4.4, 3, cfg.accent);
-  drawTruck(p, X + 1.9, Y + 4.4, 3, "#f8fafc");
-  forklift(p, X + 2.7, Y + 4.25, X + 3.6, Y + 4.25, t, seed);
-  parkedCars(p, X + 0.6, Y + 5.0, 5, seed, 1, 0.6);
-}
-
-const FACTORY_MODEL: CarModel[] = ["city", "sedan", "suv", "sports", "supercar", "hypercar", "electric", "hypercar"];
-
-function dealerLot(p: Painter, plot: Plot, owned: boolean, t: number, seed: number) {
+function dealerLot(p: Painter, plot: Plot, owned: boolean, t: number, seed: number, stock: CarId[] = [], next = 0) {
   const id = plot.dealer!;
   const cfg = DEALER_BY_ID[id];
   const X = plot.x + M;
@@ -425,10 +311,17 @@ function dealerLot(p: Painter, plot: Plot, owned: boolean, t: number, seed: numb
   p.onLeft(X + 0.1, Y + 1.3, h, 0.3, 1.9, 0.2, 2.8, p.col(tiers >= 3 ? "#eab308" : "#2563eb"));
   // the showroom glows at night; better dealers show better cars
   p.light(sx(X + 1.2, Y + 1.25), sy(X + 1.2, Y + 1.25, h / 2), 40, "#bfe3ff", 0.55);
-  const lineup = DEALER_MODELS[Math.max(0, tiers)];
-  drawModel(p, X + 0.7, Y + 0.7, 0, lineup[0], CAR_COLORS[(tiers + 1) % CAR_COLORS.length], 1);
-  drawModel(p, X + 1.6, Y + 0.75, 0, lineup[1], CAR_COLORS[(tiers + 4) % CAR_COLORS.length], 1);
-  for (let i = 0; i < 4; i++) drawModel(p, X + 0.35 + i * 0.55, Y + 1.85, 1, lineup[i % lineup.length], CAR_COLORS[(i * 3 + Math.floor(seed * 10) + tiers) % CAR_COLORS.length], 1, { lights: false });
+  // the cars actually in stock: two in the showroom, the rest on the forecourt
+  const cars = stock.map((m) => CAR_MODEL_FOR[m]);
+  if (cars[0]) drawModel(p, X + 0.7, Y + 0.7, 0, cars[0], CAR_COLORS[(tiers + 1) % CAR_COLORS.length], 1);
+  if (cars[1]) drawModel(p, X + 1.6, Y + 0.75, 0, cars[1], CAR_COLORS[(tiers + 4) % CAR_COLORS.length], 1);
+  for (let i = 2; i < Math.min(6, cars.length); i++) drawModel(p, X + 0.35 + (i - 2) * 0.55, Y + 1.85, 1, cars[i], CAR_COLORS[(i * 3 + Math.floor(seed * 10) + tiers) % CAR_COLORS.length], 1, { lights: false });
+  // customers looking at the cars; one walks in shortly before each sale
+  if (cars.length && p.zoom > 0.55) {
+    p.person(X + 0.55 + Math.sin(t * 0.7) * 0.2, Y + 1.5, "#f472b6", t * 2);
+    const k = Math.max(0, Math.min(1, 1 - next / 4));
+    p.person(X + W - 0.2 - k * 0.9, Y + D - 0.25 - k * 0.7, "#22d3ee", t * 3);
+  }
   lightPole(p, X + W - 0.05, Y + D - 0.6);
   flag(p, X + 0.05, Y + D - 0.1, tiers >= 3 ? "#eab308" : "#ef4444", t);
   flag(p, X + W - 0.1, Y + D - 0.1, "#3b82f6", t + 1);
@@ -436,14 +329,6 @@ function dealerLot(p: Painter, plot: Plot, owned: boolean, t: number, seed: numb
   emojiAt(p, cfg.emoji, X + W - 0.22, Y + 0.28, 40, 13);
 }
 
-const DEALER_MODELS: CarModel[][] = [
-  ["city", "sedan"],
-  ["sedan", "suv"],
-  ["luxury", "sports"],
-  ["luxury", "muscle"],
-  ["supercar", "sports"],
-  ["hypercar", "electric"],
-];
 
 function structure(p: Painter, plot: Plot, b: BuildingState, t: number, seed: number) {
   const X = plot.x + M;
@@ -1159,7 +1044,7 @@ function lamp(p: Painter, x: number, y: number, t: number) {
 
 // ───────────────────────────── scene ─────────────────────────────
 
-export function buildScene(state: GameState, snap: EconomySnapshot, names: SceneNames): Drawable[] {
+export function buildScene(state: GameState, snap: EconomySnapshot, names: SceneNames, live: () => GameState = () => state): Drawable[] {
   const out: Drawable[] = [];
   const unlocked = new Set(state.city.zones);
 
@@ -1198,32 +1083,28 @@ export function buildScene(state: GameState, snap: EconomySnapshot, names: Scene
   for (const plot of WORLD_MAP.plots) {
     const seed = rand(plot.x, plot.y);
     const isOpen = unlocked.has(plot.zone);
-    const hitH = plot.kind === "factory" ? 60 : 30;
+    const tall = plot.big || !!state.city.buildings[plot.id]?.plant;
+    const hitH = plot.big ? 60 : 30;
     const base = {
       depth: plot.x + plot.w / 2 + plot.y + plot.d / 2,
       zone: plot.zone,
-      bbox: bboxOf(plot.x, plot.y, plot.w, plot.d, plot.kind === "factory" ? 160 : 70),
+      bbox: bboxOf(plot.x, plot.y, plot.w, plot.d, tall ? 170 : 70),
       pickId: plot.id,
       hit: { x: plot.x + 0.2, y: plot.y + 0.2, w: plot.w - 0.4, d: plot.d - 0.4, h: hitH },
     };
-    if (plot.kind === "factory") {
-      const id = plot.factory!;
-      const f = state.factories[id];
-      const available = isFactoryAvailable(snap.gm, id);
+    if (plot.kind === "market" || plot.kind === "depot") {
+      const market = plot.kind === "market";
       out.push({
         ...base,
-        sig: f.owned ? "built" : "lot",
-        announce: names.factory(id),
+        sig: "built",
         draw: (p, info) => {
-          factoryLot(p, plot, f.owned, f.level, info.t, seed);
-          if (info.selected === plot.id) p.quadStroke(plot.x + 0.15, plot.y + 0.15, plot.w - 0.3, plot.d - 0.3, "#fbbf24", 2.5);
+          if (market) drawMarket(p, plot, info.t);
+          else drawDepot(p, plot, info.t);
+          if (info.selected === plot.id) p.quadStroke(plot.x + 0.2, plot.y + 0.2, plot.w - 0.4, plot.d - 0.4, "#fbbf24", 2.5);
         },
         label: (p, info) => {
-          if (!isOpen || info.zoom < 0.5) return;
-          const cx = plot.x + plot.w / 2;
-          const cy = plot.y + plot.d / 2;
-          if (f.owned) p.tag(info.zoom < 0.8 ? names.level(f.level) : `${names.factory(id)} · ${names.level(f.level)}`, cx, cy, plot.w > 3 ? 92 : 46, { icon: FACTORY_BY_ID[id].emoji });
-          else p.tag(names.money(FACTORY_BY_ID[id].cost), cx, cy, 40, { icon: available ? "🏗️" : "🔒", bg: "rgba(120,53,15,0.85)", fg: "#fde68a" });
+          if (info.zoom < 0.5) return;
+          p.tag(market ? names.market : names.depot, plot.x + plot.w / 2, plot.y + plot.d / 2, 52, { icon: market ? "💰" : "🏗️", bg: market ? "rgba(21,128,61,0.9)" : "rgba(146,64,14,0.9)" });
         },
       });
     } else if (plot.kind === "dealer") {
@@ -1234,7 +1115,8 @@ export function buildScene(state: GameState, snap: EconomySnapshot, names: Scene
         sig: dl.owned ? "built" : "lot",
         announce: names.dealer(id),
         draw: (p, info) => {
-          dealerLot(p, plot, dl.owned, info.t, seed);
+          const stock = live().chain.dealers[id];
+          dealerLot(p, plot, dl.owned, info.t, seed, stock?.models, stock?.next);
           if (info.selected === plot.id) p.quadStroke(plot.x + 0.2, plot.y + 0.2, plot.w - 0.4, plot.d - 0.4, "#fbbf24", 2.5);
         },
         label: (p, info) => {
@@ -1242,7 +1124,8 @@ export function buildScene(state: GameState, snap: EconomySnapshot, names: Scene
           const cx = plot.x + plot.w / 2;
           const cy = plot.y + plot.d / 2;
           if (dl.owned) p.tag(`${names.dealer(id)} · ${names.level(dl.level)}`, cx, cy, 52, { icon: DEALER_BY_ID[id].emoji });
-          else p.tag(names.money(DEALER_BY_ID[id].cost), cx, cy, 24, { icon: "🏪", bg: "rgba(120,53,15,0.85)", fg: "#fde68a" });
+          else if (live().chain.firstCar || live().lifetime.carsProduced > 0) p.tag(names.money(DEALER_BY_ID[id].cost), cx, cy, 24, { icon: "🏪", bg: "rgba(120,53,15,0.85)", fg: "#fde68a" });
+          else if (info.zoom >= 0.9) p.tag("🔒", cx, cy, 24, { bg: "rgba(15,23,42,0.75)", size: 10 });
         },
       });
     } else {
@@ -1273,6 +1156,29 @@ export function buildScene(state: GameState, snap: EconomySnapshot, names: Scene
             c.lineTo(px, py + 4);
             c.lineWidth = 2;
             c.stroke();
+          },
+        });
+      } else if (b.plant && isPlantType(b.type)) {
+        const type = b.type;
+        out.push({
+          ...base,
+          sig: `${type}:${b.level}`,
+          announce: `${names.plant(plot.id)} · ${names.level(b.level)}`,
+          draw: (p, info) => {
+            const now = live().city.buildings[plot.id];
+            const pl = now?.plant ?? null;
+            const st = snap.chain.plants[plot.id];
+            drawPlant(p, plot, { type, level: b.level, plant: pl, fill: pl && st ? Math.min(1, pl.out / st.outCap) : 0, car: st?.car?.id ?? null }, info.t, seed);
+            if (info.selected === plot.id) p.quadStroke(plot.x + 0.2, plot.y + 0.2, plot.w - 0.4, plot.d - 0.4, "#fbbf24", 2.5);
+          },
+          label: (p, info) => {
+            if (!isOpen || info.zoom < 0.32) return;
+            const cx = plot.x + plot.w / 2;
+            const cy = plot.y + plot.d / 2;
+            const text = info.zoom < 0.9 ? names.level(b.level) : `${names.plant(plot.id)} · ${names.level(b.level)}`;
+            p.tag(text, cx, cy, (plot.big ? 110 : 64) + b.level * 4, { icon: STRUCTURE_BY_ID[type].emoji, bg: "rgba(15,23,42,0.85)" });
+            const pl = live().city.buildings[plot.id]?.plant;
+            if (pl) plantBadge(p, plot, pl, info.zoom, info.t);
           },
         });
       } else if (b.type === "garage") {
@@ -1402,6 +1308,7 @@ export function drawPreview(p: Painter, plotId: string, type: StructureType, t: 
   c.globalAlpha = 0.55 + 0.15 * Math.sin(t * 4);
   const b: BuildingState = type === "garage" ? { type, level: 1, garage: { no: 0, spec: "repair", workers: 0, facilities: [], carry: 0, serviced: 0, earned: 0 } } : { type, level: 1 };
   if (type === "garage") garage(p, plot, b, false, t);
+  else if (isPlantType(type)) drawPlant(p, plot, { type, level: 1, plant: null, fill: 0, car: null }, t, 0.5);
   else structure(p, plot, b, t, 0.5);
   c.restore();
   p.quadStroke(plot.x + 0.2, plot.y + 0.2, plot.w - 0.4, plot.d - 0.4, "#4ade80", 2.5);

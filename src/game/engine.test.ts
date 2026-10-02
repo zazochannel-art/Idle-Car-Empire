@@ -1,18 +1,34 @@
 import { describe, expect, it } from "vitest";
-import { CAR_BY_ID } from "./config/cars";
-import { OFFLINE, PRESTIGE } from "./config/prestige";
+import { MAX_WAIT, PLANT_BY_ID } from "./config/chain";
+import { PRESTIGE } from "./config/prestige";
+import { DEPOT, MARKET, STARTER_PLOT, WORLD_MAP } from "./city/layout";
 import * as A from "./engine/actions";
-import { ensureZonesUpTo } from "./engine/city";
-import { geometricCost, isAutomated, maxAffordable, snapshot, unlockedCarIds, upgradeCost } from "./engine/economy";
-import { computeOffline, collectOffline, settleOffline } from "./engine/offline";
+import * as Ch from "./engine/chain";
+import * as C from "./engine/city";
+import { geometricCost, maxAffordable, snapshot } from "./engine/economy";
+import { collectOffline, settleOffline } from "./engine/offline";
 import { canPrestige, pendingPoints, prestige } from "./engine/prestige";
 import { checkAchievements, claimDaily, dailyProgress, refreshDaily } from "./engine/progress";
 import { createInitialState } from "./engine/state";
 import { tick } from "./engine/tick";
 import { formatMoney, formatNumber } from "./format";
 import { decodeSave, encodeSave, migrate } from "./save/serialize";
+import type { GameEvent, GameState, PlantType } from "./types";
 
 const T0 = Date.UTC(2026, 0, 1, 12);
+const freePlots = () => WORLD_MAP.plots.filter((p) => p.zone === "town" && p.kind === "plot" && !p.starter && !p.big).map((p) => p.id);
+
+/** Runs the game in small steps, as the store does. */
+function run(s: GameState, seconds: number, step = 0.5): GameEvent[] {
+  const events: GameEvent[] = [];
+  for (let t = 0; t < seconds; t += step) events.push(...tick(s, step));
+  return events;
+}
+
+function build(s: GameState, plot: string, type: PlantType) {
+  s.cash += Ch.plantBuildCost(s, type);
+  expect(C.buildStructure(s, plot, type)).toBe(true);
+}
 
 describe("number formatting", () => {
   it("uses compact suffixes", () => {
@@ -23,130 +39,218 @@ describe("number formatting", () => {
     expect(formatMoney(2.8e12)).toBe("$2.8T");
     expect(formatNumber(1e40)).toMatch(/^[\d.]+[a-z]{2}$/);
   });
-});
 
-describe("costs", () => {
   it("geometric helpers agree", () => {
     const n = maxAffordable(25, 1.22, 10_000);
     expect(geometricCost(25, 1.22, n)).toBeLessThanOrEqual(10_000);
     expect(geometricCost(25, 1.22, n + 1)).toBeGreaterThan(10_000);
   });
+});
 
-  it("garage upgrades follow the $100 → $300 → $1,000 curve", () => {
+describe("the start: a small car body works", () => {
+  it("a new company owns only the Small Car Body Works, stocked with steel", () => {
     const s = createInitialState(T0);
-    expect(upgradeCost(s, "garage", "production")).toBe(100);
-    s.factories.garage.upgrades.production = 1;
-    expect(upgradeCost(s, "garage", "production")).toBe(300);
-    s.factories.garage.upgrades.production = 2;
-    expect(upgradeCost(s, "garage", "production")).toBe(1000);
+    const b = s.city.buildings[STARTER_PLOT];
+    expect(b.type).toBe("bodyWorks");
+    expect(b.level).toBe(1);
+    expect(Ch.plantsOf(s)).toHaveLength(1);
+    expect(b.plant!.raw).toBeGreaterThan(0);
+    expect(s.cash).toBe(0);
+    expect(Object.values(s.dealers).some((d) => d.owned)).toBe(false);
+  });
+
+  it("makes a body every 30s and a truck sells it at the Body Market for $150", () => {
+    const s = createInitialState(T0);
+    run(s, 29);
+    expect(s.lifetime.parts.body).toBe(0);
+    run(s, 2);
+    expect(s.lifetime.parts.body).toBe(1);
+    expect(s.city.buildings[STARTER_PLOT].plant!.out).toBe(1);
+    // the truck waits a little for a fuller load, then drives to the market
+    run(s, MAX_WAIT + 1);
+    const truck = s.chain.shipments.find((sh) => sh.from === STARTER_PLOT);
+    expect(truck).toMatchObject({ to: MARKET, item: "body", qty: 1, back: false });
+    expect(s.cash).toBe(0);
+    const events = run(s, truck!.dur - truck!.t + 0.6);
+    expect(s.cash).toBeCloseTo(150);
+    expect(events.some((e) => e.type === "sale" && e.plot === MARKET && e.amount === 150)).toBe(true);
+    expect(s.lifetime.deliveries).toBe(1);
+    // and comes back empty
+    expect(s.chain.shipments.find((sh) => sh.from === STARTER_PLOT)?.back).toBe(true);
+  });
+
+  it("buys steel from the depot when it runs low, and stops without cash", () => {
+    const s = createInitialState(T0);
+    const p = s.city.buildings[STARTER_PLOT].plant!;
+    p.raw = 30; // three bodies' worth
+    Ch.setRoute(s, STARTER_PLOT, "store"); // no sales, so no cash
+    run(s, 100);
+    expect(s.chain.shipments.some((sh) => sh.from === DEPOT)).toBe(false); // couldn't pay
+    expect(p.raw).toBe(0);
+    expect(p.status).toBe("noRaw");
+    s.cash = 10_000;
+    run(s, 1);
+    const supply = s.chain.shipments.find((sh) => sh.from === DEPOT);
+    expect(supply?.item).toBe("raw");
+    expect(s.cash).toBeLessThan(10_000); // paid when the truck left
+    run(s, supply!.dur + 1);
+    expect(p.raw).toBeGreaterThan(0);
+    run(s, 31);
+    expect(p.status).toBe("ok");
+  });
+
+  it("STORE keeps goods at the plant and pauses production when full", () => {
+    const s = createInitialState(T0);
+    expect(Ch.setRoute(s, STARTER_PLOT, "store")).toBe(true);
+    s.cash = 1e6;
+    const st = snapshot(s).chain.plants[STARTER_PLOT];
+    run(s, st.cycle * (st.outCap + 2));
+    const p = s.city.buildings[STARTER_PLOT].plant!;
+    expect(p.out).toBe(st.outCap);
+    expect(p.status).toBe("full");
+    expect(s.chain.shipments.some((sh) => sh.from === STARTER_PLOT)).toBe(false);
+    Ch.setRoute(s, STARTER_PLOT, "sell");
+    run(s, 2);
+    expect(s.chain.shipments.some((sh) => sh.from === STARTER_PLOT && sh.to === MARKET)).toBe(true);
+  });
+
+  it("upgrades: levels add lines, speed shortens the cycle, trucks and grades", () => {
+    const s = createInitialState(T0);
+    s.cash = 1e12;
+    const gm = snapshot(s).gm;
+    const before = snapshot(s).chain.plants[STARTER_PLOT];
+    expect(Ch.upgradePlantLevel(s, STARTER_PLOT, gm)).toBe(true);
+    expect(Ch.upgradePlantSpeed(s, STARTER_PLOT, gm)).toBe(true);
+    expect(Ch.upgradeAutomation(s, STARTER_PLOT, gm)).toBe(true);
+    expect(Ch.buyTruck(s, STARTER_PLOT, gm)).toBe(true);
+    expect(Ch.upgradeGrade(s, STARTER_PLOT, gm)).toBe(true);
+    const after = snapshot(s).chain.plants[STARTER_PLOT];
+    expect(after.lines).toBe(2);
+    expect(after.unitsPerSec).toBeGreaterThan(before.unitsPerSec * 2);
+    expect(after.unitValue).toBeCloseTo(before.unitValue * 2.5);
+    expect(s.city.buildings[STARTER_PLOT].plant!.fleet).toBe(2);
   });
 });
 
-describe("production", () => {
-  it("the first car is built by hand in 10s and earns $50", () => {
+describe("growing the chain", () => {
+  it("plants unlock in order: engine after body works, then interior…", () => {
     const s = createInitialState(T0);
-    expect(isAutomated(s, "garage")).toBe(false);
-    tick(s, 20);
-    expect(s.cash).toBe(0); // nothing happens until BUILD
-    A.startProduction(s, "garage");
-    tick(s, 9.9, () => 1);
+    const [a, b] = freePlots();
+    expect(Ch.plantLock(s, "engineFactory")).toBeNull();
+    expect(Ch.plantLock(s, "interiorFactory")).toEqual({ kind: "plant", plant: "engineFactory" });
+    expect(Ch.plantBuildCost(s, "engineFactory")).toBe(25_000);
+    s.cash = 24_999;
+    expect(C.buildStructure(s, a, "engineFactory")).toBe(false);
+    s.cash = 25_000;
+    expect(C.buildStructure(s, a, "engineFactory")).toBe(true);
     expect(s.cash).toBe(0);
-    tick(s, 0.2, () => 1);
-    expect(s.cash).toBe(CAR_BY_ID.compact.price - CAR_BY_ID.compact.cost);
-    expect(s.factories.garage.running).toBe(false);
-    expect(s.lifetime.carsProduced).toBe(1);
+    expect(Ch.plantLock(s, "interiorFactory")).toBeNull();
+    // a second engine factory costs more
+    expect(Ch.plantBuildCost(s, "engineFactory")).toBe(25_000 * 6);
+    expect(Ch.plantLock(s, "batteryFactory")).not.toBeNull();
+    expect(C.buildStructure(s, b, "assemblyPlant")).toBe(false);
   });
 
-  it("hiring a manager automates the garage", () => {
+  it("without an assembly plant, engines are sold at the market", () => {
     const s = createInitialState(T0);
-    s.cash = 1000;
-    expect(A.hireManager(s, "mike", "garage")).toBe(true);
-    expect(isAutomated(s, "garage")).toBe(true);
-    tick(s, 100, () => 1);
-    expect(s.lifetime.carsProduced).toBeGreaterThanOrEqual(9);
+    const [a] = freePlots();
+    build(s, a, "engineFactory");
+    run(s, 60);
+    expect(s.lifetime.parts.engine).toBeGreaterThan(0);
+    expect(s.chain.shipments.some((sh) => sh.from === a && sh.to === MARKET && sh.item === "engine")).toBe(true);
+  });
+});
+
+/** A company with every plant of the base recipe and an assembly plant. */
+function fullChain() {
+  const s = createInitialState(T0);
+  const plots = freePlots();
+  const types: PlantType[] = ["engineFactory", "interiorFactory", "glassFactory", "tireFactory", "paintFactory", "assemblyPlant"];
+  types.forEach((ty, i) => build(s, plots[i], ty));
+  return { s, assembly: plots[5] };
+}
+
+describe("assembly and sales", () => {
+  it("an assembly plant waits for missing parts, then builds the first car", () => {
+    const { s, assembly } = fullChain();
+    const p = s.city.buildings[assembly].plant!;
+    run(s, 1);
+    expect(p.status).toBe("noParts");
+    expect(p.missing).toBeDefined();
+    // every part arrives by truck…
+    const events = run(s, 400);
+    for (const c of ["body", "engine", "interior", "glass", "tires", "paint"] as const) expect(s.lifetime.parts[c]).toBeGreaterThan(0);
+    expect(s.lifetime.carsProduced).toBeGreaterThan(0);
+    expect(events.filter((e) => e.type === "carBuilt" && e.first)).toHaveLength(1);
+    expect(s.chain.firstCar).toBe(true);
+    // no dealership yet: the cars wait at the plant
+    expect(p.out).toBeGreaterThan(0);
   });
 
-  it("large time steps are counted analytically", () => {
-    const a = createInitialState(T0);
-    a.factories.garage.upgrades.automation = 1;
-    const b = structuredClone(a);
-    tick(a, 3600, () => 1);
-    for (let i = 0; i < 36_000; i++) tick(b, 0.1, () => 1);
-    expect(a.lifetime.carsProduced).toBe(b.lifetime.carsProduced);
+  it("dealerships open after the first car; transporters deliver and customers buy", () => {
+    const { s } = fullChain();
+    s.cash = 1e12;
+    expect(A.buyDealer(s, "local")).toBe(false); // no car yet
+    run(s, 400);
+    expect(A.buyDealer(s, "local")).toBe(true);
+    const earned = s.lifetime.moneyEarned;
+    run(s, 300);
+    expect(s.lifetime.carsSold).toBeGreaterThan(0);
+    expect(s.chain.dealers.local?.sold).toBe(s.lifetime.carsSold);
+    expect(s.lifetime.moneyEarned).toBeGreaterThan(earned);
   });
 
-  it("technology unlocks the next car tier", () => {
-    const s = createInitialState(T0);
-    s.cash = 1e6;
-    expect(unlockedCarIds(s, snapshot(s).gm).has("sedan")).toBe(false);
-    expect(A.buyUpgrade(s, "garage", "technology")).toBe(true);
-    expect(snapshot(s).factories.garage!.car.id).toBe("sedan");
-  });
-
-  it("cannot buy what you cannot afford", () => {
-    const s = createInitialState(T0);
-    expect(A.buyFactory(s, "local")).toBe(false);
-    expect(A.buyLevels(s, "garage", 1)).toBe(0);
-    expect(s.cash).toBe(0);
-  });
-
-  it("electric factory needs research", () => {
-    const s = createInitialState(T0);
-    s.cash = 1e30;
-    expect(A.buyFactory(s, "electricFactory")).toBe(false);
-    s.research.push("battery_cells", "advanced_engines", "electric_motors");
-    // Its lot is in Supercar Valley, which must be unlocked on the map first.
-    expect(A.buyFactory(s, "electricFactory")).toBe(false);
-    ensureZonesUpTo(s, "supercar");
-    expect(A.buyFactory(s, "electricFactory")).toBe(true);
+  it("better cars need better component grades", () => {
+    const { s } = fullChain();
+    const gm = snapshot(s).gm;
+    expect(Ch.availableCars(s, gm).map((c) => c.id)).toEqual(["city", "sedan"]);
+    expect(Ch.carLock(s, { ...Ch.availableCars(s, gm)[0], grade: 2 }, gm)?.kind).toBe("grade");
   });
 });
 
 describe("offline progress", () => {
-  it("only automated factories earn, capped at 12 hours", () => {
+  it("plants keep producing and trucks keep selling while away; money waits for COLLECT", () => {
     const s = createInitialState(T0);
-    expect(computeOffline(s, T0 + 3600_000).money).toBe(0);
-    s.factories.garage.upgrades.automation = 1;
-    const twelve = computeOffline(s, T0 + 12 * 3600_000);
-    const day = computeOffline(s, T0 + 48 * 3600_000);
-    expect(twelve.money).toBeGreaterThan(0);
-    expect(day.cappedSeconds).toBe(OFFLINE.baseCapHours * 3600);
-    expect(day.money).toBeCloseTo(twelve.money);
+    s.cash = 5_000;
+    const report = settleOffline(s, T0 + 3600 * 1000);
+    expect(report).not.toBeNull();
+    expect(report!.components).toBeGreaterThan(50);
+    expect(report!.deliveries).toBeGreaterThan(0);
+    expect(report!.money).toBeGreaterThan(0);
+    const before = s.cash;
+    const paid = collectOffline(s);
+    expect(paid).toBe(report!.money);
+    expect(s.cash).toBeCloseTo(before + paid);
+    expect(s.pendingOffline).toBeNull();
   });
 
-  it("long absences wait for COLLECT, then pay out", () => {
-    const s = createInitialState(T0);
-    s.factories.garage.upgrades.automation = 1;
-    const report = settleOffline(s, T0 + 2 * 3600_000);
-    expect(report).not.toBeNull();
-    expect(s.cash).toBe(0);
-    const paid = collectOffline(s);
-    expect(paid).toBeGreaterThan(0);
-    expect(s.cash).toBe(paid);
-    expect(s.pendingOffline).toBeNull();
-    expect(s.lastActiveAt).toBe(T0 + 2 * 3600_000);
+  it("is capped at the offline limit", () => {
+    const a = createInitialState(T0);
+    const b = createInitialState(T0);
+    a.cash = b.cash = 1e6;
+    const r12 = settleOffline(a, T0 + 12 * 3600 * 1000)!;
+    const r48 = settleOffline(b, T0 + 48 * 3600 * 1000)!;
+    expect(r48.cappedSeconds).toBe(r12.cappedSeconds);
   });
 });
 
 describe("prestige", () => {
-  it("resets the run but keeps permanent progress", () => {
+  it("resets the company but keeps permanent progress", () => {
     const s = createInitialState(T0);
     expect(canPrestige(s)).toBe(false);
-    s.cash = 5e9;
     s.run.moneyEarned = PRESTIGE.minRunEarnings;
     s.lifetime.moneyEarned = PRESTIGE.minRunEarnings;
-    s.factories.local.owned = true;
+    build(s, freePlots()[0], "engineFactory");
     s.research.push("advanced_engines");
-    s.managers.mike = { hired: true, level: 3, assignedTo: "garage" };
+    s.managers.mike = { hired: true, level: 3, assignedTo: STARTER_PLOT };
     const expected = pendingPoints(s);
     expect(expected).toBeGreaterThan(0);
     expect(prestige(s, T0 + 1)).toBe(expected);
     expect(s.empirePoints).toBe(expected);
-    expect(s.factories.local.owned).toBe(false);
+    expect(Ch.plantsOf(s)).toHaveLength(1);
+    expect(s.chain.shipments).toHaveLength(0);
     expect(s.research).toContain("advanced_engines");
     expect(s.managers.mike).toMatchObject({ hired: true, level: 3, assignedTo: null });
-    expect(pendingPoints(s)).toBe(0);
-    // Empire Points raise income: +2% each.
     expect(snapshot(s).gm.income).toBeGreaterThan(1);
   });
 });
@@ -154,15 +258,14 @@ describe("prestige", () => {
 describe("achievements and missions", () => {
   it("unlocks achievements once and pays rewards", () => {
     const s = createInitialState(T0);
-    s.lifetime.carsProduced = 1;
-    expect(checkAchievements(s)).toContain("first_car");
+    s.lifetime.parts.body = 1;
+    expect(checkAchievements(s)).toContain("first_body");
     expect(checkAchievements(s)).toEqual([]);
-    expect(s.cash).toBe(50);
+    expect(s.cash).toBe(100);
   });
 
   it("daily missions count progress from when they were handed out", () => {
     const s = createInitialState(T0);
-    s.lifetime.levelsBought = 100;
     refreshDaily(s, T0);
     expect(s.missions.daily).toHaveLength(3);
     const m = s.missions.daily[0];
@@ -174,19 +277,26 @@ describe("achievements and missions", () => {
 });
 
 describe("save system", () => {
-  it("round-trips and fills in missing fields", () => {
+  it("round-trips the chain, trucks included", () => {
     const s = createInitialState(T0);
     s.cash = 1234;
-    s.managers.mike = { hired: true, level: 2, assignedTo: "garage" };
+    run(s, 60);
+    s.managers.mike = { hired: true, level: 2, assignedTo: STARTER_PLOT };
     const back = decodeSave(encodeSave(s), T0);
-    expect(back.cash).toBe(1234);
-    expect(back.managers.mike.assignedTo).toBe("garage");
+    expect(back.cash).toBe(s.cash);
+    expect(back.managers.mike.assignedTo).toBe(STARTER_PLOT);
+    expect(back.city.buildings[STARTER_PLOT]).toEqual(s.city.buildings[STARTER_PLOT]);
+    expect(back.chain.shipments.map((sh) => [sh.from, sh.to, sh.qty])).toEqual(s.chain.shipments.map((sh) => [sh.from, sh.to, sh.qty]));
+  });
 
-    const partial = migrate({ cash: "oops", rp: 5, factories: { garage: { level: 7 } } }, T0);
-    expect(partial.cash).toBe(0);
-    expect(partial.rp).toBe(5);
-    expect(partial.factories.garage.level).toBe(7);
-    expect(partial.factories.garage.upgrades.production).toBe(0);
-    expect(partial.factories.mega.owned).toBe(false);
+  it("saves from the old economy start a new company but keep Empire Points", () => {
+    const old = { version: 2, cash: 5e9, empirePoints: 42, empirePointsEarned: 42, prestigeCount: 3, research: ["advanced_engines"], settings: { lang: "ro", buyAmount: 10 }, factories: { garage: { owned: true, level: 80 } } };
+    const s = migrate(old, T0);
+    expect(s.cash).toBeLessThan(1e9);
+    expect(s.empirePoints).toBe(42);
+    expect(s.settings.lang).toBe("ro");
+    expect(s.research).toEqual(["advanced_engines"]);
+    expect(s.city.buildings[STARTER_PLOT].type).toBe("bodyWorks");
+    expect(PLANT_BY_ID.bodyWorks.time).toBe(30);
   });
 });

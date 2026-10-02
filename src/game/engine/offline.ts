@@ -1,48 +1,58 @@
-import { FACTORIES } from "../config/factories";
 import { OFFLINE } from "../config/prestige";
 import type { GameState, OfflineReport } from "../types";
+import { simulateChain } from "./chain";
 import { snapshot } from "./economy";
-import { credit, recordCars } from "./tick";
+import { credit } from "./tick";
 
 /**
- * What the factories produced between `lastActiveAt` and `now`. Only automated
- * factories work while you are away, at their offline efficiency, up to the
- * offline limit (12h base, raised by research and Empire perks).
+ * Plays out the time between `lastActiveAt` and `now`: plants keep producing
+ * (at their offline efficiency), trucks keep delivering, dealers keep selling,
+ * up to the offline limit (12h base, raised by research and Empire perks).
+ * The chain's state moves forward here; the money waits in the report until
+ * the player collects it.
  */
 export function computeOffline(s: GameState, now: number): OfflineReport {
   const seconds = Math.max(0, (now - s.lastActiveAt) / 1000);
   const snap = snapshot(s);
   const capped = Math.min(seconds, snap.gm.offlineCapHours * 3600);
-  const report: OfflineReport = { seconds, cappedSeconds: capped, cars: 0, money: 0, rp: 0, carsByType: {} };
+  const report: OfflineReport = { seconds, cappedSeconds: capped, cars: 0, components: 0, deliveries: 0, money: 0, rp: 0, carsByType: {} };
   if (capped <= 0) return report;
 
-  for (const cfg of FACTORIES) {
-    const st = snap.factories[cfg.id];
-    if (!st || !st.automated) continue;
-    const eff = st.offlineEfficiency;
-    const cars = st.carsPerSec * capped * eff;
-    report.cars += cars;
-    report.carsByType[st.car.id] = (report.carsByType[st.car.id] ?? 0) + cars;
-    report.money += st.incomeBeforeDealers * snap.dealers.multiplier * capped * eff;
-    report.rp += cars * st.car.rp * snap.gm.rp;
+  const cash = s.cash;
+  const byType = { ...s.lifetime.carsByType };
+  const rp = s.rp;
+  const r = simulateChain(s, capped, snap.chain, (amount) => credit(s, amount));
+  // Hold the net earnings back for the COLLECT button (they already count as earned).
+  const net = s.cash - cash;
+  if (net > 0) s.cash = cash;
+  report.money = Math.max(0, net);
+  report.cars = r.cars;
+  report.components = r.components;
+  report.deliveries = r.deliveries;
+  report.rp = s.rp - rp;
+  s.rp = rp;
+  for (const [car, n] of Object.entries(s.lifetime.carsByType)) {
+    const d = n - byType[car as keyof typeof byType];
+    if (d > 0) report.carsByType[car as keyof typeof byType] = d;
   }
-  // Garages and map buildings keep working too, at the same efficiency.
+
+  // Garages and map buildings keep working too, at the offline efficiency.
   const eff = snap.gm.offline;
-  report.money += snap.city.incomePerSec * capped * eff;
+  const city = snap.city.incomePerSec * capped * eff;
+  credit(s, city);
+  s.cash -= city;
+  report.money += city;
   report.serviced = Math.floor(snap.city.carsPerSec * capped * eff);
-  report.cars = Math.floor(report.cars);
   return report;
 }
 
+/** Pays out a report computed by computeOffline (earnings were already counted). */
 export function applyOffline(s: GameState, report: OfflineReport) {
-  credit(s, report.money);
+  s.cash += report.money;
   s.run.offlineEarned += report.money;
   s.lifetime.offlineEarned += report.money;
   s.rp += report.rp;
   s.city.carsServiced += report.serviced ?? 0;
-  for (const [car, n] of Object.entries(report.carsByType)) {
-    recordCars(s, car as keyof typeof s.run.carsByType, Math.floor(n ?? 0));
-  }
 }
 
 /**
@@ -52,7 +62,7 @@ export function applyOffline(s: GameState, report: OfflineReport) {
 export function settleOffline(s: GameState, now: number): OfflineReport | null {
   const report = computeOffline(s, now);
   s.lastActiveAt = now;
-  if (report.money <= 0 && report.cars <= 0 && !report.serviced) return null;
+  if (report.money <= 0 && report.cars <= 0 && !report.components && !report.serviced) return null;
   if (report.seconds < OFFLINE.minReportSeconds) {
     applyOffline(s, report);
     return null;
@@ -63,6 +73,8 @@ export function settleOffline(s: GameState, now: number): OfflineReport | null {
     p.seconds += report.seconds;
     p.cappedSeconds += report.cappedSeconds;
     p.cars += report.cars;
+    p.components = (p.components ?? 0) + (report.components ?? 0);
+    p.deliveries = (p.deliveries ?? 0) + (report.deliveries ?? 0);
     p.serviced = (p.serviced ?? 0) + (report.serviced ?? 0);
     p.money += report.money;
     p.rp += report.rp;

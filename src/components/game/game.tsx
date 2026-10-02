@@ -9,6 +9,7 @@ import { RESEARCH } from "@/game/config/research";
 import { ZONE_BY_ID } from "@/game/config/city";
 import { canResearch, isManagerUnlocked } from "@/game/engine/actions";
 import { buildingUpgradeCost } from "@/game/engine/city";
+import { levelCost } from "@/game/engine/chain";
 import { nextGoals } from "@/game/engine/insights";
 import { canPrestige } from "@/game/engine/prestige";
 import { claimableCount } from "@/game/engine/progress";
@@ -25,7 +26,7 @@ import { Sheet } from "../panels/sheet";
 import { AchievementsView } from "../views/achievements-view";
 import { CarsView } from "../views/cars-view";
 import { DealersView } from "../views/dealers-view";
-import { EmpireView } from "../views/empire-view";
+import { ProductionView } from "../views/production-view";
 import { ManagersView } from "../views/managers-view";
 import { MissionsView } from "../views/missions-view";
 import { PrestigeView } from "../views/prestige-view";
@@ -34,6 +35,8 @@ import { StatsView } from "../views/stats-view";
 import { goalText, runGoal } from "./goals";
 import { Hud } from "./hud";
 import { OfflineDialog, PrestigeOverlay, SettingsDialog, Toasts } from "./overlays";
+import { FirstCarOverlay } from "./first-car";
+import { PlantFloor } from "../plant/plant-floor";
 
 type Icon = React.ComponentType<{ className?: string }>;
 
@@ -53,8 +56,8 @@ function useBadges() {
   const state = useGame((g) => g.state);
   const snap = useGame((g) => g.snap);
   const idle = Object.values(snap.city.garages).reduce((a, g) => a + Math.max(0, g.workstations - g.staffed), 0);
-  const upgrades = Object.keys(state.city.buildings).filter((id) => {
-    const c = buildingUpgradeCost(state, id);
+  const upgrades = Object.entries(state.city.buildings).filter(([id, b]) => {
+    const c = b.plant ? levelCost(b, snap.gm) : buildingUpgradeCost(state, id);
     return c !== null && c <= state.cash;
   }).length;
   return {
@@ -94,6 +97,7 @@ function Shell() {
   const plot = useUi((u) => u.plot);
   const zone = useUi((u) => u.zone);
   const garage = useUi((u) => u.garage);
+  const floor = useUi((u) => u.floor);
   const closeAll = useUi((u) => u.closeAll);
   const state = useGame((g) => g.state);
   const [settings, setSettings] = useState(false);
@@ -104,13 +108,13 @@ function Shell() {
   const open = !!(view || plot || zone);
 
   useEffect(() => {
-    if (garage) return;
+    if (garage || floor) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") closeAll();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [garage, closeAll]);
+  }, [garage, floor, closeAll]);
   const panelOffset = desktop ? { x: 470, y: 0 } : { x: 0, y: typeof window !== "undefined" ? window.innerHeight * 0.55 : 400 };
 
   let title: React.ReactNode = null;
@@ -136,7 +140,7 @@ function Shell() {
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-ink">
-      <EmpireMap active={!garage} panelOffset={panelOffset} />
+      <EmpireMap active={!garage && !floor} panelOffset={panelOffset} />
       <Hud onSettings={() => setSettings(true)} />
       <LeftRail />
       {!open && <GoalTracker />}
@@ -151,6 +155,8 @@ function Shell() {
       </Sheet>
 
       <AnimatePresence>{garage && <GarageView key={garage} plotId={garage} />}</AnimatePresence>
+      <AnimatePresence>{floor && <PlantFloor key={floor} plotId={floor} />}</AnimatePresence>
+      <FirstCarOverlay />
 
       <Toasts />
       <OfflineDialog />
@@ -188,7 +194,7 @@ function ViewSwitch({ view, onSettings }: { view: View; onSettings: () => void }
     case "menu":
       return <MenuPanel onSettings={onSettings} />;
     case "empire":
-      return <EmpireView />;
+      return <ProductionView />;
     case "dealers":
       return <DealersView />;
     case "cars":
@@ -309,7 +315,7 @@ function GoalTracker() {
   const cost = "cost" in goal ? goal.cost : undefined;
   const ready = !cost || state.cash >= cost;
   const pct = cost ? Math.min(100, (state.cash / cost) * 100) : 100;
-  const eta = cost && !ready && snap.incomePerSec > 0 ? (cost - state.cash) / snap.incomePerSec : null;
+  const eta = cost && !ready && snap.incomePerSec > 0 && (cost - state.cash) / snap.incomePerSec < 86400 * 30 ? (cost - state.cash) / snap.incomePerSec : null;
   const text = goalText(goal, t, n);
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+5.25rem)] z-20 flex justify-center px-3">

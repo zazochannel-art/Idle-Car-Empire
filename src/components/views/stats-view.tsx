@@ -2,7 +2,7 @@
 
 import { CARS, CAR_BY_ID } from "@/game/config/cars";
 import { DEALERS } from "@/game/config/dealerships";
-import { FACTORIES } from "@/game/config/factories";
+import { carValue, plantsOf } from "@/game/engine/chain";
 import { formatDuration, formatHours, formatMoney, formatNumber, formatPercent } from "@/game/format";
 import type { CarId } from "@/game/types";
 import { useContent } from "@/i18n/content";
@@ -22,18 +22,21 @@ export function StatsView() {
     null,
   );
   let mostValuable: { id: CarId; v: number } | null = null;
-  for (const st of Object.values(snap.factories)) {
-    if (!st) continue;
-    const v = st.valuePerCar * snap.dealers.multiplier;
-    if (!mostValuable || v > mostValuable.v) mostValuable = { id: st.car.id, v };
+  for (const car of snap.chain.cars) {
+    const v = carValue(state, car, snap.gm);
+    if (!mostValuable || v > mostValuable.v) mostValuable = { id: car.id, v };
   }
+  const parts = Object.values(L.parts).reduce((a, b) => a + b, 0);
 
   const rows: [string, string][] = [
     [t("stats.cars"), formatNumber(Math.floor(L.carsProduced))],
+    [t("stats.carsSold"), formatNumber(L.carsSold)],
+    [t("stats.parts"), formatNumber(parts)],
+    [t("stats.deliveries"), formatNumber(L.deliveries)],
     [t("stats.serviced"), formatNumber(Math.floor(state.city.carsServiced))],
     [t("stats.money"), formatMoney(L.moneyEarned)],
     [t("stats.run"), formatMoney(state.run.moneyEarned)],
-    [t("stats.factories"), `${FACTORIES.filter((f) => state.factories[f.id].owned).length} / ${FACTORIES.length}`],
+    [t("stats.factories"), formatNumber(plantsOf(state).length)],
     [t("stats.dealers"), `${DEALERS.filter((d) => state.dealers[d.id].owned).length} / ${DEALERS.length}`],
     [t("stats.profit"), `${formatMoney(snap.incomePerSec)}${t("unit.perSec")}`],
     [t("stats.highest"), `${formatMoney(L.highestIncome)}${t("unit.perSec")}`],

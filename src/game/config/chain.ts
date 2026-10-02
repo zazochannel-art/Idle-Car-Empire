@@ -1,0 +1,162 @@
+// The automotive supply chain: what each plant makes, from what, how fast,
+// what it sells for, and how plants grow. All balance numbers live here;
+// engine/chain.ts runs them.
+import type { ComponentId, PlantType, Vehicle } from "../types";
+
+export interface ComponentConfig {
+  id: ComponentId;
+  emoji: string;
+  /** Market value of one unit at grade 1 (each grade multiplies it). */
+  value: number;
+  color: string;
+}
+
+export const COMPONENTS: ComponentConfig[] = [
+  { id: "body", emoji: "🚙", value: 150, color: "#94a3b8" },
+  { id: "engine", emoji: "⚙️", value: 1_500, color: "#ef4444" },
+  { id: "interior", emoji: "💺", value: 5_000, color: "#a16207" },
+  { id: "glass", emoji: "🪟", value: 12_000, color: "#7dd3fc" },
+  { id: "tires", emoji: "🛞", value: 25_000, color: "#1f2937" },
+  { id: "paint", emoji: "🎨", value: 50_000, color: "#ec4899" },
+  { id: "electronics", emoji: "🔌", value: 300_000, color: "#22c55e" },
+  { id: "battery", emoji: "🔋", value: 2_000_000, color: "#84cc16" },
+];
+
+export const COMPONENT_BY_ID = Object.fromEntries(COMPONENTS.map((c) => [c.id, c])) as Record<ComponentId, ComponentConfig>;
+
+/** Every car needs one of each of these, plus its model's extras. */
+export const BASE_RECIPE: ComponentId[] = ["body", "engine", "interior", "glass", "tires", "paint"];
+
+export interface PlantConfig {
+  id: PlantType;
+  emoji: string;
+  /** What it makes. null = cars (the assembly plant). */
+  item: ComponentId | null;
+  /** Raw material it consumes, and how much per unit. */
+  raw: string;
+  rawPer: number;
+  /** Seconds per unit at Level 1, before upgrades. */
+  time: number;
+  /** Price to build the first one (second one ×PLANT_COPY_COST…). Also the base of every upgrade price. */
+  cost: number;
+  /** The plant that must exist before this one can be built. */
+  requires: PlantType | null;
+  /** Research needed first. */
+  research?: string;
+  color: string;
+  roof: string;
+}
+
+export const PLANTS: PlantConfig[] = [
+  { id: "bodyWorks", emoji: "🚙", item: "body", raw: "steel", rawPer: 10, time: 30, cost: 5_000, requires: null, color: "#e2e8f0", roof: "#64748b" },
+  { id: "engineFactory", emoji: "⚙️", item: "engine", raw: "metal", rawPer: 10, time: 40, cost: 25_000, requires: "bodyWorks", color: "#e7e5e4", roof: "#b91c1c" },
+  { id: "interiorFactory", emoji: "💺", item: "interior", raw: "fabric", rawPer: 10, time: 45, cost: 250_000, requires: "engineFactory", color: "#fef3c7", roof: "#a16207" },
+  { id: "glassFactory", emoji: "🪟", item: "glass", raw: "sand", rawPer: 10, time: 40, cost: 2e6, requires: "interiorFactory", color: "#e0f2fe", roof: "#0284c7" },
+  { id: "tireFactory", emoji: "🛞", item: "tires", raw: "rubber", rawPer: 10, time: 35, cost: 1.2e7, requires: "glassFactory", color: "#d4d4d8", roof: "#27272a" },
+  { id: "paintFactory", emoji: "🎨", item: "paint", raw: "pigment", rawPer: 10, time: 30, cost: 6e7, requires: "tireFactory", color: "#fce7f3", roof: "#db2777" },
+  { id: "assemblyPlant", emoji: "🏭", item: null, raw: "", rawPer: 0, time: 60, cost: 3e8, requires: "paintFactory", color: "#f1f5f9", roof: "#1d4ed8" },
+  { id: "electronicsFactory", emoji: "🔌", item: "electronics", raw: "chips", rawPer: 10, time: 50, cost: 3e10, requires: "assemblyPlant", color: "#dcfce7", roof: "#15803d" },
+  { id: "batteryFactory", emoji: "🔋", item: "battery", raw: "lithium", rawPer: 10, time: 60, cost: 3e12, requires: "electronicsFactory", research: "electric_motors", color: "#ecfccb", roof: "#4d7c0f" },
+];
+
+export const PLANT_BY_ID = Object.fromEntries(PLANTS.map((p) => [p.id, p])) as Record<PlantType, PlantConfig>;
+export const PLANT_TYPES = PLANTS.map((p) => p.id);
+export const isPlantType = (t: string): t is PlantType => t in PLANT_BY_ID;
+
+/** The plant that makes each component. */
+export const MAKER: Record<ComponentId, PlantType> = Object.fromEntries(
+  PLANTS.filter((p) => p.item).map((p) => [p.item, p.id]),
+) as Record<ComponentId, PlantType>;
+
+/** Each extra plant of the same type costs this many times the previous. */
+export const PLANT_COPY_COST = 6;
+
+// ───────────────────────────── growth ─────────────────────────────
+
+export interface LevelConfig {
+  /** Units made per batch. */
+  lines: number;
+  /** Storage multiplier (raw, inputs and finished goods). */
+  storage: number;
+  /** Upgrade price to reach this level, × plant cost. */
+  cost: number;
+}
+
+/** Small → Mega Factory. Every level also changes how the building looks. */
+export const PLANT_LEVELS: LevelConfig[] = [
+  { lines: 1, storage: 1, cost: 0 },
+  { lines: 2, storage: 2, cost: 0.1 },
+  { lines: 3, storage: 3, cost: 0.8 },
+  { lines: 4, storage: 4, cost: 5 },
+  { lines: 6, storage: 6, cost: 30 },
+  { lines: 8, storage: 8, cost: 200 },
+  { lines: 12, storage: 12, cost: 1_500 },
+  { lines: 16, storage: 16, cost: 12_000 },
+];
+export const PLANT_MAX_LEVEL = PLANT_LEVELS.length;
+
+/** Speed upgrades: each makes production this much faster. */
+export const SPEED = { mult: 1.08, firstCost: 0.02, growth: 1.45, max: 40 };
+
+/** Manual → Semi-Automated → Automated → Advanced Automation → AI Factory. */
+export const AUTOMATION = [
+  { speed: 1, offline: 0, cost: 0 },
+  { speed: 1.5, offline: 0.1, cost: 1 },
+  { speed: 2.2, offline: 0.2, cost: 15 },
+  { speed: 3.2, offline: 0.3, cost: 200 },
+  { speed: 5, offline: 0.4, cost: 3_000 },
+];
+
+/** Trucks a plant can own; the n-th truck costs FLEET.firstCost × growth^(n-2) × plant cost. */
+export const FLEET = { max: 8, firstCost: 0.08, growth: 2.4 };
+
+/** Component grades: Standard, Lightweight, Performance, Luxury, Carbon. */
+export const GRADES = [
+  { value: 1, time: 1, cost: 0 },
+  { value: 2.5, time: 1.15, cost: 25 },
+  { value: 6, time: 1.3, cost: 600 },
+  { value: 15, time: 1.5, cost: 15_000 },
+  { value: 40, time: 1.75, cost: 400_000 },
+];
+export const MAX_GRADE = GRADES.length;
+
+/** Raw materials cost this share of the finished unit's value. */
+export const MATERIAL_SHARE = 0.6;
+/** Raw material storage at Level 1, in units of finished goods. */
+export const RAW_STORAGE = 20;
+/** Finished goods and assembly input storage at Level 1, in units. */
+export const OUT_STORAGE = 20;
+
+// ───────────────────────────── transport ─────────────────────────────
+
+/** Road speed of trucks, tiles per second (before Logistics bonuses). */
+export const TRUCK_SPEED = 2.6;
+/** Loading/unloading time added to every leg. */
+export const DOCK_TIME = 2;
+/** A truck leaves with a partial load after waiting this long. */
+export const MAX_WAIT = 12;
+
+export interface VehicleConfig {
+  id: Vehicle;
+  /** Units per trip. */
+  capacity: number;
+}
+
+/** What a plant's trucks are, by plant level (index = level - 1). */
+export const PLANT_VEHICLE: Vehicle[] = ["van", "van", "truck", "truck", "semi", "semi", "trailer", "trailer"];
+export const VEHICLE_CAPACITY: Record<Vehicle, number> = { van: 4, truck: 10, semi: 24, trailer: 60, carrier: 6 };
+/** Car transporters carry more cars at higher assembly levels. */
+export const CARRIER_CAPACITY = [2, 3, 4, 6, 8, 8, 10, 12];
+
+/** The Materials Depot sends raw material when a plant drops below this share. */
+export const RESUPPLY_AT = 0.5;
+/** Supply trucks bring up to this share of a plant's raw storage. */
+export const SUPPLY_LOAD = 0.6;
+
+// ───────────────────────────── selling ─────────────────────────────
+
+/** Dealerships: seconds between customers at Level 1, and stock. */
+export const DEALER_SALE = { interval: 14, stock: 6, perLevelSpeed: 0.25, perLevelStock: 3 };
+
+/** Smoothing of the HUD income rate (seconds). */
+export const RATE_WINDOW = 30;

@@ -1,217 +1,124 @@
 /**
  * Balance simulator: a greedy bot plays the real engine and logs when it hits
- * each milestone. Used to tune config/ so the early game is fast and the late
- * game slows down. Run: npm run simulate -- [hours]
+ * each milestone of the supply chain. Used to tune config/ so the first
+ * factory comes quickly and the empire takes hours. Run: npm run simulate -- [hours]
  */
 import { CARS } from "../src/game/config/cars";
+import { PLANTS } from "../src/game/config/chain";
 import { DEALERS } from "../src/game/config/dealerships";
-import { FACTORIES } from "../src/game/config/factories";
 import { MANAGERS } from "../src/game/config/managers";
 import { RESEARCH } from "../src/game/config/research";
-import { UPGRADE_IDS } from "../src/game/config/upgrades";
-import { FACILITIES, SPECS, ZONE_BY_ID } from "../src/game/config/city";
-import { WORLD_MAP, factoryPlot } from "../src/game/city/layout";
+import { ZONE_BY_ID } from "../src/game/config/city";
 import * as A from "../src/game/engine/actions";
+import * as Ch from "../src/game/engine/chain";
 import * as C from "../src/game/engine/city";
-import {
-  carModelCost,
-  dealerUpgradeCost,
-  levelPurchase,
-  lineCost,
-  managerUpgradeCost,
-  snapshot,
-  unlockedCarIds,
-  upgradeCost,
-} from "../src/game/engine/economy";
-import { canPrestige, pendingPoints, prestige } from "../src/game/engine/prestige";
+import { carModelCost, dealerUpgradeCost, snapshot } from "../src/game/engine/economy";
+import { freePlot } from "../src/game/engine/insights";
 import { checkAchievements, claimMilestone, openMilestones } from "../src/game/engine/progress";
 import { cloneState, createInitialState } from "../src/game/engine/state";
 import { tick } from "../src/game/engine/tick";
-import { formatDuration, formatMoney } from "../src/game/format";
+import { formatDuration, formatMoney, formatNumber } from "../src/game/format";
 import type { GameState } from "../src/game/types";
 
-const hours = Number(process.argv[2] ?? 6);
-const STEP = 2;
-const s = createInitialState(0);
+const hours = Number(process.argv[2] ?? 8);
+const STEP = 1;
+let s = createInitialState(0);
 let t = 0;
 const seen = new Set<string>();
 const log = (msg: string) => console.log(`${formatDuration(t).padStart(8)}  ${msg}`);
 
-type Option = { label: string; cost: number; act: (g: GameState) => unknown };
+type Option = { label: string; cost: number; act: (g: GameState) => unknown; weight?: number };
 
 function options(g: GameState): Option[] {
   const out: Option[] = [];
-  for (const f of FACTORIES) {
-    const st = g.factories[f.id];
-    if (!st.owned) {
-      // A factory on a locked district comes with the price of the district.
-      const zone = factoryPlot(f.id)!.zone;
-      const zoneCost = g.city.zones.includes(zone) ? 0 : ZONE_BY_ID[zone].cost;
-      const blocked = zoneCost > 0 && C.zoneBlocker(g, zone);
-      if (!blocked) {
-        out.push({
-          label: zoneCost ? `buy ${f.name} + ${zone}` : `buy ${f.name}`,
-          cost: f.cost + zoneCost,
-          act: (x) => (zoneCost ? C.unlockZone(x, zone) : true) && A.buyFactory(x, f.id),
-        });
-      }
-      continue;
-    }
-    out.push({ label: `level ${f.id}`, cost: levelPurchase(g, f.id, 1).cost, act: (x) => A.buyLevels(x, f.id, 1) });
-    const lc = lineCost(g, f.id);
-    if (lc !== null) out.push({ label: `line ${f.id}`, cost: lc, act: (x) => A.buyLine(x, f.id) });
-    for (const u of UPGRADE_IDS) {
-      const c = upgradeCost(g, f.id, u);
-      if (c !== null) out.push({ label: `${u} ${f.id}`, cost: c, act: (x) => A.buyUpgrade(x, f.id, u) });
-    }
+  const gm = snapshot(g).gm;
+  for (const p of PLANTS) {
+    if (Ch.plantLock(g, p.id)) continue;
+    const plot = freePlot(g);
+    const count = Ch.plantCount(g, p.id);
+    // build each type once, later a second assembly feeder line
+    if (count >= (p.id === "bodyWorks" ? 2 : 1)) continue;
+    if (plot) out.push({ label: `build ${p.id}`, cost: Ch.plantBuildCost(g, p.id), act: (x) => C.buildStructure(x, plot, p.id), weight: 0.5 });
+  }
+  if (!freePlot(g)) {
+    const z = C.nextZone(g);
+    if (z && !C.zoneBlocker(g, z.id)) out.push({ label: `zone ${z.id}`, cost: ZONE_BY_ID[z.id].cost, act: (x) => C.unlockZone(x, z.id) });
+  }
+  for (const [id, b] of Ch.plantsOf(g)) {
+    const push = (label: string, cost: number | null, act: (x: GameState) => unknown, weight = 1) => {
+      if (cost !== null) out.push({ label: `${label} ${b.type}`, cost, act, weight });
+    };
+    push("level", Ch.levelCost(b, gm), (x) => Ch.upgradePlantLevel(x, id, snapshot(x).gm));
+    push("speed", Ch.speedCost(b, gm), (x) => Ch.upgradePlantSpeed(x, id, snapshot(x).gm));
+    push("auto", Ch.automationCost(b, gm), (x) => Ch.upgradeAutomation(x, id, snapshot(x).gm));
+    if (b.plant.fleet < 3) push("truck", Ch.fleetCost(b, gm), (x) => Ch.buyTruck(x, id, snapshot(x).gm), 2);
+    // grades that unlock the next car model come first
+    const nextCar = CARS.find((c) => Ch.carLock(g, c, gm) !== null);
+    const needed = nextCar && Ch.hasPlant(g, "assemblyPlant") && b.plant.grade < nextCar.grade;
+    push("grade", Ch.gradeCost(b, gm), (x) => Ch.upgradeGrade(x, id, snapshot(x).gm), needed ? 0.3 : 3);
   }
   for (const d of DEALERS) {
-    if (!g.dealers[d.id].owned) out.push({ label: `dealer ${d.id}`, cost: d.cost, act: (x) => A.buyDealer(x, d.id) });
-    else out.push({ label: `dealer+ ${d.id}`, cost: dealerUpgradeCost(g, d.id), act: (x) => A.upgradeDealer(x, d.id) });
+    if (!g.dealers[d.id].owned && A.canOpenDealers(g)) out.push({ label: `dealer ${d.id}`, cost: d.cost, act: (x) => A.buyDealer(x, d.id), weight: 0.3 });
+    else if (g.dealers[d.id].owned) out.push({ label: `dealerUp ${d.id}`, cost: dealerUpgradeCost(g, d.id), act: (x) => A.upgradeDealer(x, d.id), weight: 3 });
   }
-  const free = FACTORIES.filter((f) => g.factories[f.id].owned && !MANAGERS.some((m) => g.managers[m.id].assignedTo === f.id));
   for (const m of MANAGERS) {
-    const st = g.managers[m.id];
-    if (!st.hired && A.isManagerUnlocked(g, m.id) && free.length) {
-      const target = free[free.length - 1].id;
-      out.push({ label: `hire ${m.name}`, cost: m.cost, act: (x) => A.hireManager(x, m.id, target) });
-    } else if (st.hired) {
-      const c = managerUpgradeCost(g, m.id);
-      if (c !== null) out.push({ label: `mgr+ ${m.name}`, cost: c, act: (x) => A.upgradeManager(x, m.id) });
+    if (!g.managers[m.id].hired && A.isManagerUnlocked(g, m.id)) {
+      const target = Ch.plantsOf(g).find(([id]) => !Object.values(g.managers).some((mm) => mm.assignedTo === id))?.[0];
+      out.push({ label: `hire ${m.id}`, cost: m.cost, act: (x) => A.hireManager(x, m.id, target), weight: 2 });
     }
   }
-  // The Empire Map: garages, their facilities and plot buildings.
-  for (const [plot, b] of Object.entries(g.city.buildings)) {
-    const up = C.buildingUpgradeCost(g, plot);
-    if (up !== null) out.push({ label: `upgrade ${b.type} ${plot}`, cost: up, act: (x) => C.upgradeBuilding(x, plot) });
-    if (!b.garage) continue;
-    const wc = C.workerCost(g, plot);
-    if (wc !== null) out.push({ label: `worker ${plot}`, cost: wc, act: (x) => C.hireWorker(x, plot) });
-    for (const f of FACILITIES) {
-      if (C.facilityCount(b.garage, f.id) >= C.facilityCap(b.level, f.id)) continue;
-      for (const rot of [0, 1] as const) {
-        const spot = C.findSpot(b.level, b.garage, f.id, rot);
-        if (!spot) continue;
-        out.push({ label: `facility ${f.id} ${plot}`, cost: C.facilityCost(g, plot, f.id), act: (x) => C.placeFacility(x, plot, f.id, spot.x, spot.y, rot) });
-        break;
-      }
-    }
-    for (const sp of SPECS) {
-      if (sp.id !== b.garage.spec && b.level >= sp.level) out.push({ label: `spec ${sp.id} ${plot}`, cost: C.specCost(g, plot), act: (x) => C.setSpecialization(x, plot, sp.id) });
-    }
-  }
-  const tried = new Set<string>();
-  for (const p of WORLD_MAP.plots) {
-    if (!C.canBuildOn(g, p.id) || tried.has(p.zone)) continue;
-    tried.add(p.zone);
-    for (const type of ZONE_BY_ID[p.zone].builds) {
-      if (type !== "garage") {
-        out.push({ label: `build ${type} ${p.zone}`, cost: C.structureCost(g, p.id, type), act: (x) => C.buildStructure(x, p.id, type) });
-        continue;
-      }
-      // An empty garage earns nothing: judge it with its first bay and lift.
-      const scale = ZONE_BY_ID[p.zone].scale;
-      out.push({
-        label: `build garage ${p.zone}`,
-        cost: C.structureCost(g, p.id, "garage") + 200 * scale,
-        act: (x) => C.buildStructure(x, p.id, "garage") && C.placeFacility(x, p.id, "serviceBay", 0, 0, 0) && C.placeFacility(x, p.id, "carLift", 4, 0, 0),
-      });
-    }
-  }
-
-  const unlocked = unlockedCarIds(g, snapshot(g).gm);
   for (const c of CARS) {
-    if (!unlocked.has(c.id)) continue;
-    const cost = carModelCost(g, c.id);
-    if (cost !== null) out.push({ label: `model ${c.id}`, cost, act: (x) => A.upgradeCarModel(x, c.id) });
+    const cost = Ch.carLock(g, c, gm) === null ? carModelCost(g, c.id, gm) : null;
+    if (cost !== null) out.push({ label: `refine ${c.id}`, cost, act: (x) => A.upgradeCarModel(x, c.id), weight: 2 });
   }
   return out;
 }
 
-function income(g: GameState) {
-  const snap = snapshot(g);
-  return snap.incomePerSec;
-}
-
-function botStep() {
-  // Early game: keep the manual garage busy, as a player would.
-  A.startProduction(s, "garage");
-  for (let i = 0; i < 4; i++) A.rush(s, "garage", 0.05);
-
-  for (const r of RESEARCH.slice().sort((a, b) => a.cost - b.cost)) A.doResearch(s, r.id);
-  for (const m of openMilestones(s, 25)) claimMilestone(s, m.id);
-
-  for (let guard = 0; guard < 200; guard++) {
-    const base = income(s);
-    let best: { o: Option; score: number } | null = null;
-    for (const o of options(s)) {
-      if (!(o.cost > 0) || !Number.isFinite(o.cost)) continue;
-      const trial = cloneState(s);
-      trial.cash = o.cost + 1;
-      if (!o.act(trial)) continue;
-      const gain = income(trial) - base;
-      // Payback time, with a small preference for things you can afford now.
-      const wait = Math.max(0, (o.cost - s.cash) / Math.max(base, 1));
-      const score = gain <= 0 ? -Infinity : gain / o.cost / (1 + wait / Number(process.env.PATIENCE ?? 600));
-      if (!best || score > best.score) best = { o, score };
-    }
-    if (!best || best.score === -Infinity || s.cash < best.o.cost) break;
-    best.o.act(s);
-    if (process.env.TRACE) log(`  ${best.o.label} cost ${formatMoney(best.o.cost)} -> ${formatMoney(income(s))}/s cash ${formatMoney(s.cash)}`);
-    const key = best.o.label;
-    const milestone = key.replace(/ (town|industrial|downtown|automotive|luxury|supercar|mega|global):\d:\d$/, "");
-    if (/^(buy|hire|dealer |build garage|facility (paintBooth|dyno|supercarWorkshop)|upgrade garage)/.test(key) && !seen.has(milestone)) {
-      seen.add(milestone);
-      log(`${key.padEnd(24)}| income ${formatMoney(income(s))}/s`);
-    }
-  }
-}
+const marks: [string, (g: GameState) => boolean][] = [
+  ["first body", (g) => g.lifetime.parts.body >= 1],
+  ["first sale", (g) => g.lifetime.moneyEarned > 0],
+  ["100 bodies", (g) => g.lifetime.parts.body >= 100],
+  ...PLANTS.map((p) => [`${p.id} built`, (g: GameState) => Ch.hasPlant(g, p.id)] as [string, (g: GameState) => boolean]),
+  ["FIRST CAR", (g) => g.lifetime.carsProduced >= 1],
+  ["dealership", (g) => DEALERS.some((d) => g.dealers[d.id].owned)],
+  ["first car sold", (g) => g.lifetime.carsSold >= 1],
+  ["100 cars sold", (g) => g.lifetime.carsSold >= 100],
+  ...CARS.map((c) => [`model ${c.id}`, (g: GameState) => g.lifetime.carsByType[c.id] > 0] as [string, (g: GameState) => boolean]),
+  ["$1M earned", (g) => g.lifetime.moneyEarned >= 1e6],
+  ["$1B earned", (g) => g.lifetime.moneyEarned >= 1e9],
+];
 
 const end = hours * 3600;
-let lastReport = 0;
+let nextReport = 600;
 while (t < end) {
-  botStep();
   tick(s, STEP);
-  checkAchievements(s);
   t += STEP;
-
-  for (const c of CARS) {
-    const k = `car ${c.id}`;
-    if (!seen.has(k) && s.lifetime.carsByType[c.id] > 0) {
-      seen.add(k);
-      log(`first ${c.name}`);
+  checkAchievements(s);
+  for (const m of openMilestones(s, 3)) claimMilestone(s, m.id);
+  for (const r of RESEARCH) if (A.canResearch(s, r.id) && s.rp >= r.cost) A.doResearch(s, r.id);
+  // buy the cheapest affordable thing (weighted), a few per second
+  for (let i = 0; i < 5; i++) {
+    const opts = options(s).filter((o) => o.cost <= s.cash).sort((a, b) => a.cost * (a.weight ?? 1) - b.cost * (b.weight ?? 1));
+    if (!opts.length) break;
+    const g = cloneState(s);
+    if (opts[0].act(g)) s = g;
+    else break;
+  }
+  for (const [label, test] of marks) {
+    if (!seen.has(label) && test(s)) {
+      seen.add(label);
+      log(`${label.padEnd(26)} cash ${formatMoney(s.cash).padStart(9)}  rate ${formatMoney(s.chain.rate)}/s`);
     }
   }
-  for (const r of s.research) {
-    if (!seen.has(r)) {
-      seen.add(r);
-      log(`research ${r}`);
-    }
+  if (t >= nextReport) {
+    nextReport += 1800;
+    const plants = Ch.plantsOf(s).map(([, b]) => `${b.type.replace(/Factory|Works|Plant/, "")}${b.level}/${b.plant.speed}/${b.plant.grade}`).join(" ");
+    log(`· earned ${formatMoney(s.lifetime.moneyEarned)} rate ${formatMoney(s.chain.rate)}/s trucks ${s.chain.shipments.length} cars ${formatNumber(s.lifetime.carsProduced)} | ${plants}`);
   }
-  // Prestige once it at least doubles the points held.
-  if (canPrestige(s) && pendingPoints(s) >= Math.max(3, s.empirePoints)) {
-    log(`PRESTIGE +${pendingPoints(s)} EP (run earned ${formatMoney(s.run.moneyEarned)})`);
-    prestige(s, t * 1000);
-    for (const k of [...seen]) if (k.startsWith("buy") || k.startsWith("dealer")) seen.delete(k);
-  }
-  if (process.env.DUMP && t === Number(process.env.DUMP)) {
-    const snap = snapshot(s);
-    for (const f of FACTORIES) {
-      const st = s.factories[f.id];
-      if (!st.owned) continue;
-      const fs = snap.factories[f.id]!;
-      console.log(f.id, "L", st.level, "lines", st.lines, JSON.stringify(st.upgrades), fs.car.id, "value", formatMoney(fs.valuePerCar), "cycle", fs.cycleTime.toFixed(2), "inc", formatMoney(fs.incomeBeforeDealers));
-    }
-    console.log("models", JSON.stringify(s.carModels), "mgr", JSON.stringify(Object.fromEntries(Object.entries(s.managers).filter(([, m]) => m.hired).map(([k, m]) => [k, m.level + "@" + m.assignedTo]))));
-    console.log("gm speed", snap.gm.speed, "income", snap.gm.income, "value", snap.gm.value.map((v) => v.toFixed(2)).join(","), "dealer", snap.dealers.multiplier.toFixed(2), "research", s.research.join(","));
-  }
-  if (t - lastReport >= Number(process.env.REPORT ?? 300)) {
-    lastReport = t;
-    if (process.env.CITY) {
-      const kinds: Record<string, string[]> = {};
-      for (const b of Object.values(s.city.buildings)) (kinds[b.type] ??= []).push(String(b.level));
-      log(`    city ${Object.entries(kinds).map(([k, v]) => `${k}[${v.join(",")}]`).join(" ")}  effects ${JSON.stringify(C.cityEffects(s))}`);
-    }
-    log(`--- cash ${formatMoney(s.cash)}  income ${formatMoney(income(s))}/s (map ${formatMoney(snapshot(s).city.incomePerSec)}/s, ${Object.keys(s.city.buildings).length} bldg)  RP ${Math.floor(s.rp)}  EP ${s.empirePoints}  achievements ${s.achievements.length}`);
-  }
+}
+if (process.env.DEBUG) {
+  const opts = options(s).sort((a, b) => a.cost - b.cost);
+  console.log("free plot:", freePlot(s), "zones:", s.city.zones.join(","), "cash", formatMoney(s.cash));
+  console.log(opts.filter((o) => /build|zone/.test(o.label)).map((o) => `${o.label} ${formatMoney(o.cost)}`).join("\n"));
+  console.log("dealers", JSON.stringify(s.chain.dealers));
 }

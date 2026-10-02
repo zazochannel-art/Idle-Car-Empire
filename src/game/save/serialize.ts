@@ -1,4 +1,6 @@
+import { migrateChain } from "../engine/chain";
 import { migrateCity, unlockOwnedZones } from "../engine/city";
+import { applyStartPerks } from "../engine/prestige";
 import { createInitialState, SAVE_VERSION } from "../engine/state";
 import type { GameState } from "../types";
 
@@ -26,22 +28,38 @@ function mergeDefaults<T>(defaults: T, saved: unknown): T {
   return (typeof saved === typeof defaults ? saved : defaults) as T;
 }
 
+/**
+ * Saves from before the supply chain (v1–v2) described a different economy:
+ * the company starts over from the Small Car Body Works, keeping the
+ * settings, Empire Points and research.
+ */
+function fromOldEconomy(raw: Json, now: number): GameState {
+  const state = createInitialState(now);
+  const kept = mergeDefaults(
+    { settings: state.settings, empirePoints: 0, empirePointsEarned: 0, prestigeCount: 0, research: [] as string[], createdAt: now },
+    raw,
+  );
+  Object.assign(state, kept);
+  state.research = kept.research.filter((r) => typeof r === "string");
+  applyStartPerks(state);
+  return state;
+}
+
 export function migrate(raw: unknown, now: number): GameState {
   const fresh = createInitialState(now);
   if (!isObject(raw)) return fresh;
+  if (typeof raw.version !== "number" || raw.version < SAVE_VERSION) return fromOldEconomy(raw, now);
   const state = mergeDefaults(fresh, raw);
   // Nullable fields have no typed default to merge against.
   state.pendingOffline = isObject(raw.pendingOffline) ? (raw.pendingOffline as unknown as GameState["pendingOffline"]) : null;
-  for (const [id, f] of Object.entries(state.factories)) {
-    const savedCar = (raw.factories as Json | undefined)?.[id];
-    f.carId = isObject(savedCar) && typeof savedCar.carId === "string" ? (savedCar.carId as typeof f.carId) : null;
-  }
-  for (const [id, m] of Object.entries(state.managers)) {
-    const saved = (raw.managers as Json | undefined)?.[id];
-    m.assignedTo = isObject(saved) && typeof saved.assignedTo === "string" ? (saved.assignedTo as typeof m.assignedTo) : null;
-  }
   // The city has open-ended keys (plot ids), so it is validated on its own.
   state.city = migrateCity(raw.city);
+  for (const [id, m] of Object.entries(state.managers)) {
+    const saved = (raw.managers as Json | undefined)?.[id];
+    const plot = isObject(saved) && typeof saved.assignedTo === "string" ? saved.assignedTo : null;
+    m.assignedTo = plot && state.city.buildings[plot]?.plant ? plot : null;
+  }
+  state.chain = migrateChain(raw.chain, state);
   unlockOwnedZones(state);
   state.version = SAVE_VERSION;
   return state;

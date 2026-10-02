@@ -1,8 +1,9 @@
 import { EMPIRE_PERKS, PRESTIGE } from "../config/prestige";
 import type { GameState } from "../types";
-import { factoryPlot } from "../city/layout";
-import { createCity, ensureZonesUpTo } from "./city";
-import { createDealers, createFactories, createStats, emptyCarCounts } from "./state";
+import { STARTER_PLOT, WORLD_MAP } from "../city/layout";
+import { createChain, newPlant } from "./chain";
+import { createCity } from "./city";
+import { createDealers, createStats, emptyCarCounts } from "./state";
 
 /** Empire Points a player is entitled to in total for these lifetime earnings. */
 export function totalPointsFor(lifetimeEarned: number): number {
@@ -28,7 +29,7 @@ export function perksFor(points: number) {
 }
 
 /**
- * Global Expansion. Resets cash, factories, upgrades, dealers and car models.
+ * Global Expansion. Resets cash, plants, the map, dealers and car models.
  * Keeps Empire Points, research, managers (unassigned), achievements and
  * lifetime stats. Start-of-run perks are applied afterwards.
  */
@@ -40,10 +41,10 @@ export function prestige(s: GameState, now: number): number {
   s.prestigeCount += 1;
 
   s.cash = 0;
-  s.factories = createFactories();
   s.dealers = createDealers();
   s.carModels = emptyCarCounts();
   s.city = { ...createCity(), carsServiced: s.city.carsServiced };
+  s.chain = createChain();
   s.run = createStats();
   s.runStartedAt = now;
   s.pendingOffline = null;
@@ -57,11 +58,12 @@ export function applyStartPerks(s: GameState) {
   const perks = perksFor(s.empirePoints);
   const startCash = Math.max(0, ...perks.map((p) => p.startCash ?? 0));
   s.cash = Math.max(s.cash, startCash);
-  if (perks.some((p) => p.startAutomation)) s.factories.garage.upgrades.automation = Math.max(1, s.factories.garage.upgrades.automation);
-  for (const p of perks) {
-    if (!p.startFactory) continue;
-    s.factories[p.startFactory].owned = true;
-    const plot = factoryPlot(p.startFactory);
-    if (plot) ensureZonesUpTo(s, plot.zone);
+  const starter = s.city.buildings[STARTER_PLOT]?.plant;
+  if (starter && perks.some((p) => p.startAutomation)) starter.automation = Math.max(1, starter.automation);
+  const types = [...new Set(perks.flatMap((p) => p.startPlants ?? []))];
+  for (const type of types) {
+    if (Object.values(s.city.buildings).some((b) => b.type === type)) continue;
+    const free = WORLD_MAP.plots.find((p) => p.kind === "plot" && !p.big && p.zone === "town" && !s.city.buildings[p.id]);
+    if (free) s.city.buildings[free.id] = { type, level: 1, plant: newPlant(type) };
   }
 }

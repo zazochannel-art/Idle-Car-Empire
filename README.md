@@ -1,15 +1,14 @@
 # Idle Car Empire
 
-An idle / tycoon city-builder about growing a one-bay garage into a global car
-empire. The game is played on an isometric **Empire Map**: an island with a natural
-coastline, beaches, a river crossed by bridges, farmland, forests and
-mountains, eight organically shaped districts to unlock, plots to build on, garages with their own interiors, factories and
-dealerships on their lots, and live traffic carrying parts, customers and new
-cars between them. Day, evening and night lighting (or an automatic cycle),
-buildings that visibly grow with every level, construction animations, and
-detailed car models (city cars to hypercars) that brake, stop at traffic
-lights and park. Plus eight car classes from the City Compact to the Future
-Car, research, managers, offline production and Global Expansion (prestige).
+An idle / tycoon city-builder about an automotive supply chain. You start with
+one **Small Car Body Works** and grow it into a global car empire: body works,
+engine, interior, glass, tyre and paint factories feed a **Car Assembly
+Plant**, car transporters take the finished cars to your dealerships, and
+customers drive them home. Every dollar comes from that chain, and every link of
+it is visible on the isometric **Empire Map**: trucks drive real routes between
+the plants, the Materials Depot and the Parts Market. The map is an island with
+a river and eight districts to unlock. It has day and night lighting, plants
+that grow from Small to Mega Factory, and a live factory-floor view.
 
 Built with Next.js (App Router, static export), TypeScript, Tailwind CSS v4,
 shadcn/ui-style components, Lucide icons, Framer Motion and Zustand. Saves go
@@ -30,40 +29,51 @@ npm run simulate -- 3   # balance bot: plays 3 hours and logs milestones
 
 ## How to play
 
-1. Build your first City Compact by hand in the **Assembly Workshop** ($50).
-2. Tap **Garage #01** on the map and enter it. Its floor is a tile grid: build a
-   **Service Bay** (pick it, place it, rotate it, confirm). Each workstation
-   needs a mechanic (**Workers**); support facilities (storage, office, parts
-   workshop) boost the whole garage. Garage levels 1–10 enlarge the floor
-   (8×8 → 24×20), unlock new facilities (paint booth, engine workshop, dyno,
-   supercar workshop…) and grow the building on the map. A **specialization**
-   (repair, painting, tuning, performance, supercar) doubles matching stations.
-3. Tap a **+** plot to build: more garages, car washes, parking, warehouses,
-   parts factories, logistics centres, R&D, export terminals, HQ, airport.
-   Support buildings are one per district.
-4. **Unlock districts** (Small Town → Industrial → Downtown → Automotive →
-   Luxury → Supercar Valley → Mega City → Global Empire). Each one has plots,
-   factory and dealership lots, and richer customers.
-5. Spend on factory **levels** (cheap, frequent; ×2 speed at levels 25, 50, 75…) and the
-   six **upgrades**: Production, Quality, Automation, Marketing, Logistics and
-   Technology (which unlocks the next car tier in that factory).
-6. Hire **Mike** ($300) or buy Automation to make the workshop run by itself.
-   Garages and automated factories also earn while the game is closed.
-7. Open new **factories**, **dealerships** (they sell your cars; overflow goes to
-   wholesale at 50%), **research** (paid in research points from every car) and
-   **managers** (one per factory; they automate it and add a bonus).
-8. After earning $1B in a run, **Global Expansion** resets the run for
-   permanent **Empire Points** (+2% income each, plus perks at 1, 5, 15, 40…).
+1. **Car bodies.** The Small Car Body Works turns steel into a car body every
+   30 s. A truck takes the bodies to the **Parts Market** ($150 each). When the
+   steel runs low, a supply truck brings more from the **Materials Depot**,
+   paid when it leaves. With no cash for steel, production stops.
+2. **Upgrade the plant.** Each plant has five upgrades:
+   - **Levels** (Small → Basic → Industrial → … → Mega Factory) add
+     production lines, storage and bigger trucks, and change the building.
+   - **Speed** shortens each batch.
+   - **Automation** (Manual → AI Factory) raises speed and offline output.
+   - **Trucks** adds vehicles to the fleet.
+   - **Grades** (Standard → Lightweight → … → Carbon) raise the value of
+     each part and unlock better cars.
+3. **Extend the chain.** Build the plants in order, on any plot in an unlocked
+   district: Engine Factory ($25K), Interior, Glass, Tyre and Paint factories,
+   then the **Car Assembly Plant**. Industrial lots (a whole block) double a
+   plant's output and storage. Each plant sends its goods by truck: **USE**
+   (to the assembly plant), **SELL** (to the market) or **STORE**.
+4. **Assemble cars.** The assembly line has nine stations: body, engine,
+   suspension, interior, glass, wheels, paint, final assembly and quality
+   control. When a part is missing, the line stops (⚠️ NOT ENOUGH ENGINES).
+   Your first car gets its own celebration.
+5. **Sell them.** Dealerships open after the first car. Car transporters fill
+   the showroom, customers come in and drive off in your cars. Later models
+   need better grades: City Car and Sedan, then SUV, Sports Car (with the
+   Electronics Factory), Luxury Sedan, Performance SUV, Supercar and Hypercar.
+   Electric Performance cars need the Battery Factory.
+6. **Grow the empire.** You can also:
+   - unlock districts for more plots;
+   - hire **managers** (one per plant);
+   - **research** with points from every part and car;
+   - follow the objectives (Produce 100 car bodies → Build your second
+     factory → … → Build your automotive empire);
+   - run **Global Expansion** after $10B for permanent **Empire Points**.
+   - Garages, car washes and other city buildings are a side business.
 
 Drag to pan, pinch or scroll to zoom, tap buildings; the minimap jumps the
 camera. Coming back after a while shows **Welcome Back!** with the time away,
-cars built and serviced, and money earned (capped at 12h; research and perks extend the cap).
+the parts and cars made while you were away, the units delivered and the money earned (capped at 12h; research and perks extend the cap).
 
 ## Code layout
 
 ```
 src/game/
-  config/     all economy numbers — cars, factories, upgrades, managers,
+  config/     all economy numbers — chain.ts (parts, plants, levels,
+              automation, grades, trucks), cars (models and recipes), managers,
               dealerships, research, achievements, missions, prestige, and
               city.ts (districts + layouts, plot buildings, garage facilities,
               levels, specializations)
@@ -72,10 +82,13 @@ src/game/
   engine/     pure game logic, no React
     state.ts      initial state
     modifiers.ts  aggregates research / managers / perks / achievements
-    economy.ts    costs, factory stats, dealer allocation, income snapshot
-    tick.ts       advances time (handles any dt analytically)
+    chain.ts      the supply chain: production, raw material, stock, trucks
+                  (shipments with routes and travel times), market, assembly,
+                  dealers and customers, offline simulation, plant upgrades
+    economy.ts    costs and the income snapshot
+    tick.ts       advances time in small steps
     actions.ts    player actions (buy, hire, research…)
-    offline.ts    offline report + collect
+    offline.ts    plays out the time away, report + collect
     prestige.ts   Empire Points, Global Expansion
     progress.ts   achievements, daily & milestone missions
     insights.ts   "next goal" hints and lock reasons for the UI
@@ -88,13 +101,15 @@ src/store/    Zustand stores: game loop + autosave (game-store), panels and
 src/components/
   map/        the Empire Map on a canvas: isometric painter, camera (pan,
               zoom, inertia, fly-to), terrain (coastline), scene of
-              buildings and scenery, props, vehicle models, lighting
-              (time of day), traffic, ships, minimap
+              buildings and scenery, plants, props, vehicle models,
+              lighting (time of day), traffic and shipments, ships, minimap
   garage/     garage interior: room + facility drawing, placement ghost
-  panels/     sheets over the map: build menu, plot/zone info, lists
+  plant/      the factory floor: a live production line inside each plant
+  panels/     sheets over the map: build menu, plant/market/depot/dealer
+              panels, zone info, lists
   ui/         shadcn-style primitives
-  game/       shell, HUD, factory cards, dialogs, toasts
-  views/      factories, dealers, research, cars, managers, missions…
+  game/       shell, HUD, goals, first-car celebration, dialogs, toasts
+  views/      supply chain, dealers, research, cars, managers, missions…
 ```
 
 The UI never contains economy numbers; tune the game in `src/game/config/` and

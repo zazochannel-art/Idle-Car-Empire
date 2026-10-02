@@ -9,6 +9,7 @@ import { BUILD_ANIM, drawConstruction, drawFog, drawGround, drawPreview, hitBox,
 import type { StructureType } from "@/game/types";
 import { applyLighting, skyAt, type TimeMode } from "./lighting";
 import { Traffic, type TrafficWorld } from "./traffic";
+import type { CarModel } from "./vehicles";
 
 export type MapTarget = { kind: "plot"; id: string } | { kind: "zone"; id: ZoneId } | null;
 
@@ -78,10 +79,9 @@ export class MapEngine {
     return Math.max(0.85, Math.min(1.35, this.cam.w / 1000 + 0.3));
   }
 
-  /** Where the camera starts: the first garage and its neighbours. */
+  /** Where the camera starts: the body works between the depot and the market. */
   private homeTile(): [number, number] {
-    // around Garage #01 in the Small Town
-    return this.cam.w < 700 ? [24, 17] : [25, 18];
+    return this.cam.w < 700 ? [23, 9] : [25, 8];
   }
 
   resize() {
@@ -192,11 +192,25 @@ export class MapEngine {
 
   // ───────────────────────── effects ─────────────────────────
 
+  private followUntil = 0;
+
+  /**
+   * FIRST CAR COMPLETED: zoom in on the assembly plant and follow the car as
+   * it rolls out for `seconds`.
+   */
+  celebrateFirstCar(plotId: string, model: CarModel, color: string, seconds = 6) {
+    const plot = WORLD_MAP.plotById[plotId];
+    if (!plot) return;
+    this.traffic.rollOut({ id: plotId, entry: plot.entry, weight: 1 }, model, color);
+    this.focusPlot(plotId, { x: 0, y: 0 }, 2.2, 0.9);
+    this.followUntil = this.t + seconds;
+  }
+
   pop(plotId: string, text: string, color = "#fde047") {
     const p = WORLD_MAP.plotById[plotId];
     if (!p) return;
     // above the building's label
-    this.pops.push({ x: p.x + p.w / 2, y: p.y + p.d / 2, z: p.kind === "factory" ? (p.w > 3 ? 130 : 80) : 95, text, color, age: 0 });
+    this.pops.push({ x: p.x + p.w / 2, y: p.y + p.d / 2, z: p.big ? 130 : 95, text, color, age: 0 });
     if (this.pops.length > 40) this.pops.shift();
   }
 
@@ -319,6 +333,13 @@ export class MapEngine {
     this.t += dt;
     cam.update(dt);
     this.traffic.update(dt);
+    const hero = this.traffic.hero;
+    if (hero && this.t < this.followUntil && this.t > this.followUntil - 5.2) {
+      // ease the camera along with the first car
+      const k = Math.min(1, dt * 2.5);
+      cam.x += (sx(hero.rx, hero.ry) - cam.x) * k;
+      cam.y += (sy(hero.rx, hero.ry, 10) - cam.y) * k;
+    }
 
     for (const e of this.earners) {
       e.acc += dt;

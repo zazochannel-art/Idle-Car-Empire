@@ -46,6 +46,14 @@ export function OfflineDialog() {
               </div>
             )}
           </div>
+          <div className="rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.07]">
+            <div className="text-[11px] uppercase tracking-wider text-white/45">{t("offline.components")}</div>
+            <div className="mt-1 text-lg font-bold tabular-nums">{formatNumber(report.components ?? 0)}</div>
+          </div>
+          <div className="rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.07]">
+            <div className="text-[11px] uppercase tracking-wider text-white/45">{t("offline.deliveries")}</div>
+            <div className="mt-1 text-lg font-bold tabular-nums">{formatNumber(report.deliveries ?? 0)}</div>
+          </div>
         </div>
         <div className="mt-2 rounded-2xl bg-gradient-to-br from-gold/15 to-transparent p-4 ring-1 ring-gold/30">
           <div className="text-[11px] uppercase tracking-wider text-gold/70">{t("offline.money")}</div>
@@ -64,7 +72,7 @@ export function OfflineDialog() {
 
 interface Toast {
   id: number;
-  tone: "success" | "gold" | "info";
+  tone: "success" | "gold" | "info" | "warn";
   title: string;
   body?: string;
   icon?: string;
@@ -99,6 +107,7 @@ export function Toasts() {
               t.tone === "gold" && "ring-1 ring-gold/40",
               t.tone === "success" && "ring-1 ring-emerald-400/30",
               t.tone === "info" && "ring-1 ring-electric/30",
+              t.tone === "warn" && "ring-1 ring-amber-400/50",
             )}
           >
             {t.icon && <span className="text-2xl">{t.icon}</span>}

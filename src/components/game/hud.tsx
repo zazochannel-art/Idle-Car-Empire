@@ -3,10 +3,10 @@
 import { Car, Factory, Moon, Settings, Star, Sun, Sunset, SunMoon, TrendingUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { TIME_MODES } from "@/components/map/lighting";
-import { FACTORIES } from "@/game/config/factories";
 import { formatMoney, formatNumber } from "@/game/format";
 import { LANGS } from "@/i18n";
 import { useT } from "@/i18n/use-t";
+import { plantsOf } from "@/game/engine/chain";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { AnimatedNumber } from "./animated-number";
@@ -18,8 +18,11 @@ const count = (n: number) => formatNumber(Math.floor(n));
 export function Hud({ onSettings }: { onSettings: () => void }) {
   const cash = useGame((g) => g.state.cash);
   const income = useGame((g) => g.snap.incomePerSec);
-  const cars = useGame((g) => g.state.lifetime.carsProduced + g.state.city.carsServiced);
-  const owned = useGame((g) => FACTORIES.filter((f) => g.state.factories[f.id].owned).length);
+  // before the first car, count the parts the plants have made
+  const cars = useGame((g) => g.state.lifetime.carsProduced);
+  const parts = useGame((g) => Object.values(g.state.lifetime.parts).reduce((a, b) => a + b, 0));
+  const owned = useGame((g) => plantsOf(g.state).length);
+  const trucks = useGame((g) => g.state.chain.shipments.length);
   const ep = useGame((g) => g.state.empirePoints);
   const setView = useUi((u) => u.setView);
   const { t } = useT();
@@ -37,9 +40,9 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
             </div>
           </div>
           <Pill icon={<TrendingUp className="size-3.5 text-emerald-400" />} label={t("hud.profit")} value={`${formatMoney(income)}${t("unit.perSec")}`} />
-          <Pill icon={<Car className="size-3.5 text-sky-400" />} label={t("hud.cars")} value={<AnimatedNumber value={cars} format={count} />} />
+          <Pill icon={<Car className="size-3.5 text-sky-400" />} label={cars > 0 ? t("hud.cars") : t("hud.parts")} value={<AnimatedNumber value={cars > 0 ? cars : parts} format={count} />} />
           <div className="hidden sm:block">
-            <Pill icon={<Factory className="size-3.5 text-cyan-300" />} label={t("hud.factories")} value={`${owned}/${FACTORIES.length}`} />
+            <Pill icon={<Factory className="size-3.5 text-cyan-300" />} label={t("hud.factories")} value={`${owned} · 🚚${trucks}`} />
           </div>
           <button onClick={() => setView("prestige")} className="text-left">
             <Pill icon={<Star className="size-3.5 fill-gold text-gold" />} label={t("hud.prestige")} value={formatNumber(ep)} gold />

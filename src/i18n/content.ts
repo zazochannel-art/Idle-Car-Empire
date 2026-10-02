@@ -4,47 +4,47 @@ import { useMemo } from "react";
 import type { AchievementConfig } from "@/game/config/achievements";
 import type { CarConfig } from "@/game/config/cars";
 import type { DealerConfig } from "@/game/config/dealerships";
-import type { FactoryConfig } from "@/game/config/factories";
 import type { ManagerBonus, ManagerConfig } from "@/game/config/managers";
 import type { MilestoneMission } from "@/game/config/missions";
 import type { EmpirePerk } from "@/game/config/prestige";
 import type { ResearchCategoryConfig, ResearchNode } from "@/game/config/research";
-import type { UpgradeConfig } from "@/game/config/upgrades";
-import { FACTORY_BY_ID } from "@/game/config/factories";
 import { RESEARCH_BY_ID } from "@/game/config/research";
+import type { CarLock, PlantLock } from "@/game/engine/chain";
 import type { Requirement } from "@/game/engine/insights";
 import { formatMoney, formatNumber } from "@/game/format";
-import type { Continent, Lang, MissionState } from "@/game/types";
+import type { ComponentId, Lang, MissionState } from "@/game/types";
+import { MAKER } from "@/game/config/chain";
 import { content as c, translate } from ".";
 
 /** Localised names and descriptions for everything defined in config/. */
 export function contentFor(lang: Lang) {
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string | number>) => translate(lang, key, vars);
   const research = (x: ResearchNode) => c(lang, `research.${x.id}.name`, x.name);
-  const factory = (x: FactoryConfig) => c(lang, `factory.${x.id}.name`, x.name);
-  return {
-    /** Why something is locked, in words. */
-    requirement: (r: Requirement) => {
-      switch (r.kind) {
-        case "research":
-          return t("req.research", { name: research(RESEARCH_BY_ID[r.research]) });
-        case "buyFactory":
-          return t("req.buyFactory", { name: factory(FACTORY_BY_ID[r.factory]) });
-        case "technology":
-          return t("req.technology", { level: r.level, name: factory(FACTORY_BY_ID[r.factory]) });
-        case "zone":
-          return t("req.zone", { name: t(`zone.${r.zone}`) });
-        case "unavailable":
-          return t("req.unavailable");
+  /** Why something is locked, in words. */
+  const requirement = (r: Requirement): string => {
+    switch (r.kind) {
+      case "research":
+        return t("req.research", { name: research(RESEARCH_BY_ID[r.research]) });
+      case "plant":
+        return t("req.plant", { name: t(`structure.${r.plant}`) });
+      case "grade": {
+        const item = (Object.keys(MAKER) as ComponentId[]).find((k) => MAKER[k] === r.plant) ?? "body";
+        return t("req.grade", { name: t(`structure.${r.plant}`), grade: t(`grade.${item}.${r.grade}` as Parameters<typeof translate>[1]) });
       }
-    },
+      case "zone":
+        return t("req.zone", { name: t(`zone.${r.zone}`) });
+      case "firstCar":
+        return t("req.firstCar");
+      case "unavailable":
+        return t("req.unavailable");
+    }
+  };
+  return {
+    requirement,
+    plantLock: (l: NonNullable<PlantLock>) => requirement(l),
+    carLock: (l: NonNullable<CarLock>) => requirement(l),
     car: (x: CarConfig) => c(lang, `car.${x.id}.name`, x.name),
     carTagline: (x: CarConfig) => c(lang, `car.${x.id}.tagline`, x.tagline),
-    factory,
-    city: (x: FactoryConfig) => c(lang, `city.${x.city}`, x.city),
-    continent: (x: Continent) => c(lang, `continent.${x}`, x),
-    upgrade: (x: UpgradeConfig) => c(lang, `upgrade.${x.id}.name`, x.name),
-    upgradeDesc: (x: UpgradeConfig) => c(lang, `upgrade.${x.id}.desc`, x.description),
     role: (x: ManagerConfig) => c(lang, `manager.${x.id}.role`, x.role),
     bonus: (b: ManagerBonus, level: number) => {
       const pct = Math.round(b.pct * Math.max(1, level) * 100);
