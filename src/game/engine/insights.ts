@@ -2,7 +2,7 @@
 // and why something is locked. They return data, not text — the UI words it
 // in the player's language. Never mutate state.
 import { CARS } from "../config/cars";
-import { MAKER, PLANTS } from "../config/chain";
+import { MAKER, PLANTS, PLANT_BY_ID } from "../config/chain";
 import { DEALERS } from "../config/dealerships";
 import { MANAGERS } from "../config/managers";
 import { ZONE_BY_ID } from "../config/city";
@@ -20,6 +20,7 @@ export type Requirement =
   | { kind: "grade"; plant: PlantType; grade: number }
   | { kind: "zone"; zone: ZoneId }
   | { kind: "firstCar" }
+  | { kind: "made"; item: ComponentId; n: number; have: number }
   | { kind: "unavailable" };
 
 export type Goal =
@@ -32,7 +33,8 @@ export type Goal =
   | { kind: "prestige"; icon: string; points: number }
   | { kind: "facility"; icon: string; plot: string }
   | { kind: "worker"; icon: string; plot: string; idle: number }
-  | { kind: "zone"; icon: string; cost: number; zone: ZoneId };
+  | { kind: "zone"; icon: string; cost: number; zone: ZoneId }
+  | { kind: "made"; icon: string; plant: PlantType; item: ComponentId; n: number; have: number; plot: string | null };
 
 export function dealerRequirement(s: GameState, id: DealerId): Requirement | null {
   if (!canOpenDealers(s)) return { kind: "firstCar" };
@@ -77,6 +79,15 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
   if (canOpenDealers(s) && !DEALERS.some((d) => s.dealers[d.id].owned)) {
     const d = DEALERS[0];
     goals.push({ kind: "dealer", icon: d.emoji, cost: d.cost, dealer: d.id });
+  }
+
+  // A production milestone that unlocks the next plant (25 bodies → Engine Factory).
+  for (const p of PLANTS) {
+    const lock = hasPlant(s, p.id) ? null : plantLock(s, p.id);
+    if (lock?.kind !== "made") continue;
+    const plot = plantsOf(s).find(([, b]) => b.type === MAKER[lock.item])?.[0] ?? null;
+    goals.push({ kind: "made", icon: PLANT_BY_ID[p.id].emoji, plant: p.id, item: lock.item, n: lock.n, have: lock.have, plot });
+    break;
   }
 
   // The next plant in the chain.

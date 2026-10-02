@@ -43,6 +43,7 @@ interface GameStore {
   plantAutomation: (plot: string) => boolean;
   plantGrade: (plot: string) => boolean;
   setPlantCar: (plot: string, car: CarId | null) => void;
+  setCombine: (plot: string, on: boolean) => void;
   hireManager: (id: ManagerId, assignTo?: string) => boolean;
   upgradeManager: (id: ManagerId) => boolean;
   assignManager: (id: ManagerId, plot: string | null) => void;
@@ -188,6 +189,9 @@ export const useGame = create<GameStore>((set, get) => {
     plantSpeed: (plot) => act((s) => Ch.upgradePlantSpeed(s, plot, get().snap.gm)),
     plantAutomation: (plot) => act((s) => Ch.upgradeAutomation(s, plot, get().snap.gm)),
     plantGrade: (plot) => act((s) => Ch.upgradeGrade(s, plot, get().snap.gm)),
+    setCombine: (plot, on) => {
+      act((s) => Ch.setCombine(s, plot, on));
+    },
     setPlantCar: (plot, car) => {
       act((s) => Ch.setPlantCar(s, plot, car, get().snap.gm));
     },

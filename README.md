@@ -41,23 +41,28 @@ npm run simulate -- 3   # balance bot: plays 3 hours and logs milestones
    - **Automation** (Manual → AI Factory) raises speed and offline output.
    - **Grades** (Standard → Lightweight → … → Carbon) raise the value of
      each part and unlock better cars.
-3. **Your first car needs three parts.** Build the Engine Factory ($3K), the
+3. **Engines and the first choice.** After 25 bodies the Engine Factory
+   ($3K) unlocks. Until you have an assembly plant it can sell engines, or
+   fit each engine into a body and sell **motorized chassis** (+30% value,
+   but it stops when bodies run out); the panel recommends one from your
+   body and engine output.
+4. **Your first car needs three parts.** Build the Engine Factory ($3K), the
    Tyre Factory ($60K) and the **Car Assembly Plant** ($600K), on any plot in
    an unlocked district. Industrial lots (a whole block) double a plant's
    output and storage. Deliveries are automatic: parts go to the assembly
    plant when it needs them, and the rest is sold at the market.
-4. **Assemble cars.** The assembly line has nine stations: body, engine,
+5. **Assemble cars.** The assembly line has nine stations: body, engine,
    suspension, interior, glass, wheels, paint, final assembly and quality
    control. When a part is missing, the line stops (⚠️ NOT ENOUGH ENGINES).
    Your first car gets its own celebration and opens the **Local Dealer** for
    free.
-5. **Sell them, then build better cars.** Car transporters fill the showroom,
+6. **Sell them, then build better cars.** Car transporters fill the showroom,
    customers come in and drive off in your cars. Each better model needs one
    more plant and better grades: City Car (body, engine, tyres) → Sedan
    (+ Interior Factory) → SUV (+ Glass) → Sports Car (+ Paint) → Luxury Sedan,
    Performance SUV, Supercar and Hypercar (+ Electronics) → Electric
    Performance (+ Battery Factory). More dealerships add customers and markup.
-6. **Grow the empire.** You can also:
+7. **Grow the empire.** You can also:
    - unlock districts for more plots;
    - hire **managers** (one per plant);
    - **research** with points from every part and car;
