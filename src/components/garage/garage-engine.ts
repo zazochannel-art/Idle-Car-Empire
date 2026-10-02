@@ -212,6 +212,8 @@ export class GarageEngine {
     const z = cam.zoom * this.dpr;
     ctx.setTransform(z, 0, 0, z, this.dpr * (cam.w / 2 - cam.x * cam.zoom), this.dpr * (cam.h / 2 - cam.y * cam.zoom));
     p.t = this.t;
+    p.zoom = cam.zoom;
+    p.dpr = this.dpr;
     p.proj = null;
 
     const [gw, gd] = this.scene.grid;

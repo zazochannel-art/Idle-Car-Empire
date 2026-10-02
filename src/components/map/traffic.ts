@@ -6,7 +6,7 @@
 import { BLOCKS, NODES, ROAD_STEP, segmentOpen, type Entry } from "@/game/city/layout";
 import type { ZoneId } from "@/game/types";
 import { sx, sy, type Painter } from "./iso";
-import { CAR_COLORS, CAR_MODELS, drawCarrier, drawModel, drawTruck, type CarModel, type Dir } from "./vehicles";
+import { CAR_COLORS, CAR_MODELS, DIR_YAW, drawCarrier, drawModel, drawTruck, type CarModel, type Dir } from "./vehicles";
 import { trafficLight } from "./props";
 
 export interface Site {
@@ -40,6 +40,8 @@ export interface ShipView {
   vehicle: "van" | "truck" | "semi" | "trailer" | "carrier";
   /** Cargo colour (component), or car models for transporters. */
   color: string;
+  /** What it carries: a component id, "raw" or "car". */
+  item?: string;
   models?: CarModel[];
 }
 
@@ -51,6 +53,9 @@ interface Ship extends ShipView {
   x: number;
   y: number;
   dir: Dir;
+  yaw?: number;
+  steer?: number;
+  odo: number;
 }
 
 const VEHICLE_SCALE = { van: 0.8, truck: 1, semi: 1.12, trailer: 1.25, carrier: 1 };
@@ -88,6 +93,19 @@ export interface Agent {
   ry: number;
   braking: boolean;
   puffs: { x: number; y: number; age: number }[];
+  /** Heading (radians) easing toward the direction of travel, front-wheel angle, distance driven. */
+  yaw?: number;
+  steer?: number;
+  odo?: number;
+}
+
+/** Turns `cur` toward `target` (radians) at `rate` rad/s; returns the new angle and the steering side. */
+function turnToward(cur: number | undefined, target: number, rate: number, dt: number): [number, number] {
+  if (cur === undefined) return [target, 0];
+  let d = target - cur;
+  d = Math.atan2(Math.sin(d), Math.cos(d));
+  const step = Math.max(-rate * dt, Math.min(rate * dt, d));
+  return [cur + step, Math.abs(d) > 0.12 ? Math.sign(d) : 0];
 }
 
 interface Walker {
@@ -96,6 +114,18 @@ interface Walker {
   s: number;
   speed: number;
   shirt: string;
+}
+
+/** A vehicle the player tapped on the map, for the showcase. */
+export interface VehiclePick {
+  /** The live agent or shipment, to follow it with the camera. */
+  ref: object;
+  kind: "car" | "van" | "truck" | "semi" | "trailer" | "carrier";
+  model: CarModel;
+  color: string;
+  models?: CarModel[];
+  item?: string;
+  empty?: boolean;
 }
 
 export type ArriveFn = (kind: Kind, site: Site) => void;
@@ -278,7 +308,7 @@ export class Traffic {
       }
       const path = old?.path ?? this.shipPath(v.from, v.to);
       const len = path.reduce((a, q, i) => (i ? a + Math.abs(q.x - path[i - 1].x) + Math.abs(q.y - path[i - 1].y) : 0), 0);
-      this.ships.set(v.id, { ...v, path, len, lt: v.t, x: path[0].x, y: path[0].y, dir: 0 });
+      this.ships.set(v.id, { ...v, path, len, lt: v.t, x: path[0].x, y: path[0].y, dir: 0, odo: 0, yaw: old?.yaw });
     }
     for (const id of this.ships.keys()) if (!seen.has(id)) this.ships.delete(id);
   }
@@ -325,8 +355,12 @@ export class Traffic {
       // keep right, except on the driveways at either end
       const drive2 = i === 0 || i >= sh.path.length - 2;
       const lane = drive2 ? 0 : 0.2;
-      sh.x = p0.x + (p1.x - p0.x) * k - dy * lane;
-      sh.y = p0.y + (p1.y - p0.y) * k + dx * lane;
+      const nx = p0.x + (p1.x - p0.x) * k - dy * lane;
+      const ny = p0.y + (p1.y - p0.y) * k + dx * lane;
+      sh.odo += Math.abs(nx - sh.x) + Math.abs(ny - sh.y);
+      sh.x = nx;
+      sh.y = ny;
+      [sh.yaw, sh.steer] = turnToward(sh.yaw, DIR_YAW[sh.dir], 3.2, dt);
     }
   }
 
@@ -416,6 +450,8 @@ export class Traffic {
       const dx = Math.sign(p1.x - p0.x);
       const dy = Math.sign(p1.y - p0.y);
       a.dir = dx > 0 ? 0 : dx < 0 ? 2 : dy > 0 ? 1 : 3;
+      [a.yaw, a.steer] = turnToward(a.yaw, DIR_YAW[a.dir], 4.5, dt);
+      a.odo = (a.odo ?? 0) + a.cur * dt;
       // keep right: offset perpendicular to the direction of travel
       const lane = 0.2;
       const onDriveway = a.seg >= a.path.length - 2 && a.phase === "go" && a.kind !== "ambient";
@@ -528,6 +564,49 @@ export class Traffic {
   }
 
   /** Things to depth-sort with the buildings. */
+  /** The vehicle under a point of the map (world px), front-most first. */
+  pickVehicle(wx: number, wy: number, tol: number): VehiclePick | null {
+    let best: VehiclePick | null = null;
+    let bestD = tol;
+    let bestDepth = -Infinity;
+    const test = (x: number, y: number, z: number, make: () => VehiclePick) => {
+      const d = Math.hypot(sx(x, y) - wx, sy(x, y, z) - wy);
+      if (d < bestD || (d < tol && x + y > bestDepth && d < bestD + 4)) {
+        bestD = Math.min(bestD, d);
+        bestDepth = x + y;
+        best = make();
+      }
+    };
+    for (const sh of this.ships.values())
+      test(sh.x, sh.y, 9, () => ({
+        ref: sh,
+        kind: sh.vehicle,
+        model: sh.models?.[0] ?? "sedan",
+        color: sh.vehicle === "carrier" ? CAR_COLORS[sh.id % CAR_COLORS.length] : sh.color,
+        models: sh.vehicle === "carrier" && !sh.back ? (sh.models?.length ? sh.models : (["sedan", "sedan"] as CarModel[])) : undefined,
+        item: sh.item,
+        empty: sh.back,
+      }));
+    for (const a of this.agents) {
+      if (a.phase === "inside" || a.alpha <= 0.3) continue;
+      test(a.rx, a.ry, a.kind === "truck" || a.kind === "carrier" ? 8 : 5, () =>
+        a.kind === "truck"
+          ? { ref: a, kind: "van", model: a.model, color: a.color2 === a.color ? "#f97316" : "#f8fafc", empty: true }
+          : a.kind === "carrier"
+            ? { ref: a, kind: "carrier", model: a.model, color: a.color, models: [a.model, CAR_MODELS[(CAR_MODELS.indexOf(a.model) + 3) % CAR_MODELS.length]] }
+            : { ref: a, kind: "car", model: a.model, color: a.color },
+      );
+    }
+    return best;
+  }
+
+  /** Where a picked vehicle is now (tiles), or null once it has gone. */
+  positionOf(ref: object): [number, number] | null {
+    for (const sh of this.ships.values()) if (sh === ref) return [sh.x, sh.y];
+    for (const a of this.agents) if (a === ref) return a.phase === "inside" || a.alpha <= 0 ? null : [a.rx, a.ry];
+    return null;
+  }
+
   drawables(): { depth: number; x: number; y: number; draw: (p: Painter) => void }[] {
     const out: { depth: number; x: number; y: number; draw: (p: Painter) => void }[] = [];
     for (const sh of this.ships.values()) {
@@ -537,10 +616,11 @@ export class Traffic {
         y: sh.y,
         draw: (p) => {
           const scale = VEHICLE_SCALE[sh.vehicle];
-          if (sh.vehicle === "carrier" && !sh.back && sh.models?.length) {
-            const m = sh.models;
-            drawCarrier(p, sh.x, sh.y, sh.dir, [CAR_COLORS[sh.id % CAR_COLORS.length], CAR_COLORS[(sh.id * 3 + 2) % CAR_COLORS.length]], 1, [m[0], m[1] ?? m[0]]);
-          } else drawTruck(p, sh.x, sh.y, sh.dir, sh.back ? "#e2e8f0" : sh.color, scale);
+          const look = { yaw: sh.yaw, odo: sh.odo };
+          if (sh.vehicle === "carrier") {
+            const m = sh.models?.length ? sh.models : (["sedan", "sedan"] as CarModel[]);
+            drawCarrier(p, sh.x, sh.y, sh.dir, [CAR_COLORS[sh.id % CAR_COLORS.length], CAR_COLORS[(sh.id * 3 + 2) % CAR_COLORS.length]], 1, [m[0], m[1] ?? m[0]], { ...look, empty: sh.back });
+          } else drawTruck(p, sh.x, sh.y, sh.dir, sh.color, scale, false, { ...look, kind: sh.vehicle, empty: sh.back });
           if (p.night > 0.35) p.light(sx(sh.x, sh.y), sy(sh.x, sh.y, 4), 14, "#fef3c7", 0.5);
         },
       });
@@ -555,9 +635,10 @@ export class Traffic {
           // exhaust when pulling away
           for (const pf of a.puffs) p.circle(pf.x, pf.y, 3 + pf.age * 8, 1.5 + pf.age * 3, `rgba(203,213,225,${0.4 * (1 - pf.age / 1.2)})`);
           p.ctx.globalAlpha = a.alpha;
-          if (a.kind === "truck") drawTruck(p, a.rx, a.ry, a.dir, a.color2 === a.color ? "#f97316" : "#f8fafc", 1, a.braking);
-          else if (a.kind === "carrier") drawCarrier(p, a.rx, a.ry, a.dir, [a.color, a.color2], 1, [a.model, CAR_MODELS[(CAR_MODELS.indexOf(a.model) + 3) % CAR_MODELS.length]]);
-          else drawModel(p, a.rx, a.ry, a.dir, a.model, a.color, 1, { brake: a.braking, lights: p.night > 0.35 });
+          const look = { yaw: a.yaw, steer: a.steer, odo: a.odo };
+          if (a.kind === "truck") drawTruck(p, a.rx, a.ry, a.dir, a.color2 === a.color ? "#f97316" : "#f8fafc", 1, a.braking, { ...look, kind: "van" });
+          else if (a.kind === "carrier") drawCarrier(p, a.rx, a.ry, a.dir, [a.color, a.color2], 1, [a.model, CAR_MODELS[(CAR_MODELS.indexOf(a.model) + 3) % CAR_MODELS.length]], look);
+          else drawModel(p, a.rx, a.ry, a.dir, a.model, a.color, 1, { ...look, brake: a.braking, lights: p.night > 0.35 });
           p.ctx.globalAlpha = 1;
         },
       });

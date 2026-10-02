@@ -8,6 +8,11 @@ import { Painter, sx, sy } from "../map/iso";
 import { forklift, robotArm, tireStack } from "../map/props";
 import { drawModel, drawTruck, type CarModel } from "../map/vehicles";
 import { drawRoom, WALL_H } from "../garage/interior";
+import { sprites3d, tierFor, type SpriteSize } from "../three/sprites";
+import { STATION_MACHINES } from "../three/industrial-models";
+
+const MACHINE_SIZE: SpriteSize = { w: 84, h: 110, ax: 42, ay: 84 };
+const ROBOT_SIZE: SpriteSize = { w: 70, h: 80, ax: 35, ay: 60 };
 
 export interface FloorScene {
   type: string;
@@ -124,6 +129,7 @@ export class FloorEngine {
     ctx.setTransform(z, 0, 0, z, this.dpr * (cam.w / 2 - cam.x * cam.zoom), this.dpr * (cam.h / 2 - cam.y * cam.zoom));
     p.t = this.t;
     p.zoom = cam.zoom;
+    p.dpr = this.dpr;
     p.night = 0;
     p.lights.length = 0;
     const s = this.scene;
@@ -149,6 +155,19 @@ export class FloorEngine {
       const by = 0.4 + Math.floor(i / 2) * 0.55;
       p.box(bx, by, 0.5, 0.45, 0, 7, s.type === "tireFactory" ? "#57534e" : "#a8a29e");
     }
+    // stations: the machine of each step stands behind the belt
+    const kinds = STATION_MACHINES[s.type] ?? [];
+    for (let i = 0; i < n; i++) {
+      const x = stationX(i);
+      const active = s.running && Math.floor(this.belt * n) === i;
+      const kind = kinds[i % Math.max(1, kinds.length)];
+      if (!kind || !this.machine(kind, x, y0 - 0.85, active ? Math.floor(this.t * 5) % 4 : 0, s.accent)) {
+        p.box(x - 0.45, y0 - 1.25, 0.9, 0.8, 0, 16 + (i % 2) * 4, i === n - 1 ? "#0f766e" : "#475569", "#64748b");
+        p.onLeft(x - 0.45, y0 - 0.45, 0, 0.15, 0.75, 8, 13, active ? "#38bdf8" : "#1e293b");
+      }
+      if (active) p.light(sx(x, y0 - 0.45), sy(x, y0 - 0.45, 10), 18, "#7dd3fc", 0.6);
+    }
+
     // conveyor
     p.box(x0, y0, span, 1, 0, 5, "#374151", "#1f2937");
     const c = ctx;
@@ -162,25 +181,26 @@ export class FloorEngine {
     }
     c.stroke();
 
-    // stations: machines behind the belt, arms or workers in front
-    const robots = s.automation;
-    for (let i = 0; i < n; i++) {
-      const x = stationX(i);
-      const active = s.running && Math.floor(this.belt * n) === i;
-      p.box(x - 0.45, y0 - 1.25, 0.9, 0.8, 0, 16 + (i % 2) * 4, i === n - 1 ? "#0f766e" : "#475569", "#64748b");
-      p.onLeft(x - 0.45, y0 - 0.45, 0, 0.15, 0.75, 8, 13, active ? "#38bdf8" : "#1e293b");
-      if (active) p.light(sx(x, y0 - 0.45), sy(x, y0 - 0.45, 10), 18, "#7dd3fc", 0.6);
-      if (i < robots + 1 && i % 2 === 0) robotArm(p, x - 0.3, y0 + 1.3, this.t + i, active);
-      else p.person(x + 0.1, y0 + 1.5, i % 3 ? "#f59e0b" : "#3b82f6", this.t * 3 + i);
-      p.tag(s.steps[i], x, y0 - 0.9, 28, { size: 9, bg: active ? "rgba(14,165,233,0.92)" : "rgba(15,23,42,0.8)" });
-    }
-
     // the units on the belt: one per station, each a step further along
     for (let i = 0; i < n; i++) {
       const u = (i + this.belt) / n;
       const x = x0 + u * span;
       const stage = Math.min(n - 1, Math.floor(u * n));
       this.drawUnit(s, x, y0 + 0.5, stage, n);
+    }
+
+    // in front of the belt: robot arms on automated stations, workers on the others
+    const robots = s.automation;
+    for (let i = 0; i < n; i++) {
+      const x = stationX(i);
+      const active = s.running && Math.floor(this.belt * n) === i;
+      if (i < robots + 1 && i % 2 === 0) {
+        if (!this.robot(x - 0.3, y0 + 1.3, active ? Math.floor(this.t * 5 + i) % 4 : 0, i)) robotArm(p, x - 0.3, y0 + 1.3, this.t + i, active);
+      } else p.person(x + 0.1, y0 + 1.5, i % 3 ? "#f59e0b" : "#3b82f6", this.t * 3 + i);
+    }
+    for (let i = 0; i < n; i++) {
+      const active = s.running && Math.floor(this.belt * n) === i;
+      p.tag(s.steps[i], stationX(i), y0 - 0.9, 34, { size: 9, bg: active ? "rgba(14,165,233,0.92)" : "rgba(15,23,42,0.8)" });
     }
 
     // finished goods racks next to the dock
@@ -217,6 +237,31 @@ export class FloorEngine {
     ctx.globalCompositeOperation = "source-over";
   }
 
+  /** A station's 3D machine; false until its sprite is ready. */
+  private machine(kind: string, x: number, y: number, pose: number, accent: string) {
+    const k = tierFor(this.cam.zoom * this.dpr);
+    const spr = sprites3d.get(`mach|${kind}|${pose}|${accent}`, MACHINE_SIZE, k, (T, { kit, industrial }) =>
+      industrial.buildMachine(T, kit, kind as Parameters<typeof industrial.buildMachine>[2], pose, accent),
+    );
+    if (!spr) return false;
+    this.ctx.drawImage(spr.img, sx(x, y) - MACHINE_SIZE.ax, sy(x, y, 0) - MACHINE_SIZE.ay, MACHINE_SIZE.w, MACHINE_SIZE.h);
+    return true;
+  }
+
+  /** A six-axis robot reaching over the belt; false until its sprite is ready. */
+  private robot(x: number, y: number, pose: number, i: number) {
+    const k = tierFor(this.cam.zoom * this.dpr);
+    const tool = (["torch", "gripper", "suction", "spray"] as const)[i % 4];
+    const spr = sprites3d.get(`robot|${pose}|${tool}`, ROBOT_SIZE, k, (T, { kit, industrial }) => {
+      const r = industrial.buildRobot(T, kit, pose, "#f59e0b", tool);
+      r.rotation.y = Math.PI / 2;
+      return r;
+    });
+    if (!spr) return false;
+    this.ctx.drawImage(spr.img, sx(x, y) - ROBOT_SIZE.ax, sy(x, y, 0) - ROBOT_SIZE.ay, ROBOT_SIZE.w, ROBOT_SIZE.h);
+    return true;
+  }
+
   /** One unit on the line, drawn as it looks after `stage` of `n` steps. */
   private drawUnit(s: FloorScene, x: number, y: number, stage: number, n: number) {
     const p = this.p;
@@ -224,7 +269,8 @@ export class FloorEngine {
     if (s.type === "assemblyPlant") {
       // primer shell → painted car (station 7 of 9 is the paint shop)
       const painted = stage >= 6;
-      drawModel(p, x, y, 0, s.model ?? "sedan", painted ? (s.paint ?? "#ef4444") : MODEL_COLOR, 1, { lift: 5, noShadow: true });
+      // the 3D model shows exactly what is fitted at this station
+      drawModel(p, x, y, 0, s.model ?? "sedan", painted ? (s.paint ?? "#ef4444") : MODEL_COLOR, 1, { lift: 5, noShadow: true, stage, odo: x });
       if (stage >= 8) p.light(sx(x, y), sy(x, y, 10), 22, "#facc15", 0.5);
       return;
     }
@@ -233,7 +279,7 @@ export class FloorEngine {
       case "bodyWorks":
         if (stage === 0) p.box(x - 0.35, y - 0.3, 0.7, 0.6, z, 1.5, "#9ca3af");
         else if (stage < n - 1) p.box(x - 0.4, y - 0.3, 0.8, 0.6, z, 2 + stage * 2, "#b6bec9", "#d1d5db");
-        else drawModel(p, x, y, 0, "sedan", "#9aa4b2", 0.8, { lift: z, noShadow: true });
+        else drawModel(p, x, y, 0, "sedan", "#9aa4b2", 0.8, { lift: z, noShadow: true, stage: 1 });
         if (stage === 2 && Math.sin(this.t * 20) > 0.3) p.light(sx(x, y), sy(x, y, 10), 14, "#fde68a", 0.9);
         break;
       case "engineFactory":

@@ -8,10 +8,10 @@ import { Painter, sx, sy, toTile } from "./iso";
 import { BUILD_ANIM, drawConstruction, drawFog, drawGround, drawPreview, hitBox, WORLD_BOUNDS, zoneCenter, type Drawable, type DrawInfo } from "./scene";
 import type { StructureType } from "@/game/types";
 import { applyLighting, skyAt, type TimeMode } from "./lighting";
-import { Traffic, type TrafficWorld } from "./traffic";
+import { Traffic, type TrafficWorld, type VehiclePick } from "./traffic";
 import type { CarModel } from "./vehicles";
 
-export type MapTarget = { kind: "plot"; id: string } | { kind: "zone"; id: ZoneId } | null;
+export type MapTarget = { kind: "plot"; id: string } | { kind: "zone"; id: ZoneId } | { kind: "vehicle"; v: VehiclePick } | null;
 
 interface Pop {
   x: number;
@@ -66,6 +66,8 @@ export class MapEngine {
     this.ro.observe(canvas);
     this.resize();
     const [hx, hy] = this.homeTile();
+    // close enough to read the cars' details (sprites are re-rendered sharper)
+    this.cam.maxZoom = 4;
     this.cam.zoom = this.defaultZoom();
     this.cam.x = sx(hx, hy);
     this.cam.y = sy(hx, hy);
@@ -193,6 +195,13 @@ export class MapEngine {
   // ───────────────────────── effects ─────────────────────────
 
   private followUntil = 0;
+  /** The vehicle in the showcase: the camera glides after it until the player pans. */
+  private tracked: { ref: object; x: number; y: number; zoom: number } | null = null;
+
+  /** Starts (or, with null, stops) following a vehicle with a close-up camera. */
+  track(ref: object | null) {
+    this.tracked = ref ? { ref, x: NaN, y: NaN, zoom: NaN } : null;
+  }
 
   /**
    * FIRST CAR COMPLETED: zoom in on the assembly plant and follow the car as
@@ -222,6 +231,9 @@ export class MapEngine {
 
   private pick(px: number, py: number): MapTarget {
     const [wx, wy] = this.cam.toWorld(px, py);
+    // vehicles first: they drive in front of the buildings
+    const v = this.traffic.pickVehicle(wx, wy, Math.max(9, 14 / this.cam.zoom));
+    if (v) return { kind: "vehicle", v };
     // Front-most building whose silhouette contains the point.
     for (let i = this.scene.length - 1; i >= 0; i--) {
       const d = this.scene[i];
@@ -341,6 +353,27 @@ export class MapEngine {
       cam.y += (sy(hero.rx, hero.ry, 10) - cam.y) * k;
     }
 
+    const tr = this.tracked;
+    if (tr) {
+      const pos = this.traffic.positionOf(tr.ref);
+      // the player dragged or zoomed: let go, but keep the showcase open
+      const moved = !Number.isNaN(tr.x) && (Math.abs(cam.x - tr.x) > 1 || Math.abs(cam.y - tr.y) > 1 || Math.abs(cam.zoom - tr.zoom) > 0.001);
+      if (!pos || moved) this.tracked = null;
+      else {
+        cam.stop();
+        const k = Math.min(1, dt * 3);
+        cam.x += (sx(pos[0], pos[1]) - cam.x) * k;
+        // on phones the showroom card covers the lower half: keep the car above it
+        const lift = cam.w < 768 ? (cam.h * 0.2) / cam.zoom : 0;
+        cam.y += (sy(pos[0], pos[1], 6) + lift - cam.y) * k;
+        cam.zoom *= Math.pow(Math.min(cam.maxZoom, 3) / cam.zoom, Math.min(1, dt * 1.6));
+        cam.clamp();
+        tr.x = cam.x;
+        tr.y = cam.y;
+        tr.zoom = cam.zoom;
+      }
+    }
+
     for (const e of this.earners) {
       e.acc += dt;
       if (e.acc >= e.every && e.perSec > 0) {
@@ -365,6 +398,7 @@ export class MapEngine {
     const sky = skyAt(this.timeMode, this.t);
     p.night = sky.dark;
     p.zoom = cam.zoom;
+    p.dpr = this.dpr;
     p.lights.length = 0;
 
     // sea shimmer around the island

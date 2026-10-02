@@ -1,4 +1,5 @@
 import type { CarId } from "@/game/types";
+import { sprites3d, tierFor, type SpriteSize } from "../three/sprites";
 import { shade, sx, sy, type Painter } from "./iso";
 
 /** 0 = +x, 1 = +y, 2 = -x, 3 = -y. */
@@ -45,6 +46,14 @@ const SPECS: Record<CarModel, Spec> = {
 };
 
 export interface CarOpts {
+  /** Heading in radians on the map (0 = +x, π/2 = +y); overrides `dir` for smooth turns. */
+  yaw?: number;
+  /** Front wheels: -1 left, 0 straight, 1 right. */
+  steer?: number;
+  /** Distance driven (tiles), turns the wheels. */
+  odo?: number;
+  /** Assembly-line stage 0…8 (8 = finished car). */
+  stage?: number;
   /** Raise the whole car (lifts). */
   lift?: number;
   /** Brake lights on. */
@@ -91,6 +100,7 @@ function wheel(p: Painter, wx: number, wy: number, z: number, r: number, ax: boo
  * ~3-4 inside a garage).
  */
 export function drawModel(p: Painter, x: number, y: number, dir: Dir, model: CarModel, color: string, s = 1, opts: CarOpts = {}) {
+  if (!p.dim && drawCarSprite(p, x, y, opts.yaw ?? DIR_YAW[dir], model, color, s, opts)) return;
   const sp = SPECS[model];
   const ax = dir === 0 || dir === 2;
   const sgn = dir === 0 || dir === 1 ? 1 : -1;
@@ -201,7 +211,11 @@ export function drawCar(p: Painter, x: number, y: number, dir: Dir, color: strin
   drawModel(p, x, y, dir, sporty ? "sports" : "sedan", color, s, { lift, lights: p.night > 0.35 });
 }
 
-export function drawTruck(p: Painter, x: number, y: number, dir: Dir, cargo: string, s = 1, brake = false) {
+export function drawTruck(p: Painter, x: number, y: number, dir: Dir, cargo: string, s = 1, brake = false, look: TruckSpriteOpts = {}) {
+  if (!p.dim && drawTruckSprite(p, x, y, look.yaw ?? DIR_YAW[dir], cargo, s, look)) {
+    if (brake || p.night > 0.35) truckGlows(p, x, y, look.yaw ?? DIR_YAW[dir], s, brake);
+    return;
+  }
   const ax = dir === 0 || dir === 2;
   const sgn = dir === 0 || dir === 1 ? 1 : -1;
   p.ellipse(x, y, 0, 24 * s, "rgba(0,0,0,0.3)", 0.42);
@@ -243,7 +257,11 @@ export function drawTruck(p: Painter, x: number, y: number, dir: Dir, cargo: str
 }
 
 /** Car carrier: cab plus a two-deck trailer with real cars on it. */
-export function drawCarrier(p: Painter, x: number, y: number, dir: Dir, colors: [string, string], s = 1, models: [CarModel, CarModel] = ["sedan", "sports"]) {
+export function drawCarrier(p: Painter, x: number, y: number, dir: Dir, colors: [string, string], s = 1, models: [CarModel, CarModel] = ["sedan", "sports"], look: TruckSpriteOpts = {}) {
+  if (!p.dim && drawCarrierSprite(p, x, y, look.yaw ?? DIR_YAW[dir], colors, models, s, look)) {
+    if (p.night > 0.35) truckGlows(p, x, y, look.yaw ?? DIR_YAW[dir], s, false);
+    return;
+  }
   const ax = dir === 0 || dir === 2;
   const sgn = dir === 0 || dir === 1 ? 1 : -1;
   const pos = (o: number): [number, number] => [ax ? x + o * sgn : x, ax ? y : y + o * sgn];
@@ -276,3 +294,131 @@ export const CAR_MODEL_FOR: Record<CarId, CarModel> = {
   hypercar: "hypercar",
   electric: "electric",
 };
+
+
+// ───────────────────────────── 3D sprites ─────────────────────────────
+
+/** Map heading of each axis direction. */
+export const DIR_YAW = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
+const YAW_STEPS = 16;
+/** Tiles per metre: a 4.8 m sedan is ~0.57 tiles long. */
+const CAR_TPM = 0.118;
+const CAR_SIZE: SpriteSize = { w: 50, h: 38, ax: 25, ay: 23 };
+const SOLID = new Set(["#f1f5f9", "#facc15", "#ea580c", "#16a34a"]);
+
+const yawIndex = (yaw: number) => ((Math.round(yaw / ((Math.PI * 2) / YAW_STEPS)) % YAW_STEPS) + YAW_STEPS) % YAW_STEPS;
+
+/**
+ * Draws a car from its 3D model. Returns false while the sprite is not
+ * ready yet (or without WebGL); the caller then draws the vector car.
+ */
+export function drawCarSprite(p: Painter, x: number, y: number, yaw: number, model: CarModel, color: string, s: number, opts: CarOpts): boolean {
+  const k = tierFor((p.zoom ?? 1) * (p.dpr ?? 1) * s);
+  const yi = yawIndex(yaw);
+  const steer = opts.steer ? Math.sign(opts.steer) : 0;
+  // the wheels visibly turn only when the car is big on screen
+  const spins = k >= 4 ? 3 : 1;
+  const spokes = 5;
+  const phase = spins > 1 && opts.odo ? Math.floor((opts.odo / 0.05) % spins) : 0;
+  const stage = opts.stage ?? 8;
+  const shadow = !opts.noShadow;
+  const key = `car|${model}|${color}|${yi}|${steer}|${phase}|${stage}`;
+  const spr = sprites3d.get(
+    key,
+    CAR_SIZE,
+    k,
+    (T, { kit, models }) => {
+      const g = new T.Group();
+      const car = models.buildCar(T, kit, {
+        model,
+        color,
+        finish: SOLID.has(color) ? "gloss" : "metallic",
+        steer: steer * 0.42,
+        spin: (phase * (Math.PI * 2)) / spokes / spins,
+        stage: { station: stage },
+      });
+      car.scale.setScalar(CAR_TPM);
+      car.rotation.y = -(yi * Math.PI * 2) / YAW_STEPS;
+      g.add(car);
+      return g;
+    },
+    shadow,
+  );
+  if (!spr) return false;
+  const X = sx(x, y);
+  const Y = sy(x, y, opts.lift ?? 0);
+  const { w, h, ax, ay } = spr.size;
+  p.ctx.drawImage(spr.img, X - ax * s, Y - ay * s, w * s, h * s);
+  // glows for the evening/night pass
+  if (opts.lights || opts.brake) {
+    const a = (yi * Math.PI * 2) / YAW_STEPS;
+    const half = (SPECS[model].len * s) / 2;
+    const fx = x + Math.cos(a) * half;
+    const fy = y + Math.sin(a) * half;
+    if (opts.lights) p.light(sx(fx, fy), sy(fx, fy, 3 * s + (opts.lift ?? 0)), 14 * s, "#fff7d6", 0.8);
+    const bx = x - Math.cos(a) * half;
+    const by = y - Math.sin(a) * half;
+    p.light(sx(bx, by), sy(bx, by, 3 * s + (opts.lift ?? 0)), (opts.brake ? 10 : 6) * s, "#ff3b3b", opts.brake ? 0.9 : 0.5);
+  }
+  return true;
+}
+
+export interface TruckSpriteOpts {
+  yaw?: number;
+  /** Which truck: van, box truck, semi or road train. */
+  kind?: "van" | "truck" | "semi" | "trailer";
+  empty?: boolean;
+  odo?: number;
+}
+
+const TRUCK_SIZE: SpriteSize = { w: 84, h: 64, ax: 42, ay: 40 };
+/** Trucks are a little compressed so they fit the lanes (real trucks are long). */
+const TRUCK_TPM = { van: 0.11, truck: 0.095, semi: 0.082, trailer: 0.074 };
+
+function drawTruckSprite(p: Painter, x: number, y: number, yaw: number, cargo: string, s: number, o: TruckSpriteOpts): boolean {
+  const kind = o.kind ?? (s < 0.9 ? "van" : s > 1.2 ? "trailer" : s > 1.05 ? "semi" : "truck");
+  const k = tierFor((p.zoom ?? 1) * (p.dpr ?? 1));
+  const yi = yawIndex(yaw);
+  const empty = !!o.empty;
+  const spr = sprites3d.get(`truck|${kind}|${empty ? "e" : cargo}|${yi}`, TRUCK_SIZE, k, (T, { kit, models }) => {
+    const g = models.buildTruck(T, kit, { kind, cargo, empty });
+    g.scale.setScalar(TRUCK_TPM[kind]);
+    g.rotation.y = -(yi * Math.PI * 2) / YAW_STEPS;
+    const w = new T.Group();
+    w.add(g);
+    return w;
+  });
+  if (!spr) return false;
+  const { w, h, ax, ay } = spr.size;
+  p.ctx.drawImage(spr.img, sx(x, y) - ax, sy(x, y) - ay, w, h);
+  return true;
+}
+
+function drawCarrierSprite(p: Painter, x: number, y: number, yaw: number, colors: [string, string], models: [CarModel, CarModel], s: number, o: TruckSpriteOpts): boolean {
+  const k = tierFor((p.zoom ?? 1) * (p.dpr ?? 1));
+  const yi = yawIndex(yaw);
+  const empty = !!o.empty;
+  const key = `carrier|${empty ? "e" : `${models.join(",")}|${colors.join(",")}`}|${yi}`;
+  const spr = sprites3d.get(key, TRUCK_SIZE, k, (T, ctx) => {
+    const cars = empty
+      ? []
+      : [0, 1, 2, 3].map((i) => ({ model: models[i % 2], color: colors[i % 2], finish: "metallic" as const }));
+    const g = ctx.models.buildCarrier(T, ctx.kit, cars);
+    g.scale.setScalar(0.074);
+    g.rotation.y = -(yi * Math.PI * 2) / YAW_STEPS;
+    const w = new T.Group();
+    w.add(g);
+    return w;
+  });
+  if (!spr) return false;
+  const { w, h, ax, ay } = spr.size;
+  p.ctx.drawImage(spr.img, sx(x, y) - ax * s, sy(x, y) - ay * s, w * s, h * s);
+  return true;
+}
+
+function truckGlows(p: Painter, x: number, y: number, yaw: number, s: number, brake: boolean) {
+  const a = (yawIndex(yaw) * Math.PI * 2) / YAW_STEPS;
+  const half = 0.4 * s;
+  if (p.night > 0.35) p.light(sx(x + Math.cos(a) * half, y + Math.sin(a) * half), sy(x + Math.cos(a) * half, y + Math.sin(a) * half, 5), 16 * s, "#fff7d6", 0.8);
+  if (brake) p.light(sx(x - Math.cos(a) * half, y - Math.sin(a) * half), sy(x - Math.cos(a) * half, y - Math.sin(a) * half, 4), 9 * s, "#ff3b3b", 0.8);
+}

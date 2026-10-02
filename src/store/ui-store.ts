@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import type { CarId, StructureType, ZoneId } from "@/game/types";
 import type { TimeMode } from "@/components/map/lighting";
+import type { VehiclePick } from "@/components/map/traffic";
 
 const TIME_KEY = "idle-car-empire:time";
 function savedTime(): TimeMode {
@@ -54,6 +55,9 @@ interface UiStore {
   timeMode: TimeMode;
   /** A building shown translucent on a plot before it is bought. */
   preview: { plot: string; type: StructureType } | null;
+  /** The vehicle in the 3D showcase (tapped on the map). */
+  showcase: VehiclePick | null;
+  setShowcase: (v: VehiclePick | null) => void;
   setTimeMode: (m: TimeMode) => void;
   setPreview: (p: { plot: string; type: StructureType } | null) => void;
   setView: (v: View | null) => void;
@@ -82,6 +86,8 @@ export const useUi = create<UiStore>((set) => ({
   command: null,
   timeMode: savedTime(),
   preview: null,
+  showcase: null,
+  setShowcase: (showcase) => set(showcase ? { showcase, view: null, plot: null, zone: null, preview: null } : { showcase }),
   setTimeMode: (timeMode) => {
     try {
       localStorage.setItem(TIME_KEY, timeMode);
@@ -91,9 +97,9 @@ export const useUi = create<UiStore>((set) => ({
     set({ timeMode });
   },
   setPreview: (preview) => set({ preview }),
-  setView: (view) => set({ view, plot: null, zone: null, preview: null }),
+  setView: (view) => set({ view, plot: null, zone: null, preview: null, showcase: null }),
   selectPlot: (plot, focus = true) =>
-    set(() => ({ plot, zone: null, view: null, preview: null, ...(plot && focus ? { command: { kind: "plot" as const, id: plot, n: ++n } } : {}) })),
+    set(() => ({ plot, zone: null, view: null, preview: null, showcase: null, ...(plot && focus ? { command: { kind: "plot" as const, id: plot, n: ++n } } : {}) })),
   selectZone: (zone, focus = true) =>
     set(() => ({ zone, plot: null, view: null, ...(zone && focus ? { command: { kind: "zone" as const, id: zone, n: ++n } } : {}) })),
   enterGarage: (garage) => {
@@ -106,6 +112,6 @@ export const useUi = create<UiStore>((set) => ({
   exitGarage: () => set((s) => ({ garage: null, command: s.garage ? { kind: "plot", id: s.garage, zoom: -1, n: ++n } : s.command })),
   openFloor: (floor) => set({ floor }),
   setCelebrate: (celebrate) => set(celebrate ? { celebrate, view: null, plot: null, zone: null, floor: null } : { celebrate }),
-  closeAll: () => set({ view: null, plot: null, zone: null, preview: null }),
+  closeAll: () => set({ view: null, plot: null, zone: null, preview: null, showcase: null }),
   map: (cmd) => set({ command: { ...cmd, n: ++n } as MapCommand }),
 }));
