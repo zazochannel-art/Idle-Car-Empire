@@ -330,6 +330,25 @@ export function buildPlant(T: Three, kit: MaterialKit, spec: PlantSpec, W: numbe
     g.add(office(T, kit, frame, std(T, "#1e3a8a", 0.4, 0.4), tx, 0.15, 0.5 * s, 0.5 * s, 80 * PX));
     g.add(cyl(T, steel, tx + 0.25 * s, 80 * PX + 0.03, 0.15 + 0.25 * s, 0.008, 0.2, 6));
   }
+  // Industrial Complex: a helipad on the roof and a glass skybridge to the tower
+  if (L >= 9) {
+    const pad = new T.Mesh(new T.CylinderGeometry(0.16, 0.16, 0.012, 24), std(T, "#334155", 0.2, 0.7));
+    pad.position.set(hx + hw * 0.7, H + 0.05, hy + hd * 0.6);
+    g.add(pad);
+    const mark = new T.Mesh(new T.TorusGeometry(0.11, 0.008, 6, 24), std(T, "#facc15", 0.2, 0.5));
+    mark.rotation.x = Math.PI / 2;
+    mark.position.set(hx + hw * 0.7, H + 0.058, hy + hd * 0.6);
+    g.add(mark);
+    g.add(box(T, kit.glass, hx + hw, H * 0.8, 0.2, W - 0.55 * s - (hx + hw), 0.06, 0.1));
+  }
+  // Auto City: a second glass tower with a lit crown
+  if (L >= 10) {
+    const t2 = W - 1.15 * s;
+    g.add(office(T, kit, frame, std(T, "#0f766e", 0.4, 0.4), t2, 0.15, 0.45 * s, 0.45 * s, 64 * PX));
+    const crown = new T.Mesh(new T.BoxGeometry(0.45 * s + 0.02, 0.02, 0.45 * s + 0.02), new T.MeshStandardMaterial({ color: "#67e8f9", emissive: "#22d3ee", emissiveIntensity: 1.5 }));
+    crown.position.set(t2 + 0.225 * s, 64 * PX + 0.04, 0.15 + 0.225 * s);
+    g.add(crown);
+  }
 
   // equipment that says what the plant makes
   const yardZ = spec.dockFront ? hy + hd + 0.25 : 0.2;
