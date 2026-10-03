@@ -2,6 +2,7 @@ import { ACHIEVEMENT_INCOME_BONUS } from "../config/achievements";
 import { CARS, CAR_MODEL } from "../config/cars";
 import { MANAGERS, type ManagerConfig } from "../config/managers";
 import { EMPIRE_PERKS, OFFLINE, PRESTIGE } from "../config/prestige";
+import { BASE_MAX_LEVEL, PLANT_MAX_LEVEL } from "../config/chain";
 import { REGIONS, regionIndex } from "../config/regions";
 import { activeEvent } from "./events";
 import { starMods } from "./imperium";
@@ -24,6 +25,8 @@ export interface GlobalMods {
   markup: number;
   rp: number;
   costMult: number;
+  /** Highest plant level allowed: 10, plus one per region reached. */
+  maxPlantLevel: number;
   unlockedCars: Set<CarId>;
   unlockedPlants: Set<PlantType>;
 }
@@ -92,6 +95,7 @@ export function computeGlobalMods(s: GameState): GlobalMods {
     markup: 0,
     rp: 1,
     costMult: 1,
+    maxPlantLevel: Math.min(PLANT_MAX_LEVEL, BASE_MAX_LEVEL + regionIndex(s.prestigeCount)),
     unlockedCars: new Set(),
     unlockedPlants: new Set(),
   };

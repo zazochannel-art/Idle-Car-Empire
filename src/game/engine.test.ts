@@ -8,6 +8,7 @@ import * as A from "./engine/actions";
 import * as Ch from "./engine/chain";
 import * as C from "./engine/city";
 import * as D from "./engine/design";
+import * as K from "./engine/contracts";
 import * as Ev from "./engine/events";
 import * as I from "./engine/imperium";
 import * as L from "./engine/logistics";
@@ -537,5 +538,55 @@ describe("save transfer", () => {
     expect(back.cash).toBe(12_345);
     expect(link.length).toBeLessThan(encodeSave(s).length);
     await expect(decodeTransfer("z1.broken")).rejects.toThrow();
+  });
+});
+
+describe("late-game depth", () => {
+  it("opens plant levels 11-15 one region at a time", () => {
+    const { s, assembly } = fullChain();
+    const b = s.city.buildings[assembly];
+    b.level = 10;
+    expect(Ch.levelCost(b, snapshot(s).gm)).toBeNull();
+    s.prestigeCount = 2; // Germany → up to level 12
+    expect(Ch.levelCost(b, snapshot(s).gm)).not.toBeNull();
+    b.level = 12;
+    expect(Ch.levelCost(b, snapshot(s).gm)).toBeNull();
+  });
+
+  it("auto-upgrade buys cheap upgrades on automated plants only", () => {
+    const s = createInitialState(T0);
+    const [id, b] = Ch.plantsOf(s)[0];
+    s.cash = 1e6;
+    b.plant.auto = true;
+    expect(Ch.autoUpgrade(s, snapshot(s).gm)).toBe(0); // still Manual
+    b.plant.automation = 2;
+    const before = b.level + b.plant.speed;
+    expect(Ch.autoUpgrade(s, snapshot(s).gm)).toBe(1);
+    expect(s.city.buildings[id].level + s.city.buildings[id].plant!.speed).toBe(before + 1);
+    s.cash = 0;
+    expect(Ch.autoUpgrade(s, snapshot(s).gm)).toBe(0);
+  });
+
+  it("runs a customer contract from offer to payout", () => {
+    const { s } = fullChain();
+    s.cash = 1e9;
+    run(s, 300);
+    const snap = snapshot(s);
+    expect(K.refreshContracts(s, T0 + 1, snap)).toBe("offer");
+    const offer = s.contracts.offer!;
+    expect(offer.n).toBeGreaterThanOrEqual(3);
+    expect(K.acceptContract(s, T0 + 1)).toBe(true);
+    expect(K.claimContract(s, T0 + 2, snap)).toBe(false);
+    s.lifetime.carsByType[offer.car] = (s.lifetime.carsByType[offer.car] ?? 0) + offer.n;
+    const cash = s.cash;
+    expect(K.claimContract(s, T0 + 3, snap)).toBe(true);
+    expect(s.cash).toBeGreaterThan(cash);
+    expect(s.contracts.done).toBe(1);
+    // an unfinished contract expires at its deadline
+    expect(K.refreshContracts(s, T0 + 3, snap)).toBeNull(); // cooldown
+    s.contracts.nextAt = 0;
+    K.refreshContracts(s, T0 + 10 * 60_000, snap);
+    K.acceptContract(s, T0 + 10 * 60_000);
+    expect(K.refreshContracts(s, T0 + 10 * 60_000 + 31 * 60_000, snap)).toBe("expired");
   });
 });

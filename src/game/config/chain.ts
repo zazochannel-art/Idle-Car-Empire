@@ -65,7 +65,7 @@ export const PLANTS: PlantConfig[] = [
   { id: "glassFactory", emoji: "🪟", item: "glass", raw: "sand", rawPer: 10, time: 40, cost: 1.2e8, requires: "suspensionFactory", color: "#e0f2fe", roof: "#0284c7" },
   { id: "paintFactory", emoji: "🎨", item: "paint", raw: "pigment", rawPer: 10, time: 30, cost: 8e8, requires: "glassFactory", color: "#fce7f3", roof: "#db2777" },
   { id: "electronicsFactory", emoji: "🔌", item: "electronics", raw: "chips", rawPer: 10, time: 50, cost: 3e10, requires: "paintFactory", color: "#dcfce7", roof: "#15803d" },
-  { id: "batteryFactory", emoji: "🔋", item: "battery", raw: "lithium", rawPer: 10, time: 60, cost: 3e12, requires: "electronicsFactory", research: "electric_motors", color: "#ecfccb", roof: "#4d7c0f" },
+  { id: "batteryFactory", emoji: "🔋", item: "battery", raw: "lithium", rawPer: 10, time: 60, cost: 8e11, requires: "electronicsFactory", research: "electric_motors", color: "#ecfccb", roof: "#4d7c0f" },
 ];
 
 export const PLANT_BY_ID = Object.fromEntries(PLANTS.map((p) => [p.id, p])) as Record<PlantType, PlantConfig>;
@@ -98,7 +98,7 @@ export interface LevelConfig {
   cost: number;
 }
 
-/** Small → Mega Factory → Auto City (10 levels). Every level also changes how the building and its floor look. */
+/** Small → Mega Factory → Auto City → … Global Flagship (15 levels). Every level also changes how the building and its floor look. */
 export const PLANT_LEVELS: LevelConfig[] = [
   { lines: 1, storage: 1, cost: 0 },
   { lines: 2, storage: 2, cost: 0.1 },
@@ -110,7 +110,15 @@ export const PLANT_LEVELS: LevelConfig[] = [
   { lines: 16, storage: 16, cost: 12_000 },
   { lines: 22, storage: 22, cost: 120_000 },
   { lines: 30, storage: 30, cost: 1_500_000 },
+  // 11-15: one more level for every region the empire has expanded to
+  { lines: 40, storage: 40, cost: 1.8e7 },
+  { lines: 52, storage: 52, cost: 2.2e8 },
+  { lines: 68, storage: 68, cost: 2.7e9 },
+  { lines: 88, storage: 88, cost: 3.3e10 },
+  { lines: 115, storage: 115, cost: 4e11 },
 ];
+/** Levels every player can reach; the rest open one per region. */
+export const BASE_MAX_LEVEL = 10;
 export const PLANT_MAX_LEVEL = PLANT_LEVELS.length;
 
 /** Speed upgrades: each makes production this much faster. */
@@ -126,7 +134,7 @@ export const AUTOMATION = [
 ];
 
 /** Trucks that come with each plant level (no separate purchase). */
-export const PLANT_TRUCKS = [1, 2, 2, 3, 3, 4, 5, 6, 7, 8];
+export const PLANT_TRUCKS = [1, 2, 2, 3, 3, 4, 5, 6, 7, 8, 8, 8, 8, 8, 8];
 export const MAX_TRUCKS = 8;
 
 /** Component grades: Standard, Lightweight, Performance, Luxury, Carbon. */
@@ -162,10 +170,10 @@ export interface VehicleConfig {
 }
 
 /** What a plant's trucks are, by plant level (index = level - 1). */
-export const PLANT_VEHICLE: Vehicle[] = ["van", "van", "truck", "truck", "semi", "semi", "trailer", "trailer", "trailer", "trailer"];
+export const PLANT_VEHICLE: Vehicle[] = ["van", "van", "truck", "truck", "semi", "semi", "trailer", "trailer", "trailer", "trailer", "trailer", "trailer", "trailer", "trailer", "trailer"];
 export const VEHICLE_CAPACITY: Record<Vehicle, number> = { van: 4, truck: 10, semi: 24, trailer: 60, carrier: 6 };
 /** Car transporters carry more cars at higher assembly levels. */
-export const CARRIER_CAPACITY = [2, 3, 4, 6, 8, 8, 10, 12, 14, 16];
+export const CARRIER_CAPACITY = [2, 3, 4, 6, 8, 8, 10, 12, 14, 16, 20, 24, 28, 32, 40];
 
 /** The Materials Depot sends raw material when a plant drops below this share. */
 export const RESUPPLY_AT = 0.5;
