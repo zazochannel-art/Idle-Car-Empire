@@ -165,7 +165,7 @@ export const en = {
   "dealers.production": "Cars built",
   "dealers.stats": "{n} customers/min · +{markup} markup",
   "dealers.open": "Open dealership",
-  "dealers.upgrade": "Upgrade: more customers, +3 showroom places, +2% markup",
+  "dealers.upgrade": "Upgrade: more customers, +20 storage places, +2% markup",
 
   "cars.tier": "Tier {tier}",
   "cars.modelLv": "Model Lv {level}",
@@ -532,7 +532,7 @@ export const en = {
   "chain.footer": "Every dollar comes from this chain: no truck, no sale. The {name} turns parts into cars worth far more than the parts.",
   "dealers.customers": "Customers",
   "dealers.inStock": "Cars in stock",
-  "dealers.showroom": "Showroom",
+  "dealers.showroom": "Storage lot",
   "dealers.transporter": "A car transporter is bringing {n} car(s).",
   "dealers.empty": "Waiting for cars from your assembly plant.",
   "dealers.nextCustomer": "Next customer in {time}",

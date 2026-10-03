@@ -235,10 +235,11 @@ export function drawPlant(p: Painter, plot: Plot, look: PlantLook, t: number, se
 
   if (!has3d) signature(p, type, hx, hy, hw, h, t, active, seed);
 
-  // assembly: finished cars wait on the lot, a conveyor brings them out
+  // assembly: a conveyor brings finished cars out; they leave for the dealers
+  // at once, so at most a couple wait by the loading dock
   if (type === "assemblyPlant") {
     const model = CAR_MODEL_FOR[look.car ?? "city"];
-    const n = Math.round(look.fill * 6 * s);
+    const n = Math.min(2, Math.ceil(look.fill * 6 * s));
     for (let i = 0; i < n; i++) drawModel(p, X + 0.35 + (i % (3 * s)) * 0.6, Y + D - 0.35 - Math.floor(i / (3 * s)) * 0.5 - (dockFront ? 0 : D - 1.2), 1, model, CAR_COLORS[(i * 3 + 1) % CAR_COLORS.length], 0.95);
     if (active && p.zoom > 0.55) {
       const u = (t * 0.12) % 1;

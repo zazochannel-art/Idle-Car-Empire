@@ -183,7 +183,8 @@ export const SUPPLY_LOAD = 0.6;
 // ───────────────────────────── selling ─────────────────────────────
 
 /** Dealerships: seconds between customers at Level 1, and stock. */
-export const DEALER_SALE = { interval: 14, stock: 6, perLevelSpeed: 0.25, perLevelStock: 3 };
+/** Dealers keep a storage lot: finished cars are stored there until customers buy them. */
+export const DEALER_SALE = { interval: 14, stock: 40, perLevelSpeed: 0.25, perLevelStock: 20 };
 /**
  * When every dealership is full, a full transporter load goes to a wholesale
  * buyer at the Parts Market for this share of the car's value (no markup), so

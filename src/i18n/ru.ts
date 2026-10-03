@@ -164,7 +164,7 @@ export const ru: Record<MessageKey, string> = {
   "dealers.production": "Собрано машин",
   "dealers.stats": "{n} покупателей/мин · наценка +{markup}",
   "dealers.open": "Открыть салон",
-  "dealers.upgrade": "Улучшить: больше покупателей, +3 места в салоне, +2% наценки",
+  "dealers.upgrade": "Улучшить: больше покупателей, +20 мест на складе, +2% наценки",
 
   "cars.tier": "Класс {tier}",
   "cars.modelLv": "Модель ур. {level}",
@@ -531,7 +531,7 @@ export const ru: Record<MessageKey, string> = {
   "chain.footer": "Каждый доллар приходит из этой цепочки: нет грузовика — нет продажи. {name} превращает детали в машины, которые стоят гораздо дороже деталей.",
   "dealers.customers": "Покупатели",
   "dealers.inStock": "Машин в наличии",
-  "dealers.showroom": "Салон",
+  "dealers.showroom": "Склад-стоянка",
   "dealers.transporter": "Автовоз везёт машин: {n}.",
   "dealers.empty": "Ждёт машины со сборочного завода.",
   "dealers.nextCustomer": "Следующий покупатель через {time}",

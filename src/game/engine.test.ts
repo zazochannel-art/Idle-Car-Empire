@@ -688,3 +688,24 @@ describe("selling cars", () => {
     expect(s.chain.wholesale).toBe(0);
   });
 });
+
+describe("cars go to the dealers", () => {
+  it("leaves no cars waiting at the plant: they are stored on the dealer's lot", () => {
+    const { s, assembly } = fullChain();
+    for (const [, b] of Ch.plantsOf(s)) {
+      b.level = 4;
+      b.plant.speed = 12;
+    }
+    s.cash = 1e12;
+    let worst = 0;
+    for (let t = 0; t < 400; t += 0.5) {
+      tick(s, 0.5);
+      if (t > 100) worst = Math.max(worst, s.city.buildings[assembly].plant!.out);
+    }
+    // at most one transporter load waits by the dock
+    expect(worst).toBeLessThanOrEqual(Object.values(snapshot(s).chain.plants).find((p) => p.type === "assemblyPlant")!.capacity + 1);
+    // the dealer's storage lot holds the cars until customers buy them
+    expect(s.chain.dealers.local!.cars).toBeGreaterThan(6);
+    expect(snapshot(s).chain.dealers.local!.stockCap).toBeGreaterThanOrEqual(40);
+  });
+});
