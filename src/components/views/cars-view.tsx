@@ -7,7 +7,7 @@ import { CARS, CAR_MODEL, DESIGN_COLORS, DESIGN_MAX, DESIGN_OPTIONS, type CarCon
 import { COMPONENT_BY_ID } from "@/game/config/chain";
 import { DEALERS } from "@/game/config/dealerships";
 import { carBaseValue, carLock, carPartsValue, carValue, modelStats, recipe } from "@/game/engine/chain";
-import { developCost } from "@/game/engine/design";
+import { developCost, REVIEW_BASE, REVIEW_PER_STAR } from "@/game/engine/design";
 import { carModelCost, unlockedCarIds } from "@/game/engine/economy";
 import { formatMoney, formatNumber, formatPercent, formatTime } from "@/game/format";
 import type { MessageKey } from "@/i18n";
@@ -94,6 +94,7 @@ function ModelCard({ car, unlocked, open, onToggle }: { car: CarConfig; unlocked
         <StatBar label={t("design.quality")} value={ms.quality} />
         <StatBar label={t("design.design")} value={ms.design} />
       </div>
+      <Review car={car} stars={ms.stars} />
 
       <div className="relative mt-3 grid grid-cols-3 gap-1.5 text-center">
         <Spec label={t("cars.cost")} value={formatMoney(cost)} />
@@ -232,6 +233,32 @@ function Spec({ label, value, accent }: { label: string; value: string; accent?:
     <div className="rounded-lg bg-white/[0.04] px-1 py-1.5">
       <div className="text-[9px] uppercase tracking-wider text-white/40">{label}</div>
       <div className={`text-xs font-semibold tabular-nums ${accent ? "text-emerald-300" : ""}`}>{value}</div>
+    </div>
+  );
+}
+
+const OUTLETS = ["Motor Weekly", "Auto Review", "Drive Daily"];
+
+/** The press review: stars, the outlet's verdict, and what the score does to price. */
+function Review({ car, stars }: { car: CarConfig; stars: number }) {
+  const { t } = useT();
+  const outlet = OUTLETS[car.id.length % OUTLETS.length];
+  const full = Math.floor(stars);
+  const effect = REVIEW_BASE + REVIEW_PER_STAR * stars - 1;
+  return (
+    <div className="relative mt-3 rounded-xl bg-white/[0.04] p-2.5 ring-1 ring-white/[0.06]">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm tracking-tight text-gold" aria-label={t("review.aria", { n: stars })}>
+          {"★".repeat(full)}
+          {stars % 1 ? (
+            <span className="bg-[linear-gradient(90deg,#f5c451_50%,rgba(255,255,255,0.2)_50%)] bg-clip-text text-transparent">★</span>
+          ) : null}
+          <span className="text-white/20">{"★".repeat(5 - Math.ceil(stars))}</span>
+        </span>
+        <span className="text-[10px] font-bold uppercase tracking-wider text-white/40">{outlet}</span>
+      </div>
+      <p className="mt-1 text-[11px] italic text-white/60">“{t(`review.q${Math.max(1, full)}` as MessageKey)}”</p>
+      <p className="mt-0.5 text-[10px] text-white/40">{t("review.effect", { pct: `${effect >= 0 ? "+" : "−"}${formatPercent(Math.abs(effect))}` })}</p>
     </div>
   );
 }

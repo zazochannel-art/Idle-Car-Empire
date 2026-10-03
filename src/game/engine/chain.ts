@@ -868,3 +868,17 @@ export function autoUpgrade(s: GameState, gm: GlobalMods): number {
   }
   return bought;
 }
+
+/** What one finished unit costs the plant: raw material (plus the body in a chassis), or a car's parts. */
+export function plantUnitCost(st: PlantStats, gm: GlobalMods): number {
+  const cfg = PLANT_BY_ID[st.type];
+  // a motorized chassis also uses up a body (counted at its market value)
+  const bodyCost = st.combine && st.chassisValue !== null ? st.chassisValue / CHASSIS_BONUS - st.engineValue : 0;
+  if (cfg.item) return st.rawPrice * cfg.rawPer + bodyCost;
+  return st.car ? carPartsValue(st.car) * gm.value[1] * gm.income : 0;
+}
+
+/** Value added per minute at full speed: units made × (value − cost). */
+export function plantProfitPerMin(st: PlantStats, gm: GlobalMods): number {
+  return st.unitsPerSec * 60 * (st.unitValue - plantUnitCost(st, gm));
+}
