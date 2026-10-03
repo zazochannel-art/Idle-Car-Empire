@@ -44,6 +44,11 @@ export const ro: Record<MessageKey, string> = {
   "manager.allBusy": "Toți managerii sunt ocupați — vezi echipa",
 
   "goal.next": "Următorul obiectiv",
+  "goal.dealerFull": "Dealerii sunt plini: {n} mașini/min vândute en-gros",
+  "goal.dealerFullUpgrade": "En-gros se plătește cu 30% mai puțin. Îmbunătățește {name} ca să vinzi mai mult la preț întreg.",
+  "goal.dealerFullOpen": "En-gros se plătește cu 30% mai puțin. Deschide {name} ca să vinzi mai mult la preț întreg.",
+  "dealers.wholesale": "{n} mașini/min merg la cumpărătorul en-gros cu −30%: dealerii tăi sunt plini. Îmbunătățește-i sau deschide alții noi.",
+  "dealers.capacity": "Capacitate de vânzare",
   "report.title": "Profit pe fabrică",
   "report.subtitle": "Valoarea adăugată de fiecare fabrică pe minut, la viteză maximă. Atinge una ca s-o deschizi; ⚠️ arată unde se blochează lanțul.",
   "review.aria": "{n} din 5 stele",

@@ -184,6 +184,12 @@ export const SUPPLY_LOAD = 0.6;
 
 /** Dealerships: seconds between customers at Level 1, and stock. */
 export const DEALER_SALE = { interval: 14, stock: 6, perLevelSpeed: 0.25, perLevelStock: 3 };
+/**
+ * When every dealership is full, a full transporter load goes to a wholesale
+ * buyer at the Parts Market for this share of the car's value (no markup), so
+ * the assembly line never stops. Dealers always get cars first.
+ */
+export const WHOLESALE = 0.7;
 
 /** Smoothing of the HUD income rate (seconds). */
 export const RATE_WINDOW = 30;

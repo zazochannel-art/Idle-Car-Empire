@@ -9,6 +9,7 @@ import { dailyProgress, metric, openMilestones, rewardCash } from "@/game/engine
 import { formatDuration, formatMoney, formatNumber, formatPercent } from "@/game/format";
 import { CAR_BY_ID } from "@/game/config/cars";
 import { MAKER } from "@/game/config/chain";
+import { DEALER_BY_ID } from "@/game/config/dealerships";
 import { MANAGER_BY_ID } from "@/game/config/managers";
 import { freePlot, type Goal } from "@/game/engine/insights";
 import { plantFlow, plantName } from "../panels/plant-panel";
@@ -37,6 +38,11 @@ export function goalText(g: Goal, t: (k: MessageKey, v?: Vars) => string, n: Con
       };
     case "dealer":
       return { title: t("goal.dealer"), detail: t("goal.dealerDetail") };
+    case "dealerFull":
+      return {
+        title: t("goal.dealerFull", { n: formatNumber(g.perMin) }),
+        detail: t(g.open ? "goal.dealerFullOpen" : "goal.dealerFullUpgrade", { name: n.dealer(DEALER_BY_ID[g.dealer]) }),
+      };
     case "car":
       return { title: t("goal.car", { name: n.car(CAR_BY_ID[g.car]) }), detail: g.requirement ? t("goal.needs", { req: n.requirement(g.requirement) }) : "" };
     case "manager": {
@@ -90,6 +96,13 @@ export function runGoal(g: Goal, ready: boolean) {
       break;
     case "dealer":
       if (ready) game.buyDealer(g.dealer);
+      ui.selectPlot(`d:${g.dealer}`);
+      break;
+    case "dealerFull":
+      if (ready) {
+        if (g.open) game.buyDealer(g.dealer);
+        else game.upgradeDealer(g.dealer);
+      }
       ui.selectPlot(`d:${g.dealer}`);
       break;
     case "car":

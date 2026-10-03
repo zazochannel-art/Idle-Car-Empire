@@ -17,7 +17,7 @@ import * as L from "./engine/logistics";
 import { geometricCost, maxAffordable, snapshot } from "./engine/economy";
 import { collectOffline, settleOffline } from "./engine/offline";
 import { canPrestige, pendingPoints, prestige } from "./engine/prestige";
-import { incomeStalled } from "./engine/insights";
+import { incomeStalled, nextGoals } from "./engine/insights";
 import { checkAchievements, claimDaily, claimMilestone, dailyProgress, recordHistory, refreshDaily } from "./engine/progress";
 import { currentTip } from "./engine/tips";
 import { createInitialState } from "./engine/state";
@@ -656,5 +656,35 @@ describe("insight", () => {
     const per = Ch.plantProfitPerMin(st, snapshot(s).gm);
     expect(per).toBeCloseTo(st.unitsPerSec * 60 * (st.unitValue - Ch.plantUnitCost(st, snapshot(s).gm)));
     expect(per).toBeGreaterThan(0);
+  });
+});
+
+describe("selling cars", () => {
+  it("sells the surplus wholesale when every dealer is full, so the line never stops", () => {
+    const { s, assembly } = fullChain();
+    // a big chain, one small dealer: it can sell ~6 cars a minute
+    for (const [, b] of Ch.plantsOf(s)) {
+      b.level = 8;
+      b.plant.speed = 24;
+    }
+    s.cash = 1e12;
+    run(s, 600);
+    const made = s.lifetime.carsProduced;
+    expect(made).toBeGreaterThan(200);
+    // nearly everything made was sold: dealers first, the rest wholesale
+    const waiting = s.city.buildings[assembly].plant!.out + s.chain.shipments.filter((sh) => sh.item === "car" && !sh.back).reduce((a, sh) => a + sh.qty, 0) + (s.chain.dealers.local?.cars ?? 0);
+    expect(s.lifetime.carsSold + waiting).toBeGreaterThanOrEqual(made - 1);
+    expect(s.lifetime.carsSold).toBeGreaterThan(made * 0.8);
+    expect(s.chain.wholesale).toBeGreaterThan(0);
+    // and the player is told the dealers are the bottleneck
+    expect(nextGoals(s, snapshot(s), 5).some((g) => g.kind === "dealerFull")).toBe(true);
+  });
+
+  it("keeps dealers first: no wholesale while they have room", () => {
+    const { s } = fullChain();
+    s.cash = 1e9;
+    run(s, 600);
+    expect(s.lifetime.carsProduced).toBeGreaterThan(0);
+    expect(s.chain.wholesale).toBe(0);
   });
 });

@@ -12,6 +12,7 @@ import {
   CARRIER_CAPACITY,
   COMPONENT_BY_ID,
   DEALER_SALE,
+  WHOLESALE,
   DOCK_TIME,
   GRADES,
   MAKER,
@@ -82,7 +83,7 @@ export function newPlant(type: PlantType): PlantData {
 }
 
 export function createChain(): ChainState {
-  return { shipments: [], nextShip: 1, dealers: {}, rate: 0, firstCar: false };
+  return { shipments: [], nextShip: 1, dealers: {}, rate: 0, firstCar: false, wholesale: 0 };
 }
 
 export function emptyDealerStock(): DealerStock {
@@ -415,6 +416,8 @@ export interface ChainTickOut {
   cars: number;
   deliveries: number;
   rp: number;
+  /** Cars sold wholesale (dealers were full). */
+  wholesale: number;
 }
 
 /** Where a finished load from this plant should go now, or null to wait. */
@@ -434,6 +437,9 @@ function destination(s: GameState, snap: ChainSnapshot, id: string, b: BuildingS
       const markup = d.markup + (car && dealerMatches(d.id, car) ? DEALER_SPECIALTY.price : 0);
       if (room > 0 && (!best || markup > best.markup)) best = { to, room, markup };
     }
+    // every dealer is full: a full load goes to the wholesale buyer instead of
+    // blocking the line (a smaller one waits for a dealer to make room)
+    if (!best && b.plant.out >= (snap.plants[id]?.capacity ?? 1)) return { to: MARKET, room: Infinity };
     return best;
   }
   // parts go to the assembly plant that needs them most; the rest is sold
@@ -468,7 +474,7 @@ export function chainTick(
   events?: GameEvent[],
   offline = false,
 ): ChainTickOut {
-  const out: ChainTickOut = { earned: 0, spent: 0, components: 0, cars: 0, deliveries: 0, rp: 0 };
+  const out: ChainTickOut = { earned: 0, spent: 0, components: 0, cars: 0, deliveries: 0, rp: 0, wholesale: 0 };
   const lm = logisticsMods(s);
   const earn = (amount: number) => {
     credit(amount);
@@ -607,7 +613,7 @@ export function chainTick(
       continue;
     }
     if (sh.back) continue; // home again
-    arrive(s, sh, snap, earn, events);
+    out.wholesale += arrive(s, sh, snap, earn, events);
     if (sh.item !== "raw") {
       out.deliveries += sh.qty;
       s.run.deliveries += sh.qty;
@@ -651,16 +657,29 @@ export function chainTick(
   s.rp += out.rp;
   const k = Math.min(1, dt / RATE_WINDOW);
   s.chain.rate += ((out.earned - out.spent) / dt - s.chain.rate) * k;
+  s.chain.wholesale += (out.wholesale / dt - s.chain.wholesale) * Math.min(1, dt / 120);
   return out;
 }
 
-function arrive(s: GameState, sh: Shipment, snap: ChainSnapshot, earn: (n: number) => void, events?: GameEvent[]) {
+/** Unloads a truck; returns how many cars it sold wholesale. */
+function arrive(s: GameState, sh: Shipment, snap: ChainSnapshot, earn: (n: number) => void, events?: GameEvent[]): number {
   if (sh.to === MARKET) {
+    if (sh.item === "car") {
+      // the dealers were full: a wholesale buyer takes the whole load, below dealer price
+      const amount = sh.value * WHOLESALE;
+      earn(amount);
+      s.run.carsSold += sh.qty;
+      s.lifetime.carsSold += sh.qty;
+      s.run.carRevenue += amount;
+      s.lifetime.carRevenue += amount;
+      events?.push({ type: "sale", plot: MARKET, item: "car", count: sh.qty, amount });
+      return sh.qty;
+    }
     // a port sells components for more abroad
     const amount = sh.value * (1 + logisticsMods(s).market);
     earn(amount);
     events?.push({ type: "sale", plot: MARKET, item: sh.item as ItemId, count: sh.qty, amount });
-    return;
+    return 0;
   }
   if (sh.to.startsWith("d:")) {
     const id = sh.to.slice(2) as DealerId;
@@ -669,12 +688,13 @@ function arrive(s: GameState, sh: Shipment, snap: ChainSnapshot, earn: (n: numbe
     stock.cars += sh.qty;
     stock.value += sh.value;
     stock.models.push(...(sh.models ?? []));
-    return;
+    return 0;
   }
   const p = s.city.buildings[sh.to]?.plant;
-  if (!p) return;
+  if (!p) return 0;
   if (sh.item === "raw") p.raw += sh.qty;
   else if (sh.item !== "car" && sh.item !== "chassis") p.inputs[sh.item] = (p.inputs[sh.item] ?? 0) + sh.qty;
+  return 0;
 }
 
 // ───────────────────────────── offline ─────────────────────────────
@@ -685,7 +705,7 @@ function arrive(s: GameState, sh: Shipment, snap: ChainSnapshot, earn: (n: numbe
  * credited to the wallet as it is earned.
  */
 export function simulateChain(s: GameState, seconds: number, snap: ChainSnapshot, credit: (amount: number) => void): ChainTickOut {
-  const total: ChainTickOut = { earned: 0, spent: 0, components: 0, cars: 0, deliveries: 0, rp: 0 };
+  const total: ChainTickOut = { earned: 0, spent: 0, components: 0, cars: 0, deliveries: 0, rp: 0, wholesale: 0 };
   if (seconds <= 0 || Object.keys(snap.plants).length === 0) return total;
   const steps = Math.max(1, Math.min(Math.ceil(seconds), 20_000));
   const dt = seconds / steps;
@@ -698,6 +718,7 @@ export function simulateChain(s: GameState, seconds: number, snap: ChainSnapshot
     total.cars += r.cars;
     total.deliveries += r.deliveries;
     total.rp += r.rp;
+    total.wholesale += r.wholesale;
   }
   s.chain.rate = rate;
   return total;
@@ -810,6 +831,7 @@ export function migrateChain(raw: unknown, s: GameState): ChainState {
   if (!isObj(raw)) return chain;
   chain.rate = typeof raw.rate === "number" && Number.isFinite(raw.rate) ? raw.rate : 0;
   chain.firstCar = raw.firstCar === true;
+  chain.wholesale = typeof raw.wholesale === "number" && Number.isFinite(raw.wholesale) ? raw.wholesale : 0;
   chain.nextShip = int(raw.nextShip, 1, 1e12, 1);
   if (Array.isArray(raw.shipments)) {
     for (const sh of raw.shipments) {

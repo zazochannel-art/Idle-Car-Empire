@@ -30,6 +30,11 @@ export function DealersView() {
           <Metric label={t("dealers.inStock")} value={formatNumber(inStock)} gold />
         </div>
       </ViewHeader>
+      {state.chain.wholesale * 60 >= 1 && (
+        <div className="rounded-2xl bg-amber-500/10 p-3 text-xs text-amber-200 ring-1 ring-amber-400/30">
+          ⚠️ {t("dealers.wholesale", { n: formatNumber(state.chain.wholesale * 60) })}
+        </div>
+      )}
       <div className="grid gap-3 @xl:grid-cols-2">
         {DEALERS.filter((d) => state.dealers[d.id].owned || d.id === nextLocked?.id).map((d) => (
           <div key={d.id} className="glass min-w-0 rounded-2xl p-4">
