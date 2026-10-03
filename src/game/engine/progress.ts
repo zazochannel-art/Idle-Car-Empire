@@ -6,6 +6,7 @@ import {
   MILESTONES,
   type MilestoneMission,
 } from "../config/missions";
+import { CARS } from "../config/cars";
 import { RESEARCH } from "../config/research";
 import type { GameState, MetricId, MissionState, Reward } from "../types";
 import { plantsOf } from "./chain";
@@ -48,6 +49,12 @@ export function metric(s: GameState, id: MetricId, snap?: EconomySnapshot): numb
       return s.lifetime.carsSold;
     case "plantTypes":
       return new Set(plantsOf(s).map(([, b]) => b.type)).size;
+    case "carRevenue":
+      return s.lifetime.carRevenue;
+    case "sportUnlocked": {
+      const ids = unlockedCarIds(s, (snap ?? snapshot(s)).gm);
+      return CARS.some((c) => c.class === "sport" && ids.has(c.id)) ? 1 : 0;
+    }
   }
 }
 
@@ -74,6 +81,8 @@ export function rewardCash(r: Reward, snap: EconomySnapshot): number {
 export function grantReward(s: GameState, r: Reward, snap: EconomySnapshot) {
   s.cash += rewardCash(r, snap);
   if (r.rp) s.rp += r.rp;
+  if (r.boost) s.boost += r.boost;
+  if (r.stars) s.stars += r.stars;
 }
 
 /** Unlocks every achievement whose condition is met and pays its reward. */
@@ -121,7 +130,7 @@ export function generateDaily(s: GameState, now: number, snap?: EconomySnapshot)
   const key = dateKey(now);
   const rand = seeded(`${key}:${s.createdAt}`);
   const researchLeft = RESEARCH.some((r) => !s.research.includes(r.id));
-  const pool = DAILY_TEMPLATES.filter((t) => (t.metric !== "researchDone" || researchLeft) && (t.metric !== "carsProduced" || eco.carsPerSec > 0));
+  const pool = DAILY_TEMPLATES.filter((t) => (t.metric !== "researchDone" || researchLeft) && ((t.metric !== "carsProduced" && t.metric !== "carsSold") || eco.carsPerSec > 0));
   const picked: typeof pool = [];
   while (picked.length < Math.min(DAILY_COUNT, pool.length)) {
     const t = pool[Math.floor(rand() * pool.length)];
@@ -132,7 +141,7 @@ export function generateDaily(s: GameState, now: number, snap?: EconomySnapshot)
     let target: number;
     if ("seconds" in t) {
       const parts = Object.values(eco.chain.plants).reduce((a, p) => (p.type === "assemblyPlant" ? a : a + p.unitsPerSec), 0);
-      const rate = t.metric === "carsProduced" ? eco.carsPerSec : t.metric === "moneyEarned" ? income : Math.max(parts, 0.05) * 0.6;
+      const rate = t.metric === "carsProduced" ? eco.carsPerSec : t.metric === "carsSold" ? eco.carsPerSec * 0.5 : t.metric === "moneyEarned" ? income : Math.max(parts, 0.05) * 0.6;
       target = niceNumber(Math.max(t.min, rate * t.seconds));
     } else {
       target = t.amount;

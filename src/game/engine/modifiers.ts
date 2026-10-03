@@ -156,5 +156,7 @@ export function computeGlobalMods(s: GameState): GlobalMods {
 
   m.income *= 1 + s.achievements.length * ACHIEVEMENT_INCOME_BONUS;
   m.income *= 1 + s.empirePoints * PRESTIGE.incomePerPoint;
+  // permanent boosts from milestones
+  m.income *= 1 + s.boost;
   return m;
 }

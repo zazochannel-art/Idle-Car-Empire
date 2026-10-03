@@ -78,6 +78,10 @@ export interface Reward {
   /** Cash expressed as N seconds of current income (scales with progress). */
   incomeSeconds?: number;
   rp?: number;
+  /** Permanent +x global income (0.02 = +2%), kept through every reset. */
+  boost?: number;
+  /** ⭐ Stars, the prestige currency spent on permanent upgrades. */
+  stars?: number;
 }
 
 export interface DealerState {
@@ -109,7 +113,9 @@ export type MetricId =
   | "componentsProduced"
   | "deliveries"
   | "carsSold"
-  | "plantTypes";
+  | "plantTypes"
+  | "carRevenue"
+  | "sportUnlocked";
 
 export interface MissionState {
   id: string;
@@ -138,6 +144,8 @@ export interface Stats {
   /** Units (components and cars) trucks have delivered. */
   deliveries: number;
   carsSold: number;
+  /** Money from cars sold at dealerships. */
+  carRevenue: number;
 }
 
 export interface OfflineReport {
@@ -350,6 +358,10 @@ export interface GameState {
   managers: Record<ManagerId, ManagerState>;
   carModels: Record<CarId, number>;
   designs: Record<CarId, CarDesign>;
+  /** Permanent income boost from milestones (0.06 = +6%). */
+  boost: number;
+  /** ⭐ Stars: earned from milestones and Reset Imperium, spent on permanent upgrades. */
+  stars: number;
   logistics: LogisticsState;
   research: string[];
   achievements: string[];
