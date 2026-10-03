@@ -8,6 +8,7 @@ import { LANGS } from "@/i18n";
 import { useT } from "@/i18n/use-t";
 import { plantsOf } from "@/game/engine/chain";
 import { useGame } from "@/store/game-store";
+import { EventChip } from "./event-chip";
 import { useUi } from "@/store/ui-store";
 import { AnimatedNumber } from "./animated-number";
 
@@ -48,6 +49,7 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
           <button onClick={() => setView("prestige")} className="text-left">
             <Pill icon={<Globe2 className="size-3.5 text-gold" />} label={t("hud.prestige")} value={formatNumber(ep)} gold />
           </button>
+          <EventChip />
           {stars > 0 && (
             <button onClick={() => setView("prestige")} className="text-left">
               <Pill icon={<Star className="size-3.5 fill-gold text-gold" />} label={t("imperium.stars")} value={formatNumber(stars)} gold />

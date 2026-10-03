@@ -36,6 +36,7 @@ import { StatsView } from "../views/stats-view";
 import { Coach } from "./coach";
 import { FeedbackBridge } from "./feedback-bridge";
 import { ServiceWorker } from "./service-worker";
+import { TransferImport } from "./transfer-import";
 import { goalText, runGoal } from "./goals";
 import { Hud } from "./hud";
 import { OfflineDialog, PrestigeOverlay, SettingsDialog, Toasts } from "./overlays";
@@ -168,6 +169,7 @@ function Shell() {
       <Toasts />
       <FeedbackBridge />
       <ServiceWorker />
+      <TransferImport />
       <OfflineDialog />
       <PrestigeOverlay />
       <SettingsDialog open={settings} onOpenChange={setSettings} />

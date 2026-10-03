@@ -3,6 +3,7 @@ import { CARS, CAR_MODEL } from "../config/cars";
 import { MANAGERS, type ManagerConfig } from "../config/managers";
 import { EMPIRE_PERKS, OFFLINE, PRESTIGE } from "../config/prestige";
 import { REGIONS, regionIndex } from "../config/regions";
+import { activeEvent } from "./events";
 import { starMods } from "./imperium";
 import { RESEARCH_BY_ID } from "../config/research";
 import type { CarId, Effect, GameState, PlantType } from "../types";
@@ -106,6 +107,9 @@ export function computeGlobalMods(s: GameState): GlobalMods {
 
   // The region the empire has expanded to.
   REGIONS[regionIndex(s.prestigeCount)].effects.forEach((e) => applyEffect(m, e));
+
+  // A limited-time market event (the clock is the last tick).
+  activeEvent(s.lastActiveAt)?.event.effects.forEach((e) => applyEffect(m, e));
 
   // ⭐ Star upgrades from Reset Imperium.
   const star = starMods(s);

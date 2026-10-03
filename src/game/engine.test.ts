@@ -8,6 +8,7 @@ import * as A from "./engine/actions";
 import * as Ch from "./engine/chain";
 import * as C from "./engine/city";
 import * as D from "./engine/design";
+import * as Ev from "./engine/events";
 import * as I from "./engine/imperium";
 import * as L from "./engine/logistics";
 import { geometricCost, maxAffordable, snapshot } from "./engine/economy";
@@ -20,6 +21,7 @@ import { createInitialState } from "./engine/state";
 import { tick } from "./engine/tick";
 import { formatMoney, formatNumber } from "./format";
 import { decodeSave, encodeSave, migrate } from "./save/serialize";
+import { decodeTransfer, transferCodeIn, transferLink } from "./save/transfer";
 import type { GameEvent, GameState, PlantType } from "./types";
 
 const T0 = Date.UTC(2026, 0, 1, 12);
@@ -501,5 +503,39 @@ describe("smarter guidance", () => {
     expect(currentTip(s)).toBeNull();
     s.lifetime.parts.body = 12;
     expect(currentTip(s)).toBe("engine");
+  });
+});
+
+describe("market events", () => {
+  it("runs one 45-minute event per 3-hour block, never the same twice in a row", () => {
+    const H = 3_600_000;
+    expect(Ev.activeEvent(0)).toBeNull();
+    const w = Ev.activeEvent(H + 1);
+    expect(w).not.toBeNull();
+    expect(w!.end - w!.start).toBe(45 * 60_000);
+    expect(Ev.activeEvent(w!.end)).toBeNull();
+    expect(Ev.nextEvent(w!.end).start).toBe(w!.start + 3 * H);
+    for (let b = 1; b < 50; b++) expect(Ev.activeEvent(b * 3 * H + H)!.event.id).not.toBe(Ev.activeEvent((b - 1) * 3 * H + H)!.event.id);
+  });
+
+  it("applies the running event to the economy", () => {
+    const s = createInitialState(0);
+    const base = snapshot(s).gm;
+    const t = [...Array(20)].map((_, b) => b * 3 * 3_600_000 + 3_600_000 + 1).find((x) => Ev.activeEvent(x)!.event.id === "rushOrders")!;
+    s.lastActiveAt = t;
+    expect(snapshot(s).gm.speed).toBeCloseTo(base.speed * 1.5);
+  });
+});
+
+describe("save transfer", () => {
+  it("round-trips a save through a compressed link", async () => {
+    const s = createInitialState(T0);
+    s.cash = 12_345;
+    const link = await transferLink(s, "https://example.com/Idle-Car-Empire/");
+    const code = transferCodeIn(new URL(link).hash)!;
+    const back = decodeSave(await decodeTransfer(code), T0);
+    expect(back.cash).toBe(12_345);
+    expect(link.length).toBeLessThan(encodeSave(s).length);
+    await expect(decodeTransfer("z1.broken")).rejects.toThrow();
   });
 });

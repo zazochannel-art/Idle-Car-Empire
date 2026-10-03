@@ -1,12 +1,13 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Clock, Download, RotateCcw, Upload } from "lucide-react";
+import { Clock, Download, RotateCcw, Smartphone, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { formatDuration, formatHours, formatMoney, formatNumber } from "@/game/format";
 import { REGIONS, regionIndex } from "@/game/config/regions";
+import { transferLink } from "@/game/save/transfer";
 import { LANGS } from "@/i18n";
 import { useContent } from "@/i18n/content";
 import { useT } from "@/i18n/use-t";
@@ -232,6 +233,27 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
         </div>
 
         <div className="mt-4 space-y-2">
+          <Button
+            variant="gold"
+            className="w-full"
+            onClick={async () => {
+              try {
+                const url = await transferLink(useGame.getState().state, window.location.href.split("#")[0]);
+                if (navigator.share) {
+                  await navigator.share({ title: "Idle Car Empire", text: t("transfer.shareText"), url });
+                  setMsg(t("transfer.sent"));
+                } else {
+                  await navigator.clipboard.writeText(url);
+                  setMsg(t("transfer.copied"));
+                }
+              } catch (e) {
+                // closing the share sheet is not an error
+                if ((e as Error)?.name !== "AbortError") setMsg(t("transfer.failed"));
+              }
+            }}
+          >
+            <Smartphone /> {t("transfer.send")}
+          </Button>
           <Button
             variant="secondary"
             className="w-full"

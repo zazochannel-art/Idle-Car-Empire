@@ -17,6 +17,7 @@ import * as C from "@/game/engine/city";
 import { STRUCTURE_BY_ID } from "@/game/config/city";
 import { PLANT_LEVELS } from "@/game/config/chain";
 import { snapshot, unlockedCarIds, type EconomySnapshot } from "@/game/engine/economy";
+import { activeEvent } from "@/game/engine/events";
 import { collectOffline, settleOffline } from "@/game/engine/offline";
 import { prestige as doPrestige } from "@/game/engine/prestige";
 import { checkAchievements, claimDaily, claimMilestone, recordHistory, refreshDaily } from "@/game/engine/progress";
@@ -143,6 +144,11 @@ export const useGame = create<GameStore>((set, get) => {
     const events = engineTick(next, dt, snap);
     next.lastActiveAt = now;
     recordHistory(next, now, snap.incomePerSec);
+    const ev = activeEvent(now);
+    if (ev && !activeEvent(state.lastActiveAt)) {
+      const n = contentFor(next.settings.lang);
+      uiEvents.emit({ type: "toast", tone: "gold", icon: ev.event.emoji, title: tr("event.started", { name: n.event(ev.event) }), body: n.eventDesc(ev.event) });
+    }
     if (refreshDaily(next, now, snap)) {
       uiEvents.emit({ type: "toast", tone: "info", icon: "📋", title: tr("toast.daily"), body: tr("toast.dailyBody") });
     }
