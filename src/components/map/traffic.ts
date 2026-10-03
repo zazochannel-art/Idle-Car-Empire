@@ -66,6 +66,8 @@ interface Ship extends ShipView {
 const VEHICLE_SCALE = { van: 0.8, truck: 1, semi: 1.12, trailer: 1.25, carrier: 1 };
 /** Axle spread (tiles): how far the body swings out through a bend. */
 const WHEELBASE = { car: 0.3, van: 0.34, truck: 0.42, semi: 0.55, trailer: 0.65, carrier: 0.6 };
+/** Town traffic cruising pace: a share of the speeds below (calm city driving). */
+const PACE = 0.55;
 /** Matches DOCK_TIME in config/chain.ts: loading and unloading. */
 const DOCK = 2;
 
@@ -265,7 +267,7 @@ export class Traffic {
     let agent: Agent | null = null;
     const make = (kind: Kind, path: Pt[], speed: number, target?: Site, next?: Site): Agent => ({
       kind, path, seg: 0, pos: 0, speed, color, color2, x: path[0].x, y: path[0].y, dir: 0, alpha: 0, wait: 0, phase: "go", target, next, fading: false,
-      cur: speed * 0.4, model: pickModel(), rx: path[0].x, ry: path[0].y, braking: false, puffs: [],
+      cur: speed * PACE * 0.4, model: pickModel(), rx: path[0].x, ry: path[0].y, braking: false, puffs: [],
     });
 
     if (roll < 0.5 && w.garages.length) {
@@ -412,9 +414,9 @@ export class Traffic {
       }
       a.alpha = a.fading ? Math.max(0, a.alpha - dt * 2.5) : Math.min(1, a.alpha + dt * 2.5);
       // cruise, slow for turns and red lights, queue behind others
-      const target = a.speed * this.clearance(a, moving) * this.ahead(a);
+      const target = a.speed * (a.kind === "hero" ? 1 : PACE) * this.clearance(a, moving) * this.ahead(a);
       const prev = a.cur;
-      a.cur += Math.max(-4.5 * dt, Math.min(1.6 * dt, target - a.cur));
+      a.cur += Math.max(-3 * dt, Math.min(0.9 * dt, target - a.cur));
       a.braking = a.cur < prev - 0.01 || a.cur < 0.15;
       if (prev < 0.3 && a.cur > prev && a.puffs.length < 4 && Math.random() < dt * 6) a.puffs.push({ x: a.rx, y: a.ry, age: 0 });
       for (const pf of a.puffs) pf.age += dt;
