@@ -81,7 +81,7 @@ export function createInitialState(now: number): GameState {
     city: createCity(),
     chain: createChain(),
     pendingOffline: null,
-    settings: { buyAmount: 1, lang: "en" },
+    settings: { buyAmount: 1, lang: "en", lowGraphics: false, sound: true, haptics: true },
     createdAt: now,
     runStartedAt: now,
     lastActiveAt: now,

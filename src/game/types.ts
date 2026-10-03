@@ -386,7 +386,7 @@ export interface GameState {
   city: CityState;
   chain: ChainState;
   pendingOffline: OfflineReport | null;
-  settings: { buyAmount: BuyAmount; lang: Lang };
+  settings: { buyAmount: BuyAmount; lang: Lang; lowGraphics: boolean; sound: boolean; haptics: boolean };
   createdAt: number;
   runStartedAt: number;
   lastActiveAt: number;

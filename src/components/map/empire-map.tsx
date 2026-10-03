@@ -109,6 +109,7 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
       else ui.selectPlot(target.id);
     });
     engine.money = (v) => formatMoney(v);
+    engine.setLowGraphics(useGame.getState().state.settings.lowGraphics);
     engine.overlay = overlayRef.current;
     engineRef.current = engine;
     if (process.env.NODE_ENV !== "production") Object.assign(window, { __map: engine, __game: useGame, __ui: useUi, __sprites: sprites3d });
@@ -135,6 +136,7 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
     const offPaint = useGame.subscribe((g, prev) => {
       if (g.state.designs !== prev.state.designs) paint(g.state.designs);
     });
+    const offGfx = useGame.subscribe((g) => engine.setLowGraphics(g.state.settings.lowGraphics));
     // trucks follow the engine's shipments
     const offShips = useGame.subscribe((g, prev) => {
       if (g.state.chain.shipments !== prev.state.chain.shipments) engine.traffic.setShipments(shipViews(g.state));
@@ -143,6 +145,7 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
       off();
       offShips();
       offPaint();
+      offGfx();
       document.removeEventListener("visibilitychange", onVis);
       engine.destroy();
       engineRef.current = null;

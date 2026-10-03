@@ -141,6 +141,8 @@ export class Traffic {
   private openNodes: number[] = [];
   private edgeNodes: number[] = [];
   private spawnClock = 0;
+  /** Share of the usual town traffic (low graphics halves it). */
+  density = 1;
   private clock = 0;
   private ships = new Map<number, Ship>();
   /** The first car rolling out of the assembly plant (the camera follows it). */
@@ -393,7 +395,7 @@ export class Traffic {
     const w = this.world;
     if (!w) return;
     this.moveShips(dt);
-    const cap = Math.min(46, 8 + w.garages.length * 4 + w.factories.length * 3 + w.dealers.length * 2 + w.unlocked.size * 2);
+    const cap = this.density * Math.min(46, 8 + w.garages.length * 4 + w.factories.length * 3 + w.dealers.length * 2 + w.unlocked.size * 2);
     this.spawnClock -= dt;
     if (this.spawnClock <= 0 && this.agents.length < cap) {
       this.spawn();
