@@ -315,7 +315,13 @@ function dealerLot(p: Painter, plot: Plot, owned: boolean, t: number, seed: numb
   const cars = stock.map((m) => CAR_MODEL_FOR[m]);
   if (cars[0]) drawModel(p, X + 0.7, Y + 0.7, 0, cars[0], CAR_COLORS[(tiers + 1) % CAR_COLORS.length], 1);
   if (cars[1]) drawModel(p, X + 1.6, Y + 0.75, 0, cars[1], CAR_COLORS[(tiers + 4) % CAR_COLORS.length], 1);
-  for (let i = 2; i < Math.min(6, cars.length); i++) drawModel(p, X + 0.35 + (i - 2) * 0.55, Y + 1.85, 1, cars[i], CAR_COLORS[(i * 3 + Math.floor(seed * 10) + tiers) % CAR_COLORS.length], 1, { lights: false });
+  // the storage lot: stored cars parked in rows on the forecourt (up to 12 shown)
+  const rows = Math.max(1, Math.floor((D - 1.6) / 0.5));
+  const perRow = Math.max(1, Math.floor((W - 0.3) / 0.55));
+  for (let i = 2; i < Math.min(2 + rows * perRow, 14, cars.length); i++) {
+    const k = i - 2;
+    drawModel(p, X + 0.35 + (k % perRow) * 0.55, Y + 1.85 + Math.floor(k / perRow) * 0.5, 1, cars[i], CAR_COLORS[(i * 3 + Math.floor(seed * 10) + tiers) % CAR_COLORS.length], 1, { lights: false });
+  }
   // customers looking at the cars; one walks in shortly before each sale
   if (cars.length && p.zoom > 0.55) {
     p.person(X + 0.55 + Math.sin(t * 0.7) * 0.2, Y + 1.5, "#f472b6", t * 2);

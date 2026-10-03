@@ -585,7 +585,9 @@ export function chainTick(
     // 3. loading dock: send a truck when there is a full load (or it waited long enough)
     if (p.out >= 1 && busyTrucks(s, id) < st.trucks) {
       p.wait += dt;
-      if (p.out >= st.capacity || p.wait >= MAX_WAIT * st.dock) {
+      // finished cars leave for the dealers straight away (no waiting for a full load);
+      // other goods wait for a full truck or MAX_WAIT
+      if (p.out >= st.capacity || !cfg.item || p.wait >= MAX_WAIT * st.dock) {
         const dest = destination(s, snap, id, b);
         if (dest) {
           const qty = Math.min(Math.floor(p.out), st.capacity, dest.room);

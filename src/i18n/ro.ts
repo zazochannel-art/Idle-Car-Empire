@@ -164,7 +164,7 @@ export const ro: Record<MessageKey, string> = {
   "dealers.production": "Mașini construite",
   "dealers.stats": "{n} clienți/min · adaos +{markup}",
   "dealers.open": "Deschide reprezentanța",
-  "dealers.upgrade": "Upgrade: mai mulți clienți, +3 locuri în showroom, +2% adaos",
+  "dealers.upgrade": "Upgrade: mai mulți clienți, +20 locuri în depozit, +2% adaos",
 
   "cars.tier": "Clasa {tier}",
   "cars.modelLv": "Model Nv {level}",
@@ -531,7 +531,7 @@ export const ro: Record<MessageKey, string> = {
   "chain.footer": "Fiecare dolar vine din acest lanț: fără camion, fără vânzare. {name} transformă piesele în mașini care valorează mult mai mult decât piesele.",
   "dealers.customers": "Clienți",
   "dealers.inStock": "Mașini în stoc",
-  "dealers.showroom": "Showroom",
+  "dealers.showroom": "Depozit (parcare)",
   "dealers.transporter": "Un transportor auto aduce {n} mașină(i).",
   "dealers.empty": "Așteaptă mașini de la fabrica de asamblare.",
   "dealers.nextCustomer": "Următorul client în {time}",
