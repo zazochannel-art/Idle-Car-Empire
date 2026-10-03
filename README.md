@@ -56,13 +56,18 @@ npm run simulate -- 3   # balance bot: plays 3 hours and logs milestones
    control. When a part is missing, the line stops (⚠️ NOT ENOUGH ENGINES).
    Your first car gets its own celebration and opens the **Local Dealer** for
    free.
-6. **Sell them, then build better cars.** Car transporters fill the showroom,
+6. **Design your models.** Every platform carries your own model (MC-01,
+   MC Sport, MC GT…) with a class (Economy → Hypercar), a body type, power,
+   comfort, quality and design. In **Models & Design** you rename it, pick
+   its colour (the cars on the map follow it) and develop its engine,
+   interior, rims and paint: each level adds value and a little build time.
+7. **Sell them, then build better cars.** Car transporters fill the showroom,
    customers come in and drive off in your cars. Each better model needs one
    more plant and better grades: City Car (body, engine, tyres) → Sedan
    (+ Interior and Suspension factories) → SUV (+ Glass) → Sports Car (+ Paint) → Luxury Sedan,
    Performance SUV, Supercar and Hypercar (+ Electronics) → Electric
    Performance (+ Battery Factory). More dealerships add customers and markup.
-7. **Grow the empire.** You can also:
+8. **Grow the empire.** You can also:
    - unlock districts for more plots;
    - hire **managers** (one per plant);
    - **research** with points from every part and car;

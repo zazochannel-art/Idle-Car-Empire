@@ -2,12 +2,13 @@
 
 import { create } from "zustand";
 import { ACHIEVEMENT_BY_ID } from "@/game/config/achievements";
-import { CAR_BY_ID } from "@/game/config/cars";
+import { CAR_BY_ID, type DesignOption } from "@/game/config/cars";
 import { DEALER_BY_ID } from "@/game/config/dealerships";
 import { MANAGER_BY_ID } from "@/game/config/managers";
 import { RESEARCH_BY_ID } from "@/game/config/research";
 import * as A from "@/game/engine/actions";
 import * as Ch from "@/game/engine/chain";
+import * as D from "@/game/engine/design";
 import * as C from "@/game/engine/city";
 import { STRUCTURE_BY_ID } from "@/game/config/city";
 import { PLANT_LEVELS } from "@/game/config/chain";
@@ -50,6 +51,9 @@ interface GameStore {
   buyDealer: (id: DealerId) => boolean;
   upgradeDealer: (id: DealerId) => boolean;
   upgradeCarModel: (id: CarId) => boolean;
+  developDesign: (id: CarId, option: DesignOption) => boolean;
+  renameDesign: (id: CarId, name: string) => void;
+  setDesignColor: (id: CarId, color: string) => void;
   research: (id: string) => boolean;
   unlockZone: (id: ZoneId) => boolean;
   buildStructure: (plot: string, type: StructureType) => boolean;
@@ -217,6 +221,14 @@ export const useGame = create<GameStore>((set, get) => {
     },
     upgradeDealer: (id) => act((s) => A.upgradeDealer(s, id)),
     upgradeCarModel: (id) => act((s) => A.upgradeCarModel(s, id)),
+    developDesign: (id, option) =>
+      act((s) => D.develop(s, id, option, D.developCost(Ch.carBaseValue(s, CAR_BY_ID[id], get().snap.gm), s.designs[id], option))),
+    renameDesign: (id, name) => {
+      act((s) => D.renameDesign(s, id, name));
+    },
+    setDesignColor: (id, color) => {
+      act((s) => D.setDesignColor(s, id, color));
+    },
     research: (id) => {
       const ok = act((s) => A.doResearch(s, id));
       if (ok) {

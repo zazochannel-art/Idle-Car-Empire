@@ -3,6 +3,7 @@ import type { GameState } from "../types";
 import { STARTER_PLOT, WORLD_MAP } from "../city/layout";
 import { createChain, newPlant } from "./chain";
 import { createCity } from "./city";
+import { resetDesignLevels } from "./design";
 import { createDealers, createStats, emptyCarCounts } from "./state";
 
 /** Empire Points a player is entitled to in total for these lifetime earnings. */
@@ -43,6 +44,7 @@ export function prestige(s: GameState, now: number): number {
   s.cash = 0;
   s.dealers = createDealers();
   s.carModels = emptyCarCounts();
+  resetDesignLevels(s);
   s.city = { ...createCity(), carsServiced: s.city.carsServiced };
   s.chain = createChain();
   s.run = createStats();

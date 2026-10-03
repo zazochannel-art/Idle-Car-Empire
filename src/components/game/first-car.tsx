@@ -70,7 +70,9 @@ export function FirstCarOverlay() {
           >
             <div className="text-6xl">{car.emoji}</div>
             <div className="mt-1 text-lg font-black">🚗 {t("firstCar.completed")}</div>
-            <div className="text-sm text-white/60">{n.car(car)}</div>
+            <div className="text-sm text-white/60">
+              {state.designs[car.id].name} · {n.car(car)}
+            </div>
             <div className="mt-4 grid grid-cols-3 gap-2">
               <Cell label={t("cars.cost")} value={formatMoney(cost)} />
               <Cell label={t("firstCar.value")} value={formatMoney(value)} />

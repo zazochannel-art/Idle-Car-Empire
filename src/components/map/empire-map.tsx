@@ -20,6 +20,7 @@ import { useUi } from "@/store/ui-store";
 import { MapEngine } from "./map-engine";
 import { Showcase } from "./showcase";
 import { sprites3d } from "../three/sprites";
+import { setLiveryOverrides } from "../three/livery";
 import { Minimap } from "./minimap";
 import { plantName } from "../panels/plant-panel";
 import { buildScene } from "./scene";
@@ -127,6 +128,13 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
         engine.celebrateFirstCar(e.plot, CAR_MODEL_FOR[car.id], car.color);
       }
     });
+    // cars on the map wear the colours picked in the Design studio
+    const paint = (designs: GameState["designs"]) =>
+      setLiveryOverrides(Object.fromEntries(Object.entries(designs).map(([id, d]) => [CAR_MODEL_FOR[id as keyof typeof CAR_MODEL_FOR], d.color])));
+    paint(useGame.getState().state.designs);
+    const offPaint = useGame.subscribe((g, prev) => {
+      if (g.state.designs !== prev.state.designs) paint(g.state.designs);
+    });
     // trucks follow the engine's shipments
     const offShips = useGame.subscribe((g, prev) => {
       if (g.state.chain.shipments !== prev.state.chain.shipments) engine.traffic.setShipments(shipViews(g.state));
@@ -134,6 +142,7 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
     return () => {
       off();
       offShips();
+      offPaint();
       document.removeEventListener("visibilitychange", onVis);
       engine.destroy();
       engineRef.current = null;

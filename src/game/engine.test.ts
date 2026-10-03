@@ -6,6 +6,7 @@ import { DEPOT, MARKET, STARTER_PLOT, WORLD_MAP } from "./city/layout";
 import * as A from "./engine/actions";
 import * as Ch from "./engine/chain";
 import * as C from "./engine/city";
+import * as D from "./engine/design";
 import { geometricCost, maxAffordable, snapshot } from "./engine/economy";
 import { collectOffline, settleOffline } from "./engine/offline";
 import { canPrestige, pendingPoints, prestige } from "./engine/prestige";
@@ -191,6 +192,31 @@ describe("motorized chassis", () => {
     expect(snapshot(s).chain.plants[engine].combine).toBe(false);
     run(s, 300);
     expect(s.city.buildings[assembly].plant!.made).toBeGreaterThan(0);
+  });
+});
+
+describe("design studio", () => {
+  it("developing options raises the car's value and build time; names and colours are kept", () => {
+    const { s, assembly } = fullChain();
+    s.cash = 1e12;
+    const gm = snapshot(s).gm;
+    const city = CAR_BY_ID.city;
+    const before = Ch.carValue(s, city, gm);
+    const t0 = snapshot(s).chain.plants[assembly].cycle;
+    const cost = D.developCost(Ch.carBaseValue(s, city, gm), s.designs.city, "engine");
+    expect(D.develop(s, "city", "engine", cost)).toBe(true);
+    expect(s.designs.city.engine).toBe(1);
+    expect(Ch.carValue(s, city, gm)).toBeCloseTo(before * 1.08);
+    expect(snapshot(s).chain.plants[assembly].cycle).toBeCloseTo(t0 * 1.05);
+    expect(Ch.modelStats(s, city).hp).toBeGreaterThan(city.hp);
+    D.renameDesign(s, "city", "  MC Rocket  ");
+    expect(s.designs.city.name).toBe("MC Rocket");
+    expect(D.setDesignColor(s, "city", "#1b46b8")).toBe(true);
+    expect(D.setDesignColor(s, "city", "#123456")).toBe(false);
+    // Global Expansion keeps the name and colour, the options start over
+    s.run.moneyEarned = s.lifetime.moneyEarned = 1e11;
+    prestige(s, T0 + 1);
+    expect(s.designs.city).toMatchObject({ name: "MC Rocket", color: "#1b46b8", engine: 0 });
   });
 });
 
