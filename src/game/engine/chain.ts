@@ -638,6 +638,8 @@ export function chainTick(
       stock.sold += 1;
       s.run.carsSold += 1;
       s.lifetime.carsSold += 1;
+      s.run.carRevenue += price;
+      s.lifetime.carRevenue += price;
       earn(price);
       events?.push({ type: "sale", plot: `d:${d.id}`, item: "car", count: 1, amount: price });
       stock.next += d.interval / (match ? DEALER_SPECIALTY.speed : 1);

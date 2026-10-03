@@ -572,6 +572,7 @@ export const en = {
   "mcat.engineer": "Engineering",
   "mcat.designer": "Design",
   "mcat.quality": "Quality",
+  "mission.boost": "+{pct} income forever",
   "plant.production": "Production",
   "plant.rate": "{n} × {item} / {time}",
   "plant.unitCost": "Cost",
@@ -748,6 +749,7 @@ export const en = {
   "grade.battery.5": "Advanced Battery",
   "daily.componentsProduced": "Produce {n} components",
   "daily.deliveries": "Deliver {n} components",
+  "daily.carsSold": "Sell {n} cars",
 } as const;
 
 export type MessageKey = keyof typeof en;

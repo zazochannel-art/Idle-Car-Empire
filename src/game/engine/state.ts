@@ -48,6 +48,7 @@ export function createStats(): Stats {
     parts: emptyParts(),
     deliveries: 0,
     carsSold: 0,
+    carRevenue: 0,
   };
 }
 
@@ -64,6 +65,8 @@ export function createInitialState(now: number): GameState {
     managers: createManagers(),
     carModels: emptyCarCounts(),
     designs: createDesigns(),
+    boost: 0,
+    stars: 0,
     logistics: createLogistics(),
     research: [],
     achievements: [],

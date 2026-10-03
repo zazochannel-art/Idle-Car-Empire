@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { MILESTONES } from "@/game/config/missions";
 import { nextGoals } from "@/game/engine/insights";
 import { dailyProgress, metric, openMilestones, rewardCash } from "@/game/engine/progress";
-import { formatDuration, formatMoney, formatNumber } from "@/game/format";
+import { formatDuration, formatMoney, formatNumber, formatPercent } from "@/game/format";
 import { CAR_BY_ID } from "@/game/config/cars";
 import { MAKER } from "@/game/config/chain";
 import { MANAGER_BY_ID } from "@/game/config/managers";
@@ -167,10 +167,12 @@ export function NextGoals() {
   );
 }
 
-export function rewardLabel(r: Reward, snapCash: number, rpUnit = "RP"): string {
+export function rewardLabel(r: Reward, snapCash: number, rpUnit = "RP", boostLabel = (pct: string) => `+${pct} income forever`): string {
   const parts: string[] = [];
   if (snapCash > 0) parts.push(formatMoney(snapCash));
   if (r.rp) parts.push(`${formatNumber(r.rp)} ${rpUnit}`);
+  if (r.stars) parts.push(`⭐ ${formatNumber(r.stars)}`);
+  if (r.boost) parts.push(boostLabel(formatPercent(r.boost)));
   return parts.join(" + ");
 }
 
@@ -208,7 +210,7 @@ export function MissionRow({
             {fmt(Math.min(value, target))}/{fmt(target)}
           </span>
         </div>
-        <div className="mt-1 text-[11px] text-gold/80">{t("mission.reward", { reward: rewardLabel(reward, rewardCash(reward, snap), t("unit.rp")) })}</div>
+        <div className="mt-1 text-[11px] text-gold/80">{t("mission.reward", { reward: rewardLabel(reward, rewardCash(reward, snap), t("unit.rp"), (pct) => t("mission.boost", { pct })) })}</div>
       </div>
       {!claimed && (
         <Button size="sm" variant={done ? "gold" : "locked"} disabled={!done} onClick={onClaim}>

@@ -12,7 +12,7 @@ import * as L from "./engine/logistics";
 import { geometricCost, maxAffordable, snapshot } from "./engine/economy";
 import { collectOffline, settleOffline } from "./engine/offline";
 import { canPrestige, pendingPoints, prestige } from "./engine/prestige";
-import { checkAchievements, claimDaily, dailyProgress, refreshDaily } from "./engine/progress";
+import { checkAchievements, claimDaily, claimMilestone, dailyProgress, refreshDaily } from "./engine/progress";
 import { createInitialState } from "./engine/state";
 import { tick } from "./engine/tick";
 import { formatMoney, formatNumber } from "./format";
@@ -194,6 +194,25 @@ describe("motorized chassis", () => {
     expect(snapshot(s).chain.plants[engine].combine).toBe(false);
     run(s, 300);
     expect(s.city.buildings[assembly].plant!.made).toBeGreaterThan(0);
+  });
+});
+
+describe("automotive milestones", () => {
+  it("pay permanent income boosts and Stars, and count money from cars", () => {
+    const s = createInitialState(T0);
+    const income0 = snapshot(s).gm.income;
+    s.lifetime.moneyEarned = 1e6;
+    expect(claimMilestone(s, "m_earn_1m")).toBe(true);
+    expect(s.boost).toBeCloseTo(0.02);
+    expect(snapshot(s).gm.income).toBeCloseTo(income0 * 1.02);
+    expect(claimMilestone(s, "m_sport")).toBe(false); // no Sport car yet
+    s.lifetime.carsProduced = 1000;
+    expect(claimMilestone(s, "m_cars_1000")).toBe(true);
+    expect(s.stars).toBe(1);
+    // car sales count towards "Earn $100,000 from cars"
+    const { s: c } = fullChain();
+    run(c, 600);
+    expect(c.lifetime.carRevenue).toBeGreaterThan(0);
   });
 });
 
