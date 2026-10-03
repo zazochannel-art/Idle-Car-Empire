@@ -13,6 +13,8 @@ export interface Pt {
 
 /** Distance of the lane from the road centre (tiles). */
 export const LANE = 0.2;
+/** Driveways have two lanes too (in and out, keep right), a little narrower. */
+export const DRIVE_LANE = 0.13;
 /** Corner radii (tiles) on the lane line. */
 const R_RIGHT = 0.28;
 const R_LEFT = 0.5;
@@ -40,7 +42,11 @@ export class LanePath {
   readonly knots: number[];
   private pieces: Piece[];
 
-  constructor(points: Pt[], lanes?: number[]) {
+  /** `big`: a long vehicle (truck, transporter) swings wider through the corners. */
+  constructor(points: Pt[], lanes?: number[], big = false) {
+    // long vehicles swing wider on the right (inside) turn; a left turn is already wide
+    const scaleR = big ? 1.5 : 1;
+    const scaleL = big ? 1.1 : 1;
     const n = points.length;
     const segs: { dx: number; dy: number; len: number; lane: number }[] = [];
     for (let i = 0; i < n - 1; i++) {
@@ -49,8 +55,8 @@ export class LanePath {
       const len = Math.abs(b.x - a.x) + Math.abs(b.y - a.y);
       const dx = Math.sign(b.x - a.x);
       const dy = Math.sign(b.y - a.y);
-      // driveways (one end inside a lot) run down the middle
-      const lane = lanes?.[i] ?? (onRoad(a) && onRoad(b) ? LANE : 0);
+      // driveways (one end inside a lot): in and out each keep right
+      const lane = lanes?.[i] ?? (onRoad(a) && onRoad(b) ? LANE : DRIVE_LANE);
       segs.push({ dx, dy, len, lane });
     }
     // offset point of segment i at route point p
@@ -123,8 +129,8 @@ export class LanePath {
       const qa = off(k - 1, p);
       const qb = off(k, p);
       const C = A.dx !== 0 ? { x: qb.x, y: qa.y } : { x: qa.x, y: qb.y };
-      const driveway = A.lane === 0 || B.lane === 0;
-      let r = driveway ? R_DRIVEWAY : cross > 0 ? R_RIGHT : R_LEFT;
+      const driveway = A.lane !== LANE || B.lane !== LANE;
+      let r = driveway ? R_DRIVEWAY * scaleR : cross > 0 ? R_RIGHT * scaleR : R_LEFT * scaleL;
       // room on both sides: the leg we came along and the leg ahead
       const back = Math.abs(C.x - cur.x) + Math.abs(C.y - cur.y);
       const ahead = B.len * 0.5;

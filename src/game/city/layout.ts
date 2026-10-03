@@ -87,6 +87,35 @@ export function hash(a: number, b: number) {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
 }
 
+/** Length of a driveway, from the road centre into the lot (tiles). */
+export const DRIVEWAY = 1.25;
+
+export interface RoadRoute {
+  /** Total length on the roads, driveways included (tiles). */
+  length: number;
+  /** Junctions where the route leaves the first road and joins the last one (columns on each entry's line), or null when both lots share a road segment. */
+  from: number | null;
+  to: number | null;
+}
+
+/**
+ * The shortest way by road from one lot to another: out of the driveway, to
+ * the junction on the side that leads toward the destination, along the
+ * grid, and into the other driveway. The engine times deliveries with its
+ * length and the map drives trucks along it, so both always agree.
+ */
+export function roadRoute(a: Entry, b: Entry): RoadRoute {
+  if (a.line === b.line && a.i0 === b.i0) return { length: 2 * DRIVEWAY + Math.abs(a.x - b.x), from: null, to: null };
+  const nx = (i: number) => i * ROAD_STEP + 0.5;
+  let best: RoadRoute = { length: Infinity, from: a.i0, to: b.i0 };
+  for (const n1 of [a.i0, a.i1])
+    for (const n2 of [b.i0, b.i1]) {
+      const length = 2 * DRIVEWAY + Math.abs(a.x - nx(n1)) + Math.abs(nx(n1) - nx(n2)) + Math.abs(a.line - b.line) * ROAD_STEP + Math.abs(nx(n2) - b.x);
+      if (length < best.length - 1e-9) best = { length, from: n1, to: n2 };
+    }
+  return best;
+}
+
 function cellEntry(gcx: number, gcy: number): Entry {
   const bx = gcx >> 1;
   const by = gcy >> 1;
