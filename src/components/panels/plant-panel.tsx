@@ -10,7 +10,7 @@ import { DEALER_BY_ID, DEALER_SPECIALTY } from "@/game/config/dealerships";
 import { MANAGERS } from "@/game/config/managers";
 import { DEPOT, MARKET, plotOf } from "@/game/city/layout";
 import { REGIONS } from "@/game/config/regions";
-import { AUTO_UPGRADE_FROM, automationCost, bestGrade, carLock, carPartsValue, carValue, componentBase, dealerStats, trucksOf, gradeCost, levelCost, plantNumber, plantsOf, recipe, speedCost } from "@/game/engine/chain";
+import { AUTO_UPGRADE_FROM, plantProfitPerMin, plantUnitCost, automationCost, bestGrade, carLock, carValue, componentBase, dealerStats, trucksOf, gradeCost, levelCost, plantNumber, plantsOf, recipe, speedCost } from "@/game/engine/chain";
 import { isManagerUnlocked } from "@/game/engine/actions";
 import { dealerUpgradeCost, managerUpgradeCost } from "@/game/engine/economy";
 import { dealerRequirement } from "@/game/engine/insights";
@@ -66,9 +66,7 @@ export function PlantPanel({ id }: { id: string }) {
   const hasAssembly = plantsOf(state).some(([, o]) => o.type === "assemblyPlant");
   const steps = processSteps(st.type, t);
   const step = Math.min(steps.length - 1, Math.floor(p.progress * (steps.length - 1)));
-  // a motorized chassis also uses up a body (counted at its market value)
-  const bodyCost = st.combine && st.chassisValue !== null ? st.chassisValue / CHASSIS_BONUS - st.engineValue : 0;
-  const unitCost = cfg.item ? st.rawPrice * cfg.rawPer + bodyCost : st.car ? carPartsValue(st.car) * gm.value[1] * gm.income : 0;
+  const unitCost = plantUnitCost(st, gm);
 
   return (
     <div className="space-y-3 pb-2">
@@ -114,7 +112,7 @@ export function PlantPanel({ id }: { id: string }) {
         <div className="mt-2 grid grid-cols-3 gap-2 text-center">
           <Stat label={t("plant.perMin")} value={`${formatNumber(st.unitsPerSec * 60)}${t("unit.perMin")}`} />
           <Stat label={t("plant.capacity")} value={`${formatNumber(Math.floor(p.out))}/${formatNumber(st.outCap)}`} />
-          <Stat label={t("plant.profitMin")} value={formatMoney(st.unitsPerSec * 60 * (st.unitValue - unitCost))} gold />
+          <Stat label={t("plant.profitMin")} value={formatMoney(plantProfitPerMin(st, gm))} gold />
         </div>
         <div className="mt-2 grid grid-cols-3 gap-2 text-center">
           <Stat label={t("plant.unitCost")} value={formatMoney(unitCost)} />

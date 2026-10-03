@@ -9,6 +9,8 @@ export interface DesignStats {
   comfort: number;
   quality: number;
   design: number;
+  /** Press review, 1-5 in halves; it moves demand (sale value). */
+  stars: number;
   /** Multipliers applied to the car's sale value and assembly time. */
   valueMult: number;
   timeMult: number;
@@ -20,6 +22,15 @@ export const designOf = (s: GameState, id: CarId): CarDesign => s.designs[id];
  * Stats of a model. Quality comes from the grade of its components (better
  * parts, better car) plus interior and paint work; it also lifts the price.
  */
+export const REVIEW_BASE = 0.9;
+export const REVIEW_PER_STAR = 0.05;
+
+/** Press review, 1-5 stars in halves, from comfort, quality and design (0-100 each). */
+export function reviewStars(comfort: number, quality: number, design: number): number {
+  const score = (comfort + quality + design) / 3;
+  return Math.max(1, Math.min(5, Math.round((score / 20) * 2) / 2));
+}
+
 export function designStats(car: CarConfig, d: CarDesign, grade = car.grade): DesignStats {
   let valueMult = 1;
   let timeMult = 1;
@@ -29,14 +40,12 @@ export function designStats(car: CarConfig, d: CarDesign, grade = car.grade): De
   }
   const quality = Math.min(100, Math.round(35 + 13 * grade + 3 * d.interior + 2 * d.paint));
   valueMult *= 0.9 + quality / 500;
-  return {
-    hp: Math.round(car.hp * (1 + 0.15 * d.engine)),
-    comfort: Math.min(100, car.comfort + 8 * d.interior),
-    quality,
-    design: Math.min(100, car.design + 4 * d.rims + 4 * d.paint),
-    valueMult,
-    timeMult,
-  };
+  const comfort = Math.min(100, car.comfort + 8 * d.interior);
+  const design = Math.min(100, car.design + 4 * d.rims + 4 * d.paint);
+  const stars = reviewStars(comfort, quality, design);
+  // the press review moves demand: 1★ −5% … 5★ +15%
+  valueMult *= REVIEW_BASE + REVIEW_PER_STAR * stars;
+  return { hp: Math.round(car.hp * (1 + 0.15 * d.engine)), comfort, quality, design, stars, valueMult, timeMult };
 }
 
 /** R&D price of the next level of an option, from the model's base value. */

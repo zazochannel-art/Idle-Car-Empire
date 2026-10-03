@@ -635,3 +635,26 @@ describe("coming back", () => {
     expect(snapshot(s).gm.income).toBeGreaterThan(base * 1.09);
   });
 });
+
+describe("insight", () => {
+  it("scores models 1-5 stars and moves their price with the review", () => {
+    expect(D.reviewStars(0, 0, 0)).toBe(1);
+    expect(D.reviewStars(100, 100, 100)).toBe(5);
+    expect(D.reviewStars(50, 50, 50)).toBe(2.5);
+    const s = createInitialState(T0);
+    const car = CAR_BY_ID.city;
+    const before = Ch.modelStats(s, car);
+    s.designs.city.interior = 3;
+    s.designs.city.rims = 3;
+    const after = Ch.modelStats(s, car);
+    expect(after.stars).toBeGreaterThan(before.stars);
+  });
+
+  it("reports the value each plant adds per minute", () => {
+    const s = createInitialState(T0);
+    const st = Object.values(snapshot(s).chain.plants)[0];
+    const per = Ch.plantProfitPerMin(st, snapshot(s).gm);
+    expect(per).toBeCloseTo(st.unitsPerSec * 60 * (st.unitValue - Ch.plantUnitCost(st, snapshot(s).gm)));
+    expect(per).toBeGreaterThan(0);
+  });
+});
