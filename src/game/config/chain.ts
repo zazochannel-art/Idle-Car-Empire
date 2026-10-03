@@ -98,7 +98,7 @@ export interface LevelConfig {
   cost: number;
 }
 
-/** Small → Mega Factory. Every level also changes how the building looks. */
+/** Small → Mega Factory → Auto City (10 levels). Every level also changes how the building and its floor look. */
 export const PLANT_LEVELS: LevelConfig[] = [
   { lines: 1, storage: 1, cost: 0 },
   { lines: 2, storage: 2, cost: 0.1 },
@@ -108,6 +108,8 @@ export const PLANT_LEVELS: LevelConfig[] = [
   { lines: 8, storage: 8, cost: 200 },
   { lines: 12, storage: 12, cost: 1_500 },
   { lines: 16, storage: 16, cost: 12_000 },
+  { lines: 22, storage: 22, cost: 120_000 },
+  { lines: 30, storage: 30, cost: 1_500_000 },
 ];
 export const PLANT_MAX_LEVEL = PLANT_LEVELS.length;
 
@@ -124,7 +126,7 @@ export const AUTOMATION = [
 ];
 
 /** Trucks that come with each plant level (no separate purchase). */
-export const PLANT_TRUCKS = [1, 2, 2, 3, 3, 4, 5, 6];
+export const PLANT_TRUCKS = [1, 2, 2, 3, 3, 4, 5, 6, 7, 8];
 export const MAX_TRUCKS = 8;
 
 /** Component grades: Standard, Lightweight, Performance, Luxury, Carbon. */
@@ -160,10 +162,10 @@ export interface VehicleConfig {
 }
 
 /** What a plant's trucks are, by plant level (index = level - 1). */
-export const PLANT_VEHICLE: Vehicle[] = ["van", "van", "truck", "truck", "semi", "semi", "trailer", "trailer"];
+export const PLANT_VEHICLE: Vehicle[] = ["van", "van", "truck", "truck", "semi", "semi", "trailer", "trailer", "trailer", "trailer"];
 export const VEHICLE_CAPACITY: Record<Vehicle, number> = { van: 4, truck: 10, semi: 24, trailer: 60, carrier: 6 };
 /** Car transporters carry more cars at higher assembly levels. */
-export const CARRIER_CAPACITY = [2, 3, 4, 6, 8, 8, 10, 12];
+export const CARRIER_CAPACITY = [2, 3, 4, 6, 8, 8, 10, 12, 14, 16];
 
 /** The Materials Depot sends raw material when a plant drops below this share. */
 export const RESUPPLY_AT = 0.5;

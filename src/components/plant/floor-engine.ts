@@ -155,12 +155,23 @@ export class FloorEngine {
       const by = 0.4 + Math.floor(i / 2) * 0.55;
       p.box(bx, by, 0.5, 0.45, 0, 7, s.type === "tireFactory" ? "#57534e" : "#a8a29e");
     }
-    // stations: the machine of each step stands behind the belt
+    // the floor grows with the plant's level: 1 worker at a workbench, 2 workers,
+    // a conveyor belt (3), more machines (4), automation (5), robots (6),
+    // a second line (7), heavy machinery (8), a smart factory (9), Auto City (10)
+    const L = s.level;
+    const belts = L >= 7 ? [y0, y0 + 2.4] : [y0];
+
+    // stations: the machine of each step stands behind the belt (every other one until Level 4)
     const kinds = STATION_MACHINES[s.type] ?? [];
     for (let i = 0; i < n; i++) {
       const x = stationX(i);
       const active = s.running && Math.floor(this.belt * n) === i;
       const kind = kinds[i % Math.max(1, kinds.length)];
+      if (L < 4 && i % 2 === 1) {
+        // a simple workbench where a machine will stand later
+        p.box(x - 0.35, y0 - 1.0, 0.7, 0.5, 0, 6, "#7c5a3a", "#5b4129");
+        continue;
+      }
       if (!kind || !this.machine(kind, x, y0 - 0.85, active ? Math.floor(this.t * 5) % 4 : 0, s.accent)) {
         p.box(x - 0.45, y0 - 1.25, 0.9, 0.8, 0, 16 + (i % 2) * 4, i === n - 1 ? "#0f766e" : "#475569", "#64748b");
         p.onLeft(x - 0.45, y0 - 0.45, 0, 0.15, 0.75, 8, 13, active ? "#38bdf8" : "#1e293b");
@@ -168,36 +179,53 @@ export class FloorEngine {
       if (active) p.light(sx(x, y0 - 0.45), sy(x, y0 - 0.45, 10), 18, "#7dd3fc", 0.6);
     }
 
-    // conveyor
-    p.box(x0, y0, span, 1, 0, 5, "#374151", "#1f2937");
     const c = ctx;
-    c.strokeStyle = "rgba(250,204,21,0.55)";
-    c.lineWidth = 1;
-    c.beginPath();
-    for (let k = 0; k < span * 3; k++) {
-      const u = x0 + ((k / 3 + (s.running ? this.t * 0.6 : 0)) % span);
-      c.moveTo(sx(u, y0), sy(u, y0, 5));
-      c.lineTo(sx(u, y0 + 1), sy(u, y0 + 1, 5));
-    }
-    c.stroke();
+    // robots: one per automation tier (every other station), on every other station from Level 6
+    const robots = L >= 6 ? n : s.automation * 2;
+    // workers: 1 at Level 1, 2 at Level 2, then one per station without a robot
+    const crew = L === 1 ? 1 : L === 2 ? 2 : n;
+    belts.forEach((by, line) => {
+      if (L >= 3) {
+        // conveyor belt with moving slats
+        p.box(x0, by, span, 1, 0, 5, "#374151", "#1f2937");
+        c.strokeStyle = "rgba(250,204,21,0.55)";
+        c.lineWidth = 1;
+        c.beginPath();
+        for (let k = 0; k < span * 3; k++) {
+          const u = x0 + ((k / 3 + (s.running ? this.t * 0.6 : 0)) % span);
+          c.moveTo(sx(u, by), sy(u, by, 5));
+          c.lineTo(sx(u, by + 1), sy(u, by + 1, 5));
+        }
+        c.stroke();
+        // Level 10: lit guide strips along the line
+        if (L >= 10) p.light(sx(x0 + span / 2, by + 1.1), sy(x0 + span / 2, by + 1.1, 1), 60, "#22d3ee", 0.25);
+      } else {
+        // before the belt: units are carried from bench to bench
+        for (let i = 0; i < n; i++) p.box(stationX(i) - 0.4, by + 0.05, 0.8, 0.9, 0, 4, "#8b6a48", "#6b5136");
+      }
 
-    // the units on the belt: one per station, each a step further along
-    for (let i = 0; i < n; i++) {
-      const u = (i + this.belt) / n;
-      const x = x0 + u * span;
-      const stage = Math.min(n - 1, Math.floor(u * n));
-      this.drawUnit(s, x, y0 + 0.5, stage, n);
-    }
+      // the units on the line: one per station, each a step further along
+      const phase = line === 0 ? this.belt : (this.belt + 0.5) % 1;
+      for (let i = 0; i < n; i++) {
+        const u = (i + phase) / n;
+        const x = x0 + u * span;
+        const stage = Math.min(n - 1, Math.floor(u * n));
+        this.drawUnit(s, x, by + 0.5, stage, n);
+      }
 
-    // in front of the belt: robot arms on automated stations, workers on the others
-    const robots = s.automation;
-    for (let i = 0; i < n; i++) {
-      const x = stationX(i);
-      const active = s.running && Math.floor(this.belt * n) === i;
-      if (i < robots + 1 && i % 2 === 0) {
-        if (!this.robot(x - 0.3, y0 + 1.3, active ? Math.floor(this.t * 5 + i) % 4 : 0, i)) robotArm(p, x - 0.3, y0 + 1.3, this.t + i, active);
-      } else p.person(x + 0.1, y0 + 1.5, i % 3 ? "#f59e0b" : "#3b82f6", this.t * 3 + i);
-    }
+      // in front of the line: robot arms on automated stations, workers on the others
+      let staffed = 0;
+      for (let i = 0; i < n; i++) {
+        const x = stationX(i);
+        const active = s.running && Math.floor(phase * n) === i;
+        if (i < robots && i % 2 === 0) {
+          if (!this.robot(x - 0.3, by + 1.3, active ? Math.floor(this.t * 5 + i) % 4 : 0, i)) robotArm(p, x - 0.3, by + 1.3, this.t + i, active);
+        } else if (staffed < crew) {
+          staffed++;
+          p.person(x + 0.1, by + 1.5, i % 3 ? "#f59e0b" : "#3b82f6", this.t * 3 + i + line);
+        }
+      }
+    });
     for (let i = 0; i < n; i++) {
       const active = s.running && Math.floor(this.belt * n) === i;
       p.tag(s.steps[i], stationX(i), y0 - 0.9, 34, { size: 9, bg: active ? "rgba(14,165,233,0.92)" : "rgba(15,23,42,0.8)" });

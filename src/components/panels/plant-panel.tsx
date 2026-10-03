@@ -74,6 +74,7 @@ export function PlantPanel({ id }: { id: string }) {
         <Badge variant="gold">
           {t("common.lv", { level: b.level })} · {t(`plantLevel.${b.level}` as MessageKey)}
         </Badge>
+        <Badge variant="muted">🏭 {t(`plantStage.${b.level}` as MessageKey)}</Badge>
         <Badge variant="muted">🤖 {t(`automation.${p.automation}` as MessageKey)}</Badge>
         {cfg.item && <Badge variant="muted">★ {gradeName(cfg.item, p.grade, t)}</Badge>}
         <Badge variant="muted">📍 {t(`zone.${plot.zone}`)}</Badge>
@@ -161,7 +162,7 @@ export function PlantPanel({ id }: { id: string }) {
         <UpgradeRow
           icon="🏗️"
           title={b.level < PLANT_LEVELS.length ? t("plant.levelUp", { name: t(`plantLevel.${b.level + 1}` as MessageKey) }) : t("plant.levelMax")}
-          detail={b.level < PLANT_LEVELS.length ? t("plant.levelDetail", { a: PLANT_LEVELS[b.level - 1].lines, b: PLANT_LEVELS[b.level].lines, n: Math.max(trucksOf(b), PLANT_TRUCKS[b.level]) + st.trucks - trucksOf(b) }) : ""}
+          detail={b.level < PLANT_LEVELS.length ? `${t(`plantStage.${b.level + 1}` as MessageKey)} · ${t("plant.levelDetail", { a: PLANT_LEVELS[b.level - 1].lines, b: PLANT_LEVELS[b.level].lines, n: Math.max(trucksOf(b), PLANT_TRUCKS[b.level]) + st.trucks - trucksOf(b) })}` : ""}
           cost={levelCost(b, gm)}
           onBuy={() => g.plantLevel(id)}
           gold
