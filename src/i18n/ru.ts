@@ -559,6 +559,18 @@ export const ru: Record<MessageKey, string> = {
   "logistics.upHint.warehouse": "+{pct} склада на каждом заводе",
   "logistics.upHint.fleet": "+{n} грузовик на каждом заводе",
   "logistics.footer": "Улучшения логистики действуют на все заводы сразу, включая построенные позже.",
+  "bonus.cost": "−{pct}% к цене улучшений и построек",
+  "bonus.carValue": "+{pct}% к цене каждой машины",
+  "rarity.common": "Обычный",
+  "rarity.rare": "Редкий",
+  "rarity.epic": "Эпический",
+  "rarity.legendary": "Легендарный",
+  "mcat.production": "Производство",
+  "mcat.logistics": "Логистика",
+  "mcat.sales": "Продажи",
+  "mcat.engineer": "Инженерия",
+  "mcat.designer": "Дизайн",
+  "mcat.quality": "Качество",
   "plant.production": "Производство",
   "plant.rate": "{n} × {item} / {time}",
   "plant.unitCost": "Затраты",
@@ -741,6 +753,8 @@ export const ruContent: Record<string, string> = {
 
 
 
+  "manager.nina.role": "Инженер",
+  "manager.leo.role": "Автодизайнер",
   "manager.mike.role": "Менеджер производства",
   "manager.sarah.role": "Менеджер по продажам",
   "manager.alex.role": "Технический менеджер",

@@ -33,6 +33,8 @@ export type DealerId = "local" | "city" | "premium" | "luxury" | "supercar" | "g
 
 export type ManagerId =
   | "mike"
+  | "nina"
+  | "leo"
   | "sarah"
   | "alex"
   | "daniel"

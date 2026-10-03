@@ -559,6 +559,18 @@ export const ro: Record<MessageKey, string> = {
   "logistics.upHint.warehouse": "+{pct} stoc la fiecare fabrică",
   "logistics.upHint.fleet": "+{n} camion la fiecare fabrică",
   "logistics.footer": "Îmbunătățirile logistice se aplică tuturor fabricilor deodată, inclusiv celor construite mai târziu.",
+  "bonus.cost": "−{pct}% la costul upgrade-urilor și construcțiilor",
+  "bonus.carValue": "+{pct}% valoare la fiecare mașină",
+  "rarity.common": "Comun",
+  "rarity.rare": "Rar",
+  "rarity.epic": "Epic",
+  "rarity.legendary": "Legendar",
+  "mcat.production": "Producție",
+  "mcat.logistics": "Logistică",
+  "mcat.sales": "Vânzări",
+  "mcat.engineer": "Inginerie",
+  "mcat.designer": "Design",
+  "mcat.quality": "Calitate",
   "plant.production": "Producție",
   "plant.rate": "{n} × {item} / {time}",
   "plant.unitCost": "Cost",
@@ -741,6 +753,8 @@ export const roContent: Record<string, string> = {
 
 
 
+  "manager.nina.role": "Inginer",
+  "manager.leo.role": "Designer auto",
   "manager.mike.role": "Manager de producție",
   "manager.sarah.role": "Manager de vânzări",
   "manager.alex.role": "Manager de tehnologie",

@@ -4,7 +4,8 @@ import { Lock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { STRUCTURE_BY_ID } from "@/game/config/city";
-import { MANAGERS } from "@/game/config/managers";
+import { CATEGORY_ICON, MANAGERS, RARITY_COLOR, type ManagerConfig } from "@/game/config/managers";
+import type { MessageKey } from "@/i18n";
 import { isManagerUnlocked } from "@/game/engine/actions";
 import { plantsOf } from "@/game/engine/chain";
 import { managerUpgradeCost } from "@/game/engine/economy";
@@ -38,14 +39,15 @@ export function ManagersView() {
           if (!st.hired) {
             const pct = Math.min(100, (state.lifetime.moneyEarned / Math.max(1, m.unlockAt)) * 100);
             return (
-              <div key={m.id} className={`rounded-2xl p-4 ring-1 ${unlocked ? "glass" : "bg-white/[0.02] ring-white/[0.05]"}`}>
+              <div key={m.id} className={`rounded-2xl p-4 ring-1 ${unlocked ? "glass" : "bg-white/[0.02] ring-white/[0.05]"}`} style={unlocked ? { boxShadow: `inset 0 0 0 1px ${RARITY_COLOR[m.rarity]}55` } : undefined}>
                 <div className="flex items-center gap-3">
                   <span className={`text-4xl ${unlocked ? "" : "grayscale opacity-40"}`}>{m.avatar}</span>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <span className="font-semibold">{m.name}</span>
                       <Badge variant={m.scope === "global" ? "gold" : "muted"}>{m.scope === "global" ? t("managers.global") : t("managers.factory")}</Badge>
                     </div>
+                    <Kind m={m} />
                     <div className="text-xs text-white/50">{n.role(m)}</div>
                     <div className="text-xs text-emerald-300">{n.bonus(m.bonus, 1)}</div>
                   </div>
@@ -64,15 +66,16 @@ export function ManagersView() {
             );
           }
           return (
-            <div key={m.id} className="glass rounded-2xl p-4">
+            <div key={m.id} className="glass rounded-2xl p-4" style={{ boxShadow: `inset 0 0 0 1px ${RARITY_COLOR[m.rarity]}88` }}>
               <div className="flex items-center gap-3">
                 <span className="text-4xl">{m.avatar}</span>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <span className="font-semibold">{m.name}</span>
                     <Badge>{t("common.lv", { level: st.level })}</Badge>
                     <Badge variant={m.scope === "global" ? "gold" : "muted"}>{m.scope === "global" ? t("managers.global") : t("managers.factory")}</Badge>
                   </div>
+                  <Kind m={m} />
                   <div className="text-xs text-white/50">{n.role(m)}</div>
                   <div className="text-xs text-emerald-300">{n.bonus(m.bonus, st.level)}</div>
                 </div>
@@ -105,6 +108,19 @@ export function ManagersView() {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/** Rarity (coloured) and category of a manager. */
+function Kind({ m }: { m: ManagerConfig }) {
+  const { t } = useT();
+  return (
+    <div className="mt-0.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider">
+      <span style={{ color: RARITY_COLOR[m.rarity] }}>◆ {t(`rarity.${m.rarity}` as MessageKey)}</span>
+      <span className="text-white/40">
+        {CATEGORY_ICON[m.category]} {t(`mcat.${m.category}` as MessageKey)}
+      </span>
     </div>
   );
 }
