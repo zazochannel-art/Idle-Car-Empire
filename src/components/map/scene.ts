@@ -1168,7 +1168,7 @@ export function buildScene(state: GameState, snap: EconomySnapshot, names: Scene
             const now = live().city.buildings[plot.id];
             const pl = now?.plant ?? null;
             const st = snap.chain.plants[plot.id];
-            drawPlant(p, plot, { type, level: b.level, plant: pl, fill: pl && st ? Math.min(1, pl.out / st.outCap) : 0, car: st?.car?.id ?? null }, info.t, seed);
+            drawPlant(p, plot, { type, level: Math.min(b.level, 10), plant: pl, fill: pl && st ? Math.min(1, pl.out / st.outCap) : 0, car: st?.car?.id ?? null }, info.t, seed);
             if (info.selected === plot.id) p.quadStroke(plot.x + 0.2, plot.y + 0.2, plot.w - 0.4, plot.d - 0.4, "#fbbf24", 2.5);
           },
           label: (p, info) => {

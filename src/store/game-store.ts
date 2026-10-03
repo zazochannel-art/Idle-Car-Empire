@@ -10,6 +10,7 @@ import { MANAGER_BY_ID } from "@/game/config/managers";
 import { RESEARCH_BY_ID } from "@/game/config/research";
 import * as A from "@/game/engine/actions";
 import * as Ch from "@/game/engine/chain";
+import * as K from "@/game/engine/contracts";
 import * as D from "@/game/engine/design";
 import * as L from "@/game/engine/logistics";
 import type { LogisticsUpgrade } from "@/game/config/logistics";
@@ -50,6 +51,7 @@ interface GameStore {
   plantGrade: (plot: string) => boolean;
   setPlantCar: (plot: string, car: CarId | null) => void;
   setCombine: (plot: string, on: boolean) => void;
+  setAutoUpgrade: (plot: string, on: boolean) => void;
   hireManager: (id: ManagerId, assignTo?: string) => boolean;
   upgradeManager: (id: ManagerId) => boolean;
   assignManager: (id: ManagerId, plot: string | null) => void;
@@ -73,6 +75,9 @@ interface GameStore {
   claimDaily: (id: string) => void;
   claimMilestone: (id: string) => void;
   dismissTip: (id: string) => void;
+  acceptContract: () => void;
+  declineContract: () => void;
+  claimContract: () => void;
   collectOffline: () => void;
   prestige: () => void;
   imperium: () => void;
@@ -144,6 +149,10 @@ export const useGame = create<GameStore>((set, get) => {
     const events = engineTick(next, dt, snap);
     next.lastActiveAt = now;
     recordHistory(next, now, snap.incomePerSec);
+    Ch.autoUpgrade(next, snap.gm);
+    const deal = K.refreshContracts(next, now, snap);
+    if (deal === "offer") uiEvents.emit({ type: "toast", tone: "info", icon: "📨", title: tr("contract.offerToast"), body: tr("contract.offerToastBody") });
+    else if (deal === "expired") uiEvents.emit({ type: "toast", tone: "warn", icon: "⌛", title: tr("contract.expired") });
     const ev = activeEvent(now);
     if (ev && !activeEvent(state.lastActiveAt)) {
       const n = contentFor(next.settings.lang);
@@ -210,6 +219,15 @@ export const useGame = create<GameStore>((set, get) => {
     plantSpeed: (plot) => act((s) => Ch.upgradePlantSpeed(s, plot, get().snap.gm)),
     plantAutomation: (plot) => act((s) => Ch.upgradeAutomation(s, plot, get().snap.gm)),
     plantGrade: (plot) => act((s) => Ch.upgradeGrade(s, plot, get().snap.gm)),
+    setAutoUpgrade: (plot, on) => {
+      act((s) => {
+        const p = s.city.buildings[plot]?.plant;
+        if (!p) return false;
+        p.auto = on;
+        return true;
+      });
+      persist(true);
+    },
     setCombine: (plot, on) => {
       act((s) => Ch.setCombine(s, plot, on));
     },
@@ -280,6 +298,20 @@ export const useGame = create<GameStore>((set, get) => {
     setSpecialization: (plot, spec) => act((s) => C.setSpecialization(s, plot, spec)),
     claimDaily: (id) => {
       act((s) => claimDaily(s, id));
+    },
+    acceptContract: () => {
+      act((s) => K.acceptContract(s, Date.now()));
+      persist(true);
+    },
+    declineContract: () => {
+      act((s) => K.declineContract(s, Date.now()));
+    },
+    claimContract: () => {
+      const ok = act((s) => K.claimContract(s, Date.now(), get().snap));
+      if (ok) {
+        uiEvents.emit({ type: "toast", tone: "gold", icon: "🤝", title: tr("contract.paid"), body: tr("contract.paidBody") });
+        persist(true);
+      }
     },
     dismissTip: (id) => {
       act((s) => !s.tips.includes(id) && s.tips.push(id) > 0);

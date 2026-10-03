@@ -1,3 +1,4 @@
+import type { ContractsState } from "./engine/contracts";
 import type { StarUpgradeId } from "./config/imperium";
 // Core type definitions shared by the config, the engine and the UI.
 
@@ -247,6 +248,8 @@ export interface PlantData {
   route: Route;
   /** Engine factory before assembly: fit every engine into a car body and sell motorized chassis. */
   combine?: boolean;
+  /** Buys this plant's cheapest speed or level upgrade by itself (Automated plants and up). */
+  auto?: boolean;
   /** Progress of the current batch, 0..1. */
   progress: number;
   /** Raw material on site (steel, rubber…). */
@@ -371,6 +374,8 @@ export interface GameState {
   epBase: number;
   /** Income samples (one a minute, last 4 hours) for the chart and the stall hint. */
   history: { t: number; income: number }[];
+  /** Customer contracts: one offer or one running contract at a time. */
+  contracts: ContractsState;
   /** Tutorial tips the player has dismissed. */
   tips: string[];
   logistics: LogisticsState;

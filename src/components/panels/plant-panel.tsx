@@ -5,11 +5,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { CARS, CAR_BY_ID } from "@/game/config/cars";
-import { AUTOMATION, CHASSIS_BONUS, COMPONENTS, COMPONENT_BY_ID, GRADES, PLANTS, PLANT_BY_ID, PLANT_LEVELS, PLANT_TRUCKS, SPEED } from "@/game/config/chain";
+import { AUTOMATION, BASE_MAX_LEVEL, CHASSIS_BONUS, COMPONENTS, COMPONENT_BY_ID, GRADES, PLANTS, PLANT_BY_ID, PLANT_LEVELS, PLANT_TRUCKS, SPEED } from "@/game/config/chain";
 import { DEALER_BY_ID, DEALER_SPECIALTY } from "@/game/config/dealerships";
 import { MANAGERS } from "@/game/config/managers";
 import { DEPOT, MARKET, plotOf } from "@/game/city/layout";
-import { automationCost, bestGrade, carLock, carPartsValue, carValue, componentBase, dealerStats, trucksOf, gradeCost, levelCost, plantNumber, plantsOf, recipe, speedCost } from "@/game/engine/chain";
+import { REGIONS } from "@/game/config/regions";
+import { AUTO_UPGRADE_FROM, automationCost, bestGrade, carLock, carPartsValue, carValue, componentBase, dealerStats, trucksOf, gradeCost, levelCost, plantNumber, plantsOf, recipe, speedCost } from "@/game/engine/chain";
 import { isManagerUnlocked } from "@/game/engine/actions";
 import { dealerUpgradeCost, managerUpgradeCost } from "@/game/engine/economy";
 import { dealerRequirement } from "@/game/engine/insights";
@@ -51,7 +52,8 @@ export function PlantPanel({ id }: { id: string }) {
   const snap = useGame((g) => g.snap);
   const g = useGame.getState();
   const openFloor = useUi((u) => u.openFloor);
-  const { t } = useT();
+  const { t, lang } = useT();
+  const n = useContent(lang);
   const b = state.city.buildings[id];
   const st = snap.chain.plants[id];
   if (!b?.plant || !st) return null;
@@ -166,6 +168,8 @@ export function PlantPanel({ id }: { id: string }) {
           cost={levelCost(b, gm)}
           onBuy={() => g.plantLevel(id)}
           gold
+          // levels 11+ open one per region: name the region that unlocks the next one
+          maxedLabel={b.level < PLANT_LEVELS.length && b.level >= gm.maxPlantLevel ? `🔒 ${REGIONS[b.level + 1 - BASE_MAX_LEVEL].emoji} ${n.region(REGIONS[b.level + 1 - BASE_MAX_LEVEL])}` : undefined}
         />
         <UpgradeRow icon="⚡" title={t("plant.speed", { n: p.speed })} detail={t("plant.speedDetail", { pct: formatPercent(SPEED.mult - 1) })} cost={speedCost(b, gm)} onBuy={() => g.plantSpeed(id)} />
         <UpgradeRow
@@ -175,6 +179,7 @@ export function PlantPanel({ id }: { id: string }) {
           cost={automationCost(b, gm)}
           onBuy={() => g.plantAutomation(id)}
         />
+        <AutoUpgradeRow id={id} />
         {cfg.item && (
           <UpgradeRow
             icon="★"
@@ -447,7 +452,23 @@ function ModelPicker({ id }: { id: string }) {
   );
 }
 
-function UpgradeRow({ icon, title, detail, cost, onBuy, gold }: { icon: string; title: string; detail: string; cost: number | null; onBuy: () => unknown; gold?: boolean }) {
+function UpgradeRow({
+  icon,
+  title,
+  detail,
+  cost,
+  onBuy,
+  gold,
+  maxedLabel,
+}: {
+  icon: string;
+  title: string;
+  detail: string;
+  cost: number | null;
+  onBuy: () => unknown;
+  gold?: boolean;
+  maxedLabel?: string;
+}) {
   const { t } = useT();
   return (
     <div className="flex items-center gap-3 rounded-2xl bg-white/[0.04] p-2.5 ring-1 ring-white/[0.07]">
@@ -456,7 +477,7 @@ function UpgradeRow({ icon, title, detail, cost, onBuy, gold }: { icon: string; 
         <span className="block truncate text-sm font-bold">{title}</span>
         {detail && <span className="block text-[11px] leading-snug text-white/50">{detail}</span>}
       </span>
-      <CostButton size="sm" variant={gold ? "gold" : "default"} cost={cost} label={t("plot.upgrade")} maxedLabel={t("common.max")} onBuy={onBuy} />
+      <CostButton size="sm" variant={gold ? "gold" : "default"} cost={cost} label={t("plot.upgrade")} maxedLabel={maxedLabel ?? t("common.max")} onBuy={onBuy} />
     </div>
   );
 }
@@ -634,4 +655,32 @@ export function plantFlow(type: PlantType, t: T): string {
   const cfg = PLANT_BY_ID[type];
   if (!cfg.item) return t("flow.assembly");
   return t("flow.component", { raw: rawName(type, t), item: itemName(cfg.item, t) });
+}
+
+/** The switch that lets an Automated plant buy its own upgrades. */
+function AutoUpgradeRow({ id }: { id: string }) {
+  const p = useGame((g) => g.state.city.buildings[id]?.plant);
+  const setAutoUpgrade = useGame((g) => g.setAutoUpgrade);
+  const { t } = useT();
+  if (!p) return null;
+  const ready = p.automation >= AUTO_UPGRADE_FROM;
+  const on = ready && !!p.auto;
+  return (
+    <button
+      role="switch"
+      aria-checked={on}
+      disabled={!ready}
+      onClick={() => setAutoUpgrade(id, !on)}
+      className={cn("flex w-full items-center gap-3 rounded-2xl bg-white/[0.04] p-2.5 text-left ring-1 ring-white/[0.07]", !ready && "opacity-60")}
+    >
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white/5 text-lg">🔁</span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-bold">{t("auto.title")}</span>
+        <span className="block text-[11px] leading-snug text-white/50">{ready ? t("auto.detail") : t("auto.locked", { name: t(`automation.${AUTO_UPGRADE_FROM}` as MessageKey) })}</span>
+      </span>
+      <span className={cn("relative h-6 w-10 shrink-0 rounded-full transition", on ? "bg-emerald-500" : "bg-white/15")}>
+        <span className={cn("absolute top-0.5 size-5 rounded-full bg-white shadow transition-all", on ? "left-[1.125rem]" : "left-0.5")} />
+      </span>
+    </button>
+  );
 }

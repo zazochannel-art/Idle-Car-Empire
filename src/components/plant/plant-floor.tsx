@@ -45,7 +45,8 @@ export function PlantFloor({ plotId }: { plotId: string }) {
     const cfg = PLANT_BY_ID[st.type];
     engineRef.current?.setScene({
       type: st.type,
-      level: b.level,
+      // levels 11-15 keep the Auto City look
+      level: Math.min(b.level, 10),
       automation: p.automation,
       progress: p.progress,
       running: p.status === "ok",

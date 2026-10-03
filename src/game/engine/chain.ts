@@ -133,7 +133,7 @@ export function plantBuildCost(s: GameState, type: PlantType): number {
 const base = (b: BuildingState) => PLANT_BY_ID[b.type as PlantType].cost;
 
 export function levelCost(b: BuildingState, gm: GlobalMods): number | null {
-  if (b.level >= PLANT_MAX_LEVEL) return null;
+  if (b.level >= Math.min(PLANT_MAX_LEVEL, gm.maxPlantLevel)) return null;
   return base(b) * PLANT_LEVELS[b.level].cost * gm.costMult;
 }
 
@@ -791,6 +791,7 @@ export function migratePlant(type: PlantType, raw: unknown): PlantData {
   // routing is automatic now: parts go where they are needed
   p.route = "use";
   if (raw.combine === true) p.combine = true;
+  if (raw.auto === true) p.auto = true;
   p.progress = Math.min(0.999, num(raw.progress));
   p.raw = num(raw.raw, p.raw);
   p.out = num(raw.out);
@@ -845,3 +846,25 @@ export function migrateChain(raw: unknown, s: GameState): ChainState {
   return chain;
 }
 
+
+/** Plants this automated can upgrade themselves. */
+export const AUTO_UPGRADE_FROM = 2;
+
+/**
+ * Auto-upgrade: each switched-on plant buys its cheapest speed or level
+ * upgrade, but only when it costs at most a quarter of the cash, so the
+ * player can still save for new plants. One purchase per plant per call.
+ */
+export function autoUpgrade(s: GameState, gm: GlobalMods): number {
+  let bought = 0;
+  for (const [id, b] of plantsOf(s)) {
+    if (!b.plant.auto || b.plant.automation < AUTO_UPGRADE_FROM) continue;
+    const sp = speedCost(b, gm);
+    const lv = levelCost(b, gm);
+    const pickLevel = lv !== null && (sp === null || lv <= sp);
+    const cost = pickLevel ? lv : sp;
+    if (cost === null || cost > s.cash * 0.25) continue;
+    if (pickLevel ? upgradePlantLevel(s, id, gm) : upgradePlantSpeed(s, id, gm)) bought++;
+  }
+  return bought;
+}
