@@ -8,6 +8,7 @@ import type { CarId } from "@/game/types";
 import { useContent } from "@/i18n/content";
 import { useT } from "@/i18n/use-t";
 import { useGame } from "@/store/game-store";
+import { IncomeChart } from "./income-chart";
 import { ViewHeader } from "./section-title";
 
 export function StatsView() {
@@ -58,6 +59,7 @@ export function StatsView() {
   return (
     <div className="space-y-4">
       <ViewHeader icon="📊" title={t("nav.stats")} subtitle={t("stats.founded", { date: new Date(state.createdAt).toLocaleDateString(lang) })} />
+      <IncomeChart />
       <div className="glass divide-y divide-white/[0.05] overflow-hidden rounded-2xl">
         {rows.map(([k, v]) => (
           <div key={k} className="flex items-center justify-between gap-4 px-4 py-3 text-sm">

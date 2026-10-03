@@ -7,6 +7,7 @@ import type { DealerConfig } from "@/game/config/dealerships";
 import type { ManagerBonus, ManagerConfig } from "@/game/config/managers";
 import type { MilestoneMission } from "@/game/config/missions";
 import type { EmpirePerk } from "@/game/config/prestige";
+import type { MarketEvent } from "@/game/config/events";
 import type { RegionConfig } from "@/game/config/regions";
 import type { ResearchCategoryConfig, ResearchNode } from "@/game/config/research";
 import { RESEARCH_BY_ID } from "@/game/config/research";
@@ -64,6 +65,8 @@ export function contentFor(lang: Lang) {
     milestone: (x: MilestoneMission) => c(lang, `milestone.${x.id}`, x.title),
     perk: (x: EmpirePerk) => c(lang, `perk.${x.points}.name`, x.name),
     perkDesc: (x: EmpirePerk) => c(lang, `perk.${x.points}.desc`, x.description),
+    event: (x: MarketEvent) => c(lang, `event.${x.id}.name`, x.name),
+    eventDesc: (x: MarketEvent) => c(lang, `event.${x.id}.desc`, x.description),
     region: (x: RegionConfig) => c(lang, `region.${x.id}.name`, x.name),
     regionFlavor: (x: RegionConfig) => c(lang, `region.${x.id}.flavor`, x.flavor),
     /** Daily missions are stored with an English title; rebuild it per language. */

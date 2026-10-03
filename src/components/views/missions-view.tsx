@@ -7,6 +7,7 @@ import { useContent } from "@/i18n/content";
 import { useT } from "@/i18n/use-t";
 import { useGame } from "@/store/game-store";
 import { MissionRow } from "../game/goals";
+import { EventCard } from "../game/event-chip";
 import { SectionTitle, ViewHeader } from "./section-title";
 
 function untilMidnight() {
@@ -27,6 +28,7 @@ export function MissionsView() {
   return (
     <div className="space-y-5">
       <ViewHeader icon="📋" title={t("nav.missions")} subtitle={t("missions.subtitle")} />
+      <EventCard />
 
       <section className="space-y-2">
         <SectionTitle title={t("mission.daily")} subtitle={t("missions.newIn", { time: formatDuration(untilMidnight()) })} />
