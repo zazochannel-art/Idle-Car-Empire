@@ -25,6 +25,7 @@ import { BuildPanel, GaragesView, MechanicsSummary, MenuPanel, PlotPanel, Upgrad
 import { Sheet } from "../panels/sheet";
 import { AchievementsView } from "../views/achievements-view";
 import { CarsView } from "../views/cars-view";
+import { LogisticsView } from "../views/logistics-view";
 import { DealersView } from "../views/dealers-view";
 import { ProductionView } from "../views/production-view";
 import { ManagersView } from "../views/managers-view";
@@ -197,6 +198,8 @@ function ViewSwitch({ view, onSettings }: { view: View; onSettings: () => void }
       return <ProductionView />;
     case "dealers":
       return <DealersView />;
+    case "logistics":
+      return <LogisticsView />;
     case "cars":
       return <CarsView />;
     case "research":

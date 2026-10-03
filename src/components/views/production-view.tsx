@@ -5,6 +5,8 @@ import { Fragment } from "react";
 import { Badge } from "@/components/ui/badge";
 import { PLANTS, PLANT_BY_ID } from "@/game/config/chain";
 import { DEALERS } from "@/game/config/dealerships";
+import { TRANSPORT_TIERS } from "@/game/config/logistics";
+import type { MessageKey } from "@/i18n";
 import { DEPOT, MARKET } from "@/game/city/layout";
 import { plantBuildCost, plantLock, plantsOf } from "@/game/engine/chain";
 import { freePlot } from "@/game/engine/insights";
@@ -26,6 +28,7 @@ export function ProductionView() {
   const state = useGame((g) => g.state);
   const snap = useGame((g) => g.snap);
   const selectPlot = useUi((u) => u.selectPlot);
+  const setView = useUi((u) => u.setView);
   const { t, lang } = useT();
   const n = useContent(lang);
   const plants = plantsOf(state);
@@ -94,6 +97,7 @@ export function ProductionView() {
             });
           })}
           {arrow("a1", t("chain.trucks"))}
+          {node("logistics", TRANSPORT_TIERS[state.logistics.tier].emoji, t("logistics.title"), `${t("logistics.network")}: ${t(`logistics.tier.${TRANSPORT_TIERS[state.logistics.tier].id}` as MessageKey)}`, "ok", () => setView("logistics"))}
           {node("market", "💰", t("market.title"), t("chain.market"), "ok", () => selectPlot(MARKET))}
           {dealers.length > 0 ? (
             dealers.map((d) => {

@@ -315,6 +315,16 @@ export interface CityState {
   carsServiced: number;
 }
 
+/** Logistics Center levels and the transport tier (0 Truck … 3 Export). */
+export interface LogisticsState {
+  speed: number;
+  capacity: number;
+  loading: number;
+  warehouse: number;
+  fleet: number;
+  tier: number;
+}
+
 /** The player's own model on a platform (Design studio). */
 export interface CarDesign {
   name: string;
@@ -338,6 +348,7 @@ export interface GameState {
   managers: Record<ManagerId, ManagerState>;
   carModels: Record<CarId, number>;
   designs: Record<CarId, CarDesign>;
+  logistics: LogisticsState;
   research: string[];
   achievements: string[];
   missions: {

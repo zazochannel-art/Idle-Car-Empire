@@ -7,6 +7,7 @@ import * as A from "./engine/actions";
 import * as Ch from "./engine/chain";
 import * as C from "./engine/city";
 import * as D from "./engine/design";
+import * as L from "./engine/logistics";
 import { geometricCost, maxAffordable, snapshot } from "./engine/economy";
 import { collectOffline, settleOffline } from "./engine/offline";
 import { canPrestige, pendingPoints, prestige } from "./engine/prestige";
@@ -192,6 +193,32 @@ describe("motorized chassis", () => {
     expect(snapshot(s).chain.plants[engine].combine).toBe(false);
     run(s, 300);
     expect(s.city.buildings[assembly].plant!.made).toBeGreaterThan(0);
+  });
+});
+
+describe("logistics center", () => {
+  it("upgrades and transport tiers speed up every truck and add trucks, storage and prices", () => {
+    const s = createInitialState(T0);
+    s.cash = 1e15;
+    const before = snapshot(s).chain.plants[STARTER_PLOT];
+    expect(L.buyLogistics(s, "speed")).toBe(true);
+    expect(L.buyLogistics(s, "capacity")).toBe(true);
+    expect(L.buyLogistics(s, "warehouse")).toBe(true);
+    expect(L.buyLogistics(s, "fleet")).toBe(true);
+    expect(L.buyLogistics(s, "loading")).toBe(true);
+    const after = snapshot(s).chain.plants[STARTER_PLOT];
+    expect(after.pace).toBeCloseTo(before.pace / 1.1);
+    expect(after.trucks).toBe(before.trucks + 1);
+    expect(after.outCap).toBeCloseTo(before.outCap * 1.2);
+    expect(after.dock).toBeCloseTo(0.9);
+    // Truck → Train → Port → Export
+    for (let i = 0; i < 3; i++) expect(L.buyTier(s)).toBe(true);
+    expect(L.buyTier(s)).toBe(false);
+    expect(L.logisticsMods(s).cars).toBeGreaterThan(0);
+    // Global Expansion starts the logistics over
+    s.run.moneyEarned = s.lifetime.moneyEarned = 1e11;
+    prestige(s, T0 + 1);
+    expect(s.logistics.tier).toBe(0);
   });
 });
 

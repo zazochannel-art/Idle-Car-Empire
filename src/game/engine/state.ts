@@ -4,6 +4,7 @@ import { DEALER_IDS } from "../config/dealerships";
 import { MANAGER_IDS } from "../config/managers";
 import { createChain } from "./chain";
 import { createCity } from "./city";
+import { createLogistics } from "./logistics";
 import type { CarDesign, CarId, ComponentId, DealerId, DealerState, GameState, ManagerId, ManagerState, Stats } from "../types";
 
 /** v3: the supply-chain economy (older saves start a new company). */
@@ -63,6 +64,7 @@ export function createInitialState(now: number): GameState {
     managers: createManagers(),
     carModels: emptyCarCounts(),
     designs: createDesigns(),
+    logistics: createLogistics(),
     research: [],
     achievements: [],
     missions: { dailyDate: "", daily: [], milestonesClaimed: [] },
