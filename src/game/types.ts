@@ -318,6 +318,8 @@ export interface ChainState {
   rate: number;
   /** The FIRST CAR COMPLETED moment has been shown. */
   firstCar: boolean;
+  /** Smoothed cars per second sold wholesale because every dealer was full. */
+  wholesale: number;
 }
 
 export interface CityState {

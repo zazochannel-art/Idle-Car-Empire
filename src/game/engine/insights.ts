@@ -11,7 +11,7 @@ import type { CarId, ComponentId, DealerId, GameState, ManagerId, PlantType, Zon
 import { canOpenDealers, isManagerUnlocked } from "./actions";
 import { bestGrade, carLock, gradeCost, hasPlant, levelCost, plantBuildCost, plantLock, plantsOf, speedCost } from "./chain";
 import { isPlotUnlocked, nextZone, zoneBlocker } from "./city";
-import type { EconomySnapshot } from "./economy";
+import { dealerUpgradeCost, type EconomySnapshot } from "./economy";
 import { PRESTIGE } from "../config/prestige";
 import { canPrestige, pendingPoints } from "./prestige";
 
@@ -30,6 +30,8 @@ export type Goal =
   /** cost/what: the cheapest upgrade on the maker plot, bought by tapping the goal. */
   | { kind: "shortage"; icon: string; plot: string; component: ComponentId; cost?: number; what?: "speed" | "level" }
   | { kind: "dealer"; icon: string; cost: number; dealer: DealerId }
+  /** Every dealer is full and cars go wholesale: the cheapest way to sell more. */
+  | { kind: "dealerFull"; icon: string; cost: number; dealer: DealerId; open: boolean; perMin: number }
   | { kind: "car"; icon: string; cost?: number; car: CarId; plot: string | null; requirement: Requirement | null }
   | { kind: "manager"; icon: string; cost: number; manager: ManagerId }
   /** gain: extra income share the points add; stalled: income stopped growing. */
@@ -85,6 +87,19 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
   if (canOpenDealers(s) && !DEALERS.some((d) => s.dealers[d.id].owned)) {
     const d = DEALERS[0];
     goals.push({ kind: "dealer", icon: d.emoji, cost: d.cost, dealer: d.id });
+  }
+
+  // Dealers can't keep up: cars are going wholesale below dealer price.
+  if (s.chain.wholesale * 60 >= 1) {
+    let best: Extract<Goal, { kind: "dealerFull" }> | null = null;
+    for (const d of DEALERS) {
+      const st = s.dealers[d.id];
+      const open = !st.owned;
+      if (open && dealerRequirement(s, d.id) !== null) continue;
+      const cost = open ? d.cost : dealerUpgradeCost(s, d.id);
+      if (!best || cost < best.cost) best = { kind: "dealerFull", icon: d.emoji, cost, dealer: d.id, open, perMin: s.chain.wholesale * 60 };
+    }
+    if (best) goals.push(best);
   }
 
   // A production milestone that unlocks the next plant (25 bodies → Engine Factory).

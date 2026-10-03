@@ -45,6 +45,11 @@ export const en = {
   "manager.allBusy": "All managers busy — view team",
 
   "goal.next": "Next goal",
+  "goal.dealerFull": "Dealers are full: {n} cars/min sold wholesale",
+  "goal.dealerFullUpgrade": "Wholesale pays 30% less. Upgrade the {name} to sell more at full price.",
+  "goal.dealerFullOpen": "Wholesale pays 30% less. Open the {name} to sell more at full price.",
+  "dealers.wholesale": "{n} cars/min go to the wholesale buyer at −30%: your dealers are full. Upgrade them or open new ones.",
+  "dealers.capacity": "Selling capacity",
   "report.title": "Profit by factory",
   "report.subtitle": "Value each plant adds per minute at full speed. Tap one to open it; ⚠️ marks the ones holding the chain up.",
   "review.aria": "{n} out of 5 stars",
