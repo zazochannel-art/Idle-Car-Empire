@@ -2,6 +2,7 @@ import { ACHIEVEMENT_INCOME_BONUS } from "../config/achievements";
 import { CARS, CAR_MODEL } from "../config/cars";
 import { MANAGERS, type ManagerConfig } from "../config/managers";
 import { EMPIRE_PERKS, OFFLINE, PRESTIGE } from "../config/prestige";
+import { REGIONS, regionIndex } from "../config/regions";
 import { RESEARCH_BY_ID } from "../config/research";
 import type { CarId, Effect, GameState, PlantType } from "../types";
 import { cityEffects } from "./city";
@@ -101,6 +102,9 @@ export function computeGlobalMods(s: GameState): GlobalMods {
   for (const perk of EMPIRE_PERKS) {
     if (s.empirePoints >= perk.points) perk.effects.forEach((e) => applyEffect(m, e));
   }
+
+  // The region the empire has expanded to.
+  REGIONS[regionIndex(s.prestigeCount)].effects.forEach((e) => applyEffect(m, e));
 
   // Car model refinements (Cars tab).
   for (const car of CARS) {

@@ -6,8 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { EMPIRE_PERKS, PRESTIGE } from "@/game/config/prestige";
+import { REGIONS, regionIndex, type RegionConfig } from "@/game/config/regions";
+import type { Effect } from "@/game/types";
 import { canPrestige, earningsForNextPoint, pendingPoints } from "@/game/engine/prestige";
 import { formatMoney, formatNumber, formatPercent } from "@/game/format";
+import type { MessageKey } from "@/i18n";
 import { useContent } from "@/i18n/content";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
@@ -29,6 +32,7 @@ export function PrestigeView() {
 
   return (
     <div className="space-y-4">
+      <RegionRoute />
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1a1505] via-[#0f0d07] to-[#07080b] p-6 ring-1 ring-gold/25">
         <div className="pointer-events-none absolute -right-16 -top-16 size-64 rounded-full bg-gold/20 blur-3xl" />
         <div className="relative flex flex-wrap items-center gap-4">
@@ -74,6 +78,7 @@ export function PrestigeView() {
             <li>• {t("prestige.reset1")}</li>
             <li>• {t("prestige.reset2")}</li>
             <li>• {t("prestige.reset3")}</li>
+            <li>• {t("prestige.reset4")}</li>
           </ul>
         </div>
         <div className="glass rounded-2xl p-4 text-sm">
@@ -136,4 +141,80 @@ export function PrestigeView() {
       </Dialog>
     </div>
   );
+}
+
+/** Local Factory → Romania → … → Global Empire: where each expansion takes you. */
+function RegionRoute() {
+  const count = useGame((g) => g.state.prestigeCount);
+  const { t, lang } = useT();
+  const n = useContent(lang);
+  const at = regionIndex(count);
+  const next = REGIONS[at + 1];
+  return (
+    <div className="glass rounded-2xl p-4">
+      <div className="mb-3 text-sm font-semibold">{t("region.title")}</div>
+      <div className="flex items-center gap-1 overflow-x-auto pb-1">
+        {REGIONS.map((r, i) => (
+          <div key={r.id} className="flex shrink-0 items-center gap-1">
+            {i > 0 && <span className={cn("h-0.5 w-3", i <= at ? "bg-gold" : "bg-white/15")} />}
+            <div
+              title={n.region(r)}
+              className={cn(
+                "flex size-10 items-center justify-center rounded-xl text-xl ring-1",
+                i === at ? "bg-gold/20 ring-gold" : i < at ? "bg-gold/[0.07] ring-gold/30" : "bg-white/[0.03] opacity-60 ring-white/10",
+              )}
+            >
+              {r.emoji}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 grid gap-2 @sm:grid-cols-2">
+        <RegionCard region={REGIONS[at]} label={t("region.here")} current />
+        {next ? <RegionCard region={next} label={t("region.next")} /> : <p className="self-center text-xs text-gold">{t("region.max")}</p>}
+      </div>
+    </div>
+  );
+}
+
+function RegionCard({ region, label, current }: { region: RegionConfig; label: string; current?: boolean }) {
+  const { t, lang } = useT();
+  const n = useContent(lang);
+  return (
+    <div className={cn("rounded-xl p-3 ring-1", current ? "bg-gold/[0.08] ring-gold/30" : "bg-white/[0.03] ring-white/10")}>
+      <div className="text-[10px] font-bold uppercase tracking-wider text-white/45">{label}</div>
+      <div className="mt-0.5 text-base font-black">
+        {region.emoji} {n.region(region)}
+      </div>
+      <div className="text-[11px] text-white/50">{n.regionFlavor(region)}</div>
+      {region.effects.length > 0 && (
+        <ul className="mt-1.5 space-y-0.5 text-[11px]">
+          {region.effects.map((e, i) => (
+            <li key={i} className={e.kind === "costMult" ? "text-rose-300" : "text-emerald-300"}>
+              {effectText(e, t)}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function effectText(e: Effect, t: (k: MessageKey, v?: Record<string, string | number>) => string): string {
+  const x = (m: number) => Number(m.toFixed(2));
+  switch (e.kind) {
+    case "value":
+      return t(e.minTier ? "regionFx.valueHigh" : "regionFx.value", { n: x(e.mult) });
+    case "markup":
+    case "offline":
+      return t(`regionFx.${e.kind}`, { pct: formatPercent(e.add) });
+    case "income":
+    case "speed":
+    case "delivery":
+    case "dealerCap":
+    case "costMult":
+      return t(`regionFx.${e.kind}`, { n: x(e.mult) });
+    default:
+      return "";
+  }
 }

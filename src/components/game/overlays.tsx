@@ -6,7 +6,9 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { formatDuration, formatHours, formatMoney, formatNumber } from "@/game/format";
+import { REGIONS, regionIndex } from "@/game/config/regions";
 import { LANGS } from "@/i18n";
+import { useContent } from "@/i18n/content";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { uiEvents, type UiEvent } from "@/store/events";
@@ -124,7 +126,10 @@ export function Toasts() {
 
 /** Full-screen celebration after a Global Expansion. */
 export function PrestigeOverlay() {
-  const { t } = useT();
+  const { t, lang } = useT();
+  const n = useContent(lang);
+  const count = useGame((g) => g.state.prestigeCount);
+  const region = REGIONS[regionIndex(count)];
   const [points, setPoints] = useState<number | null>(null);
   useEffect(
     () =>
@@ -156,8 +161,13 @@ export function PrestigeOverlay() {
               🌍
             </motion.div>
             <div className="mt-4 text-xs font-semibold uppercase tracking-[0.3em] text-gold/80">{t("nav.prestige")}</div>
-            <div className="mt-1 text-5xl font-black text-gradient-gold">+{formatNumber(points)} ⭐</div>
-            <div className="mt-2 text-sm text-white/60">{t("prestige.restart")}</div>
+            <div className="mt-1 text-5xl font-black text-gradient-gold">
+              +{formatNumber(points)} {t("unit.ep")}
+            </div>
+            <div className="mt-3 text-2xl font-black">
+              {region.emoji} {n.region(region)}
+            </div>
+            <div className="mt-1 text-sm text-white/60">{t("prestige.restart")}</div>
           </motion.div>
           {Array.from({ length: 18 }).map((_, i) => (
             <motion.span
