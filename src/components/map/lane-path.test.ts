@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LanePath } from "./lane-path";
+import { DRIVE_LANE, LanePath } from "./lane-path";
 
 // node centres sit at 7k + 0.5
 const n = (i: number, j: number) => ({ x: i * 7 + 0.5, y: j * 7 + 0.5 });
@@ -44,11 +44,12 @@ describe("lane paths", () => {
     expect(right.at(1).y).toBeCloseTo(0.7, 5);
   });
 
-  it("drives into a driveway down its middle and turns smoothly", () => {
+  it("drives into a driveway in its own lane (in and out keep right) and turns smoothly", () => {
     const e = { x: 3.5 + 2, y: 7.5 };
     const lp = new LanePath([n(0, 1), e, { x: e.x, y: e.y + 1.25 }]);
     const end = lp.at(lp.length);
-    expect(end.x).toBeCloseTo(e.x, 5);
+    // heading +y into the lot, keep right = toward −x
+    expect(end.x).toBeCloseTo(e.x - DRIVE_LANE, 5);
     expect(smooth(lp).maxJump).toBeLessThan(0.0101);
   });
 

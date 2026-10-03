@@ -37,7 +37,7 @@ export const RESEARCH: ResearchNode[] = [
 
   // 🏭 Automation
   { id: "robotic_assembly", category: "automation", name: "Robotic Assembly", description: "+20% production speed", cost: 15, requires: [], effects: [{ kind: "speed", mult: 1.2 }] },
-  { id: "smart_conveyors", category: "automation", name: "Smart Conveyors", description: "+40% truck speed", cost: 150, requires: ["robotic_assembly"], effects: [{ kind: "delivery", mult: 1.4 }] },
+  { id: "smart_conveyors", category: "automation", name: "Smart Conveyors", description: "+40% delivery rate", cost: 150, requires: ["robotic_assembly"], effects: [{ kind: "delivery", mult: 1.4 }] },
   { id: "lights_out", category: "automation", name: "Lights-Out Factory", description: "+50% production speed", cost: 6_000, requires: ["smart_conveyors"], effects: [{ kind: "speed", mult: 1.5 }] },
   { id: "self_replicating", category: "automation", name: "Self-Building Lines", description: "×2 production speed", cost: 250_000, requires: ["lights_out", "ai_factory"], effects: [{ kind: "speed", mult: 2 }] },
 
@@ -60,7 +60,7 @@ export const RESEARCH: ResearchNode[] = [
   // 🏎️ Performance
   { id: "carbon_fiber", category: "performance", name: "Carbon Fiber", description: "+30% sports car value (tiers 4–7)", cost: 1_500, requires: ["advanced_engines"], effects: [{ kind: "value", mult: 1.3, minTier: 4, maxTier: 7 }] },
   { id: "track_telemetry", category: "performance", name: "Track Telemetry", description: "+50% value on tier 5+ cars", cost: 40_000, requires: ["carbon_fiber"], effects: [{ kind: "value", mult: 1.5, minTier: 5 }] },
-  { id: "active_aero", category: "performance", name: "Active Aero", description: "+25% speed, +25% truck speed", cost: 900_000, requires: ["track_telemetry"], effects: [{ kind: "speed", mult: 1.25 }, { kind: "delivery", mult: 1.25 }] },
+  { id: "active_aero", category: "performance", name: "Active Aero", description: "+25% speed, +25% delivery rate", cost: 900_000, requires: ["track_telemetry"], effects: [{ kind: "speed", mult: 1.25 }, { kind: "delivery", mult: 1.25 }] },
 
   // 🌱 Green Technology
   { id: "recycled_materials", category: "green", name: "Recycled Materials", description: "+10% income, +20% research", cost: 100, requires: [], effects: [{ kind: "income", mult: 1.1 }, { kind: "rp", mult: 1.2 }] },

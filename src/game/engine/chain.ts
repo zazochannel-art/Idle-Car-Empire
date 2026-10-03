@@ -32,14 +32,17 @@ import {
   RESUPPLY_AT,
   SPEED,
   SUPPLY_LOAD,
-  TRUCK_SPEED,
+  ROAD_SPEED,
+  HEADWAY,
+  CAR_WAIT,
+  TRAFFIC_ALLOWANCE,
   VEHICLE_CAPACITY,
   isPlantType,
 } from "../config/chain";
 import { DEALERS, DEALER_BY_ID, DEALER_MARKUP_PER_LEVEL, DEALER_SPECIALTY } from "../config/dealerships";
 import { MANAGERS } from "../config/managers";
 import { OFFLINE } from "../config/prestige";
-import { DEPOT, MARKET, plotOf } from "../city/layout";
+import { DEPOT, MARKET, plotOf, roadRoute } from "../city/layout";
 import type {
   BuildingState,
   CarId,
@@ -253,6 +256,8 @@ export interface PlantStats {
   engineValue: number;
   /** Seconds per tile for this plant's trucks. */
   pace: number;
+  /** Dock time multiplier for loading and unloading (Loading upgrades and the delivery rate). */
+  load: number;
   /** Trucks it runs (its level plus the Logistics Center), and its dock time multiplier. */
   trucks: number;
   dock: number;
@@ -323,7 +328,9 @@ export function plantStats(s: GameState, plotId: string, gm: GlobalMods, cars: C
   const rawPrice = cfg.item ? (componentBase(cfg.item, p.grade) * MATERIAL_SHARE) / cfg.rawPer : 0;
   const vehicle = cfg.item ? PLANT_VEHICLE[b.level - 1] : "carrier";
   const lm = logisticsMods(s);
-  const capacity = Math.max(1, Math.round((cfg.item ? VEHICLE_CAPACITY[vehicle] : CARRIER_CAPACITY[b.level - 1]) * lm.capacity));
+  // delivery rate: trucks drive the city pace, so bonuses mean bigger loads and quicker docks
+  const haul = gm.delivery * mm.delivery * lm.speed;
+  const capacity = Math.max(1, Math.round((cfg.item ? VEHICLE_CAPACITY[vehicle] : CARRIER_CAPACITY[b.level - 1]) * lm.capacity * haul));
   const storage = lv.storage * (plotOf(plotId)?.big ? 2 : 1) * lm.storage;
   return {
     plotId,
@@ -343,9 +350,10 @@ export function plantStats(s: GameState, plotId: string, gm: GlobalMods, cars: C
     combine,
     chassisValue,
     engineValue: itemValue,
-    pace: 1 / (TRUCK_SPEED * gm.delivery * mm.delivery * lm.speed),
+    pace: 1 / ROAD_SPEED,
     trucks: trucksOf(b) + lm.trucks,
     dock: lm.dock,
+    load: lm.dock / haul,
     offline: gm.offline + AUTOMATION[p.automation].offline + mm.offline,
     rp: (cfg.item ? (COMPONENT_BY_ID[cfg.item].value / 5_000) * p.grade : (car?.rp ?? 0)) * gm.rp,
   };
@@ -386,16 +394,16 @@ export function chainSnapshot(s: GameState, gm: GlobalMods): ChainSnapshot {
 
 // ───────────────────────────── travel ─────────────────────────────
 
-/** Road distance between two lots, in tiles (along the grid). */
+/** Road distance between two lots, in tiles: the route the trucks drive on the map. */
 export function distance(from: string, to: string): number {
   const a = plotOf(from)?.entry;
   const b = plotOf(to)?.entry;
   if (!a || !b) return 20;
-  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+  return roadRoute(a, b).length;
 }
 
 function legTime(from: string, to: string, pace: number, dock = 1) {
-  return DOCK_TIME * dock + distance(from, to) * pace;
+  return DOCK_TIME * dock + distance(from, to) * pace * (1 + TRAFFIC_ALLOWANCE);
 }
 
 const incoming = (s: GameState, to: string, item: Shipment["item"]) =>
@@ -490,8 +498,10 @@ export function chainTick(
     // 1. raw material: order more from the depot before it runs out
     if (cfg.item) {
       const inbound = incoming(s, id, "raw");
-      if (p.raw + inbound < st.rawCap * RESUPPLY_AT && inbound === 0) {
-        let qty = Math.min(st.rawCap - p.raw, Math.ceil(st.rawCap * SUPPLY_LOAD));
+      // up to two loads on the road at once: trips take a while at city pace
+      const enRoute = s.chain.shipments.reduce((n, sh) => (!sh.back && sh.to === id && sh.item === "raw" ? n + 1 : n), 0);
+      if (p.raw + inbound < st.rawCap * RESUPPLY_AT * (1 + enRoute) && enRoute < 2) {
+        let qty = Math.min(st.rawCap - p.raw - inbound, Math.ceil(st.rawCap * SUPPLY_LOAD));
         const afford = Math.floor(s.cash / st.rawPrice);
         qty = Math.min(qty, afford);
         // only send whole units' worth
@@ -500,7 +510,7 @@ export function chainTick(
           const cost = qty * st.rawPrice;
           s.cash -= cost;
           out.spent += cost;
-          ship(s, { from: DEPOT, to: id, item: "raw", qty, value: cost, dur: legTime(DEPOT, id, st.pace, st.dock), vehicle: "truck" });
+          ship(s, { from: DEPOT, to: id, item: "raw", qty, value: cost, dur: legTime(DEPOT, id, st.pace, st.load), vehicle: "truck" });
         }
       }
     }
@@ -587,14 +597,17 @@ export function chainTick(
       p.wait += dt;
       // finished cars leave for the dealers straight away (no waiting for a full load);
       // other goods wait for a full truck or MAX_WAIT
-      if (p.out >= st.capacity || !cfg.item || p.wait >= MAX_WAIT * st.dock) {
+      // HEADWAY: the next truck waits a moment so two never leave nose to tail on top of each other
+      // finished cars wait only a few seconds to fill the transporter
+      const maxWait = cfg.item ? MAX_WAIT : CAR_WAIT;
+      if (p.wait >= HEADWAY && (p.out >= st.capacity || p.wait >= maxWait * st.dock)) {
         const dest = destination(s, snap, id, b);
         if (dest) {
           const qty = Math.min(Math.floor(p.out), st.capacity, dest.room);
           if (qty >= 1) {
             const value = (p.outValue / p.out) * qty;
             const models = cfg.item ? undefined : (Array.from({ length: qty }, () => st.car?.id ?? "city") as CarId[]);
-            ship(s, { from: id, to: dest.to, item: cfg.item ? (st.combine ? "chassis" : cfg.item) : "car", qty, value, dur: legTime(id, dest.to, st.pace, st.dock), vehicle: st.vehicle, models });
+            ship(s, { from: id, to: dest.to, item: cfg.item ? (st.combine ? "chassis" : cfg.item) : "car", qty, value, dur: legTime(id, dest.to, st.pace, st.load), vehicle: st.vehicle, models });
             p.out -= qty;
             p.outValue -= value;
             p.wait = 0;

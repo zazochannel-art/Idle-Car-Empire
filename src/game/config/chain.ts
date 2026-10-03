@@ -134,8 +134,8 @@ export const AUTOMATION = [
 ];
 
 /** Trucks that come with each plant level (no separate purchase). */
-export const PLANT_TRUCKS = [1, 2, 2, 3, 3, 4, 5, 6, 7, 8, 8, 8, 8, 8, 8];
-export const MAX_TRUCKS = 8;
+export const PLANT_TRUCKS = [1, 2, 2, 3, 3, 3, 4, 4, 5, 5, 5, 5, 5, 5, 5];
+export const MAX_TRUCKS = 5;
 
 /** Component grades: Standard, Lightweight, Performance, Luxury, Carbon. */
 export const GRADES = [
@@ -156,12 +156,22 @@ export const OUT_STORAGE = 20;
 
 // ───────────────────────────── transport ─────────────────────────────
 
-/** Road speed of trucks, tiles per second (before Logistics bonuses). */
-export const TRUCK_SPEED = 2.6;
+/**
+ * Road speed of every vehicle on the map, tiles per second: cars, vans,
+ * trucks and transporters all drive the same city pace. Logistics bonuses
+ * ("delivery rate") make loads bigger and docks faster instead.
+ */
+export const ROAD_SPEED = 1.4;
+/** Extra time on every trip for corners and red lights (a share of the driving time). */
+export const TRAFFIC_ALLOWANCE = 0.18;
+/** Seconds between two trucks leaving the same dock, so they never stack. */
+export const HEADWAY = 1.5;
 /** Loading/unloading time added to every leg. */
 export const DOCK_TIME = 2;
 /** A truck leaves with a partial load after waiting this long. */
 export const MAX_WAIT = 12;
+/** A car transporter leaves with what it has after this long (cars don't wait for a full load). */
+export const CAR_WAIT = 5;
 
 export interface VehicleConfig {
   id: Vehicle;
@@ -171,9 +181,10 @@ export interface VehicleConfig {
 
 /** What a plant's trucks are, by plant level (index = level - 1). */
 export const PLANT_VEHICLE: Vehicle[] = ["van", "van", "truck", "truck", "semi", "semi", "trailer", "trailer", "trailer", "trailer", "trailer", "trailer", "trailer", "trailer", "trailer"];
-export const VEHICLE_CAPACITY: Record<Vehicle, number> = { van: 4, truck: 10, semi: 24, trailer: 60, carrier: 6 };
+// sized for trucks that drive the city pace (ROAD_SPEED): bigger loads, same flow of goods
+export const VEHICLE_CAPACITY: Record<Vehicle, number> = { van: 9, truck: 22, semi: 62, trailer: 200, carrier: 14 };
 /** Car transporters carry more cars at higher assembly levels. */
-export const CARRIER_CAPACITY = [2, 3, 4, 6, 8, 8, 10, 12, 14, 16, 20, 24, 28, 32, 40];
+export const CARRIER_CAPACITY = [4, 7, 9, 13, 18, 23, 28, 40, 43, 56, 70, 85, 99, 113, 141];
 
 /** The Materials Depot sends raw material when a plant drops below this share. */
 export const RESUPPLY_AT = 0.5;
