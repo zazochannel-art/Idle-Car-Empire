@@ -11,6 +11,7 @@ import { RESEARCH_BY_ID } from "@/game/config/research";
 import * as A from "@/game/engine/actions";
 import * as Ch from "@/game/engine/chain";
 import * as K from "@/game/engine/contracts";
+import * as R from "@/game/engine/retention";
 import * as D from "@/game/engine/design";
 import * as L from "@/game/engine/logistics";
 import type { LogisticsUpgrade } from "@/game/config/logistics";
@@ -75,6 +76,7 @@ interface GameStore {
   claimDaily: (id: string) => void;
   claimMilestone: (id: string) => void;
   dismissTip: (id: string) => void;
+  claimLogin: () => void;
   acceptContract: () => void;
   declineContract: () => void;
   claimContract: () => void;
@@ -150,6 +152,10 @@ export const useGame = create<GameStore>((set, get) => {
     next.lastActiveAt = now;
     recordHistory(next, now, snap.incomePerSec);
     Ch.autoUpgrade(next, snap.gm);
+    R.updateLogin(next, now);
+    for (const r of R.checkRivals(next, now)) {
+      uiEvents.emit({ type: "toast", tone: "gold", icon: r.emoji, title: tr("rival.beaten", { name: r.name }), body: tr("rival.beatenBody", { n: r.stars }) });
+    }
     const deal = K.refreshContracts(next, now, snap);
     if (deal === "offer") uiEvents.emit({ type: "toast", tone: "info", icon: "📨", title: tr("contract.offerToast"), body: tr("contract.offerToastBody") });
     else if (deal === "expired") uiEvents.emit({ type: "toast", tone: "warn", icon: "⌛", title: tr("contract.expired") });
@@ -312,6 +318,9 @@ export const useGame = create<GameStore>((set, get) => {
         uiEvents.emit({ type: "toast", tone: "gold", icon: "🤝", title: tr("contract.paid"), body: tr("contract.paidBody") });
         persist(true);
       }
+    },
+    claimLogin: () => {
+      if (act((s) => R.claimLogin(s, get().snap))) persist(true);
     },
     dismissTip: (id) => {
       act((s) => !s.tips.includes(id) && s.tips.push(id) > 0);

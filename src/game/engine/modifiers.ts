@@ -5,6 +5,7 @@ import { EMPIRE_PERKS, OFFLINE, PRESTIGE } from "../config/prestige";
 import { BASE_MAX_LEVEL, PLANT_MAX_LEVEL } from "../config/chain";
 import { REGIONS, regionIndex } from "../config/regions";
 import { activeEvent } from "./events";
+import { SEASON_BONUS, seasonAt } from "./season";
 import { starMods } from "./imperium";
 import { RESEARCH_BY_ID } from "../config/research";
 import type { CarId, Effect, GameState, PlantType } from "../types";
@@ -111,6 +112,9 @@ export function computeGlobalMods(s: GameState): GlobalMods {
 
   // The region the empire has expanded to.
   REGIONS[regionIndex(s.prestigeCount)].effects.forEach((e) => applyEffect(m, e));
+
+  // Seasons (Halloween, winter holidays) add a little income.
+  if (seasonAt(s.lastActiveAt)) m.income *= 1 + SEASON_BONUS;
 
   // A limited-time market event (the clock is the last tick).
   activeEvent(s.lastActiveAt)?.event.effects.forEach((e) => applyEffect(m, e));

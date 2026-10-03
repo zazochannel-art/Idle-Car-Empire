@@ -1,6 +1,7 @@
 "use client";
 
 import { activeEvent, nextEvent } from "@/game/engine/events";
+import { seasonAt } from "@/game/engine/season";
 import { formatDuration } from "@/game/format";
 import { useContent } from "@/i18n/content";
 import { useT } from "@/i18n/use-t";
@@ -14,7 +15,15 @@ export function EventChip() {
   const { t, lang } = useT();
   const n = useContent(lang);
   const w = activeEvent(now);
-  if (!w) return null;
+  const season = seasonAt(now);
+  if (!w) {
+    if (!season) return null;
+    return (
+      <span className="pointer-events-auto flex items-center gap-1.5 rounded-xl bg-orange-500/15 px-2 py-1 text-xs font-bold text-orange-200 ring-1 ring-orange-400/40 md:py-1.5">
+        {season === "halloween" ? "🎃" : "❄️"} {t(`season.${season}`)} · {t("season.bonus")}
+      </span>
+    );
+  }
   return (
     <button
       onClick={() => uiEvents.emit({ type: "toast", tone: "gold", icon: w.event.emoji, title: n.event(w.event), body: n.eventDesc(w.event) })}

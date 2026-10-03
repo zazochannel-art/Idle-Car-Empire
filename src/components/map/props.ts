@@ -18,6 +18,30 @@ export function bush(p: Painter, x: number, y: number, size = 1, color = "#3f9d4
   blob(-2.5, 4.5, 3, 0);
   blob(2.2, 4.3, 3.2, -0.05);
   blob(-1, 6, 2.4, 0.2);
+  // a pumpkin beside some bushes at Halloween
+  if (p.season === "halloween" && Math.abs(Math.sin(x * 12.9898 + y * 78.233)) < 0.45) pumpkin(p, x + 0.45, y + 0.2, size);
+}
+
+/** A carved pumpkin with a glowing face. */
+export function pumpkin(p: Painter, x: number, y: number, size = 1) {
+  const c = p.ctx;
+  const px = sx(x, y);
+  const py = sy(x, y);
+  const r = 3.2 * size;
+  p.ellipse(x + 0.04, y - 0.02, 0, 4 * size, "rgba(10,30,20,0.25)", 0.45);
+  for (const [dx, k] of [[-1.4, -0.1], [1.4, -0.1], [0, 0.05]] as const) {
+    c.beginPath();
+    c.ellipse(px + dx * size, py - r, r * 0.75, r, 0, 0, Math.PI * 2);
+    c.fillStyle = p.col("#ea580c", k);
+    c.fill();
+  }
+  c.fillStyle = p.col("#3f6212");
+  c.fillRect(px - 0.5 * size, py - r * 2 - 1.6 * size, 1 * size, 1.8 * size);
+  // the face glows
+  c.fillStyle = "#fde047";
+  c.fillRect(px - 1.6 * size, py - r * 1.25, 0.9 * size, 0.9 * size);
+  c.fillRect(px + 0.7 * size, py - r * 1.25, 0.9 * size, 0.9 * size);
+  c.fillRect(px - 1.3 * size, py - r * 0.65, 2.6 * size, 0.6 * size);
 }
 
 const FLOWERS = ["#f43f5e", "#facc15", "#f472b6", "#a78bfa", "#fb923c", "#f8fafc"];

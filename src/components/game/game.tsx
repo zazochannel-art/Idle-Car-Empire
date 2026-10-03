@@ -37,6 +37,7 @@ import { Coach } from "./coach";
 import { FeedbackBridge } from "./feedback-bridge";
 import { ServiceWorker } from "./service-worker";
 import { TransferImport } from "./transfer-import";
+import { LoginDialog } from "./login-dialog";
 import { goalText, runGoal } from "./goals";
 import { Hud } from "./hud";
 import { OfflineDialog, PrestigeOverlay, SettingsDialog, Toasts } from "./overlays";
@@ -170,6 +171,7 @@ function Shell() {
       <FeedbackBridge />
       <ServiceWorker />
       <TransferImport />
+      <LoginDialog />
       <OfflineDialog />
       <PrestigeOverlay />
       <SettingsDialog open={settings} onOpenChange={setSettings} />

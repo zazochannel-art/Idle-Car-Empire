@@ -48,6 +48,8 @@ export class Painter {
   ctx: CanvasRenderingContext2D;
   /** Locked zones are drawn in muted, foggy colours. */
   dim = false;
+  /** Seasonal decoration: autumn leaves and pumpkins at Halloween. */
+  season: "halloween" | "winter" | null = null;
   /** Seconds since start, for animations. */
   t = 0;
   /**
@@ -327,6 +329,8 @@ export class Painter {
   }
 
   tree(x: number, y: number, size: number, seed: number, autumn = false) {
+    // at Halloween most trees turn orange
+    if (this.season === "halloween" && (seed * 7.3) % 1 < 0.7) autumn = true;
     const greens = autumn ? ["#d97706", "#b45309", "#ca8a04"] : ["#2f9e44", "#37b24d", "#2b8a3e", "#40c057", "#4d7c0f"];
     const g = greens[Math.floor(seed * greens.length) % greens.length];
     // cast shadow toward the lower right
