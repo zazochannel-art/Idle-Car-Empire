@@ -560,7 +560,8 @@ export function DepotPanel() {
 
 // ───────────────────────────── dealerships ─────────────────────────────
 
-export function DealerPanel({ id }: { id: DealerId }) {
+/** `inList`: shown under the dealer's own title, so its description is already on screen. */
+export function DealerPanel({ id, inList }: { id: DealerId; inList?: boolean }) {
   const state = useGame((g) => g.state);
   const snap = useGame((g) => g.snap);
   const { buyDealer, upgradeDealer } = useGame.getState();
@@ -588,7 +589,7 @@ export function DealerPanel({ id }: { id: DealerId }) {
   if (!st.owned) {
     return (
       <div className="space-y-3 pb-2">
-        <p className="text-sm text-white/60">{n.dealerDesc(d)}</p>
+        {!inList && <p className="text-sm text-white/60">{n.dealerDesc(d)}</p>}
         {specialty}
         <div className="text-xs text-white/50">{info}</div>
         <CostButton className="w-full" size="lg" variant="gold" cost={d.cost} locked={!!req} label={req ? n.requirement(req) : t("dealers.open")} onBuy={() => buyDealer(id)} />

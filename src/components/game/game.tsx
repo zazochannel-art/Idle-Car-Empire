@@ -99,6 +99,7 @@ function Shell() {
   const zone = useUi((u) => u.zone);
   const garage = useUi((u) => u.garage);
   const floor = useUi((u) => u.floor);
+  const showcase = useUi((u) => !!u.showcase);
   const closeAll = useUi((u) => u.closeAll);
   const state = useGame((g) => g.state);
   const [settings, setSettings] = useState(false);
@@ -144,7 +145,8 @@ function Shell() {
       <EmpireMap active={!garage && !floor} panelOffset={panelOffset} />
       <Hud onSettings={() => setSettings(true)} />
       <LeftRail />
-      {!open && <GoalTracker />}
+      {/* on phones the showroom card sits where the goal tracker is */}
+      {!open && !(showcase && !desktop) && <GoalTracker />}
       <BottomDock />
 
       <Sheet open={open} onClose={closeAll} title={title} icon={icon} sheetKey={desktop ? "panel" : key}>
@@ -239,7 +241,7 @@ function LeftRail() {
   const { t } = useT();
   const nothing = !view && !plot && !zone;
   return (
-    <nav className="absolute left-2 top-[6.75rem] z-20 flex flex-col gap-1 rounded-2xl border border-white/10 bg-ink/75 p-1 backdrop-blur-xl md:left-3 md:top-[5.5rem]">
+    <nav className="absolute left-[calc(env(safe-area-inset-left)+0.5rem)] top-[6.75rem] z-20 flex flex-col gap-1 rounded-2xl border border-white/10 bg-ink/75 p-1 backdrop-blur-xl md:left-[calc(env(safe-area-inset-left)+0.75rem)] md:top-[5.5rem]">
       {RAIL.map((r) => {
         const active = r.id === "map" ? nothing : view === r.id;
         const badge = r.id === "research" ? badges.research : 0;
@@ -282,7 +284,7 @@ function BottomDock() {
   const badges = useBadges();
   const { t } = useT();
   return (
-    <nav className="absolute inset-x-0 bottom-0 z-30 flex justify-center px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
+    <nav className="absolute inset-x-0 bottom-0 z-30 flex justify-center px-[calc(env(safe-area-inset-left)+0.5rem)] pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
       <div className="grid w-full max-w-xl grid-cols-5 gap-1 rounded-2xl border border-white/10 bg-ink/85 p-1.5 shadow-[0_-10px_40px_-12px_rgba(0,0,0,.9)] backdrop-blur-xl">
         {DOCK.map((d) => {
           const active = view === d.id;

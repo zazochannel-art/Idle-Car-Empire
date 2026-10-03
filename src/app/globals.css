@@ -26,6 +26,19 @@ body {
   background: var(--color-ink);
   color: #fff;
   -webkit-tap-highlight-color: transparent;
+  /* no rubber-band or pull-to-refresh behind the game */
+  overscroll-behavior: none;
+}
+
+/* Fast repeated taps on buttons must not zoom the page (iOS double-tap) or
+   select their text and open the callout menu (long press). */
+button,
+[role="button"],
+a {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 body {

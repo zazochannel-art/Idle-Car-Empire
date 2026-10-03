@@ -40,7 +40,7 @@ export function DealersView() {
                 <span className="block text-xs text-white/45">{n.dealerDesc(d)}</span>
               </span>
             </button>
-            <DealerPanel id={d.id} />
+            <DealerPanel id={d.id} inList />
           </div>
         ))}
       </div>

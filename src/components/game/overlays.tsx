@@ -13,6 +13,7 @@ import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { uiEvents, type UiEvent } from "@/store/events";
 import { useGame } from "@/store/game-store";
+import { useUi } from "@/store/ui-store";
 
 /** "Welcome Back!" — shown while an offline report is waiting to be collected. */
 export function OfflineDialog() {
@@ -83,6 +84,8 @@ let toastId = 0;
 
 export function Toasts() {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  // the first-car title takes this spot on phones while it plays
+  const celebrating = useUi((u) => !!u.celebrate);
   useEffect(
     () =>
       uiEvents.on((e: UiEvent) => {
@@ -97,7 +100,7 @@ export function Toasts() {
   return (
     <div className="pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top)+7.5rem)] z-[45] flex flex-col items-center gap-2 px-3 md:top-20 md:items-end md:pr-6">
       <AnimatePresence initial={false}>
-        {toasts.map((t) => (
+        {(celebrating ? [] : toasts).map((t) => (
           <motion.div
             key={t.id}
             layout
@@ -243,7 +246,7 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder={t("settings.pastePlaceholder")}
-            className="h-24 w-full resize-none rounded-xl bg-black/40 p-3 font-mono text-[11px] text-white/80 ring-1 ring-white/10 outline-none focus:ring-electric/50"
+            className="h-24 w-full resize-none rounded-xl bg-black/40 p-3 font-mono text-base text-white/80 ring-1 ring-white/10 outline-none focus:ring-electric/50"
           />
           <Button
             variant="secondary"

@@ -20,7 +20,8 @@ export function formatNumber(n: number, decimals = 1): string {
     suffix = String.fromCharCode(97 + Math.floor(i / 26) % 26) + String.fromCharCode(97 + (i % 26));
   }
   // Truncate rather than round so a counter never shows more than you have.
-  const factor = Math.pow(10, decimals);
+  // (toFixed would round 999.5K up to "1000K").
+  const factor = scaled >= 100 ? 1 : Math.pow(10, decimals);
   const shown = Math.floor(scaled * factor) / factor;
   return sign + shown.toFixed(scaled >= 100 ? 0 : decimals).replace(/\.0+$/, "") + suffix;
 }
