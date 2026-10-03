@@ -250,6 +250,19 @@ describe("assembly and sales", () => {
     expect(s.lifetime.moneyEarned).toBeGreaterThan(earned);
   });
 
+  it("dealers specialise in classes: their cars sell for +20%", () => {
+    expect(Ch.dealerMatches("local", "city")).toBe(true);
+    expect(Ch.dealerMatches("local", "sports")).toBe(false);
+    expect(Ch.dealerMatches("supercar", "hypercar")).toBe(true);
+    const { s } = fullChain();
+    const events = run(s, 600);
+    const sale = events.find((e): e is Extract<GameEvent, { type: "sale" }> => e.type === "sale" && e.plot === "d:local");
+    expect(sale).toBeDefined();
+    // a City Car at the Economy Dealer: value × (1 + 0% markup + 20% speciality)
+    const each = Ch.carValue(s, CAR_BY_ID.city, snapshot(s).gm);
+    expect(sale!.amount / each).toBeGreaterThan(1.15);
+  });
+
   it("better cars need better component grades", () => {
     const { s } = fullChain();
     const gm = snapshot(s).gm;

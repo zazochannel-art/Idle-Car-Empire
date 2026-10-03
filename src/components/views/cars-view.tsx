@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { CARS, CAR_MODEL, DESIGN_COLORS, DESIGN_MAX, DESIGN_OPTIONS, type CarConfig } from "@/game/config/cars";
 import { COMPONENT_BY_ID } from "@/game/config/chain";
+import { DEALERS } from "@/game/config/dealerships";
 import { carBaseValue, carLock, carPartsValue, carValue, modelStats, recipe } from "@/game/engine/chain";
 import { developCost } from "@/game/engine/design";
 import { carModelCost, unlockedCarIds } from "@/game/engine/economy";
@@ -58,6 +59,9 @@ function ModelCard({ car, unlocked, open, onToggle }: { car: CarConfig; unlocked
   const lvl = state.carModels[car.id] ?? 0;
   const paint = d.color || LIVERY[CAR_MODEL_FOR[car.id]].color;
   const onLine = Object.values(snap.chain.plants).some((p) => p.car?.id === car.id);
+  // high demand when one of your dealers specialises in this class
+  const demand = DEALERS.some((x) => state.dealers[x.id].owned && x.classes.includes(car.class));
+  const specialist = DEALERS.find((x) => x.classes.includes(car.class));
 
   return (
     <div className={cn("relative overflow-hidden rounded-2xl p-4 ring-1", unlocked ? "glass" : "bg-white/[0.02] ring-white/[0.05]")}>
@@ -75,6 +79,7 @@ function ModelCard({ car, unlocked, open, onToggle }: { car: CarConfig; unlocked
           <div className="mt-1 flex flex-wrap gap-1">
             <Badge variant={unlocked ? "default" : "muted"}>{t(`class.${car.class}` as MessageKey)}</Badge>
             {lvl > 0 && <Badge variant="gold">{t("cars.modelLv", { level: lvl })}</Badge>}
+            {unlocked && (demand ? <Badge variant="gold">{t("demand.high")}</Badge> : <Badge variant="muted">{t("demand.normal")}</Badge>)}
           </div>
         </div>
       </div>
@@ -107,6 +112,7 @@ function ModelCard({ car, unlocked, open, onToggle }: { car: CarConfig; unlocked
         <span>{t("cars.produced", { n: formatNumber(state.lifetime.carsByType[car.id]) })}</span>
       </div>
       {onLine && <div className="relative mt-1 text-[11px] text-emerald-300">{t("cars.onLine")}</div>}
+      {unlocked && !demand && specialist && <div className="relative mt-1 text-[11px] text-white/45">{t("demand.hint", { name: n.dealer(specialist) })}</div>}
 
       {unlocked ? (
         <>

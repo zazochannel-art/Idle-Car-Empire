@@ -34,7 +34,7 @@ import {
   VEHICLE_CAPACITY,
   isPlantType,
 } from "../config/chain";
-import { DEALERS, DEALER_BY_ID, DEALER_MARKUP_PER_LEVEL } from "../config/dealerships";
+import { DEALERS, DEALER_BY_ID, DEALER_MARKUP_PER_LEVEL, DEALER_SPECIALTY } from "../config/dealerships";
 import { MANAGERS } from "../config/managers";
 import { OFFLINE } from "../config/prestige";
 import { DEPOT, MARKET, plotOf } from "../city/layout";
@@ -341,6 +341,11 @@ export function plantStats(s: GameState, plotId: string, gm: GlobalMods, cars: C
   };
 }
 
+/** Whether a car is one of the dealer's specialities (+20% price, faster customers). */
+export function dealerMatches(id: DealerId, car: CarId): boolean {
+  return DEALER_BY_ID[id].classes.includes(CAR_BY_ID[car].class);
+}
+
 export function dealerStats(s: GameState, id: DealerId, gm: GlobalMods): DealerStats {
   const cfg = DEALER_BY_ID[id];
   const lvl = s.dealers[id].level;
@@ -409,14 +414,16 @@ function destination(s: GameState, snap: ChainSnapshot, id: string, b: BuildingS
   // motorized chassis are sold at the market
   if (snap.plants[id]?.combine) return { to: MARKET, room: Infinity };
   if (!cfg.item) {
-    // cars: to the dealer with the best markup that has room
+    // cars: to the dealer that pays most for this model (its speciality first) and has room
+    const car = snap.plants[id]?.car?.id;
     let best: { to: string; room: number; markup: number } | null = null;
     for (const d of Object.values(snap.dealers)) {
       if (!d) continue;
       const to = `d:${d.id}`;
       const stock = s.chain.dealers[d.id]?.cars ?? 0;
       const room = d.stockCap - stock - incoming(s, to, "car");
-      if (room > 0 && (!best || d.markup > best.markup)) best = { to, room, markup: d.markup };
+      const markup = d.markup + (car && dealerMatches(d.id, car) ? DEALER_SPECIALTY.price : 0);
+      if (room > 0 && (!best || markup > best.markup)) best = { to, room, markup };
     }
     return best;
   }
@@ -614,16 +621,17 @@ export function chainTick(
         break;
       }
       const each = stock.value / stock.cars;
-      const price = each * (1 + d.markup);
+      const model = stock.models.shift();
+      const match = !!model && dealerMatches(d.id, model);
+      const price = each * (1 + d.markup + (match ? DEALER_SPECIALTY.price : 0));
       stock.cars -= 1;
       stock.value -= each;
-      stock.models.shift();
       stock.sold += 1;
       s.run.carsSold += 1;
       s.lifetime.carsSold += 1;
       earn(price);
       events?.push({ type: "sale", plot: `d:${d.id}`, item: "car", count: 1, amount: price });
-      stock.next += d.interval;
+      stock.next += d.interval / (match ? DEALER_SPECIALTY.speed : 1);
     }
   }
 

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { CARS, CAR_BY_ID } from "@/game/config/cars";
 import { AUTOMATION, CHASSIS_BONUS, COMPONENTS, COMPONENT_BY_ID, GRADES, PLANTS, PLANT_BY_ID, PLANT_LEVELS, PLANT_TRUCKS, SPEED } from "@/game/config/chain";
-import { DEALER_BY_ID } from "@/game/config/dealerships";
+import { DEALER_BY_ID, DEALER_SPECIALTY } from "@/game/config/dealerships";
 import { MANAGERS } from "@/game/config/managers";
 import { DEPOT, MARKET, plotOf } from "@/game/city/layout";
 import { automationCost, bestGrade, carLock, carPartsValue, carValue, componentBase, dealerStats, trucksOf, gradeCost, levelCost, plantNumber, plantsOf, recipe, speedCost } from "@/game/engine/chain";
@@ -570,10 +570,25 @@ export function DealerPanel({ id }: { id: DealerId }) {
   const req = dealerRequirement(state, id);
   const ds = dealerStats(state, id, snap.gm);
   const info = t("dealers.stats", { n: formatNumber(60 / ds.interval), markup: formatPercent(ds.markup) });
+  // the classes this dealer specialises in: +20% price, faster customers
+  const specialty = (
+    <div className="rounded-xl bg-white/[0.04] p-2.5 ring-1 ring-white/[0.07]">
+      <div className="flex flex-wrap items-center gap-1">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-white/45">{t("dealers.specialty")}</span>
+        {d.classes.map((c) => (
+          <Badge key={c} variant="gold">
+            {t(`class.${c}` as MessageKey)}
+          </Badge>
+        ))}
+      </div>
+      <div className="mt-1 text-[11px] text-white/50">{t("dealers.specialtyHint", { pct: formatPercent(DEALER_SPECIALTY.price), x: DEALER_SPECIALTY.speed })}</div>
+    </div>
+  );
   if (!st.owned) {
     return (
       <div className="space-y-3 pb-2">
         <p className="text-sm text-white/60">{n.dealerDesc(d)}</p>
+        {specialty}
         <div className="text-xs text-white/50">{info}</div>
         <CostButton className="w-full" size="lg" variant="gold" cost={d.cost} locked={!!req} label={req ? n.requirement(req) : t("dealers.open")} onBuy={() => buyDealer(id)} />
       </div>
@@ -588,6 +603,7 @@ export function DealerPanel({ id }: { id: DealerId }) {
         <Badge variant="gold">{t("common.lv", { level: st.level })}</Badge>
         <span className="text-xs text-white/50">{info}</span>
       </div>
+      {specialty}
       <div className="rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.07]">
         <StockBar label={`🚗 ${t("dealers.showroom")}`} value={cars} cap={ds.stockCap} color="#facc15" />
         <div className="mt-2 flex min-h-6 flex-wrap gap-0.5 text-lg">
@@ -601,9 +617,10 @@ export function DealerPanel({ id }: { id: DealerId }) {
           {cars < 1 ? (incoming > 0 ? t("dealers.transporter", { n: incoming }) : t("dealers.empty")) : t("dealers.nextCustomer", { time: formatDuration(Math.max(0, stock?.next ?? 0)) })}
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-2 text-center">
+      <div className="grid grid-cols-3 gap-2 text-center">
         <Stat label={t("dealers.sold")} value={formatNumber(stock?.sold ?? 0)} gold />
         <Stat label={t("dealers.markup")} value={`+${formatPercent(ds.markup)}`} />
+        <Stat label={t("dealers.avgPrice")} value={cars >= 1 ? formatMoney(((stock?.value ?? 0) / cars) * (1 + ds.markup)) : "—"} />
       </div>
       <CostButton className="w-full" size="lg" cost={dealerUpgradeCost(state, id)} onBuy={() => upgradeDealer(id)} label={t("dealers.upgrade")} />
     </div>
