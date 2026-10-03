@@ -135,6 +135,13 @@ export function computeGlobalMods(s: GameState): GlobalMods {
       case "offline":
         m.offline += (mult - 1) * OFFLINE.baseEfficiency;
         break;
+      case "cost":
+        // −3% per level, never below half price
+        m.costMult *= Math.max(0.5, 2 - mult);
+        break;
+      case "carValue":
+        applyValue(m.value, mult);
+        break;
     }
   }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CAR_BY_ID } from "./config/cars";
 import { MAX_WAIT, PLANT_BY_ID } from "./config/chain";
+import { MANAGER_BY_ID } from "./config/managers";
 import { PRESTIGE } from "./config/prestige";
 import { DEPOT, MARKET, STARTER_PLOT, WORLD_MAP } from "./city/layout";
 import * as A from "./engine/actions";
@@ -193,6 +194,28 @@ describe("motorized chassis", () => {
     expect(snapshot(s).chain.plants[engine].combine).toBe(false);
     run(s, 300);
     expect(s.city.buildings[assembly].plant!.made).toBeGreaterThan(0);
+  });
+});
+
+describe("manager categories", () => {
+  it("the Engineer makes upgrades cheaper and the Designer makes every car worth more", () => {
+    const s = createInitialState(T0);
+    s.cash = 1e12;
+    s.lifetime.moneyEarned = 1e9;
+    const gm0 = snapshot(s).gm;
+    expect(A.hireManager(s, "nina", STARTER_PLOT)).toBe(true);
+    expect(A.hireManager(s, "leo")).toBe(true);
+    A.assignManager(s, "leo", STARTER_PLOT); // takes Nina's place (one manager per plant)
+    A.assignManager(s, "nina", null);
+    // global managers work while assigned anywhere
+    const free = freePlots()[0];
+    build(s, free, "engineFactory");
+    A.assignManager(s, "nina", free);
+    const gm = snapshot(s).gm;
+    expect(gm.costMult).toBeCloseTo(gm0.costMult * 0.97);
+    expect(gm.value[1]).toBeCloseTo(gm0.value[1] * 1.1);
+    expect(MANAGER_BY_ID.nina.rarity).toBe("rare");
+    expect(MANAGER_BY_ID.leo.category).toBe("designer");
   });
 });
 
