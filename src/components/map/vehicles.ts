@@ -303,13 +303,30 @@ export const CAR_MODEL_FOR: Record<CarId, CarModel> = {
 
 /** Map heading of each axis direction. */
 export const DIR_YAW = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
-const YAW_STEPS = 16;
+/** Headings per full turn: fine enough that a bend looks like a smooth sweep. */
+const YAW_STEPS = 32;
 /** Tiles per metre: a 4.8 m sedan is ~0.57 tiles long. */
 const CAR_TPM = 0.118;
 const CAR_SIZE: SpriteSize = { w: 50, h: 38, ax: 25, ay: 23 };
 const SOLID = new Set(["#f1f5f9", "#facc15", "#ea580c", "#16a34a"]);
 
 const yawIndex = (yaw: number) => ((Math.round(yaw / ((Math.PI * 2) / YAW_STEPS)) % YAW_STEPS) + YAW_STEPS) % YAW_STEPS;
+
+/**
+ * The sprite for heading `yi`; while it is still being rendered, the nearest
+ * heading already made stands in (so a car never drops back to the flat
+ * vector drawing in the middle of a bend).
+ */
+function yawSprite(keyOf: (yi: number) => string, size: SpriteSize, k: number, yi: number, build: (yi: number) => Parameters<typeof sprites3d.get>[3], shadow = true) {
+  const spr = sprites3d.get(keyOf(yi), size, k, build(yi), shadow);
+  if (spr) return spr;
+  for (let d = 1; d <= YAW_STEPS / 4; d++)
+    for (const s of [d, -d]) {
+      const near = sprites3d.peek(keyOf((yi + s + YAW_STEPS) % YAW_STEPS), k, shadow);
+      if (near) return near;
+    }
+  return null;
+}
 
 /**
  * Draws a car from its 3D model. Returns false while the sprite is not
@@ -325,12 +342,13 @@ export function drawCarSprite(p: Painter, x: number, y: number, yaw: number, mod
   const phase = spins > 1 && opts.odo ? Math.floor((opts.odo / 0.05) % spins) : 0;
   const stage = opts.stage ?? 8;
   const shadow = !opts.noShadow;
-  const key = `car|${model}|${liveryOf(model).color}|${yi}|${steer}|${phase}|${stage}`;
-  const spr = sprites3d.get(
-    key,
+  const keyOf = (yi: number) => `car|${model}|${liveryOf(model).color}|${yi}|${steer}|${phase}|${stage}`;
+  const spr = yawSprite(
+    keyOf,
     CAR_SIZE,
     k,
-    (T, { kit, models }) => {
+    yi,
+    (yi) => (T, { kit, models }) => {
       const g = new T.Group();
       const car = models.buildCar(T, kit, {
         model,
@@ -383,7 +401,7 @@ function drawTruckSprite(p: Painter, x: number, y: number, yaw: number, cargo: s
   const k = tierFor((p.zoom ?? 1) * (p.dpr ?? 1));
   const yi = yawIndex(yaw);
   const empty = !!o.empty;
-  const spr = sprites3d.get(`truck|${kind}|${empty ? "e" : cargo}|${yi}`, TRUCK_SIZE, k, (T, { kit, models }) => {
+  const spr = yawSprite((yi) => `truck|${kind}|${empty ? "e" : cargo}|${yi}`, TRUCK_SIZE, k, yi, (yi) => (T, { kit, models }) => {
     const g = models.buildTruck(T, kit, { kind, cargo, empty });
     g.scale.setScalar(TRUCK_TPM[kind]);
     g.rotation.y = -(yi * Math.PI * 2) / YAW_STEPS;
@@ -401,8 +419,8 @@ function drawCarrierSprite(p: Painter, x: number, y: number, yaw: number, colors
   const k = tierFor((p.zoom ?? 1) * (p.dpr ?? 1));
   const yi = yawIndex(yaw);
   const empty = !!o.empty;
-  const key = `carrier|${empty ? "e" : models.map((m) => `${m}:${liveryOf(m).color}`).join(",")}|${yi}`;
-  const spr = sprites3d.get(key, TRUCK_SIZE, k, (T, ctx) => {
+  const keyOf = (yi: number) => `carrier|${empty ? "e" : models.map((m) => `${m}:${liveryOf(m).color}`).join(",")}|${yi}`;
+  const spr = yawSprite(keyOf, TRUCK_SIZE, k, yi, (yi) => (T, ctx) => {
     const cars = empty
       ? []
       : [0, 1, 2, 3].map((i) => ({ model: models[i % 2], color: colors[i % 2], finish: "metallic" as const }));

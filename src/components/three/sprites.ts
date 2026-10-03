@@ -129,6 +129,11 @@ class SpriteFactory {
    * The sprite for `key`, or null while it is being made (call again next
    * frame). `k` is the resolution: sprite pixels per screen pixel at zoom 1.
    */
+  /** A sprite only if it is already made (never queues one). */
+  peek(key: string, k: number, shadow = true): Sprite | null {
+    return this.cache.get(`${key}|${k}|${shadow ? 1 : 0}`) ?? null;
+  }
+
   get(key: string, size: SpriteSize, k: number, build: Build, shadow = true): Sprite | null {
     if (this.failed || typeof document === "undefined") return null;
     const full = `${key}|${k}|${shadow ? 1 : 0}`;
