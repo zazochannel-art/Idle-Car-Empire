@@ -11,6 +11,7 @@ import { BASE_RECIPE, COMPONENT_BY_ID } from "@/game/config/chain";
 import type { CarId, ComponentId } from "@/game/types";
 import { useContent } from "@/i18n/content";
 import { useT } from "@/i18n/use-t";
+import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { itemName } from "../panels/plant-panel";
 import type { VehiclePick } from "./traffic";
@@ -24,11 +25,12 @@ export function Showcase() {
   const close = useUi((u) => u.setShowcase);
   const { t, lang } = useT();
   const n = useContent(lang);
+  const designs = useGame((g) => g.state.designs);
   if (!v) return null;
 
   const car = v.kind === "car" ? CAR_BY_ID[CAR_OF_MODEL[v.model]] : null;
   const parts: ComponentId[] = car ? [...BASE_RECIPE, ...car.extras] : [];
-  const title = car ? n.car(car) : t(`showcase.v.${v.kind as "van" | "truck" | "semi" | "trailer" | "carrier"}`);
+  const title = car ? `${designs[car.id].name} · ${n.car(car)}` : t(`showcase.v.${v.kind as "van" | "truck" | "semi" | "trailer" | "carrier"}`);
   const sub = car
     ? n.carTagline(car)
     : v.kind === "carrier"
@@ -89,7 +91,7 @@ export function Showcase() {
               const c = CAR_BY_ID[CAR_OF_MODEL[m]];
               return (
                 <span key={i} className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[11px] ring-1 ring-white/10">
-                  {c.emoji} {n.car(c)}
+                  {c.emoji} {designs[c.id].name}
                 </span>
               );
             })}

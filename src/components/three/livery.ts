@@ -18,3 +18,19 @@ export const LIVERY: Record<LiveryModel, Livery> = {
   hypercar: { color: "#6a2fd6", finish: "metallic" }, // purple mid-engine, carbon top
   electric: { color: "#1c9a3c", finish: "gloss" }, // green classic coupe, black roof, stripes
 };
+
+/** Colours the player picked in the Design studio, per model ("" or missing = factory colour). */
+const overrides: Partial<Record<LiveryModel, string>> = {};
+
+export function setLiveryOverrides(colors: Partial<Record<LiveryModel, string>>) {
+  for (const k of Object.keys(LIVERY) as LiveryModel[]) {
+    if (colors[k]) overrides[k] = colors[k];
+    else delete overrides[k];
+  }
+}
+
+/** The paint a model wears right now: the player's colour or the factory one. */
+export function liveryOf(model: LiveryModel): Livery {
+  const c = overrides[model];
+  return c ? { color: c, finish: LIVERY[model].finish } : LIVERY[model];
+}

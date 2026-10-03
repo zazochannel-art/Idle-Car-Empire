@@ -315,6 +315,17 @@ export interface CityState {
   carsServiced: number;
 }
 
+/** The player's own model on a platform (Design studio). */
+export interface CarDesign {
+  name: string;
+  engine: number;
+  interior: number;
+  rims: number;
+  paint: number;
+  /** Paint colour; "" = the platform's factory colour. */
+  color: string;
+}
+
 export interface GameState {
   version: number;
   cash: number;
@@ -326,6 +337,7 @@ export interface GameState {
   dealers: Record<DealerId, DealerState>;
   managers: Record<ManagerId, ManagerState>;
   carModels: Record<CarId, number>;
+  designs: Record<CarId, CarDesign>;
   research: string[];
   achievements: string[];
   missions: {

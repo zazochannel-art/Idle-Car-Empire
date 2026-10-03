@@ -52,6 +52,7 @@ import type {
   PlantType,
   Shipment,
 } from "../types";
+import { designStats } from "./design";
 import type { GlobalMods } from "./modifiers";
 
 // ───────────────────────────── state ─────────────────────────────
@@ -204,8 +205,20 @@ export function carPartsValue(car: CarConfig): number {
 
 /** Sale value of one car before dealer markup. */
 export function carValue(s: GameState, car: CarConfig, gm: GlobalMods): number {
+  return carBaseValue(s, car, gm) * modelStats(s, car).valueMult;
+}
+
+/** Sale value before the Design studio options (what R&D prices are based on). */
+export function carBaseValue(s: GameState, car: CarConfig, gm: GlobalMods): number {
   const refine = Math.pow(CAR_MODEL.valuePerLevel, s.carModels[car.id] ?? 0);
   return carPartsValue(car) * car.markup * refine * gm.value[car.tier] * gm.income;
+}
+
+/** The player's model on this platform, with quality from the parts actually made. */
+export function modelStats(s: GameState, car: CarConfig) {
+  const grades = recipe(car).map((c) => bestGrade(s, c));
+  const grade = grades.length ? Math.max(car.grade, grades.reduce((a, b) => a + b, 0) / grades.length) : car.grade;
+  return designStats(car, s.designs[car.id], grade);
 }
 
 // ───────────────────────────── stats ─────────────────────────────
@@ -288,7 +301,7 @@ export function plantStats(s: GameState, plotId: string, gm: GlobalMods, cars: C
   const big = plotOf(plotId)?.big ? 1.5 : 1;
   const speed = Math.pow(SPEED.mult, p.speed) * AUTOMATION[p.automation].speed * gm.speed * mm.speed * big;
   const car = cfg.item ? null : activeCar(s, p, cars);
-  const baseTime = cfg.item ? cfg.time * GRADES[p.grade - 1].time : (car?.time ?? cfg.time);
+  const baseTime = cfg.item ? cfg.time * GRADES[p.grade - 1].time : car ? car.time * modelStats(s, car).timeMult : cfg.time;
   const cycle = baseTime / speed;
   const lines = lv.lines;
   const itemValue = cfg.item

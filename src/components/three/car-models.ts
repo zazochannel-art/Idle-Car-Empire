@@ -4,7 +4,7 @@
 // lights, grilles, mirrors, handles, spoilers and diffusers are geometry,
 // not texture. Units are metres; +X is forward, +Y up, +Z to the right.
 import type * as THREE_NS from "three";
-import { LIVERY } from "./livery";
+import { liveryOf } from "./livery";
 
 type Three = typeof THREE_NS;
 
@@ -370,7 +370,7 @@ export function buildCar(T: Three, kit: MaterialKit, look: CarLook): THREE_NS.Gr
   const st = look.stage?.station ?? 8;
   const painted = st >= 6;
   // every model leaves the line in its own factory colour
-  const liv = LIVERY[look.model];
+  const liv = liveryOf(look.model);
   const body = painted ? kit.paint(liv.color, liv.finish) : kit.primer;
   const roofM = painted && sp.roofColor ? kit.paint(sp.roofColor, "gloss") : body;
   const car = new T.Group();

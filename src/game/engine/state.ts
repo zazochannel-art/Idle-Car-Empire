@@ -4,7 +4,7 @@ import { DEALER_IDS } from "../config/dealerships";
 import { MANAGER_IDS } from "../config/managers";
 import { createChain } from "./chain";
 import { createCity } from "./city";
-import type { CarId, ComponentId, DealerId, DealerState, GameState, ManagerId, ManagerState, Stats } from "../types";
+import type { CarDesign, CarId, ComponentId, DealerId, DealerState, GameState, ManagerId, ManagerState, Stats } from "../types";
 
 /** v3: the supply-chain economy (older saves start a new company). */
 export const SAVE_VERSION = 3;
@@ -25,6 +25,11 @@ export function emptyCarCounts(): Record<CarId, number> {
 
 export function emptyParts(): Record<ComponentId, number> {
   return Object.fromEntries(COMPONENTS.map((c) => [c.id, 0])) as Record<ComponentId, number>;
+}
+
+/** Every platform starts with its default model name and no options. */
+export function createDesigns(): Record<CarId, CarDesign> {
+  return Object.fromEntries(CARS.map((c) => [c.id, { name: c.modelName, engine: 0, interior: 0, rims: 0, paint: 0, color: "" }])) as Record<CarId, CarDesign>;
 }
 
 export function createStats(): Stats {
@@ -57,6 +62,7 @@ export function createInitialState(now: number): GameState {
     dealers: createDealers(),
     managers: createManagers(),
     carModels: emptyCarCounts(),
+    designs: createDesigns(),
     research: [],
     achievements: [],
     missions: { dailyDate: "", daily: [], milestonesClaimed: [] },

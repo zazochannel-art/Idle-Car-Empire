@@ -413,7 +413,7 @@ function ModelPicker({ id }: { id: string }) {
       <div className="grid grid-cols-2 gap-1.5">
         <button onClick={() => setPlantCar(id, null)} className={cn("rounded-xl p-2 text-left text-xs ring-1", chosen === null ? "bg-electric/20 ring-electric/50" : "bg-white/[0.03] ring-white/10")}>
           <div className="font-bold">✨ {t("plant.bestModel")}</div>
-          <div className="text-[10px] text-white/50">{st?.car ? n.car(st.car) : "—"}</div>
+          <div className="text-[10px] text-white/50">{st?.car ? state.designs[st.car.id].name : "—"}</div>
         </button>
         {CARS.map((c) => {
           const lock = carLock(state, c, snap.gm);
@@ -425,7 +425,7 @@ function ModelPicker({ id }: { id: string }) {
               className={cn("rounded-xl p-2 text-left text-xs ring-1 disabled:opacity-40", chosen === c.id ? "bg-electric/20 ring-electric/50" : "bg-white/[0.03] ring-white/10")}
             >
               <div className="truncate font-bold">
-                {c.emoji} {n.car(c)}
+                {c.emoji} {state.designs[c.id].name}
               </div>
               <div className="text-[10px] tabular-nums text-white/50">{lock ? `🔒 ${n.carLock(lock)}` : formatMoney(carValue(state, c, snap.gm))}</div>
             </button>
