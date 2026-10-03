@@ -144,6 +144,9 @@ export function generateDaily(s: GameState, now: number, snap?: EconomySnapshot)
       const parts = Object.values(eco.chain.plants).reduce((a, p) => (p.type === "assemblyPlant" ? a : a + p.unitsPerSec), 0);
       const rate = t.metric === "carsProduced" ? eco.carsPerSec : t.metric === "carsSold" ? eco.carsPerSec * 0.5 : t.metric === "moneyEarned" ? income : Math.max(parts, 0.05) * 0.6;
       target = niceNumber(Math.max(t.min, rate * t.seconds));
+    } else if (t.metric === "levelsBought") {
+      // a new player with one plant gets a reachable number of upgrades
+      target = Math.min(t.amount, Math.max(5, 5 * Object.keys(eco.chain.plants).length));
     } else {
       target = t.amount;
     }
@@ -204,4 +207,16 @@ export function claimableCount(s: GameState, snap?: EconomySnapshot): number {
   const daily = s.missions.daily.filter((m) => !m.claimed && dailyProgress(s, m, eco) >= m.target).length;
   const miles = openMilestones(s, MILESTONES.length).filter((m) => metric(s, m.metric, eco) >= m.target).length;
   return daily + miles;
+}
+
+export const HISTORY_EVERY_MS = 60_000;
+export const HISTORY_MAX = 240;
+
+/** Samples income once a minute for the Statistics chart and the stall hint. */
+export function recordHistory(s: GameState, now: number, income: number): boolean {
+  const last = s.history[s.history.length - 1];
+  if (last && now - last.t < HISTORY_EVERY_MS) return false;
+  s.history.push({ t: now, income });
+  if (s.history.length > HISTORY_MAX) s.history.splice(0, s.history.length - HISTORY_MAX);
+  return true;
 }

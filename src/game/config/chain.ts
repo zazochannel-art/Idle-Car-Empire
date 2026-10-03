@@ -56,7 +56,7 @@ export interface PlantConfig {
 export const PLANTS: PlantConfig[] = [
   // the first car: body + engine + tyres, put together by the assembly plant
   { id: "bodyWorks", emoji: "🚙", item: "body", raw: "steel", rawPer: 10, time: 20, cost: 5_000, requires: null, color: "#e2e8f0", roof: "#64748b" },
-  { id: "engineFactory", emoji: "⚙️", item: "engine", raw: "metal", rawPer: 10, time: 30, cost: 3_000, requires: "bodyWorks", unlockMade: { item: "body", n: 25 }, color: "#e7e5e4", roof: "#b91c1c" },
+  { id: "engineFactory", emoji: "⚙️", item: "engine", raw: "metal", rawPer: 10, time: 30, cost: 1_500, requires: "bodyWorks", unlockMade: { item: "body", n: 12 }, color: "#e7e5e4", roof: "#b91c1c" },
   { id: "tireFactory", emoji: "🛞", item: "tires", raw: "rubber", rawPer: 10, time: 30, cost: 60_000, requires: "engineFactory", color: "#d4d4d8", roof: "#27272a" },
   { id: "assemblyPlant", emoji: "🏭", item: null, raw: "", rawPer: 0, time: 60, cost: 600_000, requires: "tireFactory", color: "#f1f5f9", roof: "#1d4ed8" },
   // better cars need more parts

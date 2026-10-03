@@ -70,6 +70,8 @@ export function createInitialState(now: number): GameState {
     starUpgrades: {},
     imperiumCount: 0,
     epBase: 0,
+    history: [],
+    tips: [],
     logistics: createLogistics(),
     research: [],
     achievements: [],

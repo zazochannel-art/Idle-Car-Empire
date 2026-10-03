@@ -33,6 +33,7 @@ import { MissionsView } from "../views/missions-view";
 import { PrestigeView } from "../views/prestige-view";
 import { ResearchView } from "../views/research-view";
 import { StatsView } from "../views/stats-view";
+import { Coach } from "./coach";
 import { goalText, runGoal } from "./goals";
 import { Hud } from "./hud";
 import { OfflineDialog, PrestigeOverlay, SettingsDialog, Toasts } from "./overlays";
@@ -147,6 +148,7 @@ function Shell() {
       <LeftRail />
       {/* on phones the showroom card sits where the goal tracker is */}
       {!open && !(showcase && !desktop) && <GoalTracker />}
+      {!open && !showcase && <Coach />}
       <BottomDock />
 
       <Sheet open={open} onClose={closeAll} title={title} icon={icon} sheetKey={desktop ? "panel" : key}>
