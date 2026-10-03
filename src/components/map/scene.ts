@@ -10,6 +10,7 @@ import type { EconomySnapshot } from "@/game/engine/economy";
 import type { BuildingState, CarId, GameState, StructureType, ZoneId } from "@/game/types";
 import { drawDepot, drawMarket, drawPlant, plantBadge } from "./plants";
 import { Painter, rand, sx, sy } from "./iso";
+import { sprites3d, tierFor } from "../three/sprites";
 import { CAR_COLORS, CAR_MODEL_FOR, drawCar, drawModel, drawTruck, type CarModel, type Dir } from "./vehicles";
 import { barrier, beacon, bench, billboard, birds, bush, container, drum, fence, flagPole, flowerBed, ledStrip, lightPole, planter, tireStack, wallLamp } from "./props";
 
@@ -483,6 +484,115 @@ const HOUSE_ROOFS = ["#b91c1c", "#1d4ed8", "#92400e", "#475569", "#15803d", "#7c
 const HOUSE_WALLS = ["#fef3c7", "#f5f5f4", "#e0f2fe", "#fce7f3", "#ecfccb"];
 const GLASS = ["#60a5fa", "#93c5fd", "#a5b4fc", "#67e8f9", "#94a3b8"];
 
+/** Apartment block height in map px (shared by the 3D and vector drawings). */
+const apartmentHeight = (seed: number, zone: string) => (44 + Math.floor(seed * 4) * 8) * (zone === "mega" ? 1.4 : 1);
+
+/** Office towers in lot coordinates (shared by the 3D and vector drawings). */
+function officeTowers(seed: number, zone: string) {
+  const tall = zone === "mega" ? 1.75 : zone === "global" ? 1.4 : zone === "downtown" ? 1.1 : 0.85;
+  const h = (70 + Math.floor(seed * 6) * 14) * tall;
+  const twin = seed > 0.55;
+  const towers = twin
+    ? [
+        { x: 0.15, z: 0.15, w: 1.0, d: 1.0, h },
+        { x: 1.35, z: 1.25, w: 0.9, d: 0.9, h: h * 0.65 },
+      ]
+    : [{ x: 0.35, z: 0.35, w: 1.6, d: 1.5, h }];
+  return { h, twin, towers };
+}
+
+const SHOP_COLORS = ["#ef4444", "#22c55e", "#3b82f6", "#f59e0b"];
+const OFFICE_TINTS = ["#9fc4e8", "#bcd6ee", "#b9c2e6", "#a8e0ea", "#c3ccd6"];
+
+/**
+ * The realistic 3D version of a city lot (houses, blocks, towers, villas).
+ * Returns false while the sprite is still being made (or without WebGL).
+ */
+function decorSprite(p: Painter, dc: Decor, X: number, Y: number, W: number, D: number): boolean {
+  if (p.dim) return false;
+  const zone = dc.zone;
+  // a handful of variants per kind keeps the sprite cache small
+  const q = Math.floor(dc.seed * 12) / 12 + 1 / 24;
+  const autumn = p.season === "halloween";
+  let hpx = 40;
+  let k = Math.min(4, tierFor((p.zoom ?? 1) * (p.dpr ?? 1)));
+  let key: string;
+  let build: Parameters<typeof sprites3d.get>[3];
+  const dims = `${W.toFixed(2)}|${D.toFixed(2)}`;
+  if (dc.kind === "house" && zone === "luxury") {
+    const color = CAR_COLORS[Math.floor(dc.seed * 10)];
+    key = `villa|${q}|${color}|${dims}`;
+    build = (T, { kit, homes }) => homes.buildVillaLot(T, kit, W, D, q, color);
+  } else if (dc.kind === "house") {
+    key = `house|${q}|${autumn ? 1 : 0}|${dims}`;
+    build = (T, { kit, homes }) => homes.buildHouseLot(T, kit, W, D, q, autumn);
+  } else if (dc.kind === "apartment") {
+    hpx = apartmentHeight(dc.seed, zone);
+    key = `apt|${q}|${hpx}|${dims}`;
+    build = (T, { kit, homes }) => homes.buildApartmentLot(T, kit, W, D, q, hpx);
+  } else if (dc.kind === "office") {
+    const o = officeTowers(dc.seed, zone);
+    hpx = o.h + 40;
+    k = Math.min(k, 3);
+    const tint = OFFICE_TINTS[Math.floor(dc.seed * 13) % OFFICE_TINTS.length];
+    const helipad = zone === "mega" && o.h > 150;
+    key = `office|${o.h}|${o.twin ? 1 : 0}|${tint}|${helipad ? 1 : 0}|${dims}`;
+    build = (T, { kit, homes }) => homes.buildOfficeLot(T, kit, W, D, q, { towers: o.towers, tint, helipad, mast: !o.twin });
+  } else if (dc.kind === "shop") {
+    const colors = [0, 1].map((i) => SHOP_COLORS[Math.floor(q * 4 + i) % 4]);
+    const cars = [0, 1, 2].map((i) => CAR_COLORS[Math.floor(rand(q, i) * CAR_COLORS.length)]);
+    key = `shop|${q}|${dims}`;
+    build = (T, { kit, homes }) => homes.buildShopLot(T, kit, W, D, q, colors, cars);
+  } else return false;
+  const span = W + D;
+  const size = { w: span * 32 + 60, h: span * 16 + hpx + 90, ax: span * 16 + 30, ay: span * 8 + hpx + 70 };
+  const spr = sprites3d.get(key, size, k, build);
+  if (!spr) return false;
+  const cx = X + W / 2;
+  const cy = Y + D / 2;
+  p.ctx.drawImage(spr.img, sx(cx, cy) - size.ax, sy(cx, cy, 0) - size.ay, size.w, size.h);
+  return true;
+}
+
+/** What moves or glows over a 3D lot: lit windows at night, beacons, birds, the pool. */
+function decorLife(p: Painter, dc: Decor, X: number, Y: number, t: number) {
+  const { seed, zone } = dc;
+  const near = p.zoom >= 0.9;
+  const lit = p.night > 0.3;
+  switch (dc.kind) {
+    case "house":
+      if (zone === "luxury") {
+        p.light(sx(X + 1.75, Y + 1.75), sy(X + 1.75, Y + 1.75), 26, "#67e8f9", 0.5);
+        if (lit) p.light(sx(X + 0.9, Y + 1.15), sy(X + 0.9, Y + 1.15, 8), 34, "#fde68a", 0.6);
+      } else if (lit) {
+        p.light(sx(X + 0.5, Y + 0.95), sy(X + 0.5, Y + 0.95, 6), 18, "#fde68a", 0.55);
+        if (seed > 0.4) p.light(sx(X + 1.0, Y + 0.95), sy(X + 1.0, Y + 0.95, 14), 14, "#fde68a", 0.45);
+      }
+      break;
+    case "apartment":
+      if (lit) {
+        const h = apartmentHeight(seed, zone);
+        for (let f = 1; f * 22 < h; f++) if (rand(seed * 31, f) > 0.35) p.light(sx(X + 0.6 + rand(seed, f) * 1.2, Y + 1.8), sy(X + 0.6 + rand(seed, f) * 1.2, Y + 1.8, f * 22), 16, "#fde68a", 0.4);
+      }
+      if (near && seed > 0.6) birds(p, X + 1, Y + 1, t, seed);
+      break;
+    case "shop":
+      if (lit) for (let i = 0; i < 2; i++) p.light(sx(X + 0.65 + i * 1.15, Y + 1.4), sy(X + 0.65 + i * 1.15, Y + 1.4, 5), 24, "#fde68a", 0.55);
+      if (near && seed > 0.5) billboard(p, X + 1.4, Y + 0.05, ["#7c3aed", "#0ea5e9", "#e11d48"][Math.floor(seed * 3)], ["TURBO", "DRIVE", "V8"][Math.floor(seed * 3)]);
+      break;
+    case "office": {
+      const o = officeTowers(seed, zone);
+      if (lit)
+        for (const tw of o.towers)
+          for (let f = 1; f * 26 < tw.h; f++)
+            if (rand(seed * 17, f) > 0.3) p.light(sx(X + tw.x + tw.w / 2, Y + tw.z + tw.d), sy(X + tw.x + tw.w / 2, Y + tw.z + tw.d, f * 26), 22, "#bfdbfe", 0.35);
+      if (!o.twin) beacon(p, X + 1.15, Y + 1.1, o.h + 26, t + seed * 3, "#ef4444");
+      if (near && seed > 0.7) birds(p, X + 1, Y + 1, t, seed);
+      break;
+    }
+  }
+}
+
 function decor(p: Painter, dc: Decor, t: number) {
   const { x, y, w, d, seed } = dc;
   const X = x + M;
@@ -492,6 +602,10 @@ function decor(p: Painter, dc: Decor, t: number) {
   const zone = dc.zone;
   // small props only when close enough to read them
   const near = p.zoom >= 0.9;
+  if (decorSprite(p, dc, X, Y, W, D)) {
+    decorLife(p, dc, X, Y, t);
+    return;
+  }
   switch (dc.kind) {
     case "house": {
       if (zone === "luxury") {
@@ -534,7 +648,7 @@ function decor(p: Painter, dc: Decor, t: number) {
     }
     case "apartment": {
       p.quad(X, Y, W, D, p.col("#a3b18a"));
-      const h = (44 + Math.floor(seed * 4) * 8) * (zone === "mega" ? 1.4 : 1);
+      const h = apartmentHeight(seed, zone);
       p.shadow(X + 0.25, Y + 0.25, 1.8, 1.6, h);
       const wall = ["#fde68a", "#fecaca", "#e9d5ff", "#cffafe"][Math.floor(seed * 4)];
       p.box(X + 0.25, Y + 0.25, 1.8, 1.6, 0, h, wall, "#94a3b8");
@@ -582,10 +696,9 @@ function decor(p: Painter, dc: Decor, t: number) {
     }
     case "shop": {
       p.quad(X, Y, W, D, p.col("#d6d3d1"));
-      const colors = ["#ef4444", "#22c55e", "#3b82f6", "#f59e0b"];
       for (let i = 0; i < 2; i++) {
         const bx = X + 0.15 + i * 1.15;
-        const col = colors[Math.floor(seed * 4 + i) % 4];
+        const col = SHOP_COLORS[Math.floor(seed * 4 + i) % 4];
         p.shadow(bx, Y + 0.2, 1.0, 1.2, 16);
         p.box(bx, Y + 0.2, 1.0, 1.2, 0, 16, "#f5f5f4", "#a8a29e");
         p.onLeft(bx, Y + 1.4, 0, 0.1, 0.9, 0, 9, p.night > 0.3 ? "#fde68a" : p.col("#bae6fd", -0.15));
@@ -751,6 +864,65 @@ function grassTexture(ctx: CanvasRenderingContext2D): CanvasPattern | null {
   return (grassPattern = ctx.createPattern(cv, "repeat"));
 }
 
+let asphaltPattern: CanvasPattern | null | undefined;
+/** Aggregate speckle, patched repairs and oil stains for the roads. */
+function asphaltTexture(ctx: CanvasRenderingContext2D): CanvasPattern | null {
+  if (asphaltPattern !== undefined) return asphaltPattern;
+  if (typeof document === "undefined") return (asphaltPattern = null);
+  const cv = document.createElement("canvas");
+  cv.width = cv.height = 160;
+  const g = cv.getContext("2d")!;
+  for (let i = 0; i < 6; i++) {
+    g.fillStyle = rand(i, 7) > 0.5 ? "rgba(0,0,0,0.07)" : "rgba(255,255,255,0.035)";
+    g.beginPath();
+    g.ellipse(rand(i, 1) * 160, rand(i, 2) * 160, 10 + rand(i, 3) * 22, 6 + rand(i, 4) * 12, rand(i, 5) * 3, 0, Math.PI * 2);
+    g.fill();
+  }
+  for (let i = 0; i < 1800; i++) {
+    const v = rand(i, 4);
+    g.fillStyle = v > 0.6 ? "rgba(255,255,255,0.09)" : v > 0.25 ? "rgba(0,0,0,0.12)" : "rgba(180,170,150,0.08)";
+    g.fillRect(rand(i, 1) * 160, rand(i, 2) * 160, 1 + rand(i, 3), 1 + rand(i, 5));
+  }
+  // a few hairline cracks
+  g.strokeStyle = "rgba(0,0,0,0.18)";
+  g.lineWidth = 0.7;
+  for (let i = 0; i < 3; i++) {
+    let x = rand(i, 11) * 160;
+    let y = rand(i, 12) * 160;
+    g.beginPath();
+    g.moveTo(x, y);
+    for (let k = 0; k < 5; k++) g.lineTo((x += (rand(i * 7 + k, 13) - 0.5) * 18), (y += (rand(i * 7 + k, 14) - 0.5) * 18));
+    g.stroke();
+  }
+  return (asphaltPattern = ctx.createPattern(cv, "repeat"));
+}
+
+let paverPattern: CanvasPattern | null | undefined;
+/** Concrete paving slabs for the pavements. */
+function paverTexture(ctx: CanvasRenderingContext2D): CanvasPattern | null {
+  if (paverPattern !== undefined) return paverPattern;
+  if (typeof document === "undefined") return (paverPattern = null);
+  const cv = document.createElement("canvas");
+  cv.width = cv.height = 64;
+  const g = cv.getContext("2d")!;
+  for (let i = 0; i < 4; i++)
+    for (let j = 0; j < 4; j++) {
+      g.fillStyle = `rgba(${rand(i, j) > 0.5 ? "255,255,255" : "0,0,0"},${0.02 + rand(j, i) * 0.04})`;
+      g.fillRect(i * 16, j * 16, 16, 16);
+    }
+  g.strokeStyle = "rgba(60,70,85,0.16)";
+  g.lineWidth = 1;
+  g.beginPath();
+  for (let k = 0; k <= 64; k += 16) {
+    g.moveTo(k + 0.5, 0);
+    g.lineTo(k + 0.5, 64);
+    g.moveTo(0, k + 0.5);
+    g.lineTo(64, k + 0.5);
+  }
+  g.stroke();
+  return (paverPattern = ctx.createPattern(cv, "repeat"));
+}
+
 function coastPath(c: CanvasRenderingContext2D) {
   c.beginPath();
   for (const loop of coastline()) {
@@ -805,6 +977,8 @@ export function drawGround(p: Painter, unlocked: ReadonlySet<ZoneId>, view: [num
       if (zone) {
         p.dim = !unlocked.has(zone);
         p.quad(x, y, 6, 6, p.col(SIDEWALK));
+        const pav = !p.dim && paverTexture(c);
+        if (pav) p.quad(x, y, 6, 6, pav);
         p.quad(x + 0.22, y + 0.22, 5.56, 5.56, p.col(ZONE_BY_ID[zone].ground));
         // kerb line
         p.quadStroke(x + 0.02, y + 0.02, 5.96, 5.96, p.col("#a8b0ba"), 1);
@@ -873,6 +1047,8 @@ export function drawGround(p: Painter, unlocked: ReadonlySet<ZoneId>, view: [num
         if (!inView(bboxOf(x, y, w, d, 0))) continue;
         p.dim = !open;
         p.quad(x, y, w, d, p.col(ASPHALT));
+        const asph = !p.dim && asphaltTexture(c);
+        if (asph) p.quad(x, y, w, d, asph);
         // worn tyre tracks give the asphalt some texture
         if (axis === "x") {
           p.quad(x + 1, y + 0.22, ROAD_STEP - 1, 0.1, p.col(ASPHALT, -0.08));
@@ -910,6 +1086,8 @@ export function drawGround(p: Painter, unlocked: ReadonlySet<ZoneId>, view: [num
         continue;
       }
       p.quad(x, y, 1, 1, p.col(ASPHALT, 0.03));
+      const asph = !p.dim && asphaltTexture(c);
+      if (asph) p.quad(x, y, 1, 1, asph);
       const stripe = p.col("#f1f5f9", -0.05);
       for (let s = 0; s < 4; s++) {
         if (roads[1]) p.quad(x + 1.08, y + 0.1 + s * 0.22, 0.32, 0.1, stripe);

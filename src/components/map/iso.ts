@@ -89,7 +89,7 @@ export class Painter {
   }
 
   /** Ground-level (or raised) rectangle in tile space. */
-  quad(x: number, y: number, w: number, d: number, fill: string | CanvasGradient, z = 0) {
+  quad(x: number, y: number, w: number, d: number, fill: string | CanvasGradient | CanvasPattern, z = 0) {
     const c = this.ctx;
     c.beginPath();
     c.moveTo(sx(x, y), sy(x, y, z));
