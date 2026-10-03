@@ -434,3 +434,16 @@ describe("save system", () => {
     expect(PLANT_BY_ID.bodyWorks.time).toBe(20);
   });
 });
+
+describe("global expansion regions", () => {
+  it("moves the empire region by region with bigger income and costs", () => {
+    const s = createInitialState(0);
+    const local = snapshot(s).gm.income;
+    const cost = Ch.plantBuildCost(s, "engineFactory");
+    s.prestigeCount = 2; // Germany
+    expect(snapshot(s).gm.income).toBeCloseTo(local * 2);
+    expect(Ch.plantBuildCost(s, "engineFactory")).toBeCloseTo(cost * 1.25);
+    s.prestigeCount = 99; // capped at Global Empire
+    expect(snapshot(s).gm.costMult).toBeCloseTo(2);
+  });
+});

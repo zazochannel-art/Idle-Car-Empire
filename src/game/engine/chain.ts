@@ -3,6 +3,7 @@
 // raw material from the Materials Depot, components to the Parts Market or
 // to a Car Assembly Plant, finished cars to dealerships. Money only comes in
 // when a load is sold at the market or a customer buys a car.
+import { regionCostMult } from "../config/regions";
 import { CARS, CAR_BY_ID, CAR_MODEL, type CarConfig } from "../config/cars";
 import {
   AUTOMATION,
@@ -125,7 +126,7 @@ export function plantLock(s: GameState, type: PlantType): PlantLock {
 }
 
 export function plantBuildCost(s: GameState, type: PlantType): number {
-  return PLANT_BY_ID[type].cost * Math.pow(PLANT_COPY_COST, plantCount(s, type));
+  return PLANT_BY_ID[type].cost * Math.pow(PLANT_COPY_COST, plantCount(s, type)) * regionCostMult(s.prestigeCount);
 }
 
 const base = (b: BuildingState) => PLANT_BY_ID[b.type as PlantType].cost;

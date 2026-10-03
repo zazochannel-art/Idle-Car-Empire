@@ -6,6 +6,7 @@ import { AUTOMATION, COMPONENTS, GRADES, PLANTS, PLANT_LEVELS } from "@/game/con
 import { MANAGERS } from "@/game/config/managers";
 import { MILESTONES } from "@/game/config/missions";
 import { EMPIRE_PERKS } from "@/game/config/prestige";
+import { REGIONS } from "@/game/config/regions";
 import { RESEARCH, RESEARCH_CATEGORIES } from "@/game/config/research";
 import { en } from "./en";
 import { ro, roContent } from "./ro";
@@ -34,6 +35,7 @@ describe("translations", () => {
       ...ACHIEVEMENTS.flatMap((a) => [`achievement.${a.id}.name`, `achievement.${a.id}.desc`]),
       ...MILESTONES.map((m) => `milestone.${m.id}`),
       ...EMPIRE_PERKS.flatMap((p) => [`perk.${p.points}.name`, `perk.${p.points}.desc`]),
+      ...REGIONS.flatMap((r) => [`region.${r.id}.name`, `region.${r.id}.flavor`]),
     ];
     for (const key of keys) {
       expect(roContent[key], `ro:${key}`).toBeTruthy();
