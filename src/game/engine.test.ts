@@ -13,7 +13,9 @@ import * as L from "./engine/logistics";
 import { geometricCost, maxAffordable, snapshot } from "./engine/economy";
 import { collectOffline, settleOffline } from "./engine/offline";
 import { canPrestige, pendingPoints, prestige } from "./engine/prestige";
-import { checkAchievements, claimDaily, claimMilestone, dailyProgress, refreshDaily } from "./engine/progress";
+import { incomeStalled } from "./engine/insights";
+import { checkAchievements, claimDaily, claimMilestone, dailyProgress, recordHistory, refreshDaily } from "./engine/progress";
+import { currentTip } from "./engine/tips";
 import { createInitialState } from "./engine/state";
 import { tick } from "./engine/tick";
 import { formatMoney, formatNumber } from "./format";
@@ -31,8 +33,8 @@ function run(s: GameState, seconds: number, step = 0.5): GameEvent[] {
 }
 
 function build(s: GameState, plot: string, type: PlantType) {
-  // the Engine Factory unlocks after 25 bodies
-  s.lifetime.parts.body = Math.max(s.lifetime.parts.body, 25);
+  // the Engine Factory unlocks after 12 bodies
+  s.lifetime.parts.body = Math.max(s.lifetime.parts.body, 12);
   s.cash += Ch.plantBuildCost(s, type);
   expect(C.buildStructure(s, plot, type)).toBe(true);
 }
@@ -130,21 +132,21 @@ describe("growing the chain", () => {
   it("plants unlock in order: engine after body works, then tyres, then assembly…", () => {
     const s = createInitialState(T0);
     const [a, b] = freePlots();
-    // the Engine Factory needs 25 bodies first
-    expect(Ch.plantLock(s, "engineFactory")).toEqual({ kind: "made", item: "body", n: 25, have: 0 });
-    s.lifetime.parts.body = 25;
+    // the Engine Factory needs 12 bodies first
+    expect(Ch.plantLock(s, "engineFactory")).toEqual({ kind: "made", item: "body", n: 12, have: 0 });
+    s.lifetime.parts.body = 12;
     expect(Ch.plantLock(s, "engineFactory")).toBeNull();
     expect(Ch.plantLock(s, "tireFactory")).toEqual({ kind: "plant", plant: "engineFactory" });
     expect(Ch.plantLock(s, "interiorFactory")).toEqual({ kind: "plant", plant: "assemblyPlant" });
-    expect(Ch.plantBuildCost(s, "engineFactory")).toBe(3_000);
-    s.cash = 2_999;
+    expect(Ch.plantBuildCost(s, "engineFactory")).toBe(1_500);
+    s.cash = 1_499;
     expect(C.buildStructure(s, a, "engineFactory")).toBe(false);
-    s.cash = 3_000;
+    s.cash = 1_500;
     expect(C.buildStructure(s, a, "engineFactory")).toBe(true);
     expect(s.cash).toBe(0);
     expect(Ch.plantLock(s, "tireFactory")).toBeNull();
     // a second engine factory costs more
-    expect(Ch.plantBuildCost(s, "engineFactory")).toBe(3_000 * 6);
+    expect(Ch.plantBuildCost(s, "engineFactory")).toBe(1_500 * 6);
     expect(Ch.plantLock(s, "batteryFactory")).not.toBeNull();
     expect(C.buildStructure(s, b, "assemblyPlant")).toBe(false);
   });
@@ -477,5 +479,27 @@ describe("reset imperium", () => {
     expect(I.buyStarUpgrade(s, "production")).toBe(true);
     expect(s.stars).toBe(6);
     expect(snapshot(s).gm.speed).toBeCloseTo(speed * 1.2);
+  });
+});
+
+describe("smarter guidance", () => {
+  it("samples income once a minute and spots a stalled run", () => {
+    const s = createInitialState(0);
+    s.runStartedAt = 0;
+    expect(recordHistory(s, 0, 100)).toBe(true);
+    expect(recordHistory(s, 30_000, 100)).toBe(false);
+    for (let m = 1; m <= 25; m++) recordHistory(s, m * 60_000, 100 + m * 0.2);
+    expect(incomeStalled(s)).toBe(true);
+    s.history.push({ t: 26 * 60_000, income: 1_000 });
+    expect(incomeStalled(s)).toBe(false);
+  });
+
+  it("walks a new player through the first steps, once", () => {
+    const s = createInitialState(0);
+    expect(currentTip(s)).toBe("start");
+    s.tips.push("start");
+    expect(currentTip(s)).toBeNull();
+    s.lifetime.parts.body = 12;
+    expect(currentTip(s)).toBe("engine");
   });
 });

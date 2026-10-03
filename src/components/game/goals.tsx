@@ -31,7 +31,10 @@ export function goalText(g: Goal, t: (k: MessageKey, v?: Vars) => string, n: Con
       return { title: t(g.what === "speed" ? "goal.speed" : "goal.level", { name: plantName(s, g.plot, t) }), detail: t("goal.upgradeDetail") };
     }
     case "shortage":
-      return { title: t("goal.shortage", { item: t(`item.${g.component}`) }), detail: t("goal.shortageDetail", { name: t(`structure.${MAKER[g.component]}`) }) };
+      return {
+        title: t("goal.shortage", { item: t(`item.${g.component}`) }),
+        detail: t(g.what ? "goal.shortageFix" : "goal.shortageDetail", { name: t(`structure.${MAKER[g.component]}`) }),
+      };
     case "dealer":
       return { title: t("goal.dealer"), detail: t("goal.dealerDetail") };
     case "car":
@@ -41,7 +44,10 @@ export function goalText(g: Goal, t: (k: MessageKey, v?: Vars) => string, n: Con
       return { title: t("goal.manager", { name: m.name }), detail: n.role(m) };
     }
     case "prestige":
-      return { title: t("goal.prestige", { n: g.points }), detail: t("goal.prestigeDetail") };
+      return {
+        title: g.stalled ? t("goal.prestigeStalled", { pct: formatPercent(g.gain) }) : t("goal.prestige", { n: g.points }),
+        detail: g.stalled ? t("goal.prestigeStalledDetail", { n: g.points }) : t("goal.prestigeDetail", { pct: formatPercent(g.gain) }),
+      };
     case "facility":
       return { title: t("goal.facility"), detail: t("goal.facilityDetail") };
     case "worker":
@@ -75,6 +81,11 @@ export function runGoal(g: Goal, ready: boolean) {
       ui.selectPlot(g.plot);
       break;
     case "shortage":
+      // one tap fixes it: buy the maker's cheapest upgrade
+      if (ready && g.what) {
+        if (g.what === "speed") game.plantSpeed(g.plot);
+        else game.plantLevel(g.plot);
+      }
       ui.selectPlot(g.plot);
       break;
     case "dealer":

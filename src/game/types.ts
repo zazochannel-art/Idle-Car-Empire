@@ -369,6 +369,10 @@ export interface GameState {
   imperiumCount: number;
   /** Lifetime earnings at the last Reset Imperium: Empire Points count from here. */
   epBase: number;
+  /** Income samples (one a minute, last 4 hours) for the chart and the stall hint. */
+  history: { t: number; income: number }[];
+  /** Tutorial tips the player has dismissed. */
+  tips: string[];
   logistics: LogisticsState;
   research: string[];
   achievements: string[];

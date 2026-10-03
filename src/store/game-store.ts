@@ -19,7 +19,7 @@ import { PLANT_LEVELS } from "@/game/config/chain";
 import { snapshot, unlockedCarIds, type EconomySnapshot } from "@/game/engine/economy";
 import { collectOffline, settleOffline } from "@/game/engine/offline";
 import { prestige as doPrestige } from "@/game/engine/prestige";
-import { checkAchievements, claimDaily, claimMilestone, refreshDaily } from "@/game/engine/progress";
+import { checkAchievements, claimDaily, claimMilestone, recordHistory, refreshDaily } from "@/game/engine/progress";
 import { cloneState, createInitialState } from "@/game/engine/state";
 import { tick as engineTick } from "@/game/engine/tick";
 import { formatMoney } from "@/game/format";
@@ -71,6 +71,7 @@ interface GameStore {
   setSpecialization: (plot: string, spec: Specialization) => boolean;
   claimDaily: (id: string) => void;
   claimMilestone: (id: string) => void;
+  dismissTip: (id: string) => void;
   collectOffline: () => void;
   prestige: () => void;
   imperium: () => void;
@@ -140,6 +141,7 @@ export const useGame = create<GameStore>((set, get) => {
 
     const events = engineTick(next, dt, snap);
     next.lastActiveAt = now;
+    recordHistory(next, now, snap.incomePerSec);
     if (refreshDaily(next, now, snap)) {
       uiEvents.emit({ type: "toast", tone: "info", icon: "📋", title: tr("toast.daily"), body: tr("toast.dailyBody") });
     }
@@ -271,6 +273,10 @@ export const useGame = create<GameStore>((set, get) => {
     setSpecialization: (plot, spec) => act((s) => C.setSpecialization(s, plot, spec)),
     claimDaily: (id) => {
       act((s) => claimDaily(s, id));
+    },
+    dismissTip: (id) => {
+      act((s) => !s.tips.includes(id) && s.tips.push(id) > 0);
+      persist(true);
     },
     claimMilestone: (id) => {
       act((s) => claimMilestone(s, id));

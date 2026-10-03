@@ -12,6 +12,7 @@ import { canOpenDealers, isManagerUnlocked } from "./actions";
 import { bestGrade, carLock, gradeCost, hasPlant, levelCost, plantBuildCost, plantLock, plantsOf, speedCost } from "./chain";
 import { isPlotUnlocked, nextZone, zoneBlocker } from "./city";
 import type { EconomySnapshot } from "./economy";
+import { PRESTIGE } from "../config/prestige";
 import { canPrestige, pendingPoints } from "./prestige";
 
 export type Requirement =
@@ -26,11 +27,13 @@ export type Requirement =
 export type Goal =
   | { kind: "plant"; icon: string; cost: number; plant: PlantType }
   | { kind: "upgrade"; icon: string; cost: number; plot: string; what: "speed" | "level" }
-  | { kind: "shortage"; icon: string; plot: string; component: ComponentId }
+  /** cost/what: the cheapest upgrade on the maker plot, bought by tapping the goal. */
+  | { kind: "shortage"; icon: string; plot: string; component: ComponentId; cost?: number; what?: "speed" | "level" }
   | { kind: "dealer"; icon: string; cost: number; dealer: DealerId }
   | { kind: "car"; icon: string; cost?: number; car: CarId; plot: string | null; requirement: Requirement | null }
   | { kind: "manager"; icon: string; cost: number; manager: ManagerId }
-  | { kind: "prestige"; icon: string; points: number }
+  /** gain: extra income share the points add; stalled: income stopped growing. */
+  | { kind: "prestige"; icon: string; points: number; gain: number; stalled: boolean }
   | { kind: "facility"; icon: string; plot: string }
   | { kind: "worker"; icon: string; plot: string; idle: number }
   | { kind: "zone"; icon: string; cost: number; zone: ZoneId }
@@ -70,7 +73,10 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
   // An assembly line starved of parts is the most urgent thing on the map.
   for (const [id, b] of plantsOf(s)) {
     if (b.type === "assemblyPlant" && b.plant.status === "noParts" && b.plant.missing) {
-      goals.push({ kind: "shortage", icon: "⚠️", plot: makerPlot(s, snap, b.plant.missing) ?? id, component: b.plant.missing });
+      const plot = makerPlot(s, snap, b.plant.missing) ?? id;
+      const maker = s.city.buildings[plot];
+      const fix = maker?.plant ? cheapestUpgrade(maker, gm) : null;
+      goals.push({ kind: "shortage", icon: "⚠️", plot, component: b.plant.missing, ...(fix ?? {}) });
       break;
     }
   }
@@ -147,6 +153,35 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
   const nextManager = MANAGERS.find((m) => !s.managers[m.id].hired && isManagerUnlocked(s, m.id));
   if (nextManager) goals.push({ kind: "manager", icon: nextManager.avatar, cost: nextManager.cost, manager: nextManager.id });
 
-  if (canPrestige(s)) goals.unshift({ kind: "prestige", icon: "⭐", points: pendingPoints(s) });
+  if (canPrestige(s)) {
+    const points = pendingPoints(s);
+    const gain = (1 + (s.empirePoints + points) * PRESTIGE.incomePerPoint) / (1 + s.empirePoints * PRESTIGE.incomePerPoint) - 1;
+    const stalled = incomeStalled(s);
+    const g: Goal = { kind: "prestige", icon: "⭐", points, gain, stalled };
+    // worth it now (growth stalled or a big jump) → first; otherwise a quiet option
+    if (stalled || gain >= 0.5) goals.unshift(g);
+    else goals.splice(Math.min(goals.length, max - 1), 0, g);
+  }
   return goals.slice(0, max);
+}
+
+/** The cheaper of a plant's speed and level upgrades. */
+function cheapestUpgrade(b: Parameters<typeof speedCost>[0], gm: EconomySnapshot["gm"]): { cost: number; what: "speed" | "level" } | null {
+  const sp = speedCost(b, gm);
+  const lv = levelCost(b, gm);
+  if (sp === null && lv === null) return null;
+  return lv === null || (sp !== null && sp <= lv) ? { cost: sp!, what: "speed" } : { cost: lv, what: "level" };
+}
+
+/** How many minutes of income history the stall check looks back over. */
+export const STALL_WINDOW_MIN = 20;
+
+/** Income has grown less than 15% over the last 20 minutes of play. */
+export function incomeStalled(s: GameState): boolean {
+  // only this run: an expansion resets income on purpose
+  const h = s.history.filter((p) => p.t >= s.runStartedAt);
+  if (h.length < 2) return false;
+  const last = h[h.length - 1];
+  const past = [...h].reverse().find((p) => last.t - p.t >= STALL_WINDOW_MIN * 60_000);
+  return !!past && past.income > 0 && last.income < past.income * 1.15;
 }
