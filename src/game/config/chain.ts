@@ -16,6 +16,7 @@ export const COMPONENTS: ComponentConfig[] = [
   { id: "engine", emoji: "⚙️", value: 1_500, color: "#ef4444" },
   { id: "tires", emoji: "🛞", value: 6_000, color: "#1f2937" },
   { id: "interior", emoji: "💺", value: 20_000, color: "#a16207" },
+  { id: "suspension", emoji: "🔩", value: 35_000, color: "#f59e0b" },
   { id: "glass", emoji: "🪟", value: 60_000, color: "#7dd3fc" },
   { id: "paint", emoji: "🎨", value: 150_000, color: "#ec4899" },
   { id: "electronics", emoji: "🔌", value: 300_000, color: "#22c55e" },
@@ -60,7 +61,8 @@ export const PLANTS: PlantConfig[] = [
   { id: "assemblyPlant", emoji: "🏭", item: null, raw: "", rawPer: 0, time: 60, cost: 600_000, requires: "tireFactory", color: "#f1f5f9", roof: "#1d4ed8" },
   // better cars need more parts
   { id: "interiorFactory", emoji: "💺", item: "interior", raw: "fabric", rawPer: 10, time: 40, cost: 1.5e7, requires: "assemblyPlant", color: "#fef3c7", roof: "#a16207" },
-  { id: "glassFactory", emoji: "🪟", item: "glass", raw: "sand", rawPer: 10, time: 40, cost: 1.2e8, requires: "interiorFactory", color: "#e0f2fe", roof: "#0284c7" },
+  { id: "suspensionFactory", emoji: "🔩", item: "suspension", raw: "alloy", rawPer: 10, time: 40, cost: 4e7, requires: "interiorFactory", color: "#fef3c7", roof: "#b45309" },
+  { id: "glassFactory", emoji: "🪟", item: "glass", raw: "sand", rawPer: 10, time: 40, cost: 1.2e8, requires: "suspensionFactory", color: "#e0f2fe", roof: "#0284c7" },
   { id: "paintFactory", emoji: "🎨", item: "paint", raw: "pigment", rawPer: 10, time: 30, cost: 8e8, requires: "glassFactory", color: "#fce7f3", roof: "#db2777" },
   { id: "electronicsFactory", emoji: "🔌", item: "electronics", raw: "chips", rawPer: 10, time: 50, cost: 3e10, requires: "paintFactory", color: "#dcfce7", roof: "#15803d" },
   { id: "batteryFactory", emoji: "🔋", item: "battery", raw: "lithium", rawPer: 10, time: 60, cost: 3e12, requires: "electronicsFactory", research: "electric_motors", color: "#ecfccb", roof: "#4d7c0f" },

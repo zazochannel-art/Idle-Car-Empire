@@ -59,7 +59,7 @@ npm run simulate -- 3   # balance bot: plays 3 hours and logs milestones
 6. **Sell them, then build better cars.** Car transporters fill the showroom,
    customers come in and drive off in your cars. Each better model needs one
    more plant and better grades: City Car (body, engine, tyres) → Sedan
-   (+ Interior Factory) → SUV (+ Glass) → Sports Car (+ Paint) → Luxury Sedan,
+   (+ Interior and Suspension factories) → SUV (+ Glass) → Sports Car (+ Paint) → Luxury Sedan,
    Performance SUV, Supercar and Hypercar (+ Electronics) → Electric
    Performance (+ Battery Factory). More dealerships add customers and markup.
 7. **Grow the empire.** You can also:
