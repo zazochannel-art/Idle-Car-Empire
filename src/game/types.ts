@@ -1,3 +1,4 @@
+import type { StarUpgradeId } from "./config/imperium";
 // Core type definitions shared by the config, the engine and the UI.
 
 export type CarId =
@@ -362,6 +363,12 @@ export interface GameState {
   boost: number;
   /** ⭐ Stars: earned from milestones and Reset Imperium, spent on permanent upgrades. */
   stars: number;
+  /** Levels of the permanent ⭐ Star upgrades. */
+  starUpgrades: Partial<Record<StarUpgradeId, number>>;
+  /** Times the empire did a Reset Imperium. */
+  imperiumCount: number;
+  /** Lifetime earnings at the last Reset Imperium: Empire Points count from here. */
+  epBase: number;
   logistics: LogisticsState;
   research: string[];
   achievements: string[];

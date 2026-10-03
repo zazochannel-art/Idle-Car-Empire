@@ -55,7 +55,8 @@ import type {
 } from "../types";
 import { designStats } from "./design";
 import { logisticsMods } from "./logistics";
-import type { GlobalMods } from "./modifiers";
+import { starMods } from "./imperium";
+import { managerMult, type GlobalMods } from "./modifiers";
 
 // ───────────────────────────── state ─────────────────────────────
 
@@ -279,7 +280,7 @@ function managerMods(s: GameState, plotId: string) {
   for (const cfg of MANAGERS) {
     const st = s.managers[cfg.id];
     if (cfg.scope !== "factory" || !st?.hired || st.assignedTo !== plotId) continue;
-    const mult = 1 + cfg.bonus.pct * st.level;
+    const mult = managerMult(cfg, st.level, starMods(s).managers);
     if (cfg.bonus.stat === "speed") m.speed *= mult;
     else if (cfg.bonus.stat === "value") m.value *= mult;
     else if (cfg.bonus.stat === "delivery") m.delivery *= mult;

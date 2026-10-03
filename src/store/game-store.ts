@@ -1,5 +1,7 @@
 "use client";
 
+import type { StarUpgradeId } from "@/game/config/imperium";
+import { buyStarUpgrade, imperium as doImperium } from "@/game/engine/imperium";
 import { create } from "zustand";
 import { ACHIEVEMENT_BY_ID } from "@/game/config/achievements";
 import { CAR_BY_ID, type DesignOption } from "@/game/config/cars";
@@ -71,6 +73,8 @@ interface GameStore {
   claimMilestone: (id: string) => void;
   collectOffline: () => void;
   prestige: () => void;
+  imperium: () => void;
+  buyStarUpgrade: (id: StarUpgradeId) => boolean;
   setBuyAmount: (a: BuyAmount) => void;
   setLang: (lang: Lang) => void;
   exportSave: () => string;
@@ -283,6 +287,18 @@ export const useGame = create<GameStore>((set, get) => {
         uiEvents.emit({ type: "prestige", points: gained });
         persist(true);
       }
+    },
+    imperium: () => {
+      const gained = act((s) => doImperium(s, Date.now()));
+      if (gained > 0) {
+        uiEvents.emit({ type: "prestige", points: gained, stars: true });
+        persist(true);
+      }
+    },
+    buyStarUpgrade: (id) => {
+      const ok = act((s) => buyStarUpgrade(s, id));
+      if (ok) persist(true);
+      return ok;
     },
     setBuyAmount: (a) => {
       act((s) => {

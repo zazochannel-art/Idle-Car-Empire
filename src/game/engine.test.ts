@@ -8,6 +8,7 @@ import * as A from "./engine/actions";
 import * as Ch from "./engine/chain";
 import * as C from "./engine/city";
 import * as D from "./engine/design";
+import * as I from "./engine/imperium";
 import * as L from "./engine/logistics";
 import { geometricCost, maxAffordable, snapshot } from "./engine/economy";
 import { collectOffline, settleOffline } from "./engine/offline";
@@ -445,5 +446,33 @@ describe("global expansion regions", () => {
     expect(Ch.plantBuildCost(s, "engineFactory")).toBeCloseTo(cost * 1.25);
     s.prestigeCount = 99; // capped at Global Empire
     expect(snapshot(s).gm.costMult).toBeCloseTo(2);
+  });
+});
+
+describe("reset imperium", () => {
+  it("trades Empire Points, region and research for permanent Stars", () => {
+    const s = createInitialState(0);
+    expect(I.canImperium(s)).toBe(false);
+    s.prestigeCount = 6;
+    s.empirePoints = 500;
+    s.empirePointsEarned = 500;
+    s.research = ["x"];
+    s.run.moneyEarned = 1e12;
+    s.lifetime.moneyEarned = 1e14;
+    expect(I.canImperium(s)).toBe(true);
+    const gained = I.imperium(s, 1);
+    expect(gained).toBe(9);
+    expect(s.stars).toBe(9);
+    expect(s.empirePoints).toBe(0);
+    expect(s.prestigeCount).toBe(0);
+    expect(s.research).toEqual([]);
+    // Empire Points count again from the reset
+    expect(pendingPoints(s)).toBe(0);
+
+    const speed = snapshot(s).gm.speed;
+    expect(I.buyStarUpgrade(s, "production")).toBe(true);
+    expect(I.buyStarUpgrade(s, "production")).toBe(true);
+    expect(s.stars).toBe(6);
+    expect(snapshot(s).gm.speed).toBeCloseTo(speed * 1.2);
   });
 });
