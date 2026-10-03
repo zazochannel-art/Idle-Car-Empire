@@ -13,13 +13,13 @@ export function totalPointsFor(lifetimeEarned: number): number {
 }
 
 export function pendingPoints(s: GameState): number {
-  return Math.max(0, totalPointsFor(s.lifetime.moneyEarned) - s.empirePointsEarned);
+  return Math.max(0, totalPointsFor(s.lifetime.moneyEarned - s.epBase) - s.empirePointsEarned);
 }
 
 /** Lifetime earnings needed for the next Empire Point. */
 export function earningsForNextPoint(s: GameState): number {
   const next = s.empirePointsEarned + pendingPoints(s) + 1;
-  return Math.pow(next / PRESTIGE.scale, 3) * PRESTIGE.divisor;
+  return Math.pow(next / PRESTIGE.scale, 3) * PRESTIGE.divisor + s.epBase;
 }
 
 export function canPrestige(s: GameState): boolean {
@@ -41,7 +41,12 @@ export function prestige(s: GameState, now: number): number {
   s.empirePoints += gained;
   s.empirePointsEarned += gained;
   s.prestigeCount += 1;
+  prestigeReset(s, now);
+  return gained;
+}
 
+/** Clears the current run: shared by Global Expansion and Reset Imperium. */
+export function prestigeReset(s: GameState, now: number) {
   s.cash = 0;
   s.dealers = createDealers();
   s.carModels = emptyCarCounts();
@@ -55,7 +60,6 @@ export function prestige(s: GameState, now: number): number {
   for (const m of Object.values(s.managers)) m.assignedTo = null;
 
   applyStartPerks(s);
-  return gained;
 }
 
 export function applyStartPerks(s: GameState) {

@@ -44,6 +44,7 @@ export function StatsView() {
     [t("stats.offline"), formatMoney(L.offlineEarned)],
     [t("stats.offlineEff"), t("stats.offlineEffValue", { pct: formatPercent(snap.gm.offline), hours: formatHours(snap.gm.offlineCapHours) })],
     [t("stats.expansions"), formatNumber(state.prestigeCount)],
+    [t("stats.imperiums"), formatNumber(state.imperiumCount)],
     [t("stats.ep"), formatNumber(state.empirePoints)],
     [t("stats.mostProduced"), mostProduced ? `${CAR_BY_ID[mostProduced.id].emoji} ${n.car(CAR_BY_ID[mostProduced.id])} (${formatNumber(mostProduced.n)})` : "—"],
     [t("stats.mostValuable"), mostValuable ? `${CAR_BY_ID[mostValuable.id].emoji} ${n.car(CAR_BY_ID[mostValuable.id])} (${formatMoney(mostValuable.v)})` : "—"],

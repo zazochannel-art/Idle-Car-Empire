@@ -1,6 +1,6 @@
 "use client";
 
-import { Car, Factory, Moon, Settings, Star, Sun, Sunset, SunMoon, TrendingUp } from "lucide-react";
+import { Car, Factory, Globe2, Moon, Settings, Star, Sun, Sunset, SunMoon, TrendingUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { TIME_MODES } from "@/components/map/lighting";
 import { formatMoney, formatNumber } from "@/game/format";
@@ -24,6 +24,7 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
   const owned = useGame((g) => plantsOf(g.state).length);
   const trucks = useGame((g) => g.state.chain.shipments.length);
   const ep = useGame((g) => g.state.empirePoints);
+  const stars = useGame((g) => g.state.stars);
   const setView = useUi((u) => u.setView);
   const { t } = useT();
 
@@ -45,8 +46,13 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
             <Pill icon={<Factory className="size-3.5 text-cyan-300" />} label={t("hud.factories")} value={`${owned} · 🚚${trucks}`} />
           </div>
           <button onClick={() => setView("prestige")} className="text-left">
-            <Pill icon={<Star className="size-3.5 fill-gold text-gold" />} label={t("hud.prestige")} value={formatNumber(ep)} gold />
+            <Pill icon={<Globe2 className="size-3.5 text-gold" />} label={t("hud.prestige")} value={formatNumber(ep)} gold />
           </button>
+          {stars > 0 && (
+            <button onClick={() => setView("prestige")} className="text-left">
+              <Pill icon={<Star className="size-3.5 fill-gold text-gold" />} label={t("imperium.stars")} value={formatNumber(stars)} gold />
+            </button>
+          )}
         </div>
         <div className="pointer-events-auto flex shrink-0 flex-col gap-1.5 md:flex-row">
           <TimeButton />

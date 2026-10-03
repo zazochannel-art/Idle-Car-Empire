@@ -131,11 +131,13 @@ export function PrestigeOverlay() {
   const count = useGame((g) => g.state.prestigeCount);
   const region = REGIONS[regionIndex(count)];
   const [points, setPoints] = useState<number | null>(null);
+  const [stars, setStars] = useState(false);
   useEffect(
     () =>
       uiEvents.on((e) => {
         if (e.type !== "prestige") return;
         setPoints(e.points);
+        setStars(!!e.stars);
         setTimeout(() => setPoints(null), 2600);
       }),
     [],
@@ -158,11 +160,11 @@ export function PrestigeOverlay() {
             className="text-center"
           >
             <motion.div animate={{ rotate: 360 }} transition={{ duration: 6, repeat: Infinity, ease: "linear" }} className="mx-auto text-8xl">
-              🌍
+              {stars ? "👑" : "🌍"}
             </motion.div>
-            <div className="mt-4 text-xs font-semibold uppercase tracking-[0.3em] text-gold/80">{t("nav.prestige")}</div>
+            <div className="mt-4 text-xs font-semibold uppercase tracking-[0.3em] text-gold/80">{stars ? t("imperium.title") : t("nav.prestige")}</div>
             <div className="mt-1 text-5xl font-black text-gradient-gold">
-              +{formatNumber(points)} {t("unit.ep")}
+              +{formatNumber(points)} {stars ? "⭐" : t("unit.ep")}
             </div>
             <div className="mt-3 text-2xl font-black">
               {region.emoji} {n.region(region)}

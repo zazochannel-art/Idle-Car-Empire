@@ -3,6 +3,7 @@ import { CARS, CAR_MODEL } from "../config/cars";
 import { MANAGERS, type ManagerConfig } from "../config/managers";
 import { EMPIRE_PERKS, OFFLINE, PRESTIGE } from "../config/prestige";
 import { REGIONS, regionIndex } from "../config/regions";
+import { starMods } from "./imperium";
 import { RESEARCH_BY_ID } from "../config/research";
 import type { CarId, Effect, GameState, PlantType } from "../types";
 import { cityEffects } from "./city";
@@ -74,8 +75,8 @@ export function applyEffect(m: GlobalMods, e: Effect) {
 }
 
 /** Strength of a manager's bonus at its current level, as a multiplier. */
-export function managerMult(cfg: ManagerConfig, level: number): number {
-  return 1 + cfg.bonus.pct * level;
+export function managerMult(cfg: ManagerConfig, level: number, power = 1): number {
+  return 1 + cfg.bonus.pct * level * power;
 }
 
 export function computeGlobalMods(s: GameState): GlobalMods {
@@ -106,6 +107,13 @@ export function computeGlobalMods(s: GameState): GlobalMods {
   // The region the empire has expanded to.
   REGIONS[regionIndex(s.prestigeCount)].effects.forEach((e) => applyEffect(m, e));
 
+  // ⭐ Star upgrades from Reset Imperium.
+  const star = starMods(s);
+  m.speed *= star.speed;
+  applyValue(m.value, star.value);
+  m.offline += star.offline * OFFLINE.baseEfficiency;
+  m.costMult *= star.cost;
+
   // Car model refinements (Cars tab).
   for (const car of CARS) {
     const lvl = s.carModels[car.id] ?? 0;
@@ -116,7 +124,7 @@ export function computeGlobalMods(s: GameState): GlobalMods {
   for (const cfg of MANAGERS) {
     const st = s.managers[cfg.id];
     if (cfg.scope !== "global" || !st?.hired || !st.assignedTo) continue;
-    const mult = managerMult(cfg, st.level);
+    const mult = managerMult(cfg, st.level, star.managers);
     switch (cfg.bonus.stat) {
       case "income":
         m.income *= mult;

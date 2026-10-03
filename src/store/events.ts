@@ -5,7 +5,7 @@ export type UiEvent =
   | { type: "sale"; plot: string; item: ItemId; count: number; amount: number }
   | { type: "firstCar"; plot: string; car: CarId }
   | { type: "toast"; tone: "success" | "gold" | "info" | "warn"; title: string; body?: string; icon?: string }
-  | { type: "prestige"; points: number };
+  | { type: "prestige"; points: number; stars?: boolean };
 
 type Listener = (e: UiEvent) => void;
 const listeners = new Set<Listener>();

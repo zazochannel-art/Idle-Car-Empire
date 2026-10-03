@@ -2,12 +2,15 @@
 
 import { Check, Globe2, Lock, Star } from "lucide-react";
 import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
+import { IMPERIUM, STAR_UPGRADES } from "@/game/config/imperium";
 import { EMPIRE_PERKS, PRESTIGE } from "@/game/config/prestige";
 import { REGIONS, regionIndex, type RegionConfig } from "@/game/config/regions";
 import type { Effect } from "@/game/types";
+import { canImperium, pendingStars, starCost, starLevel } from "@/game/engine/imperium";
 import { canPrestige, earningsForNextPoint, pendingPoints } from "@/game/engine/prestige";
 import { formatMoney, formatNumber, formatPercent } from "@/game/format";
 import type { MessageKey } from "@/i18n";
@@ -115,6 +118,8 @@ export function PrestigeView() {
         </div>
       </div>
 
+      <ImperiumSection />
+
       <Dialog open={confirm} onOpenChange={setConfirm}>
         <DialogContent>
           <div className="mb-3 text-5xl">🌍</div>
@@ -217,4 +222,103 @@ function effectText(e: Effect, t: (k: MessageKey, v?: Record<string, string | nu
     default:
       return "";
   }
+}
+
+/** Reset Imperium: the end-game reset for ⭐ Stars, and the Star upgrades shop. */
+function ImperiumSection() {
+  const state = useGame((g) => g.state);
+  const { imperium, buyStarUpgrade } = useGame.getState();
+  const [confirm, setConfirm] = useState(false);
+  const { t } = useT();
+  const ready = canImperium(state);
+  const stars = pendingStars(state);
+  const expansions = Math.min(state.prestigeCount, IMPERIUM.minExpansions);
+  const runPct = Math.min(100, (state.run.moneyEarned / IMPERIUM.minRunEarnings) * 100);
+
+  return (
+    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1b0f2e] via-[#100b1c] to-[#07080b] p-4 ring-1 ring-violet-400/30">
+      <div className="pointer-events-none absolute -left-16 -top-16 size-56 rounded-full bg-violet-500/20 blur-3xl" />
+      <div className="relative flex items-center gap-3">
+        <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-violet-500/15 text-3xl ring-1 ring-violet-300/40">👑</div>
+        <div className="min-w-0 flex-1">
+          <div className="text-base font-black">{t("imperium.title")}</div>
+          <div className="text-[11px] text-white/55">{t("imperium.subtitle")}</div>
+        </div>
+        <div className="text-right">
+          <div className="text-2xl font-black tabular-nums text-gold">⭐ {formatNumber(state.stars)}</div>
+          <div className="text-[10px] uppercase tracking-wider text-white/40">{t("imperium.stars")}</div>
+        </div>
+      </div>
+
+      <div className="relative mt-3 space-y-1.5 rounded-2xl bg-black/30 p-3 text-xs ring-1 ring-white/10">
+        <Req ok={state.prestigeCount >= IMPERIUM.minExpansions} label={t("imperium.req1", { done: expansions, total: IMPERIUM.minExpansions })} />
+        <Req ok={runPct >= 100} label={t("imperium.req2", { amount: formatMoney(IMPERIUM.minRunEarnings), pct: Math.floor(runPct) })} />
+        <div className="pt-1 text-white/50">{t("imperium.grants", { n: formatNumber(stars) })}</div>
+        <div className="text-[11px] text-white/40">{t("imperium.resets")}</div>
+        <Button variant={ready ? "gold" : "locked"} disabled={!ready} size="lg" className="mt-1 w-full" onClick={() => setConfirm(true)}>
+          👑 {t("imperium.button")}
+        </Button>
+      </div>
+
+      <div className="relative mt-3 space-y-2">
+        <div className="text-[11px] font-bold uppercase tracking-wider text-white/55">{t("imperium.shop")}</div>
+        {STAR_UPGRADES.map((u) => {
+          const lvl = starLevel(state, u.id);
+          const cost = starCost(state, u.id);
+          return (
+            <div key={u.id} className="flex items-center gap-3 rounded-2xl bg-white/[0.04] p-2.5 ring-1 ring-white/[0.07]">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/5 text-xl">{u.emoji}</span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="truncate text-sm font-bold">{t(`star.${u.id}` as MessageKey)}</span>
+                  <Badge variant="muted">
+                    {lvl}/{u.max}
+                  </Badge>
+                </div>
+                <div className="text-[11px] leading-snug text-white/50">{t(`starHint.${u.id}` as MessageKey, { pct: formatPercent(u.step), total: formatPercent(u.step * lvl) })}</div>
+              </div>
+              {cost === null ? (
+                <Badge variant="gold">MAX</Badge>
+              ) : (
+                <Button size="sm" variant={state.stars >= cost ? "gold" : "locked"} disabled={state.stars < cost} onClick={() => buyStarUpgrade(u.id)}>
+                  ⭐ {cost}
+                </Button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <Dialog open={confirm} onOpenChange={setConfirm}>
+        <DialogContent>
+          <div className="mb-3 text-5xl">👑</div>
+          <DialogTitle>{t("imperium.title")}</DialogTitle>
+          <DialogDescription className="mt-2">{t("imperium.confirm", { n: formatNumber(stars) })}</DialogDescription>
+          <div className="mt-5 flex gap-2">
+            <Button variant="secondary" className="flex-1" onClick={() => setConfirm(false)}>
+              {t("prestige.notYet")}
+            </Button>
+            <Button
+              variant="gold"
+              className="flex-1"
+              onClick={() => {
+                setConfirm(false);
+                imperium();
+              }}
+            >
+              {t("imperium.button")}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function Req({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <div className={cn("flex items-center gap-2", ok ? "text-emerald-300" : "text-white/60")}>
+      {ok ? <Check className="size-3.5" /> : <Lock className="size-3.5" />} {label}
+    </div>
+  );
 }
