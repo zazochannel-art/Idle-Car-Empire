@@ -145,7 +145,8 @@ export function materialKit(T: Three): MaterialKit {
       return m;
     },
     primer: new T.MeshStandardMaterial({ color: "#a7adb5", metalness: 0.35, roughness: 0.55 }),
-    glass: new T.MeshPhysicalMaterial({ color: "#0d1622", metalness: 0.1, roughness: 0.04, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 1.4 }),
+    // tinted glass that mirrors the sky like real windows do
+    glass: new T.MeshPhysicalMaterial({ color: "#2a3b4d", metalness: 0.35, roughness: 0.03, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 2.1 }),
     tyre: new T.MeshStandardMaterial({ color: "#16181b", roughness: 0.92, metalness: 0 }),
     rim: new T.MeshStandardMaterial({ color: "#c9ced6", metalness: 0.95, roughness: 0.22 }),
     rimBlack: new T.MeshStandardMaterial({ color: "#17191c", metalness: 0.6, roughness: 0.35 }),
@@ -493,6 +494,25 @@ export function buildCar(T: Three, kit: MaterialKit, look: CarLook): THREE_NS.Gr
   for (const side of [-1, 1]) {
     const p = (u: number, h: number) => new T.Vector3(x(u), h, side * halfW(u) * 0.94);
     car.add(strut(T, p(sp.ws + 0.01, belt(sp.ws) + 0.005), p(sp.rw - 0.01, belt(sp.rw) + 0.005), 0.012, sp.chrome ? kit.chrome : kit.trim));
+  }
+
+  // door shut lines: thin dark seams following the flank, clear of the wheel arches
+  if (st >= 6) {
+    const fourDoor = sp.re - sp.rs > 0.3;
+    const front = Math.max(sp.ws + 0.012, fu + (archR + 0.04) / L);
+    const back = Math.min(fourDoor ? sp.re - 0.01 : midU + 0.06, ru - (archR + 0.04) / L);
+    const seams = fourDoor ? [front, midU, back] : [front, back];
+    const seamM = kit.trim;
+    for (const side of [-1, 1])
+      for (const u of seams) {
+        const yTop = belt(u) - 0.02;
+        const yBot = Math.max(bottom(u) + 0.06, sp.clear + 0.08);
+        const n = 6;
+        for (let k = 0; k < n; k++) {
+          const y = yBot + ((yTop - yBot) * (k + 0.5)) / n;
+          car.add(box(T, 0.008, (yTop - yBot) / n + 0.004, 0.006, seamM, x(u), y, side * (sideZ(u, y) + 0.001)));
+        }
+      }
   }
 
   // engine (visible before the hood goes on at final assembly)

@@ -35,6 +35,7 @@ export interface BuildCtx {
   models: typeof import("./car-models");
   industrial: typeof import("./industrial-models");
   buildings: typeof import("./building-models");
+  homes: typeof import("./home-models");
 }
 
 interface Job {
@@ -43,6 +44,55 @@ interface Job {
   k: number;
   shadow: boolean;
   build: Build;
+}
+
+/**
+ * An outdoor sky for reflections: blue zenith, a bright hazy horizon, darker
+ * ground, and a hot sun where the map's sun is. Paint and glass then mirror a
+ * real sky (the horizon line on car flanks, the sky in office glass) instead
+ * of a studio.
+ */
+function outdoorEnvironment(T: Three) {
+  const env = new T.Scene();
+  const c = document.createElement("canvas");
+  c.width = 256;
+  c.height = 128;
+  const g = c.getContext("2d")!;
+  const sky = g.createLinearGradient(0, 0, 0, c.height);
+  sky.addColorStop(0, "#3f7fc4");
+  sky.addColorStop(0.32, "#8dbbe6");
+  sky.addColorStop(0.49, "#eef4f8");
+  sky.addColorStop(0.51, "#8d8a7c");
+  sky.addColorStop(0.62, "#5f6656");
+  sky.addColorStop(1, "#3b4036");
+  g.fillStyle = sky;
+  g.fillRect(0, 0, c.width, c.height);
+  // a few soft clouds
+  for (let i = 0; i < 14; i++) {
+    const x = ((i * 97) % 256) + 8;
+    const y = 18 + ((i * 37) % 36);
+    const r = 10 + ((i * 53) % 18);
+    const cl = g.createRadialGradient(x, y, 1, x, y, r);
+    cl.addColorStop(0, "rgba(255,255,255,0.55)");
+    cl.addColorStop(1, "rgba(255,255,255,0)");
+    g.fillStyle = cl;
+    g.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  const tex = new T.CanvasTexture(c);
+  tex.colorSpace = T.SRGBColorSpace;
+  const dome = new T.Mesh(new T.SphereGeometry(10, 48, 24), new T.MeshBasicMaterial({ map: tex, side: T.BackSide }));
+  env.add(dome);
+  // the sun (HDR: far brighter than the sky) and a broad skylight overhead
+  const sun = new T.Mesh(new T.SphereGeometry(0.7, 16, 8), new T.MeshBasicMaterial());
+  sun.material.color.setScalar(40);
+  sun.position.set(-3, 5, 2.2).normalize().multiplyScalar(9);
+  env.add(sun);
+  const panel = new T.Mesh(new T.PlaneGeometry(9, 9), new T.MeshBasicMaterial({ side: T.DoubleSide }));
+  panel.material.color.setScalar(1.6);
+  panel.rotation.x = Math.PI / 2;
+  panel.position.y = 8;
+  env.add(panel);
+  return env;
 }
 
 class SpriteFactory {
@@ -106,10 +156,10 @@ class SpriteFactory {
   private async init() {
     try {
       const T = await import("three");
-      const { RoomEnvironment } = await import("three/addons/environments/RoomEnvironment.js");
       const models = await import("./car-models");
       const industrial = await import("./industrial-models");
       const buildings = await import("./building-models");
+      const homes = await import("./home-models");
       const canvas = document.createElement("canvas");
       const renderer = new T.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true, powerPreference: "low-power" });
       renderer.setPixelRatio(1);
@@ -122,8 +172,8 @@ class SpriteFactory {
 
       const scene = new T.Scene();
       const pmrem = new T.PMREMGenerator(renderer);
-      scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-      scene.environmentIntensity = 1.0;
+      scene.environment = pmrem.fromScene(outdoorEnvironment(T), 0.03).texture;
+      scene.environmentIntensity = 1.2;
 
       // the map's sun: from the upper left, shadows fall to the lower right
       const sun = new T.DirectionalLight("#fff4e2", 2.4);
@@ -179,7 +229,7 @@ class SpriteFactory {
       const kit = models.materialKit(T);
       // shared materials survive; everything a build creates is disposed after rendering
       this.keep = new Set(Object.values(kit).filter((m): m is THREE_NS.Material => m instanceof T.Material));
-      this.ctx = { kit, models, industrial, buildings };
+      this.ctx = { kit, models, industrial, buildings, homes };
       this.kick();
     } catch {
       this.failed = true;
