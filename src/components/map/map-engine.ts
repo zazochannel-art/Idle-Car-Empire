@@ -1,6 +1,7 @@
 // Runs the Empire Map: owns the canvas, camera, scene and traffic, renders
 // every animation frame and turns taps into selections. React only feeds it
 // state and listens to its callbacks.
+import { seasonAt } from "@/game/engine/season";
 import { ROAD_STEP, WORLD, WORLD_MAP, zoneOfBlock, type Plot } from "@/game/city/layout";
 import type { ZoneId } from "@/game/types";
 import { attachControls, Camera } from "./camera";
@@ -65,6 +66,7 @@ export class MapEngine {
   ) {
     this.ctx = canvas.getContext("2d", { alpha: false })!;
     this.painter = new Painter(this.ctx);
+    this.painter.season = seasonAt(Date.now());
     this.ro = new ResizeObserver(() => this.resize());
     this.ro.observe(canvas);
     this.resize();

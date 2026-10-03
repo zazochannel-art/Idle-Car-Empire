@@ -376,6 +376,10 @@ export interface GameState {
   history: { t: number; income: number }[];
   /** Customer contracts: one offer or one running contract at a time. */
   contracts: ContractsState;
+  /** Daily login streak (1-7) and whether today's reward was taken. */
+  login: { day: string; streak: number; claimed: boolean };
+  /** Rival companies the player has overtaken. */
+  rivalsBeaten: string[];
   /** Tutorial tips the player has dismissed. */
   tips: string[];
   logistics: LogisticsState;

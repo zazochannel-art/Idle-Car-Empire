@@ -10,7 +10,8 @@ import { createInitialState } from "./engine/state";
 import { tick } from "./engine/tick";
 import { decodeSave, encodeSave, migrate } from "./save/serialize";
 
-const T0 = Date.UTC(2026, 0, 1, 12);
+// outside every season (seasons add income) and outside market events
+const T0 = Date.UTC(2026, 2, 1, 12);
 
 /** Garages are a side business now: build one on the first free town plot. */
 const GAR = WORLD_MAP.plots.find((p) => p.zone === "town" && p.kind === "plot" && !p.starter && !p.big)!.id;

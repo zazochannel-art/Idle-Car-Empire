@@ -9,6 +9,8 @@ import * as Ch from "./engine/chain";
 import * as C from "./engine/city";
 import * as D from "./engine/design";
 import * as K from "./engine/contracts";
+import * as R from "./engine/retention";
+import { seasonAt } from "./engine/season";
 import * as Ev from "./engine/events";
 import * as I from "./engine/imperium";
 import * as L from "./engine/logistics";
@@ -25,7 +27,8 @@ import { decodeSave, encodeSave, migrate } from "./save/serialize";
 import { decodeTransfer, transferCodeIn, transferLink } from "./save/transfer";
 import type { GameEvent, GameState, PlantType } from "./types";
 
-const T0 = Date.UTC(2026, 0, 1, 12);
+// outside every season (seasons add income) and outside market events
+const T0 = Date.UTC(2026, 2, 1, 12);
 const freePlots = () => WORLD_MAP.plots.filter((p) => p.zone === "town" && p.kind === "plot" && !p.starter && !p.big).map((p) => p.id);
 
 /** Runs the game in small steps, as the store does. */
@@ -588,5 +591,47 @@ describe("late-game depth", () => {
     K.refreshContracts(s, T0 + 10 * 60_000, snap);
     K.acceptContract(s, T0 + 10 * 60_000);
     expect(K.refreshContracts(s, T0 + 10 * 60_000 + 31 * 60_000, snap)).toBe("expired");
+  });
+});
+
+describe("coming back", () => {
+  it("counts a daily login streak and restarts it after a missed day", () => {
+    const s = createInitialState(T0);
+    const day = 86_400_000;
+    const t = new Date(2026, 9, 1, 12).getTime();
+    expect(R.updateLogin(s, t)).toBe(true);
+    expect(s.login.streak).toBe(1);
+    expect(R.updateLogin(s, t + 1000)).toBe(false);
+    expect(R.claimLogin(s, snapshot(s))).toBe(true);
+    expect(R.claimLogin(s, snapshot(s))).toBe(false);
+    R.updateLogin(s, t + day);
+    expect(s.login.streak).toBe(2);
+    R.updateLogin(s, t + 3 * day);
+    expect(s.login.streak).toBe(1);
+    // day 7 wraps back to day 1
+    s.login.streak = 7;
+    R.updateLogin(s, t + 4 * day);
+    expect(s.login.streak).toBe(1);
+  });
+
+  it("pays Stars for overtaking rivals, once", () => {
+    const s = createInitialState(T0);
+    expect(R.checkRivals(s, T0)).toEqual([]);
+    s.lifetime.moneyEarned = 5e9;
+    expect(R.checkRivals(s, T0).map((r) => r.id)).toEqual(["volta"]);
+    expect(s.stars).toBe(1);
+    expect(R.checkRivals(s, T0)).toEqual([]);
+    expect(R.leaderboard(s, T0)[0].id).toBe("sakura");
+  });
+
+  it("has seasons with a small income bonus", () => {
+    expect(seasonAt(new Date(2026, 9, 20).getTime())).toBe("halloween");
+    expect(seasonAt(new Date(2026, 11, 24).getTime())).toBe("winter");
+    expect(seasonAt(new Date(2026, 6, 1).getTime())).toBeNull();
+    const s = createInitialState(T0);
+    s.lastActiveAt = new Date(2026, 6, 1).getTime();
+    const base = snapshot(s).gm.income;
+    s.lastActiveAt = new Date(2026, 9, 20).getTime();
+    expect(snapshot(s).gm.income).toBeGreaterThan(base * 1.09);
   });
 });
