@@ -6,8 +6,9 @@
 import { BLOCKS, NODES, ROAD_STEP, segmentOpen, type Entry } from "@/game/city/layout";
 import type { ZoneId } from "@/game/types";
 import { sx, sy, type Painter } from "./iso";
-import { CAR_COLORS, CAR_MODELS, DIR_YAW, drawCarrier, drawModel, drawTruck, type CarModel, type Dir } from "./vehicles";
+import { CAR_COLORS, CAR_MODELS, drawCarrier, drawModel, drawTruck, type CarModel, type Dir } from "./vehicles";
 import { trafficLight } from "./props";
+import { LanePath } from "./lane-path";
 
 export interface Site {
   id: string;
@@ -47,6 +48,10 @@ export interface ShipView {
 
 interface Ship extends ShipView {
   path: Pt[];
+  /** The route the other way, and both as smooth driving lines. */
+  rev: Pt[];
+  lane: LanePath;
+  laneBack: LanePath;
   len: number;
   /** Local clock, resynced with the engine when it drifts. */
   lt: number;
@@ -59,6 +64,8 @@ interface Ship extends ShipView {
 }
 
 const VEHICLE_SCALE = { van: 0.8, truck: 1, semi: 1.12, trailer: 1.25, carrier: 1 };
+/** Axle spread (tiles): how far the body swings out through a bend. */
+const WHEELBASE = { car: 0.3, van: 0.34, truck: 0.42, semi: 0.55, trailer: 0.65, carrier: 0.6 };
 /** Matches DOCK_TIME in config/chain.ts: loading and unloading. */
 const DOCK = 2;
 
@@ -88,7 +95,7 @@ export interface Agent {
   /** Current speed (eases toward the cruising speed). */
   cur: number;
   model: CarModel;
-  /** Drawn position: trails the exact one a little so turns are rounded. */
+  /** Drawn position: on the smooth driving line through the bends. */
   rx: number;
   ry: number;
   braking: boolean;
@@ -97,15 +104,9 @@ export interface Agent {
   yaw?: number;
   steer?: number;
   odo?: number;
-}
-
-/** Turns `cur` toward `target` (radians) at `rate` rad/s; returns the new angle and the steering side. */
-function turnToward(cur: number | undefined, target: number, rate: number, dt: number): [number, number] {
-  if (cur === undefined) return [target, 0];
-  let d = target - cur;
-  d = Math.atan2(Math.sin(d), Math.cos(d));
-  const step = Math.max(-rate * dt, Math.min(rate * dt, d));
-  return [cur + step, Math.abs(d) > 0.12 ? Math.sign(d) : 0];
+  /** The smooth driving line of `path` (rebuilt when the path changes). */
+  lane?: LanePath;
+  laneFor?: Pt[];
 }
 
 interface Walker {
@@ -309,8 +310,11 @@ export class Traffic {
         continue;
       }
       const path = old?.path ?? this.shipPath(v.from, v.to);
+      const rev = old?.rev ?? [...path].reverse();
       const len = path.reduce((a, q, i) => (i ? a + Math.abs(q.x - path[i - 1].x) + Math.abs(q.y - path[i - 1].y) : 0), 0);
-      this.ships.set(v.id, { ...v, path, len, lt: v.t, x: path[0].x, y: path[0].y, dir: 0, odo: 0, yaw: old?.yaw });
+      const lane = old?.lane ?? new LanePath(path);
+      const laneBack = old?.laneBack ?? new LanePath(rev);
+      this.ships.set(v.id, { ...v, path, rev, lane, laneBack, len, lt: v.t, x: path[0].x, y: path[0].y, dir: 0, odo: old?.odo ?? 0, yaw: old?.yaw });
     }
     for (const id of this.ships.keys()) if (!seen.has(id)) this.ships.delete(id);
   }
@@ -335,34 +339,30 @@ export class Traffic {
       sh.lt = Math.min(sh.dur, sh.lt + dt);
       const drive = Math.max(0.1, sh.dur - DOCK);
       const f = Math.max(0, Math.min(1, (sh.lt - DOCK / 2) / drive));
-      let d = (sh.back ? 1 - f : f) * sh.len;
+      // the trip back runs the route reversed, in the other lane
+      const path = sh.back ? sh.rev : sh.path;
+      let d = f * sh.len;
       let i = 0;
-      while (i < sh.path.length - 2) {
-        const seg = Math.abs(sh.path[i + 1].x - sh.path[i].x) + Math.abs(sh.path[i + 1].y - sh.path[i].y);
+      while (i < path.length - 2) {
+        const seg = Math.abs(path[i + 1].x - path[i].x) + Math.abs(path[i + 1].y - path[i].y);
         if (d <= seg) break;
         d -= seg;
         i++;
       }
-      const p0 = sh.path[i];
-      const p1 = sh.path[i + 1] ?? p0;
+      const p0 = path[i];
+      const p1 = path[i + 1] ?? p0;
       const seg = Math.abs(p1.x - p0.x) + Math.abs(p1.y - p0.y) || 1;
       const k = Math.min(1, d / seg);
-      let dx = Math.sign(p1.x - p0.x);
-      let dy = Math.sign(p1.y - p0.y);
-      if (sh.back) {
-        dx = -dx;
-        dy = -dy;
-      }
+      const dx = Math.sign(p1.x - p0.x);
+      const dy = Math.sign(p1.y - p0.y);
       sh.dir = dx > 0 ? 0 : dx < 0 ? 2 : dy > 0 ? 1 : 3;
-      // keep right, except on the driveways at either end
-      const drive2 = i === 0 || i >= sh.path.length - 2;
-      const lane = drive2 ? 0 : 0.2;
-      const nx = p0.x + (p1.x - p0.x) * k - dy * lane;
-      const ny = p0.y + (p1.y - p0.y) * k + dx * lane;
-      sh.odo += Math.abs(nx - sh.x) + Math.abs(ny - sh.y);
-      sh.x = nx;
-      sh.y = ny;
-      [sh.yaw, sh.steer] = turnToward(sh.yaw, DIR_YAW[sh.dir], 3.2, dt);
+      const lane = sh.back ? sh.laneBack : sh.lane;
+      const pose = lane.pose(lane.along(i, k), WHEELBASE[sh.vehicle]);
+      sh.odo += Math.hypot(pose.x - sh.x, pose.y - sh.y);
+      sh.x = pose.x;
+      sh.y = pose.y;
+      sh.yaw = pose.yaw;
+      sh.steer = pose.curv;
     }
   }
 
@@ -452,7 +452,6 @@ export class Traffic {
       const dx = Math.sign(p1.x - p0.x);
       const dy = Math.sign(p1.y - p0.y);
       a.dir = dx > 0 ? 0 : dx < 0 ? 2 : dy > 0 ? 1 : 3;
-      [a.yaw, a.steer] = turnToward(a.yaw, DIR_YAW[a.dir], 4.5, dt);
       a.odo = (a.odo ?? 0) + a.cur * dt;
       // keep right: offset perpendicular to the direction of travel
       const lane = 0.2;
@@ -461,14 +460,17 @@ export class Traffic {
       const ly = onDriveway ? 0 : dx * lane;
       a.x = p0.x + (p1.x - p0.x) * t + lx;
       a.y = p0.y + (p1.y - p0.y) * t + ly;
-      const k = Math.min(1, dt * 9);
-      if (Math.abs(a.rx - a.x) + Math.abs(a.ry - a.y) > 1.5) {
-        a.rx = a.x;
-        a.ry = a.y;
-      } else {
-        a.rx += (a.x - a.rx) * k;
-        a.ry += (a.y - a.ry) * k;
+      // drawn on the smooth driving line: the body follows the bend
+      if (a.laneFor !== a.path || !a.lane) {
+        a.lane = new LanePath(a.path);
+        a.laneFor = a.path;
       }
+      const wb = a.kind === "carrier" ? WHEELBASE.carrier : a.kind === "truck" ? WHEELBASE.van : WHEELBASE.car;
+      const pose = a.lane.pose(a.lane.along(a.seg, t), wb);
+      a.rx = pose.x;
+      a.ry = pose.y;
+      a.yaw = pose.yaw;
+      a.steer = pose.curv;
     }
     this.clock += dt;
     this.agents = this.agents.filter((a) => !(a.fading && a.alpha <= 0));
