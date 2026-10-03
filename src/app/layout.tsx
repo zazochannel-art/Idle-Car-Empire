@@ -3,11 +3,15 @@ import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 
+const base = process.env.PAGES_BASE_PATH ?? "";
+
 export const metadata: Metadata = {
   title: "Idle Car Empire",
   description: "Build a global car empire — from a tiny garage to hypercars and future cars.",
   applicationName: "Idle Car Empire",
   appleWebApp: { capable: true, title: "Car Empire", statusBarStyle: "black-translucent" },
+  // metadata icons are not prefixed with basePath, so add it here
+  icons: { icon: `${base}/icon-192.png`, apple: `${base}/apple-touch-icon.png` },
 };
 
 export const viewport: Viewport = {

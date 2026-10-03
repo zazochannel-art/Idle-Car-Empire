@@ -4,6 +4,7 @@ import { Lock } from "lucide-react";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { formatDuration, formatMoney, formatNumber } from "@/game/format";
 import { useT } from "@/i18n/use-t";
+import { cue } from "@/lib/feedback";
 import { cn } from "@/lib/utils";
 import { useGame } from "@/store/game-store";
 
@@ -54,7 +55,8 @@ export function CostButton({
       size={size}
       onClick={(e) => {
         e.stopPropagation();
-        if (affordable) onBuy();
+        if (!affordable) return cue("error");
+        if (onBuy() !== false) cue("buy");
       }}
       aria-disabled={!affordable}
       className={cn("max-w-full flex-col gap-0 whitespace-normal leading-tight", size === "sm" ? "h-auto py-1.5" : "h-auto py-2", className)}

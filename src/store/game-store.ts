@@ -77,6 +77,7 @@ interface GameStore {
   imperium: () => void;
   buyStarUpgrade: (id: StarUpgradeId) => boolean;
   setBuyAmount: (a: BuyAmount) => void;
+  setPref: (key: "lowGraphics" | "sound" | "haptics", on: boolean) => void;
   setLang: (lang: Lang) => void;
   exportSave: () => string;
   importSave: (text: string) => boolean;
@@ -305,6 +306,13 @@ export const useGame = create<GameStore>((set, get) => {
       const ok = act((s) => buyStarUpgrade(s, id));
       if (ok) persist(true);
       return ok;
+    },
+    setPref: (key, on) => {
+      act((s) => {
+        s.settings[key] = on;
+        return true;
+      });
+      persist(true);
     },
     setBuyAmount: (a) => {
       act((s) => {

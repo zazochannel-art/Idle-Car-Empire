@@ -225,6 +225,12 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
           </div>
         </div>
 
+        <div className="mt-4 space-y-1.5">
+          <Toggle label={t("settings.lowGraphics")} hint={t("settings.lowGraphicsHint")} k="lowGraphics" />
+          <Toggle label={t("settings.sound")} k="sound" />
+          <Toggle label={t("settings.haptics")} k="haptics" />
+        </div>
+
         <div className="mt-4 space-y-2">
           <Button
             variant="secondary"
@@ -284,5 +290,26 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function Toggle({ label, hint, k }: { label: string; hint?: string; k: "lowGraphics" | "sound" | "haptics" }) {
+  const on = useGame((g) => g.state.settings[k]);
+  const setPref = useGame((g) => g.setPref);
+  return (
+    <button
+      role="switch"
+      aria-checked={on}
+      onClick={() => setPref(k, !on)}
+      className="flex w-full items-center gap-3 rounded-xl bg-white/[0.04] px-3 py-2.5 text-left ring-1 ring-white/10"
+    >
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold">{label}</span>
+        {hint && <span className="block text-[11px] text-white/45">{hint}</span>}
+      </span>
+      <span className={cn("relative h-6 w-10 shrink-0 rounded-full transition", on ? "bg-emerald-500" : "bg-white/15")}>
+        <span className={cn("absolute top-0.5 size-5 rounded-full bg-white shadow transition-all", on ? "left-[1.125rem]" : "left-0.5")} />
+      </span>
+    </button>
   );
 }

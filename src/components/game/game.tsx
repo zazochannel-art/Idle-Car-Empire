@@ -34,6 +34,8 @@ import { PrestigeView } from "../views/prestige-view";
 import { ResearchView } from "../views/research-view";
 import { StatsView } from "../views/stats-view";
 import { Coach } from "./coach";
+import { FeedbackBridge } from "./feedback-bridge";
+import { ServiceWorker } from "./service-worker";
 import { goalText, runGoal } from "./goals";
 import { Hud } from "./hud";
 import { OfflineDialog, PrestigeOverlay, SettingsDialog, Toasts } from "./overlays";
@@ -164,6 +166,8 @@ function Shell() {
       <FirstCarOverlay />
 
       <Toasts />
+      <FeedbackBridge />
+      <ServiceWorker />
       <OfflineDialog />
       <PrestigeOverlay />
       <SettingsDialog open={settings} onOpenChange={setSettings} />

@@ -9,6 +9,8 @@ const nextConfig: NextConfig = {
   // any host can serve. Supabase, when configured, is called from the browser.
   output: "export",
   basePath,
+  // the service worker registration needs the prefix on the client
+  env: { NEXT_PUBLIC_BASE_PATH: basePath },
   images: { unoptimized: true },
   trailingSlash: true,
 };

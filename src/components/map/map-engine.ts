@@ -29,6 +29,9 @@ export class MapEngine {
   private dpr = 1;
   /** Lowered automatically when the device can't hold a smooth frame rate. */
   private maxDpr = 2;
+  /** Battery saver: 1× resolution, 30 FPS, half the traffic, no clouds or sea shimmer. */
+  private low = false;
+  private skip = 0;
   private slow = { frames: 0, time: 0 };
   private scene: Drawable[] = [];
   private unlocked = new Set<ZoneId>();
@@ -131,6 +134,11 @@ export class MapEngine {
     this.last = performance.now();
     const loop = (now: number) => {
       if (!this.running) return;
+      // low graphics: draw every other frame (~30 FPS)
+      if (this.low && (this.skip = this.skip ^ 1)) {
+        this.raf = requestAnimationFrame(loop);
+        return;
+      }
       const dt = Math.min(0.1, (now - this.last) / 1000);
       this.last = now;
       this.render(dt);
@@ -138,6 +146,14 @@ export class MapEngine {
       this.raf = requestAnimationFrame(loop);
     };
     this.raf = requestAnimationFrame(loop);
+  }
+
+  setLowGraphics(on: boolean) {
+    if (this.low === on) return;
+    this.low = on;
+    this.traffic.density = on ? 0.5 : 1;
+    this.maxDpr = on ? 1 : 2;
+    this.resize();
   }
 
   stop() {
@@ -326,7 +342,7 @@ export class MapEngine {
 
   /** Drops render resolution step by step while frames stay slow (< ~45 FPS). */
   private adaptQuality(dt: number) {
-    if (this.dpr <= 1 || document.hidden) return;
+    if (this.low || this.dpr <= 1 || document.hidden) return;
     const s = this.slow;
     s.frames++;
     s.time += dt;
@@ -405,7 +421,7 @@ export class MapEngine {
     ctx.strokeStyle = "rgba(125,211,252,0.12)";
     ctx.lineWidth = 2;
     const view = cam.view();
-    for (let i = 0; i < 18; i++) {
+    for (let i = 0; i < (this.low ? 0 : 18); i++) {
       const wx = view[0] + ((i * 397 + this.t * 8) % (view[2] - view[0] + 1));
       const wy = view[1] + ((i * 211) % (view[3] - view[1] + 1));
       ctx.beginPath();
@@ -470,7 +486,7 @@ export class MapEngine {
       }
     }
     drawFog(p, this.unlocked, this.t);
-    this.drawClouds();
+    if (!this.low) this.drawClouds();
 
     // labels and pops in screen pixels
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
