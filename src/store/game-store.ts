@@ -9,6 +9,8 @@ import { RESEARCH_BY_ID } from "@/game/config/research";
 import * as A from "@/game/engine/actions";
 import * as Ch from "@/game/engine/chain";
 import * as D from "@/game/engine/design";
+import * as L from "@/game/engine/logistics";
+import type { LogisticsUpgrade } from "@/game/config/logistics";
 import * as C from "@/game/engine/city";
 import { STRUCTURE_BY_ID } from "@/game/config/city";
 import { PLANT_LEVELS } from "@/game/config/chain";
@@ -51,6 +53,8 @@ interface GameStore {
   buyDealer: (id: DealerId) => boolean;
   upgradeDealer: (id: DealerId) => boolean;
   upgradeCarModel: (id: CarId) => boolean;
+  buyLogistics: (id: LogisticsUpgrade) => boolean;
+  buyTransportTier: () => boolean;
   developDesign: (id: CarId, option: DesignOption) => boolean;
   renameDesign: (id: CarId, name: string) => void;
   setDesignColor: (id: CarId, color: string) => void;
@@ -221,6 +225,8 @@ export const useGame = create<GameStore>((set, get) => {
     },
     upgradeDealer: (id) => act((s) => A.upgradeDealer(s, id)),
     upgradeCarModel: (id) => act((s) => A.upgradeCarModel(s, id)),
+    buyLogistics: (id) => act((s) => L.buyLogistics(s, id, get().snap.gm.costMult)),
+    buyTransportTier: () => act((s) => L.buyTier(s, get().snap.gm.costMult)),
     developDesign: (id, option) =>
       act((s) => D.develop(s, id, option, D.developCost(Ch.carBaseValue(s, CAR_BY_ID[id], get().snap.gm), s.designs[id], option))),
     renameDesign: (id, name) => {

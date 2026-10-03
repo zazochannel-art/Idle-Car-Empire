@@ -70,7 +70,11 @@ npm run simulate -- 3   # balance bot: plays 3 hours and logs milestones
    car classes (Economy, Sport, Premium, Luxury, Supercar/Hypercar, Global
    takes all): its speciality sells for +20% and 1.5× faster, so transporters
    take every model to the dealer that pays most for it.
-8. **Grow the empire.** You can also:
+8. **Logistics.** The Logistics Center upgrades every truck, dock and
+   warehouse at once (speed, load, loading time, storage, extra trucks) and
+   climbs the transport ladder Trucks → Rail → Port → Export: faster, bigger
+   loads, then higher prices abroad for parts and cars.
+9. **Grow the empire.** You can also:
    - unlock districts for more plots;
    - hire **managers** (one per plant);
    - **research** with points from every part and car;

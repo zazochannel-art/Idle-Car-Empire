@@ -29,6 +29,7 @@ export type View =
   | "prestige"
   | "build"
   | "upgrade"
+  | "logistics"
   | "menu";
 
 /** Requests for the map camera, consumed by the map component. */

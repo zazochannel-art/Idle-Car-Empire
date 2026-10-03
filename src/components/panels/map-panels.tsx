@@ -415,6 +415,7 @@ export function MenuPanel({ onSettings }: { onSettings: () => void }) {
     { icon: "📊", label: t("nav.stats"), go: () => setView("stats") },
     { icon: "👔", label: t("nav.managers"), go: () => setView("managers") },
     { icon: "🏪", label: t("nav.dealers"), go: () => setView("dealers") },
+    { icon: "🚚", label: t("nav.logistics"), go: () => setView("logistics") },
     { icon: "⚙️", label: t("menu.settings"), go: onSettings },
   ];
   return (

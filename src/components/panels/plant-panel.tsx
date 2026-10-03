@@ -148,7 +148,7 @@ export function PlantPanel({ id }: { id: string }) {
         <div className="mb-2 flex items-center justify-between">
           <span className="text-[11px] font-bold uppercase tracking-wider text-white/55">{t("plant.transport")}</span>
           <span className="flex items-center gap-1 text-[11px] tabular-nums text-white/60">
-            <Truck className="size-3.5" /> {t("plant.trucks", { busy, n: trucksOf(b), vehicle: t(`vehicle.${st.vehicle}`), cap: st.capacity })}
+            <Truck className="size-3.5" /> {t("plant.trucks", { busy, n: st.trucks, vehicle: t(`vehicle.${st.vehicle}`), cap: st.capacity })}
           </span>
         </div>
         <p className="text-[11px] text-white/55">{cfg.item ? (hasAssembly ? t("route.useHint") : t("route.useNoAssembly")) : t("plant.carsTo")}</p>
@@ -161,7 +161,7 @@ export function PlantPanel({ id }: { id: string }) {
         <UpgradeRow
           icon="🏗️"
           title={b.level < PLANT_LEVELS.length ? t("plant.levelUp", { name: t(`plantLevel.${b.level + 1}` as MessageKey) }) : t("plant.levelMax")}
-          detail={b.level < PLANT_LEVELS.length ? t("plant.levelDetail", { a: PLANT_LEVELS[b.level - 1].lines, b: PLANT_LEVELS[b.level].lines, n: Math.max(trucksOf(b), PLANT_TRUCKS[b.level]) }) : ""}
+          detail={b.level < PLANT_LEVELS.length ? t("plant.levelDetail", { a: PLANT_LEVELS[b.level - 1].lines, b: PLANT_LEVELS[b.level].lines, n: Math.max(trucksOf(b), PLANT_TRUCKS[b.level]) + st.trucks - trucksOf(b) }) : ""}
           cost={levelCost(b, gm)}
           onBuy={() => g.plantLevel(id)}
           gold
