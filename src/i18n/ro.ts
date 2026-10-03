@@ -520,7 +520,7 @@ export const ro: Record<MessageKey, string> = {
   "line.inStock": "{n} gata",
   "cars.title": "Modele și design",
   "cars.subtitle": "{n} din {total} platforme deblocate. Dă-le nume modelelor, vopsește-le și dezvoltă-le opțiunile.",
-  "class.economy": "Economy",
+  "class.economy": "Economic",
   "class.sport": "Sport",
   "class.premium": "Premium",
   "class.luxury": "Lux",

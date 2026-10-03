@@ -158,14 +158,14 @@ function RegionRoute() {
   return (
     <div className="glass rounded-2xl p-4">
       <div className="mb-3 text-sm font-semibold">{t("region.title")}</div>
-      <div className="flex items-center gap-1 overflow-x-auto pb-1">
+      <div className="flex items-center">
         {REGIONS.map((r, i) => (
-          <div key={r.id} className="flex shrink-0 items-center gap-1">
-            {i > 0 && <span className={cn("h-0.5 w-3", i <= at ? "bg-gold" : "bg-white/15")} />}
+          <div key={r.id} className={cn("flex items-center", i > 0 && "flex-1")}>
+            {i > 0 && <span className={cn("h-0.5 min-w-1 flex-1", i <= at ? "bg-gold" : "bg-white/15")} />}
             <div
               title={n.region(r)}
               className={cn(
-                "flex size-10 items-center justify-center rounded-xl text-xl ring-1",
+                "flex size-9 shrink-0 items-center justify-center rounded-xl text-lg ring-1",
                 i === at ? "bg-gold/20 ring-gold" : i < at ? "bg-gold/[0.07] ring-gold/30" : "bg-white/[0.03] opacity-60 ring-white/10",
               )}
             >

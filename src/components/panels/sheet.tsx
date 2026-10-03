@@ -37,7 +37,7 @@ export function Sheet({
           exit={{ opacity: 0, y: 40 }}
           transition={{ type: "spring", stiffness: 420, damping: 38 }}
           className={cn(
-            "glass-strong fixed inset-x-0 bottom-0 z-40 flex max-h-[72dvh] flex-col rounded-t-3xl lg:inset-x-auto lg:bottom-[5.5rem] lg:right-3 lg:top-[5.25rem] lg:max-h-none lg:w-[460px] lg:rounded-3xl",
+            "glass-strong fixed inset-x-0 bottom-0 z-40 flex max-h-[72dvh] flex-col rounded-t-3xl pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] lg:inset-x-auto lg:bottom-[5.5rem] lg:right-3 lg:top-[5.25rem] lg:max-h-none lg:w-[460px] lg:rounded-3xl",
             className,
           )}
         >

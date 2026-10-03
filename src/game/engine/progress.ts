@@ -130,7 +130,8 @@ export function generateDaily(s: GameState, now: number, snap?: EconomySnapshot)
   const key = dateKey(now);
   const rand = seeded(`${key}:${s.createdAt}`);
   const researchLeft = RESEARCH.some((r) => !s.research.includes(r.id));
-  const pool = DAILY_TEMPLATES.filter((t) => (t.metric !== "researchDone" || researchLeft) && ((t.metric !== "carsProduced" && t.metric !== "carsSold") || eco.carsPerSec > 0));
+  // research needs RP, which only cars make
+  const pool = DAILY_TEMPLATES.filter((t) => (t.metric !== "researchDone" || (researchLeft && eco.carsPerSec > 0)) && ((t.metric !== "carsProduced" && t.metric !== "carsSold") || eco.carsPerSec > 0));
   const picked: typeof pool = [];
   while (picked.length < Math.min(DAILY_COUNT, pool.length)) {
     const t = pool[Math.floor(rand() * pool.length)];

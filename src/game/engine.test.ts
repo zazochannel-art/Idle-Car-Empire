@@ -44,6 +44,9 @@ describe("number formatting", () => {
     expect(formatMoney(3_200_000)).toBe("$3.2M");
     expect(formatMoney(4.7e9)).toBe("$4.7B");
     expect(formatMoney(2.8e12)).toBe("$2.8T");
+    // never rounds up past what you have (999,500 is not "$1000K")
+    expect(formatMoney(999_500)).toBe("$999K");
+    expect(formatMoney(999_999_999)).toBe("$999M");
     expect(formatNumber(1e40)).toMatch(/^[\d.]+[a-z]{2}$/);
   });
 

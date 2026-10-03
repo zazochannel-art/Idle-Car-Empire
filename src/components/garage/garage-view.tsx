@@ -251,7 +251,7 @@ export function GarageView({ plotId }: { plotId: string }) {
       )}
 
       {/* bottom bar */}
-      <nav className="absolute inset-x-0 bottom-0 z-20 flex justify-center px-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
+      <nav className="absolute inset-x-0 bottom-0 z-20 flex justify-center px-[calc(env(safe-area-inset-left)+0.5rem)] pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
         <div className="grid w-full max-w-lg grid-cols-5 gap-1 rounded-2xl border border-white/10 bg-ink/85 p-1.5 backdrop-blur-xl">
           {(
             [

@@ -55,9 +55,9 @@ export function FirstCarOverlay() {
 
   return (
     <div className="pointer-events-none fixed inset-0 z-50 flex items-start justify-center pt-[18vh]">
-      <motion.div initial={{ opacity: 0, y: -20, scale: 0.8 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="absolute top-[8vh] text-center">
+      <motion.div initial={{ opacity: 0, y: -20, scale: 0.8 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="absolute inset-x-4 top-[calc(env(safe-area-inset-top)+7.5rem)] text-center md:top-[8vh]">
         <div className="text-[11px] font-black uppercase tracking-[0.35em] text-gold/80">{t("firstCar.kicker")}</div>
-        <div className="text-gradient-gold text-3xl font-black drop-shadow-[0_4px_20px_rgba(0,0,0,.8)] md:text-5xl">{t("firstCar.title")}</div>
+        <div className="text-gradient-gold text-balance text-[clamp(1.5rem,7vw,3rem)] font-black leading-tight drop-shadow-[0_4px_20px_rgba(0,0,0,.8)]">{t("firstCar.title")}</div>
       </motion.div>
       <AnimatePresence>
         {card && (
@@ -66,7 +66,7 @@ export function FirstCarOverlay() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0 }}
             transition={{ type: "spring", stiffness: 220, damping: 18 }}
-            className="pointer-events-auto mt-24 w-[min(92vw,22rem)] rounded-3xl border border-gold/40 bg-ink/90 p-5 text-center shadow-[0_20px_80px_-20px_rgba(250,204,21,.5)] backdrop-blur-xl"
+            className="pointer-events-auto mt-32 w-[min(92vw,22rem)] md:mt-24 rounded-3xl border border-gold/40 bg-ink/90 p-5 text-center shadow-[0_20px_80px_-20px_rgba(250,204,21,.5)] backdrop-blur-xl"
           >
             <div className="text-6xl">{car.emoji}</div>
             <div className="mt-1 text-lg font-black">🚗 {t("firstCar.completed")}</div>
