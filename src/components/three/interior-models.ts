@@ -5,7 +5,7 @@
 // unit stops, so the line runs straight through it along x.
 import type * as THREE_NS from "three";
 import type { MaterialKit } from "./car-models";
-import { buildRobot } from "./industrial-models";
+import { buildRobot, cycle } from "./industrial-models";
 import { box, cabinet, cyl, fence, H, roll, rollers, std, type Three } from "./interior-kit";
 import { addMachine, addPart, addProp } from "./interior-machines";
 import type { PartKind, PropKind, StationMachine } from "../plant/interior/layout";
@@ -49,7 +49,7 @@ export function buildStation(T: Three, kit: MaterialKit, model: StationModel, po
       // an enclosed laser bed; the bridge sweeps along it
       all.add(box(T, std(T, "#d6dbe1", 0.3, 0.4), -1.2, 0, -0.45, 2.4, 6 * H, 0.9));
       all.add(box(T, dark, -1.15, 6 * H, -0.4, 2.3, 0.4 * H, 0.8));
-      const bx = -0.9 + [0, 0.6, 1.2, 0.6][pose % 4];
+      const bx = -0.9 + cycle([0, 0.6, 1.2, 0.6], pose);
       for (const z of [-0.5, 0.48]) all.add(box(T, acc, -1.25, 6 * H, z, 2.5, 2 * H, 0.05));
       all.add(box(T, acc, bx - 0.08, 8 * H, -0.5, 0.16, 3 * H, 1.03));
       all.add(box(T, dark, bx - 0.05, 4 * H, -0.05, 0.1, 6 * H, 0.1));
@@ -71,7 +71,7 @@ export function buildStation(T: Three, kit: MaterialKit, model: StationModel, po
     }
     case "press": {
       // a tandem line of two big presses straddling the belt
-      const stroke = [0, 4, 8][pose % 3] * H;
+      const stroke = cycle([0, 4, 8], pose) * H;
       for (const px of [-0.7, 0.7]) {
         all.add(box(T, acc, px - 0.5, 0, -0.55, 1.0, 5 * H, 1.1));
         for (const z of [-0.5, 0.42]) for (const s of [-1, 1]) all.add(box(T, acc, px + s * 0.4 - 0.08, 5 * H, z, 0.16, 34 * H, 0.08));
@@ -110,7 +110,7 @@ export function buildStation(T: Three, kit: MaterialKit, model: StationModel, po
     }
     case "bodyJig": {
       // a framing gantry: posts, a bridge and clamp arms that close on the body
-      const close = [0.1, 0][pose % 2];
+      const close = cycle([0.1, 0], pose);
       for (const x of [-0.9, 0.9]) for (const z of [-0.55, 0.5]) all.add(box(T, acc, x - 0.06, 0, z, 0.12, 32 * H, 0.08));
       for (const z of [-0.55, 0.5]) all.add(box(T, acc, -0.95, 32 * H, z, 1.9, 3 * H, 0.08));
       all.add(box(T, acc, -0.95, 32 * H, -0.55, 0.08, 3 * H, 1.13));
@@ -196,7 +196,7 @@ export function buildWorker(T: Three, role: WorkerRole, pose: number, tone = 0):
   const [legs, top, hat] = outfit[role];
   const legM = std(T, legs, 0.05, 0.8);
   const topM = std(T, top, 0.05, 0.7);
-  const step = [0.05, 0, -0.05, 0][pose & 3];
+  const step = cycle([0.05, 0, -0.05, 0], pose);
   const s = 0.13; // ~1.8 m is 0.22 tiles; a little taller so people read on a phone
   for (const side of [-1, 1]) {
     const leg = box(T, legM, -0.12 + side * step - 0.06, 0, side * 0.1 - 0.06, 0.12, 0.85, 0.12);
@@ -212,7 +212,7 @@ export function buildWorker(T: Three, role: WorkerRole, pose: number, tone = 0):
   for (const side of [-1, 1]) {
     const arm = new T.Group();
     arm.position.set(0, 1.5, side * 0.27);
-    arm.rotation.z = (side > 0 ? 1 : -1) * [0.4, 0.9, 0.4, -0.2][pose & 3] * (role === "manager" ? 0.3 : 1);
+    arm.rotation.z = (side > 0 ? 1 : -1) * cycle([0.4, 0.9, 0.4, -0.2], pose) * (role === "manager" ? 0.3 : 1);
     arm.add(box(T, topM, -0.05, -0.65, -0.05, 0.1, 0.65, 0.1));
     arm.add(box(T, skin, -0.05, -0.8, -0.05, 0.1, 0.15, 0.1));
     g.add(arm);

@@ -31,9 +31,13 @@ export function claimLogin(s: GameState, snap: EconomySnapshot): boolean {
 
 // ───────────────────────────── rivals ─────────────────────────────
 
+/** Rivals stop growing after ten years (1.05^3650 is still a finite number). */
+const RIVAL_MAX_DAYS = 3650;
+
 /** A rival's lifetime earnings: they keep growing a little every day. */
 export function rivalEarned(r: Rival, s: GameState, now: number): number {
-  const days = Math.max(0, (now - s.createdAt) / 86_400_000);
+  // capped so a save with a broken start date can't grow rivals to Infinity
+  const days = Math.min(RIVAL_MAX_DAYS, Math.max(0, (now - s.createdAt) / 86_400_000));
   return r.earned * Math.pow(1 + RIVAL_DAILY_GROWTH, days);
 }
 

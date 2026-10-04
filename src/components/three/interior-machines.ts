@@ -7,7 +7,7 @@
 // across it (back is -z), y up; one map pixel of height is H.
 import type * as THREE_NS from "three";
 import type { MaterialKit } from "./car-models";
-import { buildRobot } from "./industrial-models";
+import { buildRobot, cycle } from "./industrial-models";
 import { box, cabinet, cyl, fence, H, roll, rollers, std, type Mat, type Three } from "./interior-kit";
 import type { PartKind, PropKind } from "../plant/interior/layout";
 
@@ -113,7 +113,7 @@ export function addMachine(T: Three, kit: MaterialKit, g: G, model: string, vari
       ladle.add(cyl(T, shell, 0, 0, 0, 0.14, 5 * H, 14));
       ladle.add(cyl(T, hot, 0, 5 * H, 0, 0.11, 0.3 * H, 14));
       ladle.position.set(-0.05, 12 * H, -0.35);
-      ladle.rotation.z = [0, -0.5][pose % 2];
+      ladle.rotation.z = cycle([0, -0.5], pose);
       g.add(ladle);
       g.add(box(T, steel, -0.1, 0, -0.42, 0.06, 12 * H, 0.06));
       g.add(cabinet(T, kit, 1.25, -0.7, "#f59e0b"));
@@ -128,7 +128,7 @@ export function addMachine(T: Three, kit: MaterialKit, g: G, model: string, vari
         g.add(box(T, body, x, 0, -0.95, 1.1, 22 * H, 0.65));
         g.add(box(T, acc, x, 18 * H, -0.31, 1.1, 2 * H, 0.02));
         g.add(box(T, clear(T, "#7dd3fc", 0.45), x + 0.15, 5 * H, -0.305, 0.6, 11 * H, 0.01));
-        g.add(box(T, dark, x + 0.25 + [0, 0.2, 0.35, 0.15][pose % 4], 7 * H, -0.6, 0.12, 9 * H, 0.12)); // spindle head
+        g.add(box(T, dark, x + 0.25 + cycle([0, 0.2, 0.35, 0.15], pose), 7 * H, -0.6, 0.12, 9 * H, 0.12)); // spindle head
         g.add(box(T, grey, x + 0.82, 3 * H, -0.3, 0.2, 10 * H, 0.06)); // control panel
         g.add(box(T, kit.glass, x + 0.85, 9 * H, -0.24, 0.14, 3 * H, 0.004));
         signal(T, g, x + 1.0, 22 * H, -0.85, robots ? "#22c55e" : "#f59e0b");
@@ -209,7 +209,7 @@ export function addMachine(T: Three, kit: MaterialKit, g: G, model: string, vari
     }
     case "curing": {
       // a row of clamshell curing presses; the lids open and close
-      const open = [0, 6][pose % 2] * H;
+      const open = cycle([0, 6], pose) * H;
       for (const x of [-0.95, 0, 0.95]) {
         g.add(box(T, std(T, "#3f4650", 0.6, 0.4), x - 0.4, 0, -0.95, 0.8, 8 * H, 0.65));
         g.add(cyl(T, std(T, "#1f2937", 0.6, 0.4), x, 8 * H, -0.62, 0.28, 2 * H, 20));

@@ -4,6 +4,9 @@
 import type * as THREE_NS from "three";
 import type { MaterialKit } from "./car-models";
 
+/** Frame `pose` of an animation cycle; any number (negative, fractional) is safe. */
+export const cycle = <V>(frames: readonly V[], pose: number): V => frames[(((Math.floor(pose) || 0) % frames.length) + frames.length) % frames.length];
+
 type Three = typeof THREE_NS;
 
 export type MachineKind =
@@ -64,8 +67,8 @@ export function buildRobot(T: Three, kit: MaterialKit, pose: number, color = "#f
   const g = new T.Group();
   const paint = mat(T, kit, color, 0.35, 0.35);
   const dark = mat(T, kit, "#2b2f36", 0.5, 0.5);
-  const a = [0, 0.7, 1.4, 0.7][pose % 4];
-  const lift = [0.35, 0.15, 0.4, 0.6][pose % 4];
+  const a = cycle([0, 0.7, 1.4, 0.7], pose);
+  const lift = cycle([0.35, 0.15, 0.4, 0.6], pose);
   g.add(cylAt(T, dark, 0.09, 4 * H, 0, 0, 0));
   const turret = new T.Group();
   turret.position.y = 4 * H;
@@ -112,7 +115,7 @@ export function buildMachine(T: Three, kit: MaterialKit, kind: MachineKind, pose
   const yellow = mat(T, kit, "#f5b301", 0.3, 0.45);
   const accentM = mat(T, kit, accent, 0.3, 0.4);
   const glass = kit.glass;
-  const stroke = [0, 3, 6, 3][pose % 4] * H;
+  const stroke = cycle([0, 3, 6, 3], pose) * H;
   // a safety-yellow plinth under every machine
   g.add(boxAt(T, yellow, 0.86, 0.6 * H, 0.7, 0, 0, 0));
   switch (kind) {

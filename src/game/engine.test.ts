@@ -667,6 +667,17 @@ describe("coming back", () => {
     expect(R.leaderboard(s, T0)[0].id).toBe("sakura");
   });
 
+  it("keeps rival earnings finite, even with a broken start date", () => {
+    const s = createInitialState(T0);
+    s.createdAt = 0;
+    for (const r of R.leaderboard(s, T0)) expect(Number.isFinite(r.earned)).toBe(true);
+    // a save with a missing or future start date is repaired on load
+    expect(migrate({ ...s, createdAt: 0 }, T0).createdAt).toBeGreaterThan(0);
+    expect(migrate({ ...s, createdAt: T0 + 9e9 }, T0).createdAt).toBeLessThanOrEqual(T0);
+    const ok = createInitialState(T0);
+    expect(migrate(JSON.parse(JSON.stringify(ok)), T0 + 1000).createdAt).toBe(T0);
+  });
+
   it("has seasons with a small income bonus", () => {
     expect(seasonAt(new Date(2026, 9, 20).getTime())).toBe("halloween");
     expect(seasonAt(new Date(2026, 11, 24).getTime())).toBe("winter");

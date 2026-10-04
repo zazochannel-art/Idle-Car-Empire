@@ -62,6 +62,8 @@ export function migrate(raw: unknown, now: number): GameState {
   }
   state.chain = migrateChain(raw.chain, state);
   state.racing = migrateRacing(raw.racing);
+  // a missing or future start date would skew rivals, contracts and stats
+  if (!(state.createdAt > 0 && state.createdAt <= now)) state.createdAt = Math.min(now, state.lastActiveAt > 0 ? state.lastActiveAt : now);
   unlockOwnedZones(state);
   state.version = SAVE_VERSION;
   return state;
