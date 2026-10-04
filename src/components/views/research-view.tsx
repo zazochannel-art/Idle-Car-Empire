@@ -38,6 +38,7 @@ export function ResearchView() {
           </span>
         </div>
       </ViewHeader>
+      <p className="rounded-xl bg-sky-500/10 px-3 py-2 text-[11px] text-sky-100 ring-1 ring-sky-400/25">🔬 {t("research.techNote")}</p>
 
       <div className="space-y-4">
         {RESEARCH_CATEGORIES.map((cat) => {

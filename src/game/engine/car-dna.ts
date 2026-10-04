@@ -6,6 +6,7 @@
 // track all read the same car.
 import { CAR_BY_ID, type CarConfig } from "../config/cars";
 import { RACE_UPGRADES } from "../config/racing";
+import type { TechId } from "../config/tech";
 import type { CarId, ComponentId, GameState, RaceCarState } from "../types";
 import { carStdCost, assemblyTime } from "./costs";
 import { bestGrade, recipe, supplied, suppliedGrade } from "./chain";
@@ -57,6 +58,8 @@ export interface CarDNA {
   stats: RaceStats;
   /** What the brand adds to its price (reputation, 0.9–1.1). */
   brand: number;
+  /** R&D technologies built in. */
+  tech: TechId[];
 }
 
 const g5 = (g: number) => Math.max(0, Math.min(4, Math.round(g) - 1));
@@ -89,12 +92,13 @@ export interface DnaInput {
   value: number;
   name?: string;
   rep?: number;
+  tech?: TechId[];
 }
 
 /** The full DNA of a car from what went into it. */
 export function dnaOf(x: DnaInput): CarDNA {
   const cfg = CAR_BY_ID[x.car];
-  const st = statsOf(x.car, x.grades, x.design, x.upgrades, x.wear);
+  const st = statsOf(x.car, x.grades, x.design, x.upgrades, x.wear, x.tech);
   const up = (u: (typeof RACE_UPGRADES)[number]) => x.upgrades[u] ?? 0;
   const ge = gradeOf(x.grades, "engine", cfg.grade);
   const gb = gradeOf(x.grades, "body", cfg.grade);
@@ -114,18 +118,18 @@ export function dnaOf(x: DnaInput): CarDNA {
   return {
     car: x.car,
     model: x.name ?? cfg.name,
-    engine: engineName(cfg, ge, turbo) + (up("ecu") ? ` · ECU ${up("ecu")}` : ""),
+    engine: engineName(cfg, ge, turbo) + (x.tech?.includes("direct_injection") && cfg.engine !== "Electric" ? " DI" : "") + (up("ecu") ? ` · ECU ${up("ecu")}` : ""),
     hp: st.hp,
     torque: torqueOf(cfg, st.hp, turbo),
     weight: st.weight,
     body: cfg.body,
-    chassis: CHASSIS[g5(gb)],
-    suspension: SUSPENSION[g5(gs + Math.floor(up("suspension") / 2))],
+    chassis: x.tech?.includes("carbon_body") ? `${CHASSIS[g5(gb)]} + carbon panels` : CHASSIS[g5(gb)],
+    suspension: SUSPENSION[g5(gs + Math.floor(up("suspension") / 2) + (x.tech?.includes("adaptive_dampers") ? 1 : 0))],
     brakes: BRAKES[g5((gbr ?? Math.max(gt, gs)) + Math.floor(up("brakes") / 2))],
     tires: TIRES[g5(gt + Math.floor(up("tires") / 2))],
     wheels: WHEELS[g5((gw ?? 1) + rims + (up("weight") >= 2 ? 1 : 0))],
     aero: Math.round(st.aero),
-    gearbox: gearboxOf(cfg, gtr ?? ge, up("transmission")),
+    gearbox: x.tech?.includes("dual_clutch") && cfg.engine !== "Electric" ? "7-speed dual-clutch" : gearboxOf(cfg, gtr ?? ge, up("transmission")),
     interior: INTERIOR[g5(gi)],
     glass: GLASS[g5(gg)],
     lights: LIGHTS[g5(parts.includes("electronics") ? gel + 1 : gel)],
@@ -138,6 +142,7 @@ export function dnaOf(x: DnaInput): CarDNA {
     performance: Math.round(rating(st, "circuit")),
     stats: st,
     brand: 1 + ((x.rep ?? 50) - 50) * 0.002,
+    tech: x.tech ?? [],
   };
 }
 
@@ -153,6 +158,7 @@ export function carDNA(s: GameState, rc: RaceCarState): CarDNA {
     value: rc.value,
     name: d?.name,
     rep: s.quality?.rep,
+    tech: rc.tech,
   });
 }
 

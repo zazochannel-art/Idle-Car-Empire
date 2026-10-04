@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { CARS, CAR_BY_ID } from "@/game/config/cars";
 import { carDNA, testCar, testFee, type TestReport } from "@/game/engine/car-dna";
 import { DEALER_BY_ID } from "@/game/config/dealerships";
+import { RESEARCH_BY_ID } from "@/game/config/research";
 import { carEta, carTrip, showroomFor } from "@/game/engine/chain";
 import { campaignOn } from "@/game/engine/market";
 import { campaignCost, expectedSale, fairPrice } from "@/game/engine/showroom";
@@ -157,6 +158,10 @@ function CarCard({ rc, open, onToggle }: { rc: RaceCarState; open: boolean; onTo
               <Row k={t("dna.reliability")} v={`${dna.reliability}/100`} />
               <Row k={t("dna.cost")} v={formatMoney(dna.cost)} />
               <Row k={t("dna.performance")} v={formatNumber(dna.performance)} />
+            </div>
+            <div className="mt-1 flex justify-between gap-2 text-[11px]">
+              <span className="text-white/45">🔬 {t("dna.tech")}</span>
+              <span className="text-right font-semibold">{dna.tech.length ? dna.tech.map((x) => n.research(RESEARCH_BY_ID[x])).join(" · ") : t("dna.noTech")}</span>
             </div>
             <p className="mt-1 text-[10px] text-white/40">
               {n.car(cfg)} · {t("dna.from")}

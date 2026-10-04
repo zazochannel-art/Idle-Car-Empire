@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { WORLD_MAP } from "./city/layout";
 import { CAR_BY_ID } from "./config/cars";
 import { RACE_EVENTS } from "./config/racing";
+import { RESEARCH_BY_ID } from "./config/research";
+import { CAR_TECH, TECH_IDS } from "./config/tech";
 import * as Ch from "./engine/chain";
 import * as D from "./engine/car-dna";
 import * as R from "./engine/racing";
@@ -346,5 +348,39 @@ describe("the brand", () => {
     raw.brand.style = 42;
     const back = migrate(raw, T0);
     expect(back.brand).toMatchObject({ name: "Nova", logo: "🐺", color: "#f5c451", style: "value", renames: 2 });
+  });
+});
+
+describe("R&D technologies", () => {
+  it("research builds real technology into the cars made afterwards, not into older ones", () => {
+    const s = createInitialState(T0);
+    const old = car(s);
+    expect(old.tech).toEqual([]);
+    s.research.push("carbon_body", "direct_injection", "dual_clutch", "wind_tunnel");
+    const fresh = car(s);
+    expect(fresh.tech).toEqual(["direct_injection", "dual_clutch", "wind_tunnel", "carbon_body"]);
+    const a = R.carStats(old);
+    const b = R.carStats(fresh);
+    expect(b.weight).toBeLessThan(a.weight * 0.95);
+    expect(b.hp).toBeGreaterThan(a.hp * 1.04);
+    expect(b.aero).toBeGreaterThan(a.aero + 5);
+    expect(D.testCar(fresh).zeroTo100).toBeLessThan(D.testCar(old).zeroTo100);
+    const dna = D.carDNA(s, fresh);
+    expect(dna.engine).toMatch(/ DI/);
+    expect(dna.chassis).toMatch(/carbon/);
+    expect(dna.gearbox).toBe("7-speed dual-clutch");
+    expect(dna.tech).toHaveLength(4);
+    // it stays with the car through a save
+    const back = migrate(JSON.parse(JSON.stringify(s)), T0);
+    expect(back.racing.cars.find((c) => c.id === fresh.id)!.tech).toEqual(fresh.tech);
+  });
+
+  it("every technology is a research node with a real effect", () => {
+    for (const t of TECH_IDS) {
+      const node = RESEARCH_BY_ID[t];
+      expect(node, t).toBeTruthy();
+      expect(node.effects).toContainEqual({ kind: "tech", tech: t });
+      expect(Object.keys(CAR_TECH[t].effect).length).toBeGreaterThan(0);
+    }
   });
 });
