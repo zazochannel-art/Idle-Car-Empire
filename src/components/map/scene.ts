@@ -11,6 +11,7 @@ import type { BuildingState, CarId, GameState, StructureType, ZoneId } from "@/g
 import { drawDepot, drawMarket, drawPlant, plantBadge } from "./plants";
 import { Painter, rand, sx, sy } from "./iso";
 import { sprites3d, tierFor } from "../three/sprites";
+import { garageParts } from "../three/building-models";
 import { CAR_COLORS, CAR_MODEL_FOR, drawCar, drawModel, drawTruck, type CarModel, type Dir } from "./vehicles";
 import { barrier, beacon, bench, billboard, birds, bush, container, drum, fence, flagPole, flowerBed, ledStrip, lightPole, planter, tireStack, wallLamp } from "./props";
 
@@ -190,6 +191,19 @@ function emptyPlot(p: Painter, plot: Plot, info: DrawInfo, buildable: boolean) {
   p.box(x + 0.35, y + d - 0.58, 0.4, 0.06, 12, 7, buildable ? "#2563eb" : "#64748b");
 }
 
+/** The 3D workshop as a sprite; false until it is rendered. */
+function garageSprite(p: Painter, level: number, color: string, X: number, Y: number, W: number, D: number): boolean {
+  const k = Math.min(4, tierFor((p.zoom ?? 1) * (p.dpr ?? 1)));
+  const span = W + D;
+  const size = { w: span * 32 + 40, h: span * 16 + 170, ax: span * 16 + 20, ay: span * 8 + 140 };
+  const spr = sprites3d.get(`garage|${level}|${color}|${W.toFixed(2)}|${D.toFixed(2)}`, size, k, (T, { kit, buildings }) => buildings.buildGarage(T, kit, level, color, W, D));
+  if (!spr) return false;
+  const cx = X + W / 2;
+  const cy = Y + D / 2;
+  p.ctx.drawImage(spr.img, sx(cx, cy) - size.ax, sy(cx, cy, 0) - size.ay, size.w, size.h);
+  return true;
+}
+
 function garage(p: Painter, plot: Plot, b: BuildingState, active: boolean, t: number) {
   const L = b.level;
   const spec = SPEC_BY_ID[b.garage?.spec ?? "repair"];
@@ -197,18 +211,13 @@ function garage(p: Painter, plot: Plot, b: BuildingState, active: boolean, t: nu
   const Y = plot.y + M;
   const W = plot.w - 2 * M;
   const D = plot.d - 2 * M;
-  p.quad(X, Y, W, D, p.col("#5b6472"));
-  p.quadStroke(X + 0.05, Y + 0.05, W - 0.1, D - 0.1, p.col("#e2e8f0", -0.2), 1);
-
-  type Part = { x: number; y: number; w: number; d: number; h: number; kind: "main" | "annex" | "glass" };
-  const parts: Part[] = [];
-  if (L <= 1) parts.push({ x: X + 0.35, y: Y + 0.2, w: 1.5, d: 1.2, h: 18, kind: "main" });
-  else if (L === 2) parts.push({ x: X + 0.15, y: Y + 0.15, w: 1.95, d: 1.3, h: 22, kind: "main" });
-  else if (L <= 4) parts.push({ x: X + 0.1, y: Y + 0.1, w: 1.5, d: 1.4, h: 24, kind: "main" }, { x: X + 1.7, y: Y + 0.1, w: 0.6, d: 1.0, h: 30, kind: "annex" });
-  else if (L === 5) parts.push({ x: X + 0.05, y: Y + 0.05, w: 1.7, d: 1.5, h: 30, kind: "main" }, { x: X + 1.82, y: Y + 0.05, w: 0.52, d: 0.85, h: 44, kind: "annex" });
-  else parts.push({ x: X + 0.05, y: Y + 0.05, w: 1.72, d: 1.55, h: 32, kind: "main" }, { x: X + 1.84, y: Y + 0.05, w: 0.5, d: 1.35, h: 28 + (L - 6) * 9, kind: "glass" });
-
-  for (const part of parts) p.shadow(part.x, part.y, part.w, part.d, part.h);
+  const parts = garageParts(L).map((q) => ({ ...q, x: X + q.x, y: Y + q.y }));
+  const has3d = !p.dim && garageSprite(p, L, spec.color, X, Y, W, D);
+  if (!has3d) {
+    p.quad(X, Y, W, D, p.col("#5b6472"));
+    p.quadStroke(X + 0.05, Y + 0.05, W - 0.1, D - 0.1, p.col("#e2e8f0", -0.2), 1);
+    for (const part of parts) p.shadow(part.x, part.y, part.w, part.d, part.h);
+  }
 
   // behind the building: fence for small garages, equipment for bigger ones
   if (L <= 2) {
@@ -229,25 +238,29 @@ function garage(p: Painter, plot: Plot, b: BuildingState, active: boolean, t: nu
   for (const part of parts) {
     const wall = part.kind === "glass" ? "#7dd3fc" : part.kind === "annex" ? "#f1f5f9" : "#e8ecf1";
     const roof = L >= 10 ? "#fbbf24" : "#cbd5e1";
-    if (part.kind === "main" && L >= 5) {
-      p.box(part.x, part.y, part.w, part.d, 0, part.h, wall, "#94a3b8");
-      p.sawtooth(part.x, part.y, part.w, part.d, part.h, 3, 7, "#cbd5e1");
-    } else {
-      p.box(part.x, part.y, part.w, part.d, 0, part.h, wall, roof);
+    if (!has3d) {
+      if (part.kind === "main" && L >= 5) {
+        p.box(part.x, part.y, part.w, part.d, 0, part.h, wall, "#94a3b8");
+        p.sawtooth(part.x, part.y, part.w, part.d, part.h, 3, 7, "#cbd5e1");
+      } else {
+        p.box(part.x, part.y, part.w, part.d, 0, part.h, wall, roof);
+      }
     }
     if (part.kind === "main") {
-      p.onLeft(part.x, part.y + part.d, 0, 0, part.w, part.h - 4, part.h - 1, p.col(spec.color));
+      if (!has3d) p.onLeft(part.x, part.y + part.d, 0, 0, part.w, part.h - 4, part.h - 1, p.col(spec.color));
       // windows above the doors from level 2, wall lamps everywhere
-      if (L >= 2) p.windows(part.x, part.y, part.w, part.d, part.h - 13, 7, 1, "#93c5fd", active ? 1 : 0);
+      if (L >= 2 && !has3d) p.windows(part.x, part.y, part.w, part.d, part.h - 13, 7, 1, "#93c5fd", active ? 1 : 0);
       wallLamp(p, part.x, part.y + part.d, 0.1, part.h - 9);
       wallLamp(p, part.x, part.y + part.d, part.w - 0.1, part.h - 9);
       if (L >= 5) ledStrip(p, part.x, part.y + part.d, part.w, part.h - 1.5, spec.color, t);
       doors(p, part.x, part.y + part.d, part.w, L <= 1 ? 1 : L <= 4 ? 2 : 3, Math.min(14, part.h - 7), active, t);
-      p.onRight(part.x + part.w, part.y, 0, 0.2, part.d - 0.2, part.h * 0.45, part.h * 0.7, p.col("#bae6fd", -0.25));
-      if (L >= 2 && L < 5) {
+      if (!has3d) p.onRight(part.x + part.w, part.y, 0, 0.2, part.d - 0.2, part.h * 0.45, part.h * 0.7, p.col("#bae6fd", -0.25));
+      if (L >= 2 && L < 5 && !has3d) {
         p.box(part.x + 0.25, part.y + 0.25, 0.25, 0.2, part.h, 4, "#94a3b8");
         p.box(part.x + 0.7, part.y + 0.3, 0.2, 0.2, part.h, 3, "#94a3b8");
       }
+    } else if (has3d) {
+      // the 3D model has the annex and the glass tower
     } else if (part.kind === "annex") {
       p.windows(part.x, part.y, part.w, part.d, 0, part.h, Math.max(2, Math.round(part.h / 14)), "#7dd3fc", active ? 2 : 0);
     } else {
@@ -287,6 +300,33 @@ function garage(p: Painter, plot: Plot, b: BuildingState, active: boolean, t: nu
   }
 }
 
+/** Vector showroom, drawn until the 3D one is ready (or in dimmed previews). */
+function dealerHall(p: Painter, tiers: number, X: number, Y: number, W: number, D: number) {
+  p.quad(X, Y, W, D, p.col("#e7e5e4"));
+  for (let i = 0; i < 6; i++) p.line(X + 0.1, Y + 0.4 * i + 0.2, X + W - 0.1, Y + 0.4 * i + 0.2, p.col("#d6d3d1", -0.05), 1);
+  const h = 18 + tiers * 4;
+  p.shadow(X + 0.15, Y + 0.15, 2.1, 1.1, h);
+  p.box(X + 0.15, Y + 0.15, 2.1, 1.1, 0, h, "#93c5fd", "#f8fafc");
+  for (let k = 1; k < 5; k++) p.onLeft(X + 0.15, Y + 1.25, 0, (2.1 * k) / 5 - 0.012, (2.1 * k) / 5 + 0.012, 0, h, p.col("#f1f5f9"));
+  for (let k = 1; k < 3; k++) p.onRight(X + 2.25, Y + 0.15, 0, (1.1 * k) / 3 - 0.012, (1.1 * k) / 3 + 0.012, 0, h, p.col("#e2e8f0", -0.2));
+  p.box(X + 0.1, Y + 0.1, 2.2, 1.2, h, 3, "#f8fafc");
+  p.onLeft(X + 0.1, Y + 1.3, h, 0.3, 1.9, 0.2, 2.8, p.col(tiers >= 3 ? "#eab308" : "#2563eb"));
+}
+
+/** The 3D showroom as a sprite; false until it is rendered. */
+function dealerSprite(p: Painter, tier: number, X: number, Y: number, W: number, D: number): boolean {
+  const k = Math.min(4, tierFor((p.zoom ?? 1) * (p.dpr ?? 1)));
+  const span = W + D;
+  const size = { w: span * 32 + 40, h: span * 16 + 140, ax: span * 16 + 20, ay: span * 8 + 110 };
+  const brand = tier >= 3 ? "#eab308" : "#2563eb";
+  const spr = sprites3d.get(`dealer|${tier}|${W.toFixed(2)}|${D.toFixed(2)}`, size, k, (T, { kit, buildings }) => buildings.buildDealer(T, kit, { tier, brand }, W, D));
+  if (!spr) return false;
+  const cx = X + W / 2;
+  const cy = Y + D / 2;
+  p.ctx.drawImage(spr.img, sx(cx, cy) - size.ax, sy(cx, cy, 0) - size.ay, size.w, size.h);
+  return true;
+}
+
 function dealerLot(p: Painter, plot: Plot, owned: boolean, t: number, seed: number, stock: CarId[] = [], next = 0) {
   const id = plot.dealer!;
   const cfg = DEALER_BY_ID[id];
@@ -301,16 +341,10 @@ function dealerLot(p: Painter, plot: Plot, owned: boolean, t: number, seed: numb
     return;
   }
   const tiers = ["local", "city", "premium", "luxury", "supercar", "global"].indexOf(id);
-  p.quad(X, Y, W, D, p.col("#e7e5e4"));
-  for (let i = 0; i < 6; i++) p.line(X + 0.1, Y + 0.4 * i + 0.2, X + W - 0.1, Y + 0.4 * i + 0.2, p.col("#d6d3d1", -0.05), 1);
-  const h = 18 + tiers * 4;
-  p.shadow(X + 0.15, Y + 0.15, 2.1, 1.1, h);
-  p.box(X + 0.15, Y + 0.15, 2.1, 1.1, 0, h, "#93c5fd", "#f8fafc");
-  for (let k = 1; k < 5; k++) p.onLeft(X + 0.15, Y + 1.25, 0, (2.1 * k) / 5 - 0.012, (2.1 * k) / 5 + 0.012, 0, h, p.col("#f1f5f9"));
-  for (let k = 1; k < 3; k++) p.onRight(X + 2.25, Y + 0.15, 0, (1.1 * k) / 3 - 0.012, (1.1 * k) / 3 + 0.012, 0, h, p.col("#e2e8f0", -0.2));
-  p.box(X + 0.1, Y + 0.1, 2.2, 1.2, h, 3, "#f8fafc");
-  p.onLeft(X + 0.1, Y + 1.3, h, 0.3, 1.9, 0.2, 2.8, p.col(tiers >= 3 ? "#eab308" : "#2563eb"));
+  const has3d = !p.dim && dealerSprite(p, tiers, X, Y, W, D);
+  if (!has3d) dealerHall(p, tiers, X, Y, W, D);
   // the showroom glows at night; better dealers show better cars
+  const h = 18 + tiers * 4;
   p.light(sx(X + 1.2, Y + 1.25), sy(X + 1.2, Y + 1.25, h / 2), 40, "#bfe3ff", 0.55);
   // the cars actually in stock: two in the showroom, the rest on the forecourt
   const cars = stock.map((m) => CAR_MODEL_FOR[m]);
@@ -332,7 +366,7 @@ function dealerLot(p: Painter, plot: Plot, owned: boolean, t: number, seed: numb
   lightPole(p, X + W - 0.05, Y + D - 0.6);
   flag(p, X + 0.05, Y + D - 0.1, tiers >= 3 ? "#eab308" : "#ef4444", t);
   flag(p, X + W - 0.1, Y + D - 0.1, "#3b82f6", t + 1);
-  p.box(X + W - 0.3, Y + 0.2, 0.16, 0.16, 0, 30, "#1e293b");
+  if (!has3d) p.box(X + W - 0.3, Y + 0.2, 0.16, 0.16, 0, 30, "#1e293b");
   emojiAt(p, cfg.emoji, X + W - 0.22, Y + 0.28, 40, 13);
 }
 

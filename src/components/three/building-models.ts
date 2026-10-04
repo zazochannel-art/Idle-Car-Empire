@@ -436,3 +436,253 @@ function shadeHex(hex: string, k: number) {
   const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => Math.round(k >= 0 ? v + (255 - v) * k : v * (1 + k)));
   return "#" + ch.map((v) => Math.max(0, Math.min(255, v)).toString(16).padStart(2, "0")).join("");
 }
+
+// ───────────────────────────── dealers ─────────────────────────────
+
+export interface DealerSpec {
+  /** 0 local … 5 global. */
+  tier: number;
+  /** Brand colour of the fascia and the pylon. */
+  brand: string;
+}
+
+/**
+ * A car showroom on a W×D lot: a glazed hall with mullions on a plinth, a
+ * cantilevered roof with a brand fascia, a service wing with a roller door
+ * and a sign pylon. Better dealers add an upper floor, a curved glass corner,
+ * a canopy over the handover bay and finally a tower. Origin: lot centre.
+ */
+export function buildDealer(T: Three, kit: MaterialKit, spec: DealerSpec, W: number, D: number): THREE_NS.Group {
+  const root = new T.Group();
+  const g = new T.Group();
+  g.position.set(-W / 2, 0, -D / 2);
+  root.add(g);
+  const tier = spec.tier;
+  const white = std(T, "#f4f6f8", 0.1, 0.45);
+  const stone = std(T, "#d8d4cc", 0, 0.85);
+  const plinth = std(T, "#5b6370", 0.2, 0.6);
+  const frame = std(T, "#c9ced6", 0.85, 0.25);
+  const darkFrame = std(T, "#1f242b", 0.5, 0.4);
+  const brand = std(T, spec.brand, 0.3, 0.35);
+  const floorM = std(T, "#eef0f2", 0.05, 0.15);
+  const mull = tier >= 3 ? darkFrame : frame;
+  // clear showroom glass: the lit floor and the podiums show through it
+  const vitrine = new T.MeshPhysicalMaterial({ color: "#cfe8fb", metalness: 0.1, roughness: 0.03, clearcoat: 1, envMapIntensity: 1.6, transparent: true, opacity: 0.38, depthWrite: false });
+
+  // lot: stone paving with painted bays
+  g.add(box(T, stone, 0, 0, 0, W, 0.01, D));
+  for (let i = 0; i <= 5; i++) g.add(box(T, white, 0.15 + i * 0.5, 0.01, 1.7, 0.012, 0.002, 0.42));
+
+  // the showroom hall (matches the 2D footprint: x 0.15…2.25, z 0.15…1.25)
+  const x0 = 0.15;
+  const z0 = 0.15;
+  const w = 2.1;
+  const d = 1.1;
+  const H = (18 + tier * 4) * PX;
+  g.add(box(T, plinth, x0 - 0.02, 0, z0 - 0.02, w + 0.04, 0.035, d + 0.04));
+  g.add(box(T, floorM, x0, 0.035, z0, w, 0.006, d));
+  // solid back and left walls, glass on the two faces the camera sees
+  g.add(box(T, white, x0, 0.035, z0, w, H, 0.05));
+  g.add(box(T, white, x0, 0.035, z0, 0.05, H, d));
+  g.add(box(T, vitrine, x0, 0.035, z0 + d - 0.012, w, H - 0.04, 0.012));
+  g.add(box(T, vitrine, x0 + w - 0.012, 0.035, z0, 0.012, H - 0.04, d));
+  // the inside: a bright back wall with a brand panel, a reception desk
+  g.add(box(T, std(T, "#f8fafc", 0, 0.5), x0 + 0.05, 0.035, z0 + 0.05, w - 0.1, H - 0.05, 0.01));
+  g.add(box(T, brand, x0 + w * 0.3, 0.035 + H * 0.45, z0 + 0.062, w * 0.4, H * 0.22, 0.004));
+  g.add(box(T, std(T, "#334155", 0.3, 0.4), x0 + 0.12, 0.035, z0 + 0.12, 0.35, 0.1, 0.14));
+  const panesF = 5 + (tier >= 2 ? 1 : 0);
+  for (let i = 0; i <= panesF; i++) g.add(box(T, mull, x0 + (w * i) / panesF - 0.008, 0.035, z0 + d - 0.006, 0.016, H, 0.016));
+  for (let i = 0; i <= 3; i++) g.add(box(T, mull, x0 + w - 0.006, 0.035, z0 + (d * i) / 3 - 0.008, 0.016, H, 0.016));
+  // transom bar and a glazed entrance with a dark portal
+  g.add(box(T, mull, x0, 0.035 + H * 0.72, z0 + d - 0.006, w, 0.012, 0.016));
+  g.add(box(T, darkFrame, x0 + w * 0.42, 0.035, z0 + d - 0.004, w * 0.16, H * 0.6, 0.02));
+  // display podiums inside (the cars on them are drawn by the map)
+  for (const px of [0.55, 1.45]) g.add(cyl(T, std(T, "#d1d5db", 0.6, 0.2), x0 + px, 0.04, z0 + 0.55, 0.32, 0.02, 28));
+  // ceiling lights seen through the glass
+  for (let i = 0; i < 4; i++) g.add(box(T, std(T, "#fff7e0", 0, 0.3), x0 + 0.25 + i * 0.5, 0.035 + H - 0.05, z0 + 0.3, 0.3, 0.01, 0.5));
+
+  // cantilevered roof slab with a brand fascia
+  const over = 0.12 + tier * 0.02;
+  g.add(box(T, white, x0 - 0.04, 0.035 + H, z0 - 0.04, w + 0.04 + over, 0.05, d + 0.04 + over));
+  g.add(box(T, brand, x0 - 0.04, 0.035 + H + 0.012, z0 + d + over - 0.002, w + 0.04 + over, 0.03, 0.01));
+  g.add(box(T, brand, x0 + w + over - 0.002, 0.035 + H + 0.012, z0 - 0.04, 0.01, 0.03, d + 0.04 + over));
+  // slim columns under the overhang
+  for (const [cx, cz] of [
+    [x0 + w + over - 0.04, z0 + d + over - 0.04],
+    [x0 + w * 0.5, z0 + d + over - 0.04],
+    [x0 + w + over - 0.04, z0 + 0.3],
+  ])
+    g.add(cyl(T, frame, cx, 0.01, cz, 0.012, H + 0.03, 10));
+
+  // upper floor (offices) from city dealers, set back with a terrace
+  if (tier >= 2) {
+    const uh = 0.24 + (tier >= 4 ? 0.06 : 0);
+    const uy = 0.035 + H + 0.05;
+    g.add(box(T, white, x0 + 0.05, uy, z0 + 0.05, w * 0.62, uh, d * 0.7));
+    g.add(windowBand(T, kit, mull, x0 + 0.12, z0 + 0.05 + d * 0.7, w * 0.5, uy + 0.05, uh - 0.1, 6, 1));
+    g.add(windowBandX(T, kit, mull, x0 + 0.05 + w * 0.62, z0 + 0.12, d * 0.5, uy + 0.05, uh - 0.1, 3));
+    g.add(box(T, white, x0 + 0.03, uy + uh, z0 + 0.03, w * 0.62 + 0.04, 0.03, d * 0.7 + 0.04));
+    // glass balustrade on the terrace
+    g.add(box(T, kit.glass, x0, uy, z0 + d + 0.02, w, 0.06, 0.008));
+    g.add(hvac(T, std(T, "#cfd5dc", 0.4, 0.5), darkFrame, x0 + 0.2, uy + uh + 0.03, z0 + 0.15));
+  }
+  // a rounded glass corner on premium dealers
+  if (tier >= 3) {
+    const r = 0.28;
+    const cg = new T.Mesh(new T.CylinderGeometry(r, r, H - 0.04, 24, 1, true, 0, Math.PI / 2), vitrine);
+    cg.position.set(x0 + w - r + 0.02, 0.035 + (H - 0.04) / 2, z0 + d - r + 0.02);
+    g.add(cg);
+    for (let i = 0; i <= 3; i++) {
+      const a = (i / 3) * (Math.PI / 2);
+      g.add(cyl(T, mull, x0 + w - r + 0.02 + Math.sin(a) * r, 0.035, z0 + d - r + 0.02 + Math.cos(a) * r, 0.007, H, 6));
+    }
+  }
+
+  // service wing with a roller door (from city dealers)
+  if (tier >= 1) {
+    const sx = 2.38;
+    const sw = Math.min(W - sx - 0.08, 0.55);
+    if (sw > 0.25) {
+      const sh = H * 0.75;
+      g.add(box(T, std(T, "#cbd2da", 0.3, 0.5), sx, 0, z0 + 0.1, sw, sh, d - 0.2));
+      g.add(ribs(T, std(T, "#b7c0ca", 0.4, 0.5), sx, sx + sw, z0 + d - 0.1 + 0.004, 0.02, sh - 0.04, "x", 0.05));
+      g.add(rollerDoor(T, sx + 0.08, z0 + d - 0.1, sw - 0.16, sh * 0.7, 1, std(T, "#e5e7eb", 0.5, 0.4), darkFrame, std(T, "#c4c9d0", 0.5, 0.4)));
+      g.add(box(T, brand, sx, sh - 0.04, z0 + d - 0.1, sw, 0.03, 0.01));
+    }
+  }
+  // a canopy over the handover bay (luxury and up)
+  if (tier >= 4) {
+    const cy = 0.42;
+    g.add(box(T, white, 0.3, cy, 1.55, 1.3, 0.03, 0.55));
+    for (const cx of [0.32, 1.56]) g.add(cyl(T, frame, cx, 0, 2.06, 0.015, cy, 10));
+    g.add(box(T, brand, 0.3, cy + 0.01, 2.1, 1.3, 0.015, 0.006));
+  }
+  // the tower of a global flagship
+  if (tier >= 5) g.add(office(T, kit, mull, white, x0 + 0.05, z0 + 0.05, 0.5, 0.45, H + 0.85));
+
+  // sign pylon by the road
+  const ph = 0.5 + tier * 0.08;
+  g.add(box(T, darkFrame, W - 0.38, 0, 0.18, 0.16, ph, 0.08));
+  g.add(box(T, brand, W - 0.37, ph * 0.55, 0.26, 0.14, ph * 0.4, 0.004));
+  g.add(box(T, white, W - 0.38, ph, 0.18, 0.16, 0.012, 0.08));
+
+  root.traverse((o) => {
+    const m = o as THREE_NS.Mesh;
+    if (m.isMesh) {
+      m.castShadow = m.material !== kit.glass && m.material !== vitrine;
+      m.receiveShadow = true;
+    }
+  });
+  return root;
+}
+
+// ───────────────────────────── garages ─────────────────────────────
+
+export interface GaragePart {
+  /** Offsets from the lot corner (tiles) and height (map px). */
+  x: number;
+  y: number;
+  w: number;
+  d: number;
+  h: number;
+  kind: "main" | "annex" | "glass";
+}
+
+/** The garage's buildings at a level (shared by the 3D model and the 2D overlays). */
+export function garageParts(L: number): GaragePart[] {
+  if (L <= 1) return [{ x: 0.35, y: 0.2, w: 1.5, d: 1.2, h: 18, kind: "main" }];
+  if (L === 2) return [{ x: 0.15, y: 0.15, w: 1.95, d: 1.3, h: 22, kind: "main" }];
+  if (L <= 4)
+    return [
+      { x: 0.1, y: 0.1, w: 1.5, d: 1.4, h: 24, kind: "main" },
+      { x: 1.7, y: 0.1, w: 0.6, d: 1.0, h: 30, kind: "annex" },
+    ];
+  if (L === 5)
+    return [
+      { x: 0.05, y: 0.05, w: 1.7, d: 1.5, h: 30, kind: "main" },
+      { x: 1.82, y: 0.05, w: 0.52, d: 0.85, h: 44, kind: "annex" },
+    ];
+  return [
+    { x: 0.05, y: 0.05, w: 1.72, d: 1.55, h: 32, kind: "main" },
+    { x: 1.84, y: 0.05, w: 0.5, d: 1.35, h: 28 + (L - 6) * 9, kind: "glass" },
+  ];
+}
+
+/**
+ * A workshop on a W×D lot: a clad hall on a plinth with a coloured fascia,
+ * gable or sawtooth roof with vents, an office annex, and from level 6 a glass
+ * showroom tower. The roller doors, signs and cars are drawn by the map on
+ * top (they animate). Origin: lot centre.
+ */
+export function buildGarage(T: Three, kit: MaterialKit, level: number, color: string, W: number, D: number): THREE_NS.Group {
+  const root = new T.Group();
+  const g = new T.Group();
+  g.position.set(-W / 2, 0, -D / 2);
+  root.add(g);
+  const concrete = std(T, "#7c8593", 0, 0.9);
+  const wall = std(T, "#e8ecf1", 0.25, 0.55);
+  const rib = std(T, "#d3d9e1", 0.35, 0.5);
+  const roof = std(T, level >= 10 ? "#fbbf24" : "#c3cbd6", 0.4, 0.55);
+  const frame = std(T, "#2c3440", 0.6, 0.4);
+  const accent = std(T, color, 0.3, 0.4);
+  const steel = std(T, "#9aa3ad", 0.85, 0.3);
+  const plinth = std(T, "#6b7280", 0.2, 0.7);
+  g.add(box(T, concrete, 0, 0, 0, W, 0.01, D));
+  for (const part of garageParts(level)) {
+    const H = part.h * PX;
+    const { x, y: z, w, d } = part;
+    if (part.kind === "glass") {
+      g.add(office(T, kit, frame, std(T, "#e2e8f0", 0.2, 0.5), x, z, w, d, H));
+      if (level >= 10) g.add(box(T, roof, x - 0.02, H + 0.03, z - 0.02, w + 0.04, 0.02, d + 0.04));
+      continue;
+    }
+    g.add(box(T, plinth, x - 0.01, 0, z - 0.01, w + 0.02, 0.04, d + 0.02));
+    g.add(box(T, part.kind === "annex" ? std(T, "#f1f5f9", 0.2, 0.5) : wall, x, 0.01, z, w, H, d));
+    for (const [cx, cz] of [
+      [x - 0.015, z + d - 0.015],
+      [x + w - 0.015, z + d - 0.015],
+      [x + w - 0.015, z - 0.015],
+    ])
+      g.add(box(T, frame, cx, 0.01, cz, 0.03, H + 0.005, 0.03));
+    if (part.kind === "annex") {
+      const floors = Math.max(2, Math.round(part.h / 14));
+      for (let f = 0; f < floors; f++) {
+        const fy = 0.04 + (f * (H - 0.06)) / floors;
+        g.add(windowBand(T, kit, frame, x + 0.05, z + d, w - 0.1, fy + 0.03, (H - 0.06) / floors - 0.07, 3, 1));
+        g.add(windowBandX(T, kit, frame, x + w, z + 0.08, d - 0.16, fy + 0.03, (H - 0.06) / floors - 0.07, 4));
+      }
+      g.add(box(T, wall, x - 0.01, H, z - 0.01, w + 0.02, 0.025, d + 0.02));
+      g.add(hvac(T, std(T, "#cfd5dc", 0.4, 0.5), frame, x + 0.15, H + 0.02, z + 0.2));
+      continue;
+    }
+    // main workshop: cladding on the visible walls, fascia, windows above the doors
+    g.add(ribs(T, rib, x, x + w, z + d + 0.004, 0.05, H - 0.1, "x", 0.07));
+    g.add(ribs(T, rib, z, z + d, x + w + 0.004, 0.05, H - 0.1, "z", 0.07));
+    g.add(box(T, accent, x - 0.004, H - 0.1, z + d - 0.002, w + 0.008, 0.08, 0.014));
+    g.add(box(T, accent, x + w - 0.002, H - 0.1, z - 0.004, 0.014, 0.08, d + 0.008));
+    g.add(windowBandX(T, kit, frame, x + w, z + 0.2, d - 0.4, H * 0.42, H * 0.3, 4));
+    if (level >= 2) g.add(windowBand(T, kit, frame, x + 0.1, z + d, w - 0.2, H - 0.3, 0.12, 8, 1));
+    if (level >= 5) {
+      g.add(sawtooth(T, roof, kit.glass, x, z, w, d, H, 3, 7 * PX * 1.6));
+    } else {
+      g.add(gableRoof(T, roof, x, z, w, d, H, 0.16));
+      if (level >= 2) {
+        g.add(ventilator(T, steel, x + 0.35, H + 0.06, z + d * 0.3));
+        g.add(ventilator(T, steel, x + w - 0.35, H + 0.06, z + d * 0.3));
+      }
+    }
+    // a compressor and a parts cage by the back wall
+    if (level >= 3) {
+      g.add(cyl(T, std(T, "#dc2626", 0.4, 0.4), x + w + 0.12, 0, z + 0.15, 0.06, 0.18, 14));
+      g.add(box(T, std(T, "#475569", 0.6, 0.45), x + w + 0.05, 0, z + 0.3, 0.14, 0.2, 0.2));
+    }
+  }
+  root.traverse((o) => {
+    const m = o as THREE_NS.Mesh;
+    if (m.isMesh) {
+      m.castShadow = m.material !== kit.glass;
+      m.receiveShadow = true;
+    }
+  });
+  return root;
+}
