@@ -27,7 +27,6 @@ let idleSince = 0;
 let rescues = 0;
 let maxOwed = 0;
 let prev: Record<string, number> = { ...s.chain.ledger.run };
-let racePrize = 0;
 /** A player who races whenever an event is open (the most racing can bring). */
 function raceStep(t: number) {
   const R = s.racing;
@@ -50,7 +49,7 @@ function raceStep(t: number) {
   if (Rc.condition(car) < 0.6) Rc.repairCar(s, car.id);
   for (const u of ["engine", "tires", "transmission", "suspension", "brakes", "aero"] as const) {
     const c = Rc.raceUpgradeCost(s, car, u);
-    if (c && s.cash > c.money * 8) Rc.upgradeRaceCar(s, car.id, u, R.parts >= c.racingParts) || Rc.upgradeRaceCar(s, car.id, u);
+    if (c && s.cash > c.money * 8 && !Rc.upgradeRaceCar(s, car.id, u, R.parts >= c.racingParts)) Rc.upgradeRaceCar(s, car.id, u);
   }
   if (!R.live) {
     const ev = Rc.bestEventFor(s, car);
