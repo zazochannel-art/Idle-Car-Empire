@@ -54,6 +54,9 @@ export function prestigeReset(s: GameState, now: number) {
   s.logistics = createLogistics();
   s.city = { ...createCity(), carsServiced: s.city.carsServiced };
   s.chain = createChain();
+  // the racing team stays (cars, reputation, trophies); what was on its way from the old plants is gone
+  s.racing.orders = [];
+  s.racing.arrivals = [];
   s.run = createStats();
   s.runStartedAt = now;
   s.pendingOffline = null;

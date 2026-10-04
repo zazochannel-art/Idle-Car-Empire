@@ -10,10 +10,14 @@ import { tick } from "../src/game/engine/tick";
 import { buyDealer, hireManager, upgradeDealer } from "../src/game/engine/actions";
 import { freePlot, nextGoals } from "../src/game/engine/insights";
 import { formatMoney } from "../src/game/format";
+import * as Rc from "../src/game/engine/racing";
+import { RACING_DISTRICT } from "../src/game/config/racing";
+import { CAR_BY_ID } from "../src/game/config/cars";
 import { RESTOCK_UNITS } from "../src/game/config/economy";
 
 const hours = Number(process.argv[2] ?? 3);
-const quiet = process.argv[3] === "q";
+const quiet = process.argv[3] === "q" || process.argv[3] === "race";
+const racing = process.argv.includes("race");
 const s = createInitialState(0);
 s.tips = ["start", "engine", "market", "dealers"];
 const fmtT = (t: number) => `${Math.floor(t / 3600)}h${String(Math.floor((t % 3600) / 60)).padStart(2, "0")}m${String(t % 60).padStart(2, "0")}`;
@@ -23,6 +27,36 @@ let idleSince = 0;
 let rescues = 0;
 let maxOwed = 0;
 let prev: Record<string, number> = { ...s.chain.ledger.run };
+/** A player who races whenever an event is open (the most racing can bring). */
+function raceStep(t: number) {
+  const R = s.racing;
+  if (!R.unlocked) {
+    if (Rc.racingBlocker(s) === null && s.cash > RACING_DISTRICT.cost * 3) Rc.unlockRacing(s);
+    return;
+  }
+  const best = Rc.orderableCars(s).sort((a, b) => CAR_BY_ID[b].tier - CAR_BY_ID[a].tier)[0];
+  const rc = Rc.raceCar(s, R.selected);
+  // trade up to a better platform when one is built
+  if (best && (!rc || CAR_BY_ID[best].tier > CAR_BY_ID[rc.car].tier) && !R.orders.length && !R.arrivals.length) {
+    if (rc && Rc.racingFleet(s) >= Rc.garageLevel(s).slots) Rc.retireRaceCar(s, rc.id);
+    Rc.orderRaceCar(s, best);
+  }
+  if (R.cars.length && R.selected !== R.cars[R.cars.length - 1].id) R.selected = R.cars[R.cars.length - 1].id;
+  const car = Rc.raceCar(s, R.selected);
+  if (!car) return;
+  const gc = Rc.garageUpgradeCost(s);
+  if (gc !== null && s.cash > gc * 6) Rc.upgradeGarage(s);
+  if (Rc.condition(car) < 0.6) Rc.repairCar(s, car.id);
+  for (const u of ["engine", "tires", "transmission", "suspension", "brakes", "aero"] as const) {
+    const c = Rc.raceUpgradeCost(s, car, u);
+    if (c && s.cash > c.money * 8 && !Rc.upgradeRaceCar(s, car.id, u, R.parts >= c.racingParts)) Rc.upgradeRaceCar(s, car.id, u);
+  }
+  if (!R.live) {
+    const ev = Rc.bestEventFor(s, car);
+    if (ev) Rc.enterRace(s, ev.id);
+  }
+  void t;
+}
 const counts: Record<string, number> = {};
 for (let t = 0; t < hours * 3600; t++) {
   if (t % 5 === 0) snap = snapshot(s);
@@ -37,7 +71,7 @@ for (let t = 0; t < hours * 3600; t++) {
     prev = { ...L };
     const st = Ch.plantsOf(s).map(([, b]) => `${b.type.slice(0, 4)}:${b.plant.status}${b.type === "assemblyPlant" ? "/" + Math.floor(b.plant.out) : ""}`).join(" ");
     const dl = Object.entries(s.chain.dealers).map(([k, v]) => `${k}:${Math.floor(v?.cars ?? 0)}`).join(",");
-    console.log(`   ~ ${fmtT(t)} per s: ${JSON.stringify(d)} | ${st} | dealers ${dl} | sold ${s.lifetime.carsSold}`);
+    console.log(`   ~ ${fmtT(t)} per s: ${JSON.stringify(d)} | ${st} | dealers ${dl} | sold ${s.lifetime.carsSold}${racing ? ` | rep ${Math.round(s.racing.rep)} races ${s.racing.stats.races} wins ${s.racing.stats.wins} car ${Rc.raceCar(s, s.racing.selected)?.car ?? "-"}` : ""}`);
   }
   if (t % 10 !== 0) continue;
   const goals = nextGoals(s, snap, 2);
@@ -66,6 +100,7 @@ for (let t = 0; t < hours * 3600; t++) {
     }
     if (acted) { counts[g.kind] = (counts[g.kind] ?? 0) + 1; break; }
   }
+  if (racing) raceStep(t);
   if (acted) idleSince = t;
   else if (t - idleSince === 1800) console.log(`${fmtT(t)}  !! 30 min with nothing the goals let me do (cash ${formatMoney(s.cash)})`);
 }

@@ -166,6 +166,18 @@ export interface OfflineReport {
   money: number;
   rp: number;
   carsByType: Partial<Record<CarId, number>>;
+  /** Automatic races run while away. */
+  racing?: OfflineRacing;
+}
+
+export interface OfflineRacing {
+  races: number;
+  fees?: number;
+  wins: number;
+  podiums: number;
+  prize: number;
+  rep: number;
+  repairs: number;
 }
 
 export type BuyAmount = 1 | 10 | 100 | "max";
@@ -243,7 +255,7 @@ export type PlantStatus = "ok" | "noRaw" | "full" | "noParts" | "noModel" | "noC
 export type MaterialStock = Partial<Record<import("./config/economy").MaterialId, number>>;
 
 /** Where the money went: revenue and every kind of cost. */
-export type LedgerKey = "carSales" | "partSales" | "services" | "materials" | "labor" | "energy" | "maintenance" | "logistics" | "dealerFees" | "tax";
+export type LedgerKey = "carSales" | "partSales" | "services" | "racing" | "materials" | "labor" | "energy" | "maintenance" | "logistics" | "dealerFees" | "tax" | "repairs";
 export type LedgerValues = Record<LedgerKey, number>;
 export interface Ledger {
   /** Smoothed $/s per category (for the dashboard). */
@@ -436,6 +448,7 @@ export interface GameState {
   lifetime: Stats;
   city: CityState;
   chain: ChainState;
+  racing: RacingState;
   pendingOffline: OfflineReport | null;
   settings: { buyAmount: BuyAmount; lang: Lang; lowGraphics: boolean; sound: boolean; haptics: boolean };
   createdAt: number;
@@ -448,4 +461,119 @@ export type GameEvent =
   | { type: "sale"; plot: string; item: ItemId; count: number; amount: number }
   | { type: "carBuilt"; plot: string; car: CarId; first: boolean }
   | { type: "achievement"; id: string }
-  | { type: "carUnlocked"; car: CarId };
+  | { type: "carUnlocked"; car: CarId }
+  | { type: "raceFinished"; race: number };
+
+// ───────────────────────────── racing ─────────────────────────────
+
+/** A car the player built, now at the Racing District. */
+export interface RaceCarState {
+  id: number;
+  car: CarId;
+  /** Grade of each of its components when it left the assembly line: the factories' work. */
+  grades: Partial<Record<ComponentId, number>>;
+  /** Design studio figures when it was built. */
+  hp: number;
+  quality: number;
+  design: number;
+  /** What the car was worth (repairs and upgrades are priced from it). */
+  value: number;
+  /** Racing development levels. */
+  upgrades: Partial<Record<import("./config/racing").RaceUpgrade, number>>;
+  /** Condition of each wearing part, 0–1. */
+  wear: Record<import("./config/racing").WearPart, number>;
+  skin: string;
+  races: number;
+  wins: number;
+}
+
+export interface RaceEntrant {
+  /** "player" or "<team>:<n>". */
+  id: string;
+  team: string | null;
+  driver: string;
+  model: CarId;
+  color: string;
+  accent: string;
+  rating: number;
+  /** Starting slot (0 = pole). */
+  grid: number;
+  /** Shown lap times (seconds). */
+  laps: number[];
+  /** Shown race time, the start delay included (seconds). */
+  total: number;
+}
+
+export interface RaceRecord {
+  id: number;
+  event: string;
+  /** A special event's id when this race was one. */
+  special?: string;
+  track: import("./config/racing").TrackId;
+  type: import("./config/racing").RaceType;
+  laps: number;
+  /** Racing clock when the countdown starts. */
+  startT: number;
+  car: number;
+  entrants: RaceEntrant[];
+  /** Entrant ids in finishing order. */
+  order: string[];
+  /** Championship round (0-based) when it is one. */
+  round?: number;
+  /** Entry fee paid for it. */
+  fee?: number;
+  /** Filled in when the race is settled. */
+  result?: RaceReward;
+}
+
+export interface RaceReward {
+  position: number;
+  /** Entry fee paid. */
+  fee: number;
+  prize: number;
+  sponsor: number;
+  rep: number;
+  parts: number;
+  trophy?: import("./config/racing").Trophy;
+  skin?: string;
+  /** Championship: points this race, and the title result after the final. */
+  points?: number;
+  title?: { position: number; prize: number; rep: number; trophy?: import("./config/racing").Trophy };
+}
+
+export interface ChampionshipState {
+  event: string;
+  round: number;
+  points: Record<string, number>;
+  /** Entrants of the series (the same field every round). */
+  names: Record<string, { driver: string; team: string | null }>;
+}
+
+export interface RacingState {
+  unlocked: boolean;
+  /** Seconds of racing time (live races and automatic racing run on it). */
+  clock: number;
+  garage: number;
+  cars: RaceCarState[];
+  nextCar: number;
+  /** Models asked from the assembly plants (one car each), and cars delivered but not yet unloaded. */
+  orders: CarId[];
+  arrivals: CarId[];
+  selected: number | null;
+  rep: number;
+  trophies: Record<import("./config/racing").Trophy, number>;
+  /** 🔧 Racing parts won at races. */
+  parts: number;
+  skins: string[];
+  sponsor: string | null;
+  live: RaceRecord | null;
+  last: RaceRecord | null;
+  championship: ChampionshipState | null;
+  /** Wins per event (rivals grow stronger with them). */
+  wins: Record<string, number>;
+  /** Racing clock when each event takes entries again. */
+  cooldowns: Record<string, number>;
+  auto: { on: boolean; next: number; repair: boolean };
+  stats: { races: number; wins: number; podiums: number; prize: number; repairs: number; fees?: number; titles: number; best: Record<string, number> };
+  nextRace: number;
+}

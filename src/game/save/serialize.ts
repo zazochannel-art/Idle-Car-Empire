@@ -1,4 +1,5 @@
 import { migrateChain } from "../engine/chain";
+import { migrateRacing } from "../engine/racing";
 import { migrateCity, unlockOwnedZones } from "../engine/city";
 import { applyStartPerks } from "../engine/prestige";
 import { createInitialState, SAVE_VERSION } from "../engine/state";
@@ -60,6 +61,7 @@ export function migrate(raw: unknown, now: number): GameState {
     m.assignedTo = plot && state.city.buildings[plot]?.plant ? plot : null;
   }
   state.chain = migrateChain(raw.chain, state);
+  state.racing = migrateRacing(raw.racing);
   unlockOwnedZones(state);
   state.version = SAVE_VERSION;
   return state;

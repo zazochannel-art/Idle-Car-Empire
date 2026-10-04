@@ -35,6 +35,12 @@ export function goalText(g: Goal, t: (k: MessageKey, v?: Vars) => string, n: Con
     }
     case "materials":
       return { title: t("goal.materials", { m: t(`mat.${g.material}` as MessageKey) }), detail: t("goal.materialsDetail", { name: plantName(useGame.getState().state, g.plot, t), n: g.units }) };
+    case "racing":
+      return { title: t("goal.racing"), detail: t("goal.racingDetail") };
+    case "raceCar":
+      return { title: t("goal.raceCar"), detail: t("goal.raceCarDetail") };
+    case "firstRace":
+      return { title: t("goal.firstRace"), detail: t("goal.firstRaceDetail") };
     case "warehouse":
       return { title: t("goal.warehouse", { name: plantName(useGame.getState().state, g.plot, t) }), detail: t("goal.warehouseDetail", { n: formatNumber(Math.max(0.1, Math.round(g.minutes * 10) / 10)) }) };
     case "autoBuy":
@@ -101,6 +107,16 @@ export function runGoal(g: Goal, ready: boolean) {
       ui.selectPlot(g.plot);
       break;
     }
+    case "racing":
+      if (ready) game.unlockRacing();
+      ui.setView("racing");
+      break;
+    case "raceCar":
+      ui.setView("racing");
+      break;
+    case "firstRace":
+      ui.setRace({ phase: "prep", event: "amateurCup" });
+      break;
     case "warehouse":
       if (ready) game.upgradeWarehouse(g.plot);
       ui.selectPlot(g.plot);

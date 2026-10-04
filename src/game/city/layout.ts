@@ -6,7 +6,7 @@
 // forest, farmland, hills) each block belongs to, so districts have organic
 // shapes. A river follows one node column. Pure data — shared by the engine
 // (plot rules) and the renderer.
-import { BIG_LOTS, DEALER_LOTS, DEPOT_CELL, MARKET_CELL, RIVER_LINE, STARTER_CELL, WORLD_BLOCKS, ZONES } from "../config/city";
+import { BIG_LOTS, DEALER_LOTS, DEPOT_CELL, MARKET_CELL, RACING_PADDOCK_BLOCK, RIVER_LINE, STARTER_CELL, WORLD_BLOCKS, ZONES } from "../config/city";
 import type { DealerId, ZoneId } from "../types";
 
 export const ROAD_STEP = 7;
@@ -16,11 +16,12 @@ export const NODES = BLOCKS + 1;
 export const WORLD = BLOCKS * ROAD_STEP + 1;
 export const RIVER = RIVER_LINE;
 
-/** Plot ids of the Parts Market and the Materials Depot. */
+/** Plot ids of the Parts Market, the Materials Depot and the Racing District's paddock. */
 export const MARKET = "m:market";
 export const DEPOT = "s:depot";
+export const RACING = "r:paddock";
 
-export type PlotKind = "plot" | "dealer" | "market" | "depot";
+export type PlotKind = "plot" | "dealer" | "market" | "depot" | "racing";
 
 export interface Entry {
   /** Point on the road centre line in front of the plot. */
@@ -53,7 +54,7 @@ export interface Plot {
 
 export type DecorKind = "house" | "apartment" | "office" | "shop" | "industry" | "park";
 export type SceneryKind = "forest" | "farm" | "hills";
-export type BlockKind = ZoneId | SceneryKind | "sea";
+export type BlockKind = ZoneId | SceneryKind | "sea" | "racing";
 
 export interface Decor {
   kind: DecorKind;
@@ -151,6 +152,7 @@ function build(): World {
         zoneBlocks[z.id].push([bx, by]);
         return z.id;
       }
+      if (ch === "R") return "racing";
       const s = SCENERY[ch] ?? "sea";
       if (s !== "sea") scenery.push({ kind: s, bx, by, x: bx * ROAD_STEP + 1, y: by * ROAD_STEP + 1, seed: hash(bx * 7 + 3, by * 13 + 5) });
       return s;
@@ -185,6 +187,16 @@ function build(): World {
     if (!zone) throw new Error(`dealer lot ${id} is not in a district`);
     plots.push({ id: `d:${id}`, zone, kind: "dealer", dealer: id, x: cellOrigin(cx), y: cellOrigin(cy), w: CELL, d: CELL, entry: cellEntry(cx, cy) });
     taken.add(key(cx, cy));
+  }
+
+  // The Racing District: one lot (the paddock), entered from the road below it.
+  {
+    const [bx, by] = RACING_PADDOCK_BLOCK;
+    const x = bx * ROAD_STEP + 1;
+    const y = by * ROAD_STEP + 1;
+    const zone = blockZone[by + 1]?.[bx];
+    if (!zone) throw new Error("the racing paddock needs a district below it");
+    plots.push({ id: RACING, zone, kind: "racing", x, y, w: CELL * 2, d: CELL * 2, entry: { x: x + CELL, y: (by + 1) * ROAD_STEP + 0.5, line: by + 1, i0: bx, i1: bx + 1, inward: -1 } });
   }
 
   // Every other district cell: a plot or scenery from the district's mix.
@@ -284,3 +296,21 @@ export function segmentOpen(axis: "x" | "y", line: number, k: number, unlocked: 
   if (!hasRoad(axis, line, k)) return false;
   return segmentSides(axis, line, k).some((z) => z !== null && unlocked.has(z));
 }
+
+/** Tiles of the Racing District: the paddock block, and the circuit's blocks (no roads between them). */
+export const RACING_AREA = (() => {
+  const blocks: [number, number][] = [];
+  WORLD_MAP.blocks.forEach((row, by) => row.forEach((k, bx) => k === "racing" && blocks.push([bx, by])));
+  const [pbx, pby] = RACING_PADDOCK_BLOCK;
+  const track = blocks.filter(([bx, by]) => bx !== pbx || by !== pby);
+  const x0 = Math.min(...track.map(([bx]) => bx)) * ROAD_STEP + 1;
+  const y0 = Math.min(...track.map(([, by]) => by)) * ROAD_STEP + 1;
+  const x1 = (Math.max(...track.map(([bx]) => bx)) + 1) * ROAD_STEP;
+  const y1 = (Math.max(...track.map(([, by]) => by)) + 1) * ROAD_STEP;
+  return {
+    blocks,
+    paddock: { x: pbx * ROAD_STEP + 1, y: pby * ROAD_STEP + 1, w: ROAD_STEP - 1, d: ROAD_STEP - 1 },
+    /** The circuit's land: between its outer roads (the roads inside are gone). */
+    track: { x: x0, y: y0, w: x1 - x0, d: y1 - y0 },
+  };
+})();

@@ -34,6 +34,8 @@ import { PrestigeView } from "../views/prestige-view";
 import { ResearchView } from "../views/research-view";
 import { StatsView } from "../views/stats-view";
 import { EconomyView } from "../views/economy-view";
+import { RacingView } from "../views/racing-view";
+import { RaceViewer } from "../racing/race-viewer";
 import { Coach } from "./coach";
 import { FeedbackBridge } from "./feedback-bridge";
 import { ServiceWorker } from "./service-worker";
@@ -178,6 +180,7 @@ function Shell() {
       <LoginDialog />
       <OfflineDialog />
       <PrestigeOverlay />
+      <RaceViewer />
       <SettingsDialog open={settings} onOpenChange={setSettings} />
     </div>
   );
@@ -235,6 +238,8 @@ function ViewSwitch({ view, onSettings }: { view: View; onSettings: () => void }
       return <StatsView />;
     case "economy":
       return <EconomyView />;
+    case "racing":
+      return <RacingView />;
     case "prestige":
       return <PrestigeView />;
   }

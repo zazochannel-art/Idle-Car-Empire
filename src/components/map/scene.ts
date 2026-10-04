@@ -1,6 +1,7 @@
 // Builds the list of things to draw on the Empire Map from the game state:
 // one drawable per plot/cell, depth-sorted by the renderer. Ground (zones,
 // roads, sidewalks) is drawn separately and first.
+import { racingScene } from "./racing-district";
 import { SPEC_BY_ID, STRUCTURE_BY_ID, ZONES, ZONE_BY_ID } from "@/game/config/city";
 import { DEALER_BY_ID } from "@/game/config/dealerships";
 import { isPlantType } from "@/game/config/chain";
@@ -48,6 +49,7 @@ export interface SceneNames {
   structure: (type: StructureType) => string;
   level: (n: number) => string;
   money: (n: number) => string;
+  racing: string;
 }
 
 function bboxOf(x: number, y: number, w: number, d: number, h: number): [number, number, number, number] {
@@ -1298,7 +1300,11 @@ export function buildScene(state: GameState, snap: EconomySnapshot, names: Scene
       }
     }
 
+  // the Racing District draws itself
+  out.push(...racingScene(live, { locked: names.racing, title: names.racing }));
+
   for (const plot of WORLD_MAP.plots) {
+    if (plot.kind === "racing") continue;
     const seed = rand(plot.x, plot.y);
     const isOpen = unlocked.has(plot.zone);
     const tall = plot.big || !!state.city.buildings[plot.id]?.plant;

@@ -1,6 +1,7 @@
 import { OFFLINE } from "../config/prestige";
 import type { GameState, OfflineReport } from "../types";
 import { simulateChain } from "./chain";
+import { offlineRacing } from "./racing";
 import { snapshot } from "./economy";
 import { credit } from "./tick";
 import { book, LEDGER_KEYS, settleLedger } from "./materials";
@@ -24,6 +25,9 @@ export function computeOffline(s: GameState, now: number): OfflineReport {
   const rp = s.rp;
   const before = { ...s.chain.ledger.run };
   const r = simulateChain(s, capped, snap.chain, (amount) => credit(s, amount));
+  // the racing team keeps racing (automatic racing only)
+  const racing = offlineRacing(s, capped);
+  if (racing) settleLedger(s, capped);
   // Hold the net earnings back for the COLLECT button (they already count as earned).
   const net = s.cash - cash;
   if (net > 0) s.cash = cash;
@@ -52,6 +56,7 @@ export function computeOffline(s: GameState, now: number): OfflineReport {
   // where the money came from and where it went while away
   report.ledger = Object.fromEntries(LEDGER_KEYS.map((k) => [k, Math.max(0, s.chain.ledger.run[k] - before[k])])) as OfflineReport["ledger"];
   report.carsSold = r.carsSold;
+  if (racing) report.racing = racing;
   report.materialsUsed = r.materials;
   return report;
 }
@@ -90,6 +95,10 @@ export function settleOffline(s: GameState, now: number): OfflineReport | null {
     p.rp += report.rp;
     p.carsSold = (p.carsSold ?? 0) + (report.carsSold ?? 0);
     p.materialsUsed = (p.materialsUsed ?? 0) + (report.materialsUsed ?? 0);
+    if (report.racing) {
+      const a = (p.racing ??= { races: 0, wins: 0, podiums: 0, prize: 0, rep: 0, repairs: 0 });
+      for (const k of ["races", "wins", "podiums", "prize", "rep", "repairs"] as const) a[k] += report.racing[k];
+    }
     if (report.ledger) {
       const L = (p.ledger ??= Object.fromEntries(LEDGER_KEYS.map((k) => [k, 0])) as NonNullable<OfflineReport["ledger"]>);
       for (const k of LEDGER_KEYS) L[k] += report.ledger[k];

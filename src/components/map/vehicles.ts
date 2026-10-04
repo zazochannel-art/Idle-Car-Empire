@@ -63,6 +63,8 @@ export interface CarOpts {
   lights?: boolean;
   /** Skip the ground shadow (car on a deck). */
   noShadow?: boolean;
+  /** Keep the given colour (race liveries) instead of the model's factory colour. */
+  paint?: boolean;
 }
 
 /** Axis-aligned box centred on (x, y), long along the travel direction. */
@@ -102,7 +104,7 @@ function wheel(p: Painter, wx: number, wy: number, z: number, r: number, ax: boo
  */
 export function drawModel(p: Painter, x: number, y: number, dir: Dir, model: CarModel, color: string, s = 1, opts: CarOpts = {}) {
   // finished cars wear their model's factory colour
-  if ((opts.stage ?? 8) >= 6) color = liveryOf(model).color;
+  if ((opts.stage ?? 8) >= 6 && !opts.paint) color = liveryOf(model).color;
   if (!p.dim && drawCarSprite(p, x, y, opts.yaw ?? DIR_YAW[dir], model, color, s, opts)) return;
   const sp = SPECS[model];
   const ax = dir === 0 || dir === 2;
@@ -342,7 +344,8 @@ export function drawCarSprite(p: Painter, x: number, y: number, yaw: number, mod
   const phase = spins > 1 && opts.odo ? Math.floor((opts.odo / 0.05) % spins) : 0;
   const stage = opts.stage ?? 8;
   const shadow = !opts.noShadow;
-  const keyOf = (yi: number) => `car|${model}|${liveryOf(model).color}|${yi}|${steer}|${phase}|${stage}`;
+  const paint = opts.paint ? color : liveryOf(model).color;
+  const keyOf = (yi: number) => `car|${model}|${paint}|${yi}|${steer}|${phase}|${stage}`;
   const spr = yawSprite(
     keyOf,
     CAR_SIZE,
