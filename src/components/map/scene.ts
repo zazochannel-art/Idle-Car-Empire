@@ -1245,7 +1245,7 @@ export function drawFog(p: Painter, unlocked: ReadonlySet<string>, t: number) {
 
 // ───────────────────────────── scenery ─────────────────────────────
 
-function mountain(p: Painter, x: number, y: number, w: number, d: number, h: number, seed: number) {
+function mountain(p: Painter, x: number, y: number, w: number, d: number, h: number, seed: number, feature: "road" | "falls" | null = null) {
   const c = p.ctx;
   const px = x + w * (0.45 + rand(seed, 1) * 0.1);
   const py = y + d * (0.45 + rand(seed, 2) * 0.1);
@@ -1285,6 +1285,93 @@ function mountain(p: Painter, x: number, y: number, w: number, d: number, h: num
     cap(corners[1], corners[2], "#dbe4ee");
     cap(corners[2], corners[3], "#f8fafc");
   }
+  const lerp = (a: [number, number], b: [number, number], f: number): [number, number] => [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
+  if (feature === "road") {
+    // a serpentine climbing the left face in hairpins
+    const pts: [number, number][] = [];
+    for (let k = 0; k <= 6; k++) {
+      const f = k * 0.1;
+      pts.push(lerp(lerp(corners[3], peak, f), lerp(corners[2], peak, f), k % 2 ? 0.78 : 0.22));
+    }
+    c.lineJoin = "round";
+    c.beginPath();
+    pts.forEach(([X, Y], i) => (i ? c.lineTo(X, Y) : c.moveTo(X, Y)));
+    c.strokeStyle = p.col("#c9b48a");
+    c.lineWidth = 3.2;
+    c.stroke();
+    c.strokeStyle = p.col("#7c6a52");
+    c.lineWidth = 1;
+    c.setLineDash([3, 4]);
+    c.stroke();
+    c.setLineDash([]);
+  } else if (feature === "falls") {
+    // a waterfall down the right face into a pool at its foot
+    const foot = lerp(corners[1], corners[2], 0.55);
+    const top = lerp(foot, peak, 0.5);
+    const g = c.createLinearGradient(0, top[1], 0, foot[1]);
+    g.addColorStop(0, "rgba(186,230,253,0.95)");
+    g.addColorStop(1, "rgba(255,255,255,0.95)");
+    c.fillStyle = g;
+    c.beginPath();
+    c.moveTo(top[0] - 2, top[1]);
+    c.lineTo(top[0] + 2, top[1]);
+    c.lineTo(foot[0] + 4, foot[1]);
+    c.lineTo(foot[0] - 4, foot[1]);
+    c.closePath();
+    c.fill();
+    if (!p.dim) {
+      c.strokeStyle = "rgba(255,255,255,0.8)";
+      c.lineWidth = 1;
+      c.setLineDash([4, 7]);
+      c.lineDashOffset = -p.t * 40;
+      c.beginPath();
+      c.moveTo(top[0], top[1]);
+      c.lineTo(foot[0], foot[1]);
+      c.stroke();
+      c.setLineDash([]);
+      c.lineDashOffset = 0;
+    }
+    c.fillStyle = "#3b9be0";
+    c.beginPath();
+    c.ellipse(foot[0], foot[1] + 2, 12, 5, 0, 0, Math.PI * 2);
+    c.fill();
+    for (let k = 0; k < 3; k++) {
+      const r = 3 + ((p.t * 0.7 + k / 3) % 1) * 6;
+      c.fillStyle = `rgba(255,255,255,${0.45 - r / 22})`;
+      c.beginPath();
+      c.arc(foot[0] + (k - 1) * 4, foot[1] - 1, r, 0, Math.PI * 2);
+      c.fill();
+    }
+  }
+}
+
+/** A wind turbine on the hills, its rotor turning. */
+function turbine(p: Painter, x: number, y: number, seed: number) {
+  const c = p.ctx;
+  const X = sx(x, y);
+  const Y = sy(x, y);
+  c.fillStyle = "rgba(10,20,30,0.2)";
+  c.beginPath();
+  c.ellipse(X, Y, 4, 2, 0, 0, Math.PI * 2);
+  c.fill();
+  c.strokeStyle = p.col("#f1f5f9");
+  c.lineWidth = 2.2;
+  c.beginPath();
+  c.moveTo(X, Y);
+  c.lineTo(X, Y - 62);
+  c.stroke();
+  const a0 = p.t * 1.6 + seed * 7;
+  c.lineWidth = 1.6;
+  c.beginPath();
+  for (let k = 0; k < 3; k++) {
+    const a = a0 + (k * Math.PI * 2) / 3;
+    c.moveTo(X, Y - 62);
+    c.lineTo(X + Math.cos(a) * 20, Y - 62 + Math.sin(a) * 20);
+  }
+  c.stroke();
+  c.fillStyle = p.col("#e2e8f0");
+  c.fillRect(X - 3, Y - 64, 6, 4);
+  if (p.night > 0.3) p.light(X, Y - 66, 4, "#ef4444", 0.4 + 0.4 * Math.sin(p.t * 3 + seed));
 }
 
 /** Motorway and railway corridors: no trees, farmyards or hills on them. */
@@ -1329,8 +1416,10 @@ function scenery(p: Painter, sc: Scenery) {
     p.tree(fx + 2.4, fy - 0.3, 0.9, seed + 0.3);
   } else if (sc.kind === "mountains") {
     // the northern range: big snow-capped peaks with pines on the slopes
-    mountain(p, x - 1, y - 1, 5.2, 5, 120 + rand(seed, 6) * 90, seed);
-    mountain(p, x + 2, y + 1.6, 4.6, 4.4, 90 + rand(seed, 7) * 80, seed + 1);
+    // some peaks carry a hairpin road, some a waterfall
+    const f = rand(seed, 12);
+    mountain(p, x - 1, y - 1, 5.2, 5, 120 + rand(seed, 6) * 90, seed, f < 0.3 ? "road" : null);
+    mountain(p, x + 2, y + 1.6, 4.6, 4.4, 90 + rand(seed, 7) * 80, seed + 1, f > 0.72 ? "falls" : null);
     for (let i = 0; i < 5; i++) p.pine(x + rand(seed, i + 20) * 6, y + 5 + rand(seed, i + 30) * 1.2, 1);
   } else {
     // rolling hills: green, no snow (the snow is on the northern range)
@@ -1338,6 +1427,11 @@ function scenery(p: Painter, sc: Scenery) {
     mountain(p, x - 0.6 + ox, y - 0.4, 4.2, 4.0, 34 + rand(seed, 6) * 26, seed);
     mountain(p, x + 2.4, y + 2.2, 3.8, 3.8, 26 + rand(seed, 7) * 26, seed + 1);
     for (let i = 0; i < 6; i++) p.pine(x + rand(seed, i + 20) * 6, y + 4.6 + rand(seed, i + 30) * 1.4, 0.9);
+    // a wind farm on some of the hilltops
+    if (rand(seed, 11) > 0.62) {
+      turbine(p, x + 1.4, y + 1.2, seed);
+      turbine(p, x + 4.6, y + 0.8, seed + 1);
+    }
   }
 }
 
