@@ -5,10 +5,12 @@ import { RACE_EVENTS } from "./config/racing";
 import * as Ch from "./engine/chain";
 import * as D from "./engine/car-dna";
 import * as R from "./engine/racing";
+import * as Sh from "./engine/showroom";
+import { carDemandMult } from "./engine/market";
 import { createInitialState } from "./engine/state";
 import { tick } from "./engine/tick";
 import { migrate } from "./save/serialize";
-import type { GameState, RaceCarState } from "./types";
+import type { GameEvent, GameState, RaceCarState } from "./types";
 
 const T0 = Date.UTC(2026, 2, 1, 12);
 
@@ -206,5 +208,83 @@ describe("the look of the build", () => {
     const w = D.buildLookFrom({ wheels: 5 }, { rims: 0 });
     expect(w.rimScale).toBeGreaterThan(D.buildLookFrom({ wheels: 1 }, { rims: 0 }).rimScale);
     expect(w.rims).toBe("black");
+  });
+});
+
+describe("the showroom", () => {
+  function shop() {
+    const s = createInitialState(T0);
+    s.cash = 1e6;
+    s.chain.firstCar = true;
+    const free = WORLD_MAP.plots.filter((x) => x.kind === "plot" && x.zone === "town" && !x.big && !s.city.buildings[x.id]).map((x) => x.id);
+    s.city.buildings[free[0]] = { type: "assemblyPlant", level: 1, plant: Ch.newPlant() };
+    s.dealers.local.owned = true;
+    const rc = car(s);
+    return { s, rc };
+  }
+
+  it("a transporter takes the car to a dealer the company owns, where it waits for a buyer", () => {
+    const { s, rc } = shop();
+    const fair = Sh.fairPrice(s, rc);
+    expect(Ch.sendCar(s, rc.id, "showroom")).toBe(false); // needs a price
+    expect(Ch.sendCar(s, rc.id, "showroom", fair)).toBe(true);
+    expect(rc.location).toBe("transit");
+    expect(Ch.carEta(s, rc.id)?.to).toBe("showroom");
+    for (let i = 0; i < 2000 && rc.location === "transit"; i++) tick(s, 0.5);
+    expect(rc.location).toBe("showroom");
+    expect(R.atTrack(rc)).toBe(false);
+    // a buyer comes: the car is sold at the asking price
+    const cash = s.cash;
+    const ev: GameEvent[] = [];
+    expect(Sh.showroomTick(s, 1, ev, () => 0)).toBe(1);
+    expect(s.cash).toBeCloseTo(cash + fair);
+    expect(s.racing.cars).toHaveLength(0);
+    expect(s.showroom.sold).toBe(1);
+    expect(ev[0]).toMatchObject({ type: "sale", plot: "d:local" });
+  });
+
+  it("buyers weigh the price against the car: dearer sells slower, a racing record and reputation pay", () => {
+    const { s, rc } = shop();
+    const fair = Sh.fairPrice(s, rc);
+    expect(Sh.expectedSale(s, rc, fair * 1.5)).toBeGreaterThan(Sh.expectedSale(s, rc, fair) * 4);
+    expect(Sh.expectedSale(s, rc, fair * 0.8)).toBeLessThan(Sh.expectedSale(s, rc, fair));
+    rc.wins = 5;
+    rc.podiums = 8;
+    expect(Sh.fairPrice(s, rc)).toBeGreaterThan(fair * 1.2);
+    s.quality.rep = 90;
+    expect(Sh.fairPrice(s, rc)).toBeGreaterThan(fair * 1.25);
+    rc.wear.engine = 0.3;
+    expect(Sh.fairPrice(s, rc)).toBeLessThan(fair * 1.25);
+    // the asking price stays within reason
+    Ch.sendCar(s, rc.id, "showroom", fair);
+    expect(Sh.setPrice(s, rc.id, 1e15)).toBe(true);
+    expect(rc.listing!.price).toBeCloseTo(Sh.fairPrice(s, rc) * 3);
+  });
+
+  it("a marketing campaign costs money and speeds up dealer customers and showroom buyers", () => {
+    const { s, rc } = shop();
+    const before = carDemandMult(s, "city");
+    const slow = Sh.buyerRate(s, rc, 1e5);
+    const cash = s.cash;
+    expect(Sh.startCampaign(s)).toBe(true);
+    expect(s.cash).toBeLessThan(cash);
+    expect(Sh.startCampaign(s)).toBe(false); // one at a time
+    expect(carDemandMult(s, "city")).toBeCloseTo(before * 1.5);
+    expect(Sh.buyerRate(s, rc, 1e5)).toBeCloseTo(slow * 2);
+    s.market.t += 601;
+    expect(carDemandMult(s, "city")).toBeCloseTo(before);
+  });
+
+  it("a showroom listing survives a save; without the dealer the car is back at the lot", () => {
+    const { s, rc } = shop();
+    Ch.sendCar(s, rc.id, "showroom", 12_345);
+    s.chain.shipments = [];
+    rc.location = "showroom";
+    const back = migrate(JSON.parse(JSON.stringify(s)), T0);
+    expect(back.racing.cars[0]).toMatchObject({ location: "showroom", listing: { price: 12_345, dealer: "local" } });
+    s.dealers.local.owned = false;
+    const lost = migrate(JSON.parse(JSON.stringify(s)), T0);
+    expect(lost.racing.cars[0].location).toBe("factory");
+    expect(lost.racing.cars[0].listing).toBeUndefined();
   });
 });

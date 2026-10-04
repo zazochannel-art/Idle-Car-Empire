@@ -67,7 +67,17 @@ export function migrate(raw: unknown, now: number): GameState {
   state.chain = migrateChain(raw.chain, state);
   state.racing = migrateRacing(raw.racing);
   // a car on a transporter that didn't survive the save is back at its factory lot
-  for (const rc of state.racing.cars) if (rc.location === "transit" && !state.chain.shipments.some((sh) => !sh.back && sh.fleet?.includes(rc.id))) rc.location = "factory";
+  for (const rc of state.racing.cars) {
+    if (rc.location === "transit" && !state.chain.shipments.some((sh) => !sh.back && sh.fleet?.includes(rc.id))) {
+      rc.location = "factory";
+      delete rc.listing;
+    }
+    // a showroom car needs its listing and its dealer
+    if (rc.location === "showroom" && (!rc.listing || !state.dealers[rc.listing.dealer]?.owned)) {
+      rc.location = "factory";
+      delete rc.listing;
+    }
+  }
   state.quality = migrateQuality(raw.quality);
   migrateLive(raw, state);
   state.classics = migrateClassics(raw.classics);

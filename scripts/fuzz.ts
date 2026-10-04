@@ -16,6 +16,7 @@ import { MATERIAL_IDS } from "../src/game/config/economy";
 import { WORLD_MAP } from "../src/game/city/layout";
 import * as A from "../src/game/engine/actions";
 import * as Ch from "../src/game/engine/chain";
+import * as Sh from "../src/game/engine/showroom";
 import * as C from "../src/game/engine/city";
 import * as D from "../src/game/engine/design";
 import * as K from "../src/game/engine/contracts";
@@ -162,6 +163,9 @@ const actions: [string, () => unknown][] = [
   ["keepCar", () => Rc.orderRaceCar(s, pick(CARS).id)],
   ["testTrack", () => s.racing.cars.length && Dn.runTest(s, pick(s.racing.cars).id)],
   ["sendCar", () => s.racing.cars.length && Ch.sendCar(s, pick(s.racing.cars).id, rnd() < 0.5 ? "racing" : "factory")],
+  ["showroom", () => s.racing.cars.length && rnd() < 0.15 && Ch.sendCar(s, pick(s.racing.cars).id, "showroom", 1000 + rnd() * 1e6)],
+  ["showroomPrice", () => s.racing.cars.length && Sh.setPrice(s, pick(s.racing.cars).id, rnd() * 1e7)],
+  ["campaign", () => Sh.startCampaign(s)],
   ["autoUpgrade", () => plantPlots().length && (s.city.buildings[pick(plantPlots())].plant!.auto = rnd() < 0.5)],
   ["claimUnlock", () => U.claimUnlock(s, rnd() < 0.5 ? "car" : "plant", rnd() < 0.5 ? pick(CARS).id : pick(PLANTS).id)],
   ["restockLow", () => restockLow(s, snapshot(s))],
