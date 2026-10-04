@@ -67,6 +67,7 @@ import { DRIVETRAIN_GRADE,
   type WearPart,
 } from "../config/racing";
 import { ZONE_BY_ID } from "../config/city";
+import { CAR_TECH, TECH_IDS, isTech, type TechId } from "../config/tech";
 import { DEALER_BY_ID } from "../config/dealerships";
 import { carListPrice } from "./costs";
 import { designStats } from "./design";
@@ -223,6 +224,7 @@ export function receiveRaceCar(s: GameState, car: CarId, location: "factory" | "
     races: 0,
     wins: 0,
     built: s.lastActiveAt,
+    tech: carTech(s),
     location,
     mileage: 0,
     podiums: 0,
@@ -274,11 +276,19 @@ export interface RaceStats {
 const clamp = (v: number, a = 1, b = 100) => Math.max(a, Math.min(b, v));
 
 /** What a car can do: its platform, the grades of its parts, its design and its development. */
-export function statsOf(car: CarId, grades: Partial<Record<ComponentId, number>>, design: { hp: number; quality: number; design: number }, upgrades: RaceCarState["upgrades"], wear?: RaceCarState["wear"]): RaceStats {
+export function statsOf(
+  car: CarId,
+  grades: Partial<Record<ComponentId, number>>,
+  design: { hp: number; quality: number; design: number },
+  upgrades: RaceCarState["upgrades"],
+  wear?: RaceCarState["wear"],
+  tech: readonly TechId[] = [],
+): RaceStats {
   const g = (c: ComponentId) => Math.max(0, grades[c] ?? 0);
   const up = (u: RaceUpgrade) => upgrades[u] ?? 0;
   const eff = (u: RaceUpgrade, k: keyof typeof RACE_UPGRADE_CONFIG.engine.effect) => up(u) * (RACE_UPGRADE_CONFIG[u].effect[k] ?? 0);
-  const all = (k: keyof typeof RACE_UPGRADE_CONFIG.engine.effect) => RACE_UPGRADES.reduce((a, u) => a + eff(u, k), 0);
+  // development levels plus the R&D technologies built into the car
+  const all = (k: keyof typeof RACE_UPGRADE_CONFIG.engine.effect) => RACE_UPGRADES.reduce((a, u) => a + eff(u, k), 0) + tech.reduce((a, t) => a + (CAR_TECH[t]?.effect[k] ?? 0), 0);
 
   const engineGrade = Math.max(1, g("engine"));
   const hp = design.hp * ENGINE_GRADE_POWER[Math.min(ENGINE_GRADE_POWER.length - 1, engineGrade - 1)] * (1 + all("hp"));
@@ -312,7 +322,10 @@ export function statsOf(car: CarId, grades: Partial<Record<ComponentId, number>>
   };
 }
 
-export const carStats = (rc: RaceCarState, wear = true) => statsOf(rc.car, rc.grades, rc, rc.upgrades, wear ? rc.wear : undefined);
+export const carStats = (rc: RaceCarState, wear = true) => statsOf(rc.car, rc.grades, rc, rc.upgrades, wear ? rc.wear : undefined, rc.tech);
+
+/** The R&D technologies a car leaving the line now gets. */
+export const carTech = (s: GameState): TechId[] => TECH_IDS.filter((t) => s.research.includes(t));
 
 /** The single number a race is decided on: the stats weighted by what this kind of race rewards (≈ 0–1000). */
 export function rating(st: RaceStats, type: RaceType): number {
@@ -1002,6 +1015,7 @@ export function migrateRacing(raw: unknown): RacingState {
           ? { listing: { price: num(c.listing.price), dealer: c.listing.dealer as DealerId, since: Math.max(0, num(c.listing.since)) } }
           : {}),
         ...(typeof c.home === "string" ? { home: c.home } : {}),
+        ...(Array.isArray(c.tech) ? { tech: [...new Set(c.tech.filter(isTech))] } : {}),
         mileage: Math.max(0, num(c.mileage)),
         podiums: Math.max(0, num(c.podiums)),
         ...(num(c.bestLap, 0) > 0 ? { bestLap: num(c.bestLap) } : {}),

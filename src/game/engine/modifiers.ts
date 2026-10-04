@@ -77,6 +77,9 @@ export function applyEffect(m: GlobalMods, e: Effect) {
     case "unlockPlant":
       m.unlockedPlants.add(e.plant);
       break;
+    case "tech":
+      // physical: it goes into the cars built from now on (engine/racing.ts carTech)
+      break;
   }
 }
 

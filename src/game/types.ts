@@ -76,7 +76,9 @@ export type Effect =
   | { kind: "rp"; mult: number }
   | { kind: "costMult"; mult: number }
   | { kind: "unlockCar"; car: CarId }
-  | { kind: "unlockPlant"; plant: PlantType };
+  | { kind: "unlockPlant"; plant: PlantType }
+  /** A technology built into every car made from now on (config/tech.ts). */
+  | { kind: "tech"; tech: import("./config/tech").TechId };
 
 export interface Reward {
   cash?: number;
@@ -546,6 +548,8 @@ export interface RaceCarState {
   /** Last races: event and finishing place (0 = win). */
   history?: { event: string; pos: number }[];
   test?: import("./engine/car-dna").TestReport;
+  /** R&D technologies in it when it was built (config/tech.ts). */
+  tech?: import("./config/tech").TechId[];
   /** Racing Garage: a development level being fitted (seconds left of total). */
   install?: { u: import("./config/racing").RaceUpgrade; left: number; total: number };
 }
