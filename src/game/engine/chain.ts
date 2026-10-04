@@ -3,6 +3,7 @@
 // raw material from the Materials Depot, components to the Parts Market or
 // to a Car Assembly Plant, finished cars to dealerships. Money only comes in
 // when a load is sold at the market or a customer buys a car.
+import { receiveRaceCar } from "./racing";
 import { regionCostMult } from "../config/regions";
 import { CARS, CAR_BY_ID, CAR_MODEL, type CarConfig } from "../config/cars";
 import {
@@ -700,7 +701,15 @@ export function chainTick(
       }
     }
 
-    // 3a. a car the racing team asked for leaves on its own transporter
+    // 3a. a car the company keeps (My Cars): before the Racing District it stays at the factory lot
+    if (!cfg.item && st.car && p.out >= 1 && !s.racing.unlocked && s.racing.orders.includes(st.car.id)) {
+      const value = p.outValue / p.out;
+      s.racing.orders.splice(s.racing.orders.indexOf(st.car.id), 1);
+      p.out -= 1;
+      p.outValue -= value;
+      receiveRaceCar(s, st.car.id, "factory");
+    }
+    // …with it, the car leaves for the paddock on its own transporter
     if (!cfg.item && st.car && p.out >= 1 && s.racing.unlocked && s.racing.orders.includes(st.car.id) && busyTrucks(s, id) < st.trucks) {
       const value = p.outValue / p.out;
       payOrOwe(s, TRIP_FEE.carrier);

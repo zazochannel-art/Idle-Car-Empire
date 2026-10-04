@@ -162,6 +162,11 @@ export function orderableCars(s: GameState): CarId[] {
   return CARS.filter((c) => (s.lifetime.carsByType[c.id] ?? 0) > 0).map((c) => c.id);
 }
 
+/** How many cars the company can keep: the racing garage's slots, plus a few at the factory lot. */
+export const fleetCap = (s: GameState) => (s.racing.unlocked ? garageLevel(s).slots : 0) + MY_CARS_LOT;
+/** Cars kept at the factory lot before (and besides) the racing garage. */
+export const MY_CARS_LOT = 2;
+
 /** Cars at the track plus the ones on their way. */
 export const racingFleet = (s: GameState) => s.racing.cars.length + s.racing.orders.length + s.racing.arrivals.length;
 
@@ -171,8 +176,8 @@ export const racingFleet = (s: GameState) => s.racing.cars.length + s.racing.ord
  * instead of to a dealer.
  */
 export function orderRaceCar(s: GameState, car: CarId): boolean {
-  if (!s.racing.unlocked || !orderableCars(s).includes(car)) return false;
-  if (racingFleet(s) >= garageLevel(s).slots) return false;
+  if (!orderableCars(s).includes(car)) return false;
+  if (racingFleet(s) >= fleetCap(s)) return false;
   s.racing.orders.push(car);
   return true;
 }
@@ -192,7 +197,7 @@ function gradeNow(s: GameState, c: ComponentId): number {
 }
 
 /** A delivered car becomes a race car: its parts' grades and the design studio's figures are fixed now. */
-export function receiveRaceCar(s: GameState, car: CarId): RaceCarState {
+export function receiveRaceCar(s: GameState, car: CarId, location: "factory" | "racing" = "racing"): RaceCarState {
   const cfg = CAR_BY_ID[car];
   const grades: Partial<Record<ComponentId, number>> = {};
   for (const c of recipeOf(cfg)) grades[c] = Math.max(cfg.grade, gradeNow(s, c));
@@ -210,6 +215,11 @@ export function receiveRaceCar(s: GameState, car: CarId): RaceCarState {
     skin: "factory",
     races: 0,
     wins: 0,
+    built: s.lastActiveAt,
+    location,
+    mileage: 0,
+    podiums: 0,
+    history: [],
   };
   s.racing.cars.push(rc);
   if (s.racing.selected === null) s.racing.selected = rc.id;
@@ -227,6 +237,9 @@ export function retireRaceCar(s: GameState, id: number): number {
   s.cash += pay;
   return pay;
 }
+
+/** Kilometres a lap adds to a car's odometer. */
+const TRACK_KM = 4.2;
 
 export const raceCar = (s: GameState, id: number | null) => s.racing.cars.find((c) => c.id === id) ?? null;
 export const condition = (rc: RaceCarState) => WEAR_PARTS.reduce((a, p) => a + rc.wear[p], 0) / WEAR_PARTS.length;
@@ -575,6 +588,14 @@ export function settleRace(s: GameState, rec: RaceRecord, seed = rec.id): RaceRe
   }
   if (pos <= 2) R.stats.podiums += 1;
   const me = rec.entrants.find((e) => e.id === "player");
+  const mine = raceCar(s, rec.car);
+  if (mine) {
+    mine.history = [...(mine.history ?? []), { event: ev.id, pos }].slice(-12);
+    mine.mileage = (mine.mileage ?? 0) + rec.laps * TRACK_KM;
+    if (pos <= 2) mine.podiums = (mine.podiums ?? 0) + 1;
+    if (me) mine.bestLap = Math.min(mine.bestLap ?? Infinity, ...me.laps);
+    mine.location = "racing";
+  }
   if (me) {
     const best = Math.min(...me.laps);
     const prev = R.stats.best[rec.track];
@@ -919,6 +940,13 @@ export function migrateRacing(raw: unknown): RacingState {
         skin: typeof c.skin === "string" && R.skins.includes(c.skin) ? c.skin : "factory",
         races: Math.max(0, num(c.races)),
         wins: Math.max(0, num(c.wins)),
+        built: num(c.built, 0),
+        location: c.location === "factory" ? "factory" : "racing",
+        mileage: Math.max(0, num(c.mileage)),
+        podiums: Math.max(0, num(c.podiums)),
+        ...(num(c.bestLap, 0) > 0 ? { bestLap: num(c.bestLap) } : {}),
+        history: Array.isArray(c.history) ? c.history.filter(isObj).filter((h) => typeof h.event === "string").map((h) => ({ event: h.event as string, pos: Math.max(0, Math.floor(num(h.pos))) })).slice(-12) : [],
+        ...(isObj(c.test) ? { test: c.test as unknown as RaceCarState["test"] } : {}),
       });
     }
   R.nextCar = Math.max(R.nextCar, ...R.cars.map((c) => c.id + 1));

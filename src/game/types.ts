@@ -522,6 +522,16 @@ export interface RaceCarState {
   skin: string;
   races: number;
   wins: number;
+  /** My Cars: when it left the line (ms), where it is, its record and its last test. */
+  built?: number;
+  location?: "factory" | "racing";
+  mileage?: number;
+  podiums?: number;
+  /** Best lap time ever (s). */
+  bestLap?: number;
+  /** Last races: event and finishing place (0 = win). */
+  history?: { event: string; pos: number }[];
+  test?: import("./engine/car-dna").TestReport;
 }
 
 export interface RaceEntrant {

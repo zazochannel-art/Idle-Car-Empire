@@ -38,8 +38,12 @@ describe("racing district", () => {
 
   it("race cars come off the assembly line on a car transporter", () => {
     const s = team();
+    // the garage's slot plus the factory lot (My Cars)
+    expect(R.fleetCap(s)).toBe(1 + R.MY_CARS_LOT);
+    const t = structuredClone(s);
+    for (let i = 0; i < R.fleetCap(s); i++) expect(R.orderRaceCar(t, "city")).toBe(true);
+    expect(R.orderRaceCar(t, "city")).toBe(false);
     expect(R.orderRaceCar(s, "city")).toBe(true);
-    expect(R.orderRaceCar(s, "city")).toBe(false); // one slot at garage level 1
     // an assembly plant building city cars, with a finished car waiting
     const free = WORLD_MAP.plots.filter((x) => x.kind === "plot" && x.zone === "town" && !x.big && !s.city.buildings[x.id]).map((x) => x.id);
     s.city.buildings[free[0]] = { type: "engineFactory", level: 1, plant: Ch.newPlant() };
