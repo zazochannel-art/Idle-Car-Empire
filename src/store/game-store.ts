@@ -41,6 +41,7 @@ import * as Cl from "@/game/engine/classics";
 import * as Ex from "@/game/engine/expansion";
 import * as Dn from "@/game/engine/car-dna";
 import * as Sh from "@/game/engine/showroom";
+import * as Br from "@/game/engine/brand";
 import { ENGINEER_BY_ID, type EngineerId, type ExportMarketId, type FleetProduct, type PayLevel, type ProtoFocus } from "@/game/config/expansion";
 import { HOT_CLASS, RECALL } from "@/game/config/market";
 import { claimUnlock, openPlantTypes } from "@/game/engine/unlocks";
@@ -136,6 +137,7 @@ interface GameStore {
   sendCar: (id: number, to: Ch.CarDestination, price?: number) => boolean;
   setShowroomPrice: (id: number, price: number) => boolean;
   startCampaign: () => boolean;
+  setBrand: (patch: Parameters<typeof Br.setBrand>[1]) => boolean;
   cancelRaceOrder: (car: CarId) => boolean;
   selectRaceCar: (id: number) => void;
   enterRace: (event: string, special?: string) => boolean;
@@ -391,6 +393,7 @@ export const useGame = create<GameStore>((set, get) => {
     sendCar: (id, to, price) => act((s) => Ch.sendCar(s, id, to, price)),
     setShowroomPrice: (id, price) => act((s) => Sh.setPrice(s, id, price)),
     startCampaign: () => act((s) => Sh.startCampaign(s)),
+    setBrand: (patch) => act((s) => Br.setBrand(s, patch)),
     cancelRaceOrder: (car) => act((s) => Rc.cancelOrder(s, car)),
     selectRaceCar: (id) =>
       act((s) => {

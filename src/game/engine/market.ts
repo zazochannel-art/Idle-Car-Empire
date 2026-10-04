@@ -1,4 +1,5 @@
 // Market trends, build quality, reputation and recalls (config/market.ts).
+import { brandPriceMult } from "./brand";
 import { defectMult, hypeDemand } from "./expansion";
 import { CAR_BY_ID, type CarClass } from "../config/cars";
 import { MATERIAL_IDS, type MaterialId } from "../config/economy";
@@ -64,10 +65,10 @@ export function repPriceMult(s: GameState): number {
   return (1 + (q.rep - 50) * REP_PRICE_PER_POINT) * scandal;
 }
 
-/** What a dealer gets for a car today: the class in fashion pays more. */
+/** What a dealer gets for a car today: the class in fashion pays more, and so does a strong brand. */
 export function carPriceMult(s: GameState, car: CarId | undefined): number {
   const hot = car && CAR_BY_ID[car].class === trendOf(s).hot ? 1 + HOT_CLASS.price : 1;
-  return hot * repPriceMult(s);
+  return hot * repPriceMult(s) * brandPriceMult(s, car);
 }
 
 /** A marketing campaign is running (config/showroom.ts). */

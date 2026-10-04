@@ -1,3 +1,4 @@
+import { createBrand } from "./brand";
 import { CARS } from "../config/cars";
 import { COMPONENTS } from "../config/chain";
 import { DEALER_IDS } from "../config/dealerships";
@@ -82,6 +83,7 @@ export function createInitialState(now: number): GameState {
     contracts: { offer: null, active: null, nextAt: 0, done: 0 },
     logistics: createLogistics(),
     market: { t: 0, bought: 0 },
+    brand: createBrand(),
     showroom: { campaignUntil: 0, campaigns: 0, sold: 0, revenue: 0 },
     research: [],
     achievements: [],

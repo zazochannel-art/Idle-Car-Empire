@@ -468,6 +468,8 @@ export interface GameState {
   logistics: LogisticsState;
   /** The materials market: its clock (price drift) and lifetime units bought (supplier tiers). */
   market: { t: number; bought: number };
+  /** The brand: identity chosen by the player (its attributes are earned, see engine/brand.ts). */
+  brand: BrandState;
   /** Showroom sales of the collection and the marketing campaign (market clock). */
   showroom: { campaignUntil: number; campaigns: number; sold: number; revenue: number };
   research: string[];
@@ -639,4 +641,13 @@ export interface RacingState {
   auto: { on: boolean; next: number; repair: boolean };
   stats: { races: number; wins: number; podiums: number; prize: number; repairs: number; fees?: number; titles: number; best: Record<string, number> };
   nextRace: number;
+}
+
+export interface BrandState {
+  name: string;
+  logo: string;
+  color: string;
+  accent: string;
+  style: import("./config/brand").BrandStyle;
+  renames: number;
 }

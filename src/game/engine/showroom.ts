@@ -4,6 +4,7 @@
 // development, condition and racing record) and the brand's reputation.
 import { CAMPAIGN, SHOWROOM } from "../config/showroom";
 import type { GameEvent, GameState, RaceCarState } from "../types";
+import { brandPriceMult } from "./brand";
 import { book } from "./materials";
 import { campaignOn, repPriceMult } from "./market";
 import { carWorth, condition } from "./racing";
@@ -12,7 +13,7 @@ import { carWorth, condition } from "./racing";
 export function fairPrice(s: GameState, rc: RaceCarState): number {
   const P = SHOWROOM.pedigree;
   const pedigree = Math.min(P.max, P.win * rc.wins + P.podium * (rc.podiums ?? 0));
-  return carWorth(rc) * condition(rc) * repPriceMult(s) * (1 + pedigree);
+  return carWorth(rc) * condition(rc) * repPriceMult(s) * brandPriceMult(s, rc.car) * (1 + pedigree);
 }
 
 export const clampPrice = (s: GameState, rc: RaceCarState, price: number) => {

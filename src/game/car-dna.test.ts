@@ -6,7 +6,8 @@ import * as Ch from "./engine/chain";
 import * as D from "./engine/car-dna";
 import * as R from "./engine/racing";
 import * as Sh from "./engine/showroom";
-import { carDemandMult } from "./engine/market";
+import { carDemandMult, carPriceMult } from "./engine/market";
+import * as Br from "./engine/brand";
 import { createInitialState } from "./engine/state";
 import { tick } from "./engine/tick";
 import { migrate } from "./save/serialize";
@@ -286,5 +287,64 @@ describe("the showroom", () => {
     const lost = migrate(JSON.parse(JSON.stringify(s)), T0);
     expect(lost.racing.cars[0].location).toBe("factory");
     expect(lost.racing.cars[0].listing).toBeUndefined();
+  });
+});
+
+describe("the brand", () => {
+  it("attributes are earned in the other systems, and racing image is not build quality", () => {
+    const s = createInitialState(T0);
+    const a = Br.brandAttrs(s);
+    expect(a.quality).toBe(50);
+    expect(a.sport).toBe(0);
+    s.racing.rep = 3000;
+    Object.assign(s.lifetime.carsByType, { city: 10, luxury: 10 });
+    s.research = ["a", "b", "c", "d", "e"];
+    s.proto.done = { sports: 80 };
+    const b = Br.brandAttrs(s);
+    expect(b.sport).toBeGreaterThan(80);
+    expect(b.luxury).toBeGreaterThan(a.luxury + 30);
+    expect(b.innovation).toBeGreaterThan(a.innovation + 10);
+    expect(b.quality).toBe(50); // winning races doesn't make the cars better built
+  });
+
+  it("a strong brand raises what dealers and the showroom pay, only for the classes judged on it", () => {
+    const s = createInitialState(T0);
+    s.chain.firstCar = true;
+    expect(Br.brandPriceMult(s, "city")).toBe(1);
+    const sports0 = carPriceMult(s, "sports");
+    s.racing.rep = 5000; // racing image ~96
+    expect(Br.brandPriceMult(s, "sports")).toBeGreaterThan(1.08);
+    expect(carPriceMult(s, "sports")).toBeGreaterThan(sports0 * 1.08);
+    expect(Br.brandPriceMult(s, "city")).toBe(1);
+    // being known for racing counts more
+    const plain = Br.brandPriceMult(s, "sports");
+    expect(Br.setBrand(s, { style: "sport" })).toBe(true);
+    expect(Br.brandPriceMult(s, "sports")).toBeGreaterThan(plain);
+    const rc = car(s);
+    const fair = Sh.fairPrice(s, rc);
+    s.racing.rep = 0;
+    expect(Sh.fairPrice(s, rc)).toBeLessThan(fair);
+  });
+
+  it("identity: the first name is free, a rebrand costs; the livery wears the brand colours", () => {
+    const s = createInitialState(T0);
+    s.cash = 0;
+    expect(Br.setBrand(s, { name: "  Apex   Motors " })).toBe(true);
+    expect(s.brand.name).toBe("Apex Motors");
+    expect(Br.setBrand(s, { name: "Nova" })).toBe(false); // no money for a rebrand
+    s.cash = 1e6;
+    expect(Br.setBrand(s, { name: "Nova" })).toBe(true);
+    expect(s.cash).toBe(1e6 - 50_000);
+    Br.setBrand(s, { color: "#ef4444", accent: "#111827", logo: "🐺", style: "nope" as never });
+    expect(s.brand).toMatchObject({ color: "#ef4444", accent: "#111827", logo: "🐺", style: "value" });
+    const rc = car(s);
+    s.designs[rc.car].color = "";
+    expect(R.liveryOf(s, rc)).toEqual({ color: "#ef4444", accent: "#111827" });
+    // saves keep it, junk is cleaned
+    const raw = JSON.parse(JSON.stringify(s));
+    raw.brand.color = "red";
+    raw.brand.style = 42;
+    const back = migrate(raw, T0);
+    expect(back.brand).toMatchObject({ name: "Nova", logo: "🐺", color: "#f5c451", style: "value", renames: 2 });
   });
 });

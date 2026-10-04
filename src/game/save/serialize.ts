@@ -1,4 +1,5 @@
 import { migrateChain } from "../engine/chain";
+import { migrateBrand } from "../engine/brand";
 import { migrateRacing } from "../engine/racing";
 import { migrateQuality } from "../engine/market";
 import { migrateLive } from "../engine/live";
@@ -82,6 +83,7 @@ export function migrate(raw: unknown, now: number): GameState {
   migrateLive(raw, state);
   state.classics = migrateClassics(raw.classics);
   migrateExpansion(raw, state);
+  migrateBrand(state);
   state.unlocks = state.unlocks.filter((u) => typeof u === "string");
   // a missing or future start date would skew rivals, contracts and stats
   if (!(state.createdAt > 0 && state.createdAt <= now)) state.createdAt = Math.min(now, state.lastActiveAt > 0 ? state.lastActiveAt : now);
