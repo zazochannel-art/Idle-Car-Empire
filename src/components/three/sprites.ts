@@ -163,6 +163,7 @@ class SpriteFactory {
     try {
       const T = await import("three");
       const models = await import("./car-models");
+      await models.loadShapes();
       const industrial = await import("./industrial-models");
       const buildings = await import("./building-models");
       const homes = await import("./home-models");

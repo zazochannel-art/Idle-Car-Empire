@@ -119,6 +119,11 @@ export interface MaterialKit {
   disc: THREE_NS.Material;
   caliper: THREE_NS.Material;
   seat: THREE_NS.Material;
+  cabin: THREE_NS.Material;
+  plate: THREE_NS.Material;
+  alu: THREE_NS.Material;
+  amber: THREE_NS.Material;
+  wood: THREE_NS.Material;
   engine: THREE_NS.Material;
   white: THREE_NS.Material;
   led: THREE_NS.Material;
@@ -146,7 +151,8 @@ export function materialKit(T: Three): MaterialKit {
     },
     primer: new T.MeshStandardMaterial({ color: "#a7adb5", metalness: 0.35, roughness: 0.55 }),
     // tinted glass that mirrors the sky like real windows do
-    glass: new T.MeshPhysicalMaterial({ color: "#2a3b4d", metalness: 0.35, roughness: 0.03, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 2.1 }),
+    // see-through glass: the sky reflects off it and the cabin shows behind it
+    glass: new T.MeshPhysicalMaterial({ color: "#3b5670", metalness: 0.25, roughness: 0.02, clearcoat: 1, clearcoatRoughness: 0.02, envMapIntensity: 2.2, transparent: true, opacity: 0.84, depthWrite: false }),
     tyre: new T.MeshStandardMaterial({ color: "#16181b", roughness: 0.92, metalness: 0 }),
     rim: new T.MeshStandardMaterial({ color: "#c9ced6", metalness: 0.95, roughness: 0.22 }),
     rimBlack: new T.MeshStandardMaterial({ color: "#17191c", metalness: 0.6, roughness: 0.35 }),
@@ -159,6 +165,11 @@ export function materialKit(T: Three): MaterialKit {
     disc: new T.MeshStandardMaterial({ color: "#6b7078", metalness: 0.85, roughness: 0.4 }),
     caliper: new T.MeshStandardMaterial({ color: "#d9262c", metalness: 0.3, roughness: 0.4 }),
     seat: new T.MeshStandardMaterial({ color: "#3a2a22", roughness: 0.7 }),
+    cabin: new T.MeshStandardMaterial({ color: "#1b1d21", roughness: 0.8 }),
+    plate: new T.MeshStandardMaterial({ color: "#f3f4f6", roughness: 0.35, metalness: 0.1 }),
+    alu: new T.MeshStandardMaterial({ color: "#c7ccd3", metalness: 0.9, roughness: 0.28 }),
+    amber: new T.MeshStandardMaterial({ color: "#f59e0b", emissive: "#f59e0b", emissiveIntensity: 0.35, roughness: 0.2 }),
+    wood: new T.MeshStandardMaterial({ color: "#8b5a2b", roughness: 0.85 }),
     engine: new T.MeshStandardMaterial({ color: "#5d636c", metalness: 0.8, roughness: 0.35 }),
     white: new T.MeshStandardMaterial({ color: "#f4f6f8", roughness: 0.4 }),
     led: new T.MeshStandardMaterial({ color: "#dff4ff", emissive: "#bfe9ff", emissiveIntensity: 1.2 }),
@@ -303,6 +314,21 @@ function tyreGeometry(T: Three, R: number, w: number) {
 
 function box(T: Three, w: number, h: number, d: number, mat: THREE_NS.Material, x: number, y: number, z: number, ry = 0) {
   const m = new T.Mesh(new T.BoxGeometry(w, h, d), mat);
+  m.position.set(x, y, z);
+  m.rotation.y = ry;
+  return m;
+}
+
+let RoundedBox: typeof import("three/addons/geometries/RoundedBoxGeometry.js").RoundedBoxGeometry | null = null;
+/** Loads the rounded box geometry (call once before building). */
+export async function loadShapes() {
+  RoundedBox ??= (await import("three/addons/geometries/RoundedBoxGeometry.js")).RoundedBoxGeometry;
+}
+
+/** A box with softened edges (falls back to a sharp box until the geometry is loaded). */
+function rbox(T: Three, w: number, h: number, d: number, mat: THREE_NS.Material, x: number, y: number, z: number, r = 0.03, ry = 0) {
+  const rr = Math.min(r, Math.min(w, h, d) * 0.45);
+  const m = new T.Mesh(RoundedBox && rr > 0.002 ? new RoundedBox(w, h, d, 2, rr) : new T.BoxGeometry(w, h, d), mat);
   m.position.set(x, y, z);
   m.rotation.y = ry;
   return m;
@@ -478,17 +504,33 @@ export function buildCar(T: Three, kit: MaterialKit, look: CarLook): THREE_NS.Gr
   // before the glass goes in (station 5) only the roof and pillars stand, seats visible
   const parts = splitMeshes(T, loft(T, gh, 20, classify), [st >= 4 ? kit.glass : null, roofM, painted ? kit.trim : body]);
   car.add(...parts);
-  if (st < 4) {
-    if (st >= 3) {
-      const seat = (sx: number, sz: number) => {
-        const sg = new T.Group();
-        sg.add(box(T, 0.5, 0.12, 0.48, kit.seat, 0, sp.hood - 0.25, 0));
-        sg.add(box(T, 0.12, 0.55, 0.46, kit.seat, -0.22, sp.hood + 0.02, 0));
-        sg.position.set(sx, 0, sz);
-        return sg;
-      };
-      car.add(seat(x((sp.ws + sp.rs) / 2) - 0.35, -hw * 0.42), seat(x((sp.ws + sp.rs) / 2) - 0.35, hw * 0.42));
-    }
+  // the cabin behind the glass: seats, a dashboard and a steering wheel
+  if (st >= 3) {
+    const seatX = x((sp.ws + sp.rs) / 2) - 0.35;
+    const seatY = Math.max(sp.clear + 0.3, sp.hood - 0.3);
+    const seat = (sx: number, sz: number, back = 0.55) => {
+      const sg = new T.Group();
+      sg.add(rbox(T, 0.5, 0.12, 0.46, kit.seat, 0, seatY, 0, 0.04));
+      const b = rbox(T, 0.12, back, 0.44, kit.seat, -0.24, seatY + back / 2, 0, 0.04);
+      b.rotation.z = 0.18;
+      sg.add(b);
+      sg.add(rbox(T, 0.08, 0.14, 0.26, kit.seat, -0.33, seatY + back + 0.06, 0, 0.03)); // head rest
+      sg.position.set(sx, 0, sz);
+      return sg;
+    };
+    car.add(seat(seatX, -hw * 0.42), seat(seatX, hw * 0.42));
+    // a rear bench in four-seaters
+    if (sp.re - sp.rs > 0.25) car.add(seat(seatX - 0.85, -hw * 0.4, 0.45), seat(seatX - 0.85, hw * 0.4, 0.45));
+    const dashX = x(sp.ws) - 0.12;
+    const dashY = belt(sp.ws) - 0.08;
+    car.add(rbox(T, 0.32, 0.16, W * 0.82, kit.cabin, dashX, dashY, 0, 0.05));
+    // a dark floor, so the cabin never shows the ground through it
+    car.add(box(T, (sp.rw - sp.ws) * L * 0.9, 0.02, W * 0.84, kit.cabin, x((sp.ws + sp.rw) / 2), seatY - 0.08, 0));
+    const wheelR = new T.Mesh(new T.TorusGeometry(0.17, 0.022, 6, 18), kit.cabin);
+    wheelR.rotation.y = Math.PI / 2;
+    wheelR.rotation.x = 0.35;
+    wheelR.position.set(dashX - 0.24, dashY + 0.12, -hw * 0.42);
+    car.add(wheelR);
   }
   // chrome or black trim along the window line
   for (const side of [-1, 1]) {
@@ -539,8 +581,24 @@ export function buildCar(T: Three, kit: MaterialKit, look: CarLook): THREE_NS.Gr
       }
   }
 
+  // dark wheel wells, so every wheel sits in a deep arch
+  for (const au of [fu, ru]) {
+    const well = new T.Mesh(new T.CylinderGeometry(archR * 0.98, archR * 0.98, W * 0.86, 18, 1, false, -Math.PI / 2, Math.PI), kit.cabin);
+    well.rotation.x = -Math.PI / 2; // the half-tube's axis runs across the car, open side down
+    // never taller than the bodywork above the wheel (low noses)
+    well.scale.z = Math.max(0.2, Math.min(1, (Math.min(top(au), top(au + 0.04), top(au - 0.04)) - R - 0.05) / archR));
+    well.position.set(x(au), R, 0);
+    car.add(well);
+  }
+
   if (done) {
     const lamp = sp.lamps ?? (sp.led ? "led" : "round");
+    // number plates front and back
+    for (const [u, dx] of [
+      [0, 0.03],
+      [1, -0.03],
+    ] as const)
+      car.add(rbox(T, 0.02, 0.1, 0.42, kit.plate, x(u) + dx, sp.clear + 0.26, 0, 0.01));
     const gy = sp.nose - (sp.grille ? sp.grille[1] / 2 + 0.04 : 0.12);
     // a round lamp facing forward, with a chrome bezel
     const roundLamp = (lx: number, ly: number, lz: number, r: number, tall = 1) => {
@@ -693,31 +751,72 @@ export function buildCar(T: Three, kit: MaterialKit, look: CarLook): THREE_NS.Gr
 
 // ───────────────────────────── trucks ─────────────────────────────
 
-/** A cab with windscreen, mirrors, grille and lights. Origin at its rear axle line. */
-function cab(T: Three, kit: MaterialKit, color: string, len: number, h: number, w: number) {
+/** A dark half-tube over an axle: the wheel arch. Axis across the vehicle. */
+function arch(T: Three, kit: MaterialKit, x: number, R: number, w: number) {
+  const m = new T.Mesh(new T.CylinderGeometry(R * 1.12, R * 1.12, w, 16, 1, false, -Math.PI / 2, Math.PI), kit.cabin);
+  m.rotation.x = -Math.PI / 2;
+  m.position.set(x, R, 0);
+  return m;
+}
+
+/**
+ * A forward-control truck cab: rounded shell, raked windscreen with a sun
+ * visor, grille bars, lamps in the bumper, a step, big mirrors on arms and,
+ * on long-haul tractors, a sleeper with a roof fairing. Origin: centre of
+ * the cab on the ground; +X forward.
+ */
+function cab(T: Three, kit: MaterialKit, color: string, len: number, h: number, w: number, sleeper = false) {
   const g = new T.Group();
   const paint = kit.paint(color, "gloss");
-  // rounded cab body
-  const secs: Section[] = [];
-  for (let i = 0; i <= 10; i++) {
-    const u = i / 10;
-    const front = u < 0.15;
-    secs.push({ x: len * (1 - u) - len / 2, wb: w / 2, wt: w / 2 * 0.94, bot: 0.45, top: front ? 0.45 + h * (0.82 + u) : 0.45 + h, n: 5 });
+  const y0 = 0.55;
+  const fx = len / 2;
+  // the shell: rounded box, a touch narrower at the roof
+  g.add(rbox(T, len, h, w, paint, 0, y0 + h / 2, 0, 0.16));
+  // the cabin inside, seen through the glass
+  g.add(rbox(T, len * 0.6, h * 0.4, w * 0.86, kit.cabin, fx - len * 0.35, y0 + h * 0.62, 0, 0.05));
+  // raked windscreen and side windows
+  const ws = rbox(T, 0.06, h * 0.4, w * 0.9, kit.glass, fx + 0.005, y0 + h * 0.66, 0, 0.03);
+  ws.rotation.z = -0.07;
+  g.add(ws);
+  for (const sd of [-1, 1]) {
+    g.add(rbox(T, len * 0.42, h * 0.32, 0.04, kit.glass, fx - len * 0.28, y0 + h * 0.67, sd * (w / 2 + 0.002), 0.02));
+    // door seam, handle and step
+    g.add(box(T, 0.012, h * 0.62, 0.01, kit.trim, fx - len * 0.53, y0 + h * 0.45, sd * (w / 2 + 0.004)));
+    g.add(box(T, 0.14, 0.03, 0.02, kit.chrome, fx - len * 0.48, y0 + h * 0.45, sd * (w / 2 + 0.01)));
+    g.add(rbox(T, 0.34, 0.05, 0.16, kit.plastic, fx - len * 0.2, y0 - 0.08, sd * (w / 2 - 0.02), 0.02));
+    // mirror on two arms, with a wide-angle lens below
+    const mx = fx - 0.02;
+    const mz = sd * (w / 2 + 0.24);
+    for (const my of [y0 + h * 0.86, y0 + h * 0.5]) g.add(strut(T, new T.Vector3(mx - 0.05, my, sd * (w / 2 - 0.02)), new T.Vector3(mx, my, mz), 0.016, kit.trim));
+    g.add(rbox(T, 0.07, h * 0.3, 0.13, kit.trim, mx, y0 + h * 0.7, mz, 0.03));
+    g.add(rbox(T, 0.072, h * 0.1, 0.12, kit.chrome, mx + 0.004, y0 + h * 0.48, mz, 0.03));
+    // headlamps in the bumper corners and amber indicators
+    g.add(rbox(T, 0.05, 0.14, 0.32, kit.lens, fx + 0.05, y0 + 0.13, sd * w * 0.33, 0.03));
+    const ind = new T.Mesh(new T.SphereGeometry(0.05, 8, 6), kit.amber);
+    ind.position.set(fx + 0.05, y0 + 0.13, sd * w * 0.46);
+    g.add(ind);
   }
-  g.add(new T.Mesh(loft(T, secs, 18), paint));
-  // windscreen and side windows
-  g.add(box(T, 0.04, h * 0.42, w * 0.86, kit.glass, len / 2 + 0.005, 0.45 + h * 0.66, 0));
-  for (const s of [-1, 1]) g.add(box(T, len * 0.4, h * 0.34, 0.02, kit.glass, len * 0.22, 0.45 + h * 0.66, s * (w / 2 + 0.003)));
-  // grille, bumper, lights, mirrors
-  g.add(box(T, 0.04, h * 0.3, w * 0.6, kit.trim, len / 2 + 0.01, 0.45 + h * 0.25, 0));
-  g.add(box(T, 0.12, 0.18, w * 1.02, kit.plastic, len / 2, 0.5, 0));
-  for (const s of [-1, 1]) {
-    const lens = new T.Mesh(new T.SphereGeometry(0.1, 10, 8), kit.lens);
-    lens.scale.set(0.4, 0.6, 1);
-    lens.position.set(len / 2 + 0.03, 0.62, s * w * 0.38);
-    g.add(lens);
-    g.add(box(T, 0.04, 0.32, 0.05, kit.trim, len / 2 - 0.05, 0.45 + h * 0.7, s * (w / 2 + 0.12)));
-    g.add(strut(T, new T.Vector3(len / 2 - 0.05, 0.45 + h * 0.85, s * w / 2), new T.Vector3(len / 2 - 0.05, 0.45 + h * 0.85, s * (w / 2 + 0.12)), 0.015, kit.trim));
+  // sun visor and roof marker lights
+  g.add(rbox(T, 0.22, 0.05, w * 0.94, kit.trim, fx + 0.05, y0 + h + 0.0, 0, 0.02));
+  for (let i = -2; i <= 2; i++) {
+    const l = new T.Mesh(new T.SphereGeometry(0.035, 8, 6), kit.amber);
+    l.position.set(fx + 0.08, y0 + h + 0.04, i * w * 0.15);
+    g.add(l);
+  }
+  // grille: dark panel with chrome bars and a badge
+  const gy = y0 + h * 0.3;
+  g.add(rbox(T, 0.04, h * 0.32, w * 0.64, kit.trim, fx + 0.01, gy, 0, 0.02));
+  for (let i = 0; i < 5; i++) g.add(box(T, 0.045, 0.025, w * 0.6, kit.chrome, fx + 0.02, gy - h * 0.12 + i * h * 0.06, 0));
+  g.add(rbox(T, 0.05, 0.08, 0.3, kit.chrome, fx + 0.03, gy + h * 0.2, 0, 0.02));
+  // bumper with a number plate
+  g.add(rbox(T, 0.2, 0.26, w * 1.02, kit.plastic, fx, y0 + 0.08, 0, 0.06));
+  g.add(rbox(T, 0.02, 0.1, 0.42, kit.plate, fx + 0.11, y0 + 0.02, 0, 0.01));
+  if (sleeper) {
+    // sleeper behind the seats and an aerodynamic roof fairing
+    g.add(rbox(T, len * 0.42, h * 0.5, w * 0.98, paint, -len * 0.3, y0 + h + h * 0.22, 0, 0.12));
+    const fair = rbox(T, len * 0.62, h * 0.42, w * 0.96, paint, fx - len * 0.42, y0 + h + h * 0.18, 0, 0.14);
+    fair.rotation.z = -0.22;
+    g.add(fair);
   }
   return g;
 }
@@ -729,51 +828,166 @@ export interface TruckLook {
   spin?: number;
 }
 
-/** Delivery trucks: van, box truck, semi and road train. Origin under the centre. */
+/** A panel van, lofted like the cars: low bonnet, steep screen, tall roof. */
+function van(T: Three, kit: MaterialKit, L: number, W: number, H: number, cargo: string, empty: boolean) {
+  const g = new T.Group();
+  const R = 0.36;
+  const x = (u: number) => L / 2 - u * L;
+  const fa = 0.15;
+  const ra = 0.8;
+  const top = curve([
+    [0, 0.85],
+    [0.1, 1.12],
+    [0.15, 1.2],
+    [0.3, H - 0.08],
+    [0.36, H],
+    [0.98, H],
+    [1, H - 0.08],
+  ]);
+  const archR = R + 0.07;
+  const bottom = (u: number) => {
+    let b = 0.3;
+    for (const au of [fa, ra]) {
+      const d = Math.abs(x(u) - x(au));
+      if (d < archR) b = Math.max(b, R + Math.sqrt(archR * archR - d * d) * 0.9);
+    }
+    return b;
+  };
+  const N = 40;
+  const secs: Section[] = [];
+  for (let i = 0; i <= N; i++) {
+    const u = i / N;
+    const end = Math.min(1, Math.min(u, 1 - u) / 0.02);
+    const k = 0.8 + 0.2 * Math.sqrt(end);
+    secs.push({ x: x(u), wb: (W / 2) * k, wt: (W / 2) * k * 0.9, bot: bottom(u), top: top(u), n: 4.6 });
+  }
+  // windscreen and cab windows are glass faces of the same shell
+  const classify = (i: number, pz: number, side: number) => {
+    const u = (i + 0.5) / N;
+    if (u > 0.15 && u < 0.33 && pz > -0.05 && Math.abs(side) < 0.8) return 1;
+    if (u > 0.2 && u < 0.36 && pz > 0.1 && pz < 0.75 && Math.abs(side) > 0.6) return 1;
+    return 0;
+  };
+  g.add(...splitMeshes(T, loft(T, secs, 24, classify), [kit.paint("#eef1f5", "gloss"), kit.glass, kit.trim]));
+  g.add(rbox(T, L * 0.16, 0.5, W * 0.84, kit.cabin, x(0.28), 1.25, 0, 0.05));
+  for (const au of [fa, ra]) g.add(arch(T, kit, x(au), R, W * 0.88));
+  for (const sd of [-1, 1]) {
+    // company livery band, sliding door rail, mirror, lamps
+    if (!empty) g.add(box(T, L * 0.5, 0.32, 0.01, kit.paint(cargo, "gloss"), x(0.66), 1.3, sd * (W / 2 - 0.005)));
+    g.add(box(T, L * 0.3, 0.02, 0.012, kit.trim, x(0.5), 1.62, sd * (W / 2 - 0.004)));
+    g.add(rbox(T, 0.06, 0.24, 0.12, kit.trim, x(0.2), 1.55, sd * (W / 2 + 0.14), 0.03));
+    g.add(strut(T, new T.Vector3(x(0.2), 1.48, sd * (W / 2 - 0.03)), new T.Vector3(x(0.2), 1.48, sd * (W / 2 + 0.1)), 0.015, kit.trim));
+    g.add(rbox(T, 0.05, 0.12, 0.34, kit.lens, x(0.005) - 0.01, 0.92, sd * W * 0.3, 0.03));
+    g.add(rbox(T, 0.04, 0.4, 0.14, kit.tail, x(1) - 0.005, 0.95, sd * (W / 2 - 0.1), 0.02));
+  }
+  g.add(rbox(T, 0.04, 0.2, W * 0.5, kit.trim, x(0.003), 0.66, 0, 0.02));
+  g.add(rbox(T, 0.16, 0.2, W * 1.0, kit.plastic, x(0) + 0.05, 0.42, 0, 0.06));
+  g.add(rbox(T, 0.16, 0.2, W * 1.0, kit.plastic, x(1) - 0.05, 0.42, 0, 0.06));
+  g.add(box(T, 0.012, H - 0.6, 0.012, kit.trim, x(1) - 0.002, H / 2 + 0.25, 0)); // rear door split
+  for (const au of [fa, ra])
+    for (const sd of [-1, 1]) {
+      const wg = wheel(T, kit, R, 0.24, 6, false, 0, true, "silver");
+      if (sd < 0) wg.rotation.y = Math.PI;
+      wg.position.set(x(au), R, sd * (W / 2 - 0.16));
+      g.add(wg);
+    }
+  return g;
+}
+
+/** Delivery trucks: van, rigid box truck, semi and road train. Origin under the centre, +X forward. */
 export function buildTruck(T: Three, kit: MaterialKit, look: TruckLook): THREE_NS.Group {
   const g = new T.Group();
   const dims = { van: { L: 5.2, W: 2.0, H: 2.3 }, truck: { L: 7.5, W: 2.4, H: 3.0 }, semi: { L: 9.5, W: 2.5, H: 3.3 }, trailer: { L: 11, W: 2.5, H: 3.4 } }[look.kind];
   const { L, W, H } = dims;
-  const R = look.kind === "van" ? 0.34 : 0.48;
-  const cabLen = look.kind === "van" ? 1.6 : 2.0;
-  const cabColor = "#e8ecf1";
-  // chassis
-  g.add(box(T, L * 0.96, 0.2, W * 0.8, kit.trim, 0, R + 0.05, 0));
-  const c = cab(T, kit, cabColor, cabLen, look.kind === "van" ? 1.55 : 2.0, W);
+  if (look.kind === "van") {
+    g.add(van(T, kit, L, W, H, look.cargo, look.empty));
+    g.traverse((o) => ((o as THREE_NS.Mesh).isMesh ? (o.castShadow = true) : null));
+    return g;
+  }
+  const R = 0.5;
+  const tractor = look.kind !== "truck";
+  const cabLen = 2.0;
+  const cabH = 2.05;
+  const c = cab(T, kit, tractor ? "#e9edf2" : "#f2f4f7", cabLen, cabH, W, tractor);
   c.position.x = L / 2 - cabLen / 2;
   g.add(c);
-  // cargo box with ribs, or a flat bed when empty
-  const boxLen = L - cabLen - 0.25;
-  const bx = -L / 2 + boxLen / 2 + 0.05;
-  if (look.kind === "van") {
-    const vanBody = box(T, boxLen, H - 0.55, W, kit.paint(look.empty ? cabColor : cabColor, "gloss"), bx, 0.55 + (H - 0.55) / 2, 0);
-    g.add(vanBody);
-    if (!look.empty) for (const s of [-1, 1]) g.add(box(T, boxLen * 0.8, 0.35, 0.01, kit.paint(look.cargo, "gloss"), bx, 1.4, s * (W / 2 + 0.006)));
-  } else if (!look.empty) {
-    g.add(box(T, boxLen, H - 0.65, W, kit.paint(look.cargo, "gloss"), bx, 0.65 + (H - 0.65) / 2, 0));
-    for (let i = 0; i <= 6; i++) for (const s of [-1, 1]) g.add(box(T, 0.04, H - 0.75, 0.02, kit.chrome, bx - boxLen / 2 + (i * boxLen) / 6, 0.65 + (H - 0.65) / 2, s * (W / 2 + 0.01)));
-    g.add(box(T, 0.02, H - 0.7, W * 0.96, kit.trim, bx - boxLen / 2 - 0.005, 0.65 + (H - 0.65) / 2, 0));
+  const steel = kit.trim;
+  // chassis rails
+  for (const sd of [-1, 1]) g.add(box(T, L * 0.94, 0.22, 0.12, steel, 0, R + 0.1, sd * W * 0.3));
+  // fuel tank and battery box behind the front wheels, an exhaust stack behind the cab
+  const tx = L / 2 - cabLen - 0.45;
+  const tank = new T.Mesh(new T.CylinderGeometry(0.3, 0.3, 0.9, 18), kit.alu);
+  tank.rotation.z = Math.PI / 2;
+  tank.position.set(tx, 0.62, W / 2 - 0.32);
+  g.add(tank);
+  for (const bx of [tx - 0.3, tx + 0.3]) {
+    const band = new T.Mesh(new T.TorusGeometry(0.305, 0.015, 6, 18), steel);
+    band.rotation.y = Math.PI / 2;
+    band.position.set(bx, 0.62, W / 2 - 0.32);
+    g.add(band);
+  }
+  g.add(rbox(T, 0.7, 0.45, 0.5, steel, tx, 0.62, -(W / 2 - 0.3), 0.04));
+  const stack = new T.Mesh(new T.CylinderGeometry(0.07, 0.07, cabH + 0.7, 12), kit.chrome);
+  stack.position.set(L / 2 - cabLen - 0.08, 0.55 + (cabH + 0.7) / 2, -(W / 2 - 0.2));
+  g.add(stack);
+
+  // the load: a rounded box body with corner posts and rear doors, or a flatbed
+  const gap = tractor ? 0.45 : 0.15;
+  const boxLen = L - cabLen - gap;
+  const bx = -L / 2 + boxLen / 2;
+  const floor = R * 2 + 0.25;
+  const bodyH = H - floor + 0.3;
+  if (!look.empty) {
+    const cargoM = kit.paint(look.cargo, "gloss");
+    g.add(rbox(T, boxLen, bodyH, W, cargoM, bx, floor + bodyH / 2, 0, 0.08));
+    // white roof cap and bottom rail
+    g.add(rbox(T, boxLen + 0.02, 0.12, W + 0.02, kit.white, bx, floor + bodyH - 0.05, 0, 0.05));
+    g.add(rbox(T, boxLen + 0.02, 0.14, W + 0.03, steel, bx, floor + 0.04, 0, 0.03));
+    // vertical posts along the sides, and the rear door frame with locking bars
+    const posts = Math.max(4, Math.round(boxLen / 1.2));
+    for (let i = 1; i < posts; i++) for (const sd of [-1, 1]) g.add(box(T, 0.05, bodyH - 0.2, 0.02, kit.alu, bx - boxLen / 2 + (i * boxLen) / posts, floor + bodyH / 2, sd * (W / 2 + 0.008)));
+    g.add(rbox(T, 0.06, bodyH, W + 0.02, kit.alu, -L / 2 + 0.02, floor + bodyH / 2, 0, 0.03));
+    g.add(box(T, 0.065, bodyH - 0.15, 0.025, steel, -L / 2 + 0.01, floor + bodyH / 2, 0));
+    for (const z of [-W * 0.33, -W * 0.12, W * 0.12, W * 0.33]) g.add(strut(T, new T.Vector3(-L / 2 - 0.02, floor + 0.15, z), new T.Vector3(-L / 2 - 0.02, floor + bodyH - 0.15, z), 0.02, kit.chrome));
   } else {
-    g.add(box(T, boxLen, 0.14, W, kit.plastic, bx, 0.72, 0));
-    for (const s of [-1, 1]) g.add(box(T, boxLen, 0.4, 0.04, kit.trim, bx, 0.98, s * W / 2));
+    // flatbed: wooden deck, headboard and stake pockets
+    g.add(rbox(T, boxLen, 0.14, W, kit.wood, bx, floor, 0, 0.03));
+    g.add(rbox(T, 0.1, 1.0, W, steel, bx + boxLen / 2 - 0.05, floor + 0.55, 0, 0.03));
+    for (let i = 0; i <= 5; i++) for (const sd of [-1, 1]) g.add(box(T, 0.08, 0.12, 0.06, steel, bx - boxLen / 2 + 0.2 + (i * (boxLen - 0.4)) / 5, floor - 0.05, sd * W / 2));
   }
-  // wheels: front axle under the cab, one or two rear axles
-  const axles = look.kind === "van" ? [L / 2 - 0.9, -L / 2 + 1.0] : look.kind === "truck" ? [L / 2 - 1.1, -L / 2 + 1.6] : [L / 2 - 1.1, -L / 2 + 2.2, -L / 2 + 1.0];
-  for (const ax of axles)
-    for (const s of [-1, 1]) {
-      const wg = wheel(T, kit, R, 0.32, 6, false, look.spin ?? 0);
-      if (s < 0) wg.rotation.y = Math.PI;
-      wg.position.set(ax, R, s * (W / 2 - 0.12));
-      g.add(wg);
+  // semi-trailers: landing legs and an aero side skirt between the axles
+  const axles: { x: number; dual: boolean }[] = [{ x: L / 2 - 1.1, dual: false }];
+  if (tractor) {
+    axles.push({ x: L / 2 - cabLen - 0.75, dual: true });
+    const n = look.kind === "trailer" ? 3 : 2;
+    for (let i = 0; i < n; i++) axles.push({ x: -L / 2 + 1.0 + i * 1.05, dual: false });
+    const legX = L / 2 - cabLen - gap - 1.3;
+    for (const sd of [-1, 1]) g.add(box(T, 0.1, floor - 0.1, 0.1, steel, legX, (floor - 0.1) / 2, sd * W * 0.32));
+    if (!look.empty) {
+      const s0 = legX - 0.3;
+      const s1 = -L / 2 + 1.0 + n * 1.05 - 0.2;
+      for (const sd of [-1, 1]) g.add(rbox(T, s0 - s1, floor - 0.45, 0.03, kit.plastic, (s0 + s1) / 2, (floor - 0.45) / 2 + 0.32, sd * (W / 2 - 0.03), 0.01));
     }
-  // mud flaps and tail lights
-  for (const s of [-1, 1]) {
-    g.add(box(T, 0.04, 0.4, 0.4, kit.plastic, -L / 2 + 0.3, 0.4, s * (W / 2 - 0.25)));
-    const tl = new T.Mesh(new T.SphereGeometry(0.08, 8, 6), kit.tail);
-    tl.scale.set(0.5, 1, 1.6);
-    tl.position.set(-L / 2 - 0.02, 0.75, s * (W / 2 - 0.2));
-    g.add(tl);
+  } else axles.push({ x: -L / 2 + 1.6, dual: true });
+  for (const ax of axles) {
+    if (ax.x > L / 2 - cabLen) g.add(arch(T, kit, ax.x, R, W * 0.9));
+    for (const sd of [-1, 1])
+      for (const k of ax.dual ? [0, 1] : [0]) {
+        const wg = wheel(T, kit, R, 0.3, 8, false, look.spin ?? 0, true, "silver");
+        if (sd < 0) wg.rotation.y = Math.PI;
+        wg.position.set(ax.x, R, sd * (W / 2 - 0.16 - k * 0.32));
+        g.add(wg);
+      }
   }
+  // mud flaps, rear bumper bar and tail light clusters
+  const lastX = Math.min(...axles.map((a) => a.x));
+  for (const sd of [-1, 1]) {
+    g.add(box(T, 0.03, 0.55, 0.55, kit.plastic, lastX - R - 0.15, 0.5, sd * (W / 2 - 0.3)));
+    g.add(rbox(T, 0.05, 0.16, 0.42, kit.tail, -L / 2 - 0.03, 0.75, sd * (W / 2 - 0.3), 0.03));
+    g.add(rbox(T, 0.05, 0.1, 0.16, kit.amber, -L / 2 - 0.03, 0.75, sd * (W / 2 - 0.62), 0.03));
+  }
+  g.add(rbox(T, 0.12, 0.12, W * 0.9, steel, -L / 2 + 0.05, 0.45, 0, 0.03));
+  g.add(rbox(T, 0.02, 0.12, 0.42, kit.plate, -L / 2 - 0.02, 0.6, 0, 0.01));
   g.traverse((o) => ((o as THREE_NS.Mesh).isMesh ? (o.castShadow = true) : null));
   return g;
 }
@@ -792,7 +1006,13 @@ export function buildCarrier(T: Three, kit: MaterialKit, cars: CarLook[], spin =
   // lower and upper decks with posts
   g.add(box(T, deckLen, 0.1, W, kit.plastic, dx, 0.85, 0));
   g.add(box(T, deckLen, 0.08, W, kit.trim, dx, 2.55, 0));
-  for (let i = 0; i <= 4; i++) for (const s of [-1, 1]) g.add(box(T, 0.08, 1.75, 0.08, kit.paint("#f59e0b", "gloss"), dx - deckLen / 2 + (i * deckLen) / 4, 1.7, s * W / 2));
+  for (let i = 0; i <= 4; i++) for (const s of [-1, 1]) g.add(rbox(T, 0.09, 1.75, 0.09, kit.paint("#f59e0b", "gloss"), dx - deckLen / 2 + (i * deckLen) / 4, 1.7, s * W / 2, 0.03));
+  // guard rails along both decks, a fuel tank and the cab's front arch
+  for (const y of [1.05, 2.75]) for (const s of [-1, 1]) g.add(rbox(T, deckLen, 0.06, 0.05, kit.alu, dx, y, s * W / 2, 0.02));
+  const tank = new T.Mesh(new T.CylinderGeometry(0.28, 0.28, 0.8, 16), kit.alu);
+  tank.rotation.z = Math.PI / 2;
+  tank.position.set(L / 2 - 2.6, 0.6, W / 2 - 0.3);
+  g.add(tank, arch(T, kit, L / 2 - 1.1, 0.48, W * 0.9));
   const slots = [
     [dx + deckLen * 0.25, 0.9],
     [dx - deckLen * 0.25, 0.9],

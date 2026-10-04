@@ -540,6 +540,8 @@ export class Traffic {
     if (!this.openNodes.length) return;
     const out = this.pathFrom(dealer, this.randomNode(this.edgeNodes.length ? this.edgeNodes : this.openNodes));
     if (!out) return;
+    // one buyer at a time on the forecourt: busy dealers don't stack cars on one spot
+    if (this.agents.some((o) => o.kind !== "ship" && Math.hypot(o.rx - out[0].x, o.ry - out[0].y) < 1.2)) return;
     const color = CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)];
     this.agents.push(this.agent("customer", out, { phase: "leave", color, color2: color, model, cur: 0.2 }));
   }
@@ -956,9 +958,15 @@ export class Traffic {
 
   drawables(): { depth: number; x: number; y: number; draw: (p: Painter) => void }[] {
     const out: { depth: number; x: number; y: number; draw: (p: Painter) => void }[] = [];
+    // trucks waiting at the same dock queue inside the loading bay: show one
+    const docked: Agent[] = [];
     for (const a of this.agents) {
       if (a.phase === "inside" || a.alpha <= 0) continue;
       const sh = a.ship;
+      if (sh && a.parked) {
+        if (docked.some((o) => Math.abs(o.rx - a.rx) + Math.abs(o.ry - a.ry) < 0.6)) continue;
+        docked.push(a);
+      }
       if (sh) {
         out.push({
           depth: a.rx + a.ry,
