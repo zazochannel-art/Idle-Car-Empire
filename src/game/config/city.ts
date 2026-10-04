@@ -34,37 +34,37 @@ export const ZONES: ZoneConfig[] = [
     mix: "....hhhhttsa",
   },
   {
-    id: "industrial", stage: 2, letter: "I", cost: 20_000, scale: 15, ground: "#94a06f", accent: "#38bdf8",
+    id: "industrial", stage: 2, letter: "I", cost: 25_000, scale: 1.5, ground: "#94a06f", accent: "#38bdf8",
     builds: ["garage", "partsFactory", "warehouse", "logistics", "truckDepot", "parking"],
     mix: "....iiiit",
   },
   {
-    id: "downtown", stage: 3, letter: "D", cost: 300_000, scale: 400, ground: "#7fae6e", accent: "#22d3ee",
+    id: "downtown", stage: 3, letter: "D", cost: 150_000, scale: 2.5, ground: "#7fae6e", accent: "#22d3ee",
     builds: ["garage", "carWash", "parking", "serviceCenter", "researchCenter"],
     mix: "....ooooaasst",
   },
   {
-    id: "automotive", stage: 4, letter: "A", cost: 5e7, scale: 1e4, ground: "#8fa77a", accent: "#818cf8",
+    id: "automotive", stage: 4, letter: "A", cost: 600_000, scale: 4, ground: "#8fa77a", accent: "#818cf8",
     builds: ["garage", "partsFactory", "researchCenter", "logistics", "warehouse"],
     mix: "....iiisot",
   },
   {
-    id: "luxury", stage: 5, letter: "L", cost: 2e10, scale: 3e5, ground: "#5fbf74", accent: "#facc15",
+    id: "luxury", stage: 5, letter: "L", cost: 2_500_000, scale: 7, ground: "#5fbf74", accent: "#facc15",
     builds: ["garage", "serviceCenter", "carWash", "parking", "hq"],
     mix: "....hhhttta",
   },
   {
-    id: "supercar", stage: 6, letter: "S", cost: 1e13, scale: 1e7, ground: "#b9a46c", accent: "#fb923c",
+    id: "supercar", stage: 6, letter: "S", cost: 10_000_000, scale: 12, ground: "#b9a46c", accent: "#fb923c",
     builds: ["garage", "researchCenter", "exportTerminal", "warehouse"],
     mix: "....iitto",
   },
   {
-    id: "mega", stage: 7, letter: "M", cost: 5e18, scale: 3e8, ground: "#86a08a", accent: "#e879f9",
+    id: "mega", stage: 7, letter: "M", cost: 40_000_000, scale: 20, ground: "#86a08a", accent: "#e879f9",
     builds: ["garage", "hq", "exportTerminal", "logistics", "truckDepot"],
     mix: "....ooooooaa",
   },
   {
-    id: "global", stage: 8, letter: "G", cost: 5e21, scale: 1e10, ground: "#7aa2a8", accent: "#c084fc",
+    id: "global", stage: 8, letter: "G", cost: 150_000_000, scale: 35, ground: "#7aa2a8", accent: "#c084fc",
     builds: ["garage", "airport", "hq", "exportTerminal"],
     mix: "....oooost",
   },
@@ -149,17 +149,17 @@ export const GARAGE_BUILD_COST = 25_000;
 
 export const STRUCTURES: StructureConfig[] = [
   { id: "garage", emoji: "🔧", cost: GARAGE_BUILD_COST, levelGrowth: 1, maxLevel: 10, color: "#e9edf3", roof: "#3b82f6" },
-  { id: "carWash", emoji: "🫧", cost: 1_500, levelGrowth: 3, maxLevel: 10, income: 6, color: "#dff3ff", roof: "#0ea5e9" },
-  { id: "parking", emoji: "🅿️", cost: 1_000, levelGrowth: 3, maxLevel: 10, zoneGarageIncome: 0.08, color: "#9aa3ad", roof: "#64748b" },
-  { id: "serviceCenter", emoji: "🛠️", cost: 8_000, levelGrowth: 3, maxLevel: 10, income: 25, color: "#fff4e0", roof: "#f97316" },
-  { id: "warehouse", emoji: "📦", cost: 4_000, levelGrowth: 3, maxLevel: 10, zoneGarageSpeed: 0.06, color: "#e8dcc4", roof: "#a16207" },
-  { id: "partsFactory", emoji: "⚙️", cost: 60_000, levelGrowth: 4, maxLevel: 10, speed: 0.02, color: "#d6d3d1", roof: "#57534e" },
-  { id: "logistics", emoji: "🚚", cost: 50_000, levelGrowth: 4, maxLevel: 10, delivery: 0.05, color: "#e5e7eb", roof: "#2563eb" },
-  { id: "truckDepot", emoji: "🚛", cost: 40_000, levelGrowth: 4, maxLevel: 10, dealerCap: 0.04, color: "#d1d5db", roof: "#dc2626" },
+  { id: "carWash", emoji: "🫧", cost: 4_000, levelGrowth: 3, maxLevel: 10, income: 0.3, color: "#dff3ff", roof: "#0ea5e9" },
+  { id: "parking", emoji: "🅿️", cost: 3_000, levelGrowth: 3, maxLevel: 10, zoneGarageIncome: 0.08, color: "#9aa3ad", roof: "#64748b" },
+  { id: "serviceCenter", emoji: "🛠️", cost: 20_000, levelGrowth: 3, maxLevel: 10, income: 1.2, color: "#fff4e0", roof: "#f97316" },
+  { id: "warehouse", emoji: "📦", cost: 10_000, levelGrowth: 3, maxLevel: 10, zoneGarageSpeed: 0.06, color: "#e8dcc4", roof: "#a16207" },
+  { id: "partsFactory", emoji: "⚙️", cost: 80_000, levelGrowth: 4, maxLevel: 10, speed: 0.02, color: "#d6d3d1", roof: "#57534e" },
+  { id: "logistics", emoji: "🚚", cost: 60_000, levelGrowth: 4, maxLevel: 10, delivery: 0.05, color: "#e5e7eb", roof: "#2563eb" },
+  { id: "truckDepot", emoji: "🚛", cost: 50_000, levelGrowth: 4, maxLevel: 10, dealerCap: 0.04, color: "#d1d5db", roof: "#dc2626" },
   { id: "researchCenter", emoji: "🔬", cost: 150_000, levelGrowth: 4, maxLevel: 10, rp: 0.05, color: "#f8fafc", roof: "#06b6d4" },
-  { id: "exportTerminal", emoji: "🚢", cost: 2e6, levelGrowth: 4, maxLevel: 10, markup: 0.02, color: "#cbd5e1", roof: "#0f766e" },
-  { id: "hq", emoji: "🏢", cost: 5e6, levelGrowth: 4, maxLevel: 10, income2: 0.02, color: "#bfdbfe", roof: "#1e3a8a" },
-  { id: "airport", emoji: "✈️", cost: 2e7, levelGrowth: 4, maxLevel: 10, markup: 0.04, color: "#e2e8f0", roof: "#475569" },
+  { id: "exportTerminal", emoji: "🚢", cost: 1_500_000, levelGrowth: 4, maxLevel: 10, markup: 0.02, color: "#cbd5e1", roof: "#0f766e" },
+  { id: "hq", emoji: "🏢", cost: 3_000_000, levelGrowth: 4, maxLevel: 10, income2: 0.02, color: "#bfdbfe", roof: "#1e3a8a" },
+  { id: "airport", emoji: "✈️", cost: 8_000_000, levelGrowth: 4, maxLevel: 10, markup: 0.04, color: "#e2e8f0", roof: "#475569" },
   // supply-chain plants (their economy lives in config/chain.ts)
   ...PLANTS.map((p) => ({ id: p.id, emoji: p.emoji, cost: p.cost, levelGrowth: 1, maxLevel: 8, color: p.color, roof: p.roof })),
 ];
@@ -184,7 +184,7 @@ export const GARAGE_GRID: [number, number][] = [
 ];
 
 /** Price of reaching level L+1 from L (index L-1), × zone scale. */
-export const GARAGE_LEVEL_COST = [500, 5_000, 50_000, 500_000, 5e6, 5e7, 5e8, 5e9, 5e10];
+export const GARAGE_LEVEL_COST = [2_000, 6_000, 18_000, 50_000, 140_000, 400_000, 1_100_000, 3_000_000, 8_000_000];
 /** Income multiplier per garage level. */
 export const GARAGE_LEVEL_MULT = 1.25;
 /** Mechanics a garage can employ, per level. */
@@ -194,7 +194,7 @@ export const GARAGE_POWER = [12, 22, 40, 64, 100, 140, 190, 250, 320, 400];
 export const WORKER_COST = 30;
 export const WORKER_GROWTH = 1.35;
 /** What a serviced car pays, before the facility's fee multiple (× zone scale). */
-export const SERVICE_FEE = 20;
+export const SERVICE_FEE = 1.2;
 export const FACILITY_GROWTH = 1.45;
 
 export interface FacilityConfig {

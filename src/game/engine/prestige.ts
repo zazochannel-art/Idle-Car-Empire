@@ -72,6 +72,6 @@ export function applyStartPerks(s: GameState) {
   for (const type of types) {
     if (Object.values(s.city.buildings).some((b) => b.type === type)) continue;
     const free = WORLD_MAP.plots.find((p) => p.kind === "plot" && !p.big && p.zone === "town" && !s.city.buildings[p.id]);
-    if (free) s.city.buildings[free.id] = { type, level: 1, plant: newPlant(type) };
+    if (free) s.city.buildings[free.id] = { type, level: 1, plant: newPlant() };
   }
 }

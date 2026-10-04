@@ -37,7 +37,7 @@ export interface TransportTier {
 /** Each tier replaces the one before (its numbers already include them). */
 export const TRANSPORT_TIERS: TransportTier[] = [
   { id: "truck", emoji: "🚚", cost: 0, speed: 1, capacity: 1, market: 0, cars: 0 },
-  { id: "train", emoji: "🚆", cost: 5e7, speed: 1.3, capacity: 1.5, market: 0, cars: 0 },
-  { id: "port", emoji: "🚢", cost: 5e9, speed: 1.4, capacity: 2, market: 0.1, cars: 0 },
-  { id: "export", emoji: "✈️", cost: 5e11, speed: 1.6, capacity: 2.5, market: 0.15, cars: 0.15 },
+  { id: "train", emoji: "🚆", cost: 2_000_000, speed: 1.3, capacity: 1.5, market: 0, cars: 0 },
+  { id: "port", emoji: "🚢", cost: 15_000_000, speed: 1.4, capacity: 2, market: 0.03, cars: 0 },
+  { id: "export", emoji: "✈️", cost: 80_000_000, speed: 1.6, capacity: 2.5, market: 0.04, cars: 0.04 },
 ];

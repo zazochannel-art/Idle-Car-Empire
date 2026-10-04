@@ -1,6 +1,8 @@
 // Read-only helpers that explain the game to the player: what to aim for next
 // and why something is locked. They return data, not text — the UI words it
 // in the player's language. Never mutate state.
+import { MATERIAL_BY_ID, type MaterialId } from "../config/economy";
+import { orderCost, shortfall } from "./materials";
 import { CARS } from "../config/cars";
 import { MAKER, PLANTS, PLANT_BY_ID } from "../config/chain";
 import { DEALERS } from "../config/dealerships";
@@ -30,8 +32,10 @@ export type Goal =
   /** cost/what: the cheapest upgrade on the maker plot, bought by tapping the goal. */
   | { kind: "shortage"; icon: string; plot: string; component: ComponentId; cost?: number; what?: "speed" | "level" }
   | { kind: "dealer"; icon: string; cost: number; dealer: DealerId }
-  /** Every dealer is full and cars go wholesale: the cheapest way to sell more. */
+  /** Every dealer is full and cars wait at the plants: the cheapest way to sell more (perMin: cars waiting). */
   | { kind: "dealerFull"; icon: string; cost: number; dealer: DealerId; open: boolean; perMin: number }
+  /** A plant ran out of a material and nothing is on the way: buy enough for 10 units. */
+  | { kind: "materials"; icon: string; plot: string; material: MaterialId; cost: number }
   | { kind: "car"; icon: string; cost?: number; car: CarId; plot: string | null; requirement: Requirement | null }
   | { kind: "manager"; icon: string; cost: number; manager: ManagerId }
   /** gain: extra income share the points add; stalled: income stopped growing. */
@@ -72,7 +76,18 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
   const goals: Goal[] = [];
   const gm = snap.gm;
 
-  // An assembly line starved of parts is the most urgent thing on the map.
+  // A plant out of material, with nothing on the way, is the most urgent thing on the map.
+  for (const [id, b] of plantsOf(s)) {
+    const st = snap.chain.plants[id];
+    if (b.plant.status !== "noRaw" || !b.plant.short || !st) continue;
+    if (s.chain.shipments.some((sh) => !sh.back && sh.to === id && sh.materials)) continue;
+    const want = shortfall(b.plant, st.need, 10);
+    const cost = (Object.entries(want) as [MaterialId, number][]).reduce((a, [m, n]) => a + orderCost(s, m, n), 0);
+    goals.push({ kind: "materials", icon: MATERIAL_BY_ID[b.plant.short].emoji, plot: id, material: b.plant.short, cost });
+    break;
+  }
+
+  // An assembly line starved of parts is next.
   for (const [id, b] of plantsOf(s)) {
     if (b.type === "assemblyPlant" && b.plant.status === "noParts" && b.plant.missing) {
       const plot = makerPlot(s, snap, b.plant.missing) ?? id;
@@ -89,15 +104,16 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
     goals.push({ kind: "dealer", icon: d.emoji, cost: d.cost, dealer: d.id });
   }
 
-  // Dealers can't keep up: cars are going wholesale below dealer price.
-  if (s.chain.wholesale * 60 >= 1) {
+  // Dealers can't keep up: finished cars are waiting at the plants.
+  const waiting = plantsOf(s).reduce((a, [, b]) => (b.type === "assemblyPlant" && b.plant.status === "full" ? a + Math.floor(b.plant.out) : a), 0);
+  if (waiting >= 1) {
     let best: Extract<Goal, { kind: "dealerFull" }> | null = null;
     for (const d of DEALERS) {
       const st = s.dealers[d.id];
       const open = !st.owned;
       if (open && dealerRequirement(s, d.id) !== null) continue;
       const cost = open ? d.cost : dealerUpgradeCost(s, d.id);
-      if (!best || cost < best.cost) best = { kind: "dealerFull", icon: d.emoji, cost, dealer: d.id, open, perMin: s.chain.wholesale * 60 };
+      if (!best || cost < best.cost) best = { kind: "dealerFull", icon: d.emoji, cost, dealer: d.id, open, perMin: waiting };
     }
     if (best) goals.push(best);
   }

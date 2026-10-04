@@ -409,6 +409,7 @@ export function MenuPanel({ onSettings }: { onSettings: () => void }) {
   const setView = useUi((u) => u.setView);
   const { t } = useT();
   const tiles: { icon: string; label: string; go: () => void; gold?: boolean }[] = [
+    { icon: "📊", label: t("nav.economy"), go: () => setView("economy"), gold: true },
     { icon: "⭐", label: t("nav.prestige"), go: () => setView("prestige"), gold: true },
     { icon: "🚗", label: t("nav.cars"), go: () => setView("cars") },
     { icon: "🏆", label: t("nav.achievements"), go: () => setView("achievements") },

@@ -2,6 +2,7 @@ import type { GameEvent, GameState } from "../types";
 import { chainTick } from "./chain";
 import { cityTick } from "./city";
 import { snapshot, type EconomySnapshot } from "./economy";
+import { book } from "./materials";
 
 /** Adds money to the wallet and to the earnings stats. */
 export function credit(s: GameState, amount: number) {
@@ -26,7 +27,10 @@ export function tick(s: GameState, dt: number, snap?: EconomySnapshot): GameEven
   const steps = Math.ceil(dt / MAX_STEP);
   for (let i = 0; i < steps; i++) chainTick(s, dt / steps, eco.chain, (amount) => credit(s, amount), events);
 
-  cityTick(s, dt, eco.city, (amount) => credit(s, amount));
+  cityTick(s, dt, eco.city, (amount) => {
+    credit(s, amount);
+    book(s, "services", amount);
+  });
 
   s.run.playTime += dt;
   s.lifetime.playTime += dt;

@@ -54,7 +54,7 @@ function ModelCard({ car, unlocked, open, onToggle }: { car: CarConfig; unlocked
   const d = state.designs[car.id];
   const ms = modelStats(state, car);
   const lock = unlocked ? null : carLock(state, car, snap.gm);
-  const cost = carPartsValue(car) * snap.gm.value[1] * snap.gm.income;
+  const cost = carPartsValue(car);
   const value = carValue(state, car, snap.gm);
   const lvl = state.carModels[car.id] ?? 0;
   const paint = d.color || LIVERY[CAR_MODEL_FOR[car.id]].color;

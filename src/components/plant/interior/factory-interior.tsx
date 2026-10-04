@@ -12,6 +12,7 @@ import { automationCost, gradeCost, levelCost, speedCost } from "@/game/engine/c
 import { formatMoney, formatNumber, formatPercent } from "@/game/format";
 import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
+import { stockTotal } from "@/game/engine/materials";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { CAR_MODEL_FOR } from "../../map/vehicles";
@@ -81,7 +82,7 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
       type: st.type,
       spec: { level: b.level, automation: p.automation, manager },
       running: p.status === "ok",
-      raw: cfg.item ? p.raw / st.rawCap : 0,
+      raw: cfg.item ? stockTotal(p.stock) / st.rawCap : 0,
       out: p.out / st.outCap,
       docked: p.out >= 1,
       inbound,
@@ -128,7 +129,7 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
         {p.status !== "ok" && (
           <div className="mt-2 flex justify-center">
             <div className="rounded-xl bg-amber-500/90 px-3 py-1.5 text-xs font-black text-black shadow-lg">
-              ⚠️ {t(`status.${p.status}` as MessageKey, { raw: t(`raw.${cfg.raw}` as MessageKey), item: itemName(p.missing ?? "engine", t) })} · {t("status.paused")}
+              ⚠️ {t(`status.${p.status}` as MessageKey, { raw: p.short ? t(`mat.${p.short}` as MessageKey) : t("chain.raw"), item: itemName(p.missing ?? "engine", t) })} · {t("status.paused")}
             </div>
           </div>
         )}
@@ -236,7 +237,7 @@ function StationCard({ plotId, id, people, robots, onClose }: { plotId: string; 
       break;
     case "level":
       level = t("common.lv", { level: b.level });
-      stat = def === recipe[0] && cfg.item ? [t("interior.stock"), `${formatNumber(Math.floor(p.raw))}/${formatNumber(st.rawCap)}`] : [t("interior.stock"), `${formatNumber(Math.floor(p.out))}/${formatNumber(st.outCap)}`];
+      stat = def === recipe[0] && cfg.item ? [t("interior.stock"), `${formatNumber(Math.floor(stockTotal(p.stock)))}/${formatNumber(st.rawCap)}`] : [t("interior.stock"), `${formatNumber(Math.floor(p.out))}/${formatNumber(st.outCap)}`];
       title = b.level < PLANT_LEVELS.length ? t("interior.upgradeLevel", { name: t(`plantLevel.${b.level + 1}` as MessageKey) }) : level;
       cost = levelCost(b, gm);
       buy = () => g.plantLevel(plotId);
