@@ -61,8 +61,8 @@ export function showroomTick(s: GameState, dt: number, events?: GameEvent[], rol
   return sold;
 }
 
-/** A marketing campaign's price: a few minutes of steady income. */
-export const campaignCost = (s: GameState) => Math.max(CAMPAIGN.min, Math.max(0, s.chain.steady ?? s.chain.rate) * CAMPAIGN.costSec);
+/** A marketing campaign's price: a few minutes of what car sales bring in on average this run (part sales don't benefit). */
+export const campaignCost = (s: GameState) => Math.max(CAMPAIGN.min, (Math.max(0, s.run.carRevenue) / Math.max(600, s.run.playTime)) * CAMPAIGN.costSec);
 
 export function startCampaign(s: GameState): boolean {
   const cost = campaignCost(s);

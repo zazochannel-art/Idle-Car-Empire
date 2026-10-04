@@ -163,7 +163,8 @@ export const RIVAL_TEAMS: RivalTeam[] = [
 ];
 export const RIVAL_BY_ID = Object.fromEntries(RIVAL_TEAMS.map((r) => [r.id, r])) as Record<string, RivalTeam>;
 /** Each win in an event makes its rivals this much stronger (up to `max` wins): they learn and spend. */
-export const RIVAL_GROWTH = { perWin: 0.012, max: 12 };
+// up to +36%: a dominant car (development, turbo, R&D tech) keeps finding rivals that catch up
+export const RIVAL_GROWTH = { perWin: 0.012, max: 30 };
 
 // ───────────────────────────── events ─────────────────────────────
 

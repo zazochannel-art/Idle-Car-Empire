@@ -1,5 +1,8 @@
 // A "new player" that only does what the What's-next goals suggest.
-// Run: npx tsx scripts/goal-bot.ts [hours] [q = quiet] [save.json]
+// Run: npx tsx scripts/goal-bot.ts [hours] [q = quiet] [race] [full] [sessions] [audit] [save.json]
+//   full: also uses every system a player would (research, sponsors, event
+//         objectives, marketing, prestige) and lives on the real clock (events)
+//   sessions: plays 1 h, then is away 7 h (offline simulation), repeatedly
 import { writeFileSync } from "node:fs";
 import * as Ch from "../src/game/engine/chain";
 import { buildStructure, unlockZone } from "../src/game/engine/city";
@@ -15,13 +18,23 @@ import * as Rc from "../src/game/engine/racing";
 import { RACING_DISTRICT } from "../src/game/config/racing";
 import { CAR_BY_ID } from "../src/game/config/cars";
 import { RESTOCK_UNITS } from "../src/game/config/economy";
+import { RESEARCH } from "../src/game/config/research";
+import { SPONSORS } from "../src/game/config/racing";
+import { doResearch } from "../src/game/engine/actions";
+import { claimEventGoal } from "../src/game/engine/events";
+import { campaignCost, startCampaign } from "../src/game/engine/showroom";
+import { canPrestige, pendingPoints, prestige } from "../src/game/engine/prestige";
+import { collectOffline, settleOffline } from "../src/game/engine/offline";
+import { brandScore } from "../src/game/engine/brand";
 
 const hours = Number(process.argv[2] ?? 3);
-const quiet = process.argv[3] === "q" || process.argv[3] === "race";
-const racing = process.argv.includes("race");
+const quiet = ["q", "race", "full", "sessions"].includes(process.argv[3]);
+const full = process.argv.includes("full");
+const sessions = process.argv.includes("sessions");
+const racing = process.argv.includes("race") || full;
 const audit = process.argv.includes("audit");
 /** Where to write the final save: the first argument after the hours that is a file name, not a flag. */
-const savePath = process.argv.slice(4).find((a) => !["q", "race", "audit"].includes(a));
+const savePath = process.argv.slice(4).find((a) => !["q", "race", "audit", "full", "sessions"].includes(a));
 const problems = new Map<string, string>();
 const s = createInitialState(0);
 s.tips = ["start", "engine", "market", "dealers"];
@@ -62,8 +75,55 @@ function raceStep(t: number) {
   }
   void t;
 }
+/** The rest of a player's toolbox (full mode): research, sponsors, event objectives, marketing, prestige. */
+/** FULL_SKIP=research,sponsor,event,campaign,prestige switches parts of the full player off (to measure each). */
+const skip = new Set((process.env.FULL_SKIP ?? "").split(",").filter(Boolean));
+function fullStep(t: number) {
+  // research: the cheapest node open
+  const node = RESEARCH.filter((r) => !s.research.includes(r.id) && r.requires.every((q) => s.research.includes(q)) && r.cost <= s.rp).sort((a, b) => a.cost - b.cost)[0];
+  if (node && !skip.has("research") && doResearch(s, node.id)) counts.research = (counts.research ?? 0) + 1;
+  // the best sponsor it can sign
+  const sp = [...SPONSORS].reverse().find((x) => s.racing.rep >= x.minRep);
+  if (sp && !skip.has("sponsor") && s.racing.sponsor !== sp.id && s.racing.unlocked && Rc.signSponsor(s, sp.id)) counts.sponsor = (counts.sponsor ?? 0) + 1;
+  if (!skip.has("event") && claimEventGoal(s, s.lastActiveAt) !== null) counts.eventGoal = (counts.eventGoal ?? 0) + 1;
+  // marketing when it is cheap next to the cash
+  if (!skip.has("campaign") && s.cash > campaignCost(s) * 20 && startCampaign(s)) counts.campaign = (counts.campaign ?? 0) + 1;
+  // a new region once it brings a good handful of points
+  if (!skip.has("prestige") && canPrestige(s) && pendingPoints(s) >= Math.max(3, s.empirePointsEarned)) {
+    const pts = prestige(s, s.lastActiveAt);
+    console.log(`>> prestige at ${fmtT(t)}: +${pts} points`);
+    counts.prestige = (counts.prestige ?? 0) + 1;
+  }
+}
+
+/** Horizons the economy is checked at. */
+const CHECKPOINTS = [15 * 60, 3600, 3 * 3600, 10 * 3600, 24 * 3600, 72 * 3600, 168 * 3600];
+function checkpoint(t: number) {
+  const sn = snapshot(s);
+  console.log(
+    `@@ ${fmtT(t).padEnd(10)} earned ${formatMoney(s.lifetime.moneyEarned).padStart(9)} cash ${formatMoney(s.cash).padStart(9)} steady ${formatMoney(Math.max(0, s.chain.steady ?? s.chain.rate)).padStart(8)}/s` +
+      ` cars ${String(Math.floor(s.lifetime.carsProduced)).padStart(6)} plants ${Ch.plantsOf(s).length} research ${s.research.length} rp/s ${sn.rpPerSec.toFixed(1)} prestige ${s.prestigeCount}` +
+      ` race ${s.racing.stats.races}/${s.racing.stats.wins} rep ${Math.round(s.racing.rep)} brand ${brandScore(s)} owed ${formatMoney(s.chain.owed)}`,
+  );
+}
+
 const counts: Record<string, number> = {};
 for (let t = 0; t < hours * 3600; t++) {
+  if (full) s.lastActiveAt = t * 1000;
+  if (CHECKPOINTS.includes(t)) checkpoint(t);
+  // away 7 h after every hour of play
+  if (sessions && t > 0 && t % (8 * 3600) === 3600) {
+    const back = (t + 7 * 3600) * 1000;
+    s.lastActiveAt = t * 1000;
+    const rep = settleOffline(s, back);
+    const got = collectOffline(s);
+    const led = rep?.ledger ? Object.entries(rep.ledger).filter(([, v]) => Math.abs(v) > 1).map(([k, v]) => `${k} ${formatMoney(v)}`).join(", ") : "";
+    console.log(`   .. away 7h at ${fmtT(t)}: +${formatMoney(got)} (${rep?.cars ?? 0} cars; races ${rep?.racing?.races ?? 0} prize ${formatMoney(rep?.racing?.prize ?? 0)}) ${led}`);
+    for (const c of CHECKPOINTS) if (c > t && c <= t + 7 * 3600) checkpoint(c);
+    t += 7 * 3600;
+    snap = snapshot(s);
+    if (full) s.lastActiveAt = t * 1000;
+  }
   if (t % 5 === 0) snap = snapshot(s);
   const before = s.cash;
   const owedBefore = s.chain.owed;
@@ -118,9 +178,11 @@ for (let t = 0; t < hours * 3600; t++) {
     if (acted) { counts[g.kind] = (counts[g.kind] ?? 0) + 1; break; }
   }
   if (racing) raceStep(t);
+  if (full) fullStep(t);
   if (acted) idleSince = t;
   else if (t - idleSince === 1800) console.log(`${fmtT(t)}  !! 30 min with nothing the goals let me do (cash ${formatMoney(s.cash)})`);
 }
+checkpoint(hours * 3600);
 console.log("\nactions:", counts, "rescues:", rescues, "max owed:", formatMoney(maxOwed));
 console.log("rp", Math.round(s.rp), "rp/s", snapshot(s).rpPerSec.toFixed(3));
 console.log("cars made", Math.floor(s.lifetime.carsProduced), "sold", s.lifetime.carsSold, "earned", formatMoney(s.lifetime.moneyEarned), "cash", formatMoney(s.cash));

@@ -50,7 +50,7 @@ Regula de lucru: **extindem ce există, nu creăm sisteme paralele.**
 | **7. Brand** ✅ | Nume (primul gratuit, rebranding plătit), logo, culori, stil (valoare / curse / lux / tehnologie); atribute câștigate în joc: calitate (reputația de fabricație), lux (mașini premium+ vândute), inovație (cercetare, prototipuri, electrice), imagine sportivă (reputația din curse, separată); bonus de preț la dealeri și în showroom pe clasa judecată după atributul ei (peste 50, stilul ×1,5); livreaua de fabrică poartă culorile brandului | `engine/brand.ts`, `market.ts`, `showroom.ts`, `racing.liveryOf` |
 | **8. R&D** ✅ | 7 tehnologii noi în arborele existent (injecție directă, cutie cu dublu ambreiaj, frânare regenerativă, amortizoare adaptive, tunel aerodinamic, panouri din carbon, acoperiri ceramice); fiecare intră fizic în mașinile construite după cercetare (stocată pe mașină, în DNA, pe pista de teste și în curse); mașinile vechi rămân cum au fost făcute | `config/tech.ts`, `config/research.ts`, `racing.statsOf`, `car-dna.ts` |
 | **9. Evenimente + sponsori** ✅ | Fiecare eveniment de piață are un obiectiv numărat de la începutul lui (Factory Week: mașini construite, Car Show: vândute, Race Weekend: victorii, Electric Week: hypercar/electrice, export, cercetare, upgrade-uri) cu recompensă în venit + piese; obiectivele neaccesibile (fără echipă de curse, fără export) apar închise; sponsorii au contracte (podiumuri/victorii în 2 h de curse) cu bonus și reînnoire, iar ratarea îl face să plece; prima de semnare se plătește o singură dată (repară exploit-ul semnare/anulare). Bonus: după prestige, mașinile de pe drum sau din showroom revin la fabrică | `events.ts`, `config/events.ts`, `racing.ts`, `prestige.ts` |
-| **10. Economie** | Goal-bot pe 15 min, 1 h, 3 h, 10 h, 24 h, 3 zile, 7 zile; recalibrare | `scripts/goal-bot.ts` |
+| **10. Economie** ✅ | Goal-bot cu jucător „full” (toate sistemele), ceas real (evenimente), sesiuni 1 h joc / 7 h offline, rapoarte la 15 min → 7 zile; recalibrare: campania costă din vânzările de mașini (nu și din piese), rivalii cresc până la +36%, furnizorul acoperă o fabrică de transmisie/roți/frâne care nu livrează (repară blocarea asamblării după prestige) | `scripts/goal-bot.ts`, `showroom.ts`, `config/racing.ts`, `chain.ts` |
 | **11. UI** | Navigare pe 4 piloni: EMPIRE, CARS, RACING, BUSINESS | `game.tsx` |
 | **12. Grafică + performanță** | Mașini 3D mai detaliate, LOD, cache de sprite-uri | `three/*` |
 
@@ -59,3 +59,23 @@ Regula de lucru: **extindem ce există, nu creăm sisteme paralele.**
 - Datele salvate rămân compatibile (`migrate*` la fiecare stare nouă).
 - Fiecare fază: teste unitare, fuzzer, invariante, simulare goal-bot, verificare în browser.
 - Nicio componentă „decorativă”: tot ce apare în UI influențează simularea.
+
+## 5. Economia pe orizonturi (faza 10)
+
+`npx tsx scripts/goal-bot.ts <ore> [q|race|full|sessions] [audit]` — `FULL_SKIP=research,sponsor,event,campaign,prestige` oprește câte un sistem ca să-i măsori efectul.
+
+| Orizont | Jucător de bază (doar obiectivele) | Jucător complet, 1 h joc / 7 h offline |
+|---|---|---|
+| 15 min | $130K câștigați, prima mașină la 26 min | idem (prima mașină la 25 min) |
+| 1 h | $563K, $26/s | $548K, $27/s |
+| 3 h | $4.1M, $172/s | $5.7M (offline inclus) |
+| 10 h | $98M, $1.2K/s | $124M, $1K/s, 15 cercetări |
+| 24 h | $369M, $1.1K/s (platou: nu cercetează, nu face prestige) | $715M, $6.8K/s, 1 prestige |
+| 3 zile | — | $100B, 47K mașini, 3 prestige |
+| 7 zile | — | $2T, 152K mașini, 5 prestige, curse 39% victorii |
+
+Ce a arătat și ce s-a reparat:
+- **Asamblarea se bloca după prestige**: o fabrică proprie de frâne fără materiale oprea furnizorul extern, iar linia stătea ore întregi. Acum furnizorul acoperă golul (la prețul lui) cât timp fabrica proprie nu livrează: 23K → 152K mașini în 7 zile.
+- **Campania de marketing** costa din tot venitul (inclusiv piese) și golea casa; acum costă 300 s din media vânzărilor de mașini ale rundei.
+- **Cursele** deveniseră prea ușoare pe termen lung (96% victorii): rivalii unui eveniment cresc acum până la +36% (30 de victorii).
+- Contribuția sistemelor noi la 10 h (fără cercetare/prestige): sponsori + obiective de eveniment + campanii ≈ +25% venit; cercetarea rămâne cel mai mare multiplicator.
