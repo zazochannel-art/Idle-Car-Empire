@@ -1,3 +1,4 @@
+import { BUYABLE_TERRITORIES } from "../config/city";
 import { ACHIEVEMENT_INCOME_BONUS } from "../config/achievements";
 import { ENGINEER_BY_ID } from "../config/expansion";
 import { CARS, CAR_MODEL } from "../config/cars";
@@ -113,6 +114,9 @@ export function computeGlobalMods(s: GameState): GlobalMods {
   for (const perk of EMPIRE_PERKS) {
     if (s.empirePoints >= perk.points) perk.effects.forEach((e) => applyEffect(m, e));
   }
+
+  // Territories bought around the districts.
+  for (const t of BUYABLE_TERRITORIES) if (s.city.territories?.includes(t.id)) t.effects.forEach((e) => applyEffect(m, e));
 
   // The region the empire has expanded to.
   REGIONS[regionIndex(s.prestigeCount)].effects.forEach((e) => applyEffect(m, e));

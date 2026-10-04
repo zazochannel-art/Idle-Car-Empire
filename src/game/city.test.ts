@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { FACILITY_BY_ID, SERVICE_FEE, ZONES } from "./config/city";
-import { DEPOT, DRIVEWAY, MARKET, STARTER_PLOT, WORLD, WORLD_MAP, roadRoute, segmentOpen } from "./city/layout";
+import { FACILITY_BY_ID, LEGACY_OFFSET, SERVICE_FEE, TERRITORIES, ZONES } from "./config/city";
+import { DEPOT, DRIVEWAY, MARKET, RACING, RIVER, STARTER_PLOT, WORLD, WORLD_MAP, hasRoad, roadRoute, segmentOpen } from "./city/layout";
+import * as T from "./engine/territory";
+import LEGACY_PLOTS from "./legacy-plots.json";
+import { computeGlobalMods } from "./engine/modifiers";
 import type { GameState } from "./types";
 import * as C from "./engine/city";
 import { snapshot } from "./engine/economy";
@@ -25,7 +28,7 @@ function withGarage(cash = 0): GameState {
 
 describe("world layout", () => {
   it("has the market, the depot, industrial lots and the starter works", () => {
-    expect(WORLD).toBe(71);
+    expect(WORLD).toBe(24 * 7 + 1);
     expect(WORLD_MAP.plotById[MARKET].zone).toBe("town");
     expect(WORLD_MAP.plotById[DEPOT].zone).toBe("town");
     expect(WORLD_MAP.plots.filter((p) => p.big)).toHaveLength(9);
@@ -44,11 +47,102 @@ describe("world layout", () => {
 
   it("only roads next to unlocked zones carry traffic", () => {
     const open = new Set(["town"] as const);
-    expect(segmentOpen("x", 0, 2, open)).toBe(true);
-    expect(segmentOpen("x", 2, 3, open)).toBe(true); // border with Downtown
-    expect(segmentOpen("x", 6, 5, open)).toBe(false); // Supercar Valley
-    expect(segmentOpen("x", 0, 0, open)).toBe(false); // hills: no road
-    expect(segmentOpen("y", 5, 0, open)).toBe(false); // the river
+    const o = LEGACY_OFFSET;
+    expect(segmentOpen("x", o + 0, o + 2, open)).toBe(true);
+    expect(segmentOpen("x", o + 2, o + 3, open)).toBe(true); // border with Downtown
+    expect(segmentOpen("x", o + 6, o + 5, open)).toBe(false); // Supercar Valley
+    expect(segmentOpen("x", 0, 0, open)).toBe(false); // mountains: no road
+    expect(segmentOpen("y", RIVER, o, open)).toBe(false); // the river
+  });
+
+  it("every territory is reachable by road from the starter works, and has its landmarks", () => {
+    // flood the road graph from the starter plot's road
+    const start = WORLD_MAP.plotById[STARTER_PLOT].entry;
+    const seen = new Set<string>([`${start.i0},${start.line}`]);
+    const queue: [number, number][] = [[start.i0, start.line]];
+    while (queue.length) {
+      const [i, j] = queue.shift()!;
+      const next: [number, number, boolean][] = [
+        [i + 1, j, hasRoad("x", j, i)],
+        [i - 1, j, hasRoad("x", j, i - 1)],
+        [i, j + 1, hasRoad("y", i, j)],
+        [i, j - 1, hasRoad("y", i, j - 1)],
+      ];
+      for (const [a, b, ok] of next) if (ok && !seen.has(`${a},${b}`)) (seen.add(`${a},${b}`), queue.push([a, b]));
+    }
+    const reached = (bx: number, by: number) => [[bx, by], [bx + 1, by], [bx, by + 1], [bx + 1, by + 1]].some(([a, b]) => seen.has(`${a},${b}`));
+    for (const t of TERRITORIES) {
+      const blocks = WORLD_MAP.territoryBlocks[t.id];
+      expect(blocks.length, t.id).toBeGreaterThan(0);
+      expect(blocks.some(([bx, by]) => reached(bx, by)), t.id).toBe(true);
+    }
+    // the racing paddock's driveway is on a road
+    const pad = WORLD_MAP.plotById[RACING].entry;
+    expect(hasRoad("x", pad.line, pad.i0)).toBe(true);
+    // no street cuts the runway or the circuit
+    const [ax, ay] = WORLD_MAP.territoryBlocks.airport[0];
+    expect(hasRoad("y", ax + 1, ay)).toBe(false);
+    expect(WORLD_MAP.landmarks.some((l) => l.kind === "port")).toBe(true);
+  });
+
+  it("the map is about five times the first one, with room to breathe", () => {
+    expect((WORLD / 71) ** 2).toBeGreaterThan(4);
+    const kinds = WORLD_MAP.blocks.flat();
+    const share = (f: (k: string) => boolean) => kinds.filter(f).length / kinds.length;
+    expect(share((k) => k === "sea" || k === "lake")).toBeGreaterThan(0.12);
+    expect(share((k) => ["forest", "farm", "hills", "mountains"].includes(k))).toBeGreaterThan(0.25);
+  });
+});
+
+describe("territories", () => {
+  it("cost money and need their district, reputation and Empire Points; then they pay off", () => {
+    const s = createInitialState(T0);
+    expect(T.isTerritoryOpen(s, "raw")).toBe(false);
+    expect(T.territoryLock(s, "raw")).toEqual({ kind: "zone", zone: "industrial" });
+    s.city.zones.push("industrial");
+    expect(T.territoryLock(s, "raw")).toMatchObject({ kind: "cash" });
+    s.cash = 1e6;
+    const speed = computeGlobalMods(s).speed;
+    expect(T.unlockTerritory(s, "raw")).toBe(true);
+    expect(s.cash).toBe(1e6 - 250_000);
+    expect(computeGlobalMods(s).speed).toBeCloseTo(speed * 1.05);
+    expect(T.unlockTerritory(s, "raw")).toBe(false);
+    expect(T.territoryLock(s, "port")).toEqual({ kind: "rep", need: 5_000 });
+    s.racing.rep = 30_000;
+    s.city.zones.push("global");
+    s.cash = 1e12;
+    expect(T.territoryLock(s, "airport")).toEqual({ kind: "ep", need: 25 });
+    // the campus opens with its district, racing with the Racing District
+    expect(T.isTerritoryOpen(s, "campus")).toBe(false);
+    s.city.zones.push("automotive");
+    expect(T.isTerritoryOpen(s, "campus")).toBe(true);
+    expect(T.unlockTerritory(s, "campus")).toBe(false);
+    const back = migrate(JSON.parse(JSON.stringify(s)), T0);
+    expect(back.city.territories).toEqual(["raw"]);
+  });
+
+  it("every lot of the first map is a lot of the new one, shifted to the middle", () => {
+    const shift = (id: string) => id.replace(/^c:(\d+):(\d+)$/, (_, x, y) => `c:${+x + LEGACY_OFFSET * 2}:${+y + LEGACY_OFFSET * 2}`).replace(/^b:(\d+):(\d+)$/, (_, x, y) => `b:${+x + LEGACY_OFFSET}:${+y + LEGACY_OFFSET}`);
+    for (const id of LEGACY_PLOTS) {
+      const p = WORLD_MAP.plotById[shift(id)];
+      expect(p, id).toBeTruthy();
+    }
+  });
+
+  it("a save from the first map keeps every building on the same lot of the middle of the new one", () => {
+    const s = createInitialState(T0);
+    const raw = JSON.parse(JSON.stringify(s));
+    // what a first-map save looked like: the starter works at c:6:2, a big lot at b:6:0
+    delete raw.mapVersion;
+    raw.city.buildings = { "c:6:2": raw.city.buildings[STARTER_PLOT], "b:6:0": { type: "engineFactory", level: 2, plant: raw.city.buildings[STARTER_PLOT].plant } };
+    raw.managers.nina = { ...raw.managers.nina, hired: true, assignedTo: "c:6:2" };
+    const back = migrate(raw, T0);
+    expect(Object.keys(back.city.buildings).sort()).toEqual([STARTER_PLOT, "b:13:7"].sort());
+    expect(back.city.buildings["b:13:7"].level).toBe(2);
+    expect(back.managers.nina.assignedTo).toBe(STARTER_PLOT);
+    expect(back.mapVersion).toBe(2);
+    // a current save is not shifted again
+    expect(Object.keys(migrate(JSON.parse(JSON.stringify(back)), T0).city.buildings).sort()).toEqual([STARTER_PLOT, "b:13:7"].sort());
   });
 });
 

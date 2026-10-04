@@ -407,6 +407,8 @@ export interface ChainState {
 
 export interface CityState {
   zones: ZoneId[];
+  /** Territories bought around the districts (config/city.ts TERRITORIES). */
+  territories?: import("./config/city").TerritoryId[];
   /** Keyed by plot id (see game/city/layout.ts). */
   buildings: Record<string, BuildingState>;
   nextUid: number;
@@ -470,6 +472,8 @@ export interface GameState {
   logistics: LogisticsState;
   /** The materials market: its clock (price drift) and lifetime units bought (supplier tiers). */
   market: { t: number; bought: number };
+  /** Which world map the plot ids refer to (2: the 24×24 region; older saves are shifted on load). */
+  mapVersion: number;
   /** The running event's objective: counted from `base` since the event that started at `start` (ms). */
   eventGoal: { start: number; base: number; claimed: boolean };
   /** The brand: identity chosen by the player (its attributes are earned, see engine/brand.ts). */

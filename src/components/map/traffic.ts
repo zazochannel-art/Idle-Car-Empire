@@ -23,7 +23,7 @@ export interface Site {
 }
 
 export interface TrafficWorld {
-  unlocked: ReadonlySet<ZoneId>;
+  unlocked: ReadonlySet<string>;
   garages: Site[];
   factories: Site[];
   dealers: Site[];

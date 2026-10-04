@@ -1,7 +1,7 @@
 // The Empire Map: zones (stages), what can be built on plots, and the garage
 // interior (facilities, levels, specializations). All balance numbers live
 // here; engine/city.ts turns them into income.
-import type { DealerId, FacilityType, Specialization, StructureType, ZoneId } from "../types";
+import type { DealerId, Effect, FacilityType, Specialization, StructureType, ZoneId } from "../types";
 import { PLANTS } from "./chain";
 
 // ───────────────────────────── zones ─────────────────────────────
@@ -71,54 +71,123 @@ export const ZONES: ZoneConfig[] = [
 ];
 
 /**
- * The world, block by block (10×10 blocks of 6×6 tiles between roads).
- * District letters as in ZONES; scenery: w sea, f forest, a farmland,
- * h hills; R the Racing District (the paddock block and the circuit, with
- * no roads between its blocks). A river runs down node column RIVER_LINE,
- * crossed by bridges.
+ * The world, block by block: 24×24 blocks of 6×6 tiles between roads, an
+ * automotive region around the old town (the first map sits in the middle,
+ * LEGACY_OFFSET blocks in, so its plots keep their places).
+ *
+ * District letters as in ZONES (plots to build on). Scenery: w sea, l lake,
+ * f forest, a farmland, h hills, m mountains. Territories (TERRITORIES,
+ * unlocked as the empire grows; landmarks, no plots): K test facility, P port,
+ * Y rail yard, Q raw-material basin, U suburbs, V premium boulevard, O city
+ * skyline, X cargo airport, C automotive campus, R racing (paddock and
+ * circuit), Z racing annex (drag strip, drift, stands). Lower-case k p q u z
+ * are their access roads (country and mountain roads). A river runs down
+ * node column RIVER_LINE, crossed by bridges.
+ *
+ *            N (mountains, test facility)
+ *     NW port              NE hills, lakes
+ *  W raw materials   core   E skyline, boulevard
+ *     SW suburbs           SE airport
+ *            S racing
  */
 export const WORLD_BLOCKS = [
-  "hfTTTIIRRR",
-  "fTTTTIIIRR",
-  "aaTDDILLRR",
-  "aDDDDALLLh",
-  "wDDAAAALww",
-  "wwMAASSSww",
-  "wMMMASSShw",
-  "wMMGGGShhw",
-  "wwGGGwwwww",
-  "wwwwwwwwww",
+  "mmmmmmmffffffaffhahfafaf",
+  "mmmmmmffhfffhffhhfahflla",
+  "mmmmmafhfhallfhhhhaahlla",
+  "mmmmKKfhfffllffafOOOOaff",
+  "mmmfKKkkhffffhahhOOOOaaa",
+  "wmfffffkfffffffahOOOOfaa",
+  "wfffffakkahfhfhaaOOOOaha",
+  "wfaaaaahfTTTIICCCOaaaffw",
+  "wwhaahppTTTTIIICCVVffaaw",
+  "wwPPfppaaTDDILLCCVVffffw",
+  "wwPPYYhaDDDDALLLhVVhahfw",
+  "wwPPYYawDDAAAALwwhhXXXXw",
+  "wwaffffwwMAASSSwwafXXXXw",
+  "wwhfffawMMMASSShwafXXXXw",
+  "wwaffahwMMGGGShhwafXXXXw",
+  "wwhfffqqqGGGwwwwwfahhhhw",
+  "wwhafhqwwwuwwwwwwafffaww",
+  "wfQQQqqaauuaffffhhfhffww",
+  "wfQQQhahUUUUUUUUUzRRRZww",
+  "waQQQahhUUUUUUUUUZZRRZww",
+  "wfaQQQafUUUUUllhhZZRRZww",
+  "wfhQQQhhUUUUUllhaafffaww",
+  "wwwwwwaafahffhhffffafaww",
+  "wwwwwwwwwwwwwwwwwwwwwwww",
 ];
-/** The Racing District's paddock block (garage, pits, stands) — the rest of its blocks hold the circuit. */
-export const RACING_PADDOCK_BLOCK: [number, number] = [7, 0];
-export const RIVER_LINE = 5;
+/** Where the first map sits in this one (blocks): its plots keep their ids shifted by this. */
+export const LEGACY_OFFSET = 7;
+/** The Racing District's paddock block (garage, pits, stands) — the circuit is the R blocks next to it. */
+export const RACING_PADDOCK_BLOCK: [number, number] = [18, 18];
+export const RIVER_LINE = 12;
 
 /** Special lots, as global cell coordinates (two cells per block). */
 /** Where the Small Car Body Works stands on a new game. */
-export const STARTER_CELL: [number, number] = [6, 2];
+export const STARTER_CELL: [number, number] = [20, 16];
 /** The Parts Market buys components; the Materials Depot sells raw material. */
-export const MARKET_CELL: [number, number] = [9, 1];
-export const DEPOT_CELL: [number, number] = [4, 2];
+export const MARKET_CELL: [number, number] = [23, 15];
+export const DEPOT_CELL: [number, number] = [18, 16];
 /** Industrial lots: a whole block each, for big plants (given as any cell of the block). */
 export const BIG_LOTS: [number, number][] = [
-  [12, 0],
-  [12, 2],
-  [4, 6],
-  [10, 8],
-  [14, 6],
-  [12, 10],
-  [14, 12],
-  [4, 12],
-  [8, 14],
+  [26, 14],
+  [26, 16],
+  [18, 20],
+  [24, 22],
+  [28, 20],
+  [26, 24],
+  [28, 26],
+  [18, 26],
+  [22, 28],
 ];
 export const DEALER_LOTS: Record<DealerId, [number, number]> = {
-  local: [6, 3],
-  city: [8, 2],
-  premium: [6, 6],
-  luxury: [8, 8],
-  supercar: [12, 6],
-  global: [10, 12],
+  local: [20, 17],
+  city: [22, 16],
+  premium: [20, 20],
+  luxury: [22, 22],
+  supercar: [26, 20],
+  global: [24, 26],
 };
+
+// ───────────────────────────── territories ─────────────────────────────
+
+export type TerritoryId = "mountain" | "port" | "raw" | "suburbs" | "boulevard" | "airport" | "campus" | "racing";
+
+/**
+ * The land around the districts: bought as the empire grows. Each one is a
+ * landmark area with a real effect on the business (the Racing District has
+ * its own unlock in config/racing.ts; the campus comes with the Automotive
+ * District).
+ */
+export interface TerritoryConfig {
+  id: TerritoryId;
+  emoji: string;
+  /** Block letters it covers (its landmarks and its access roads). */
+  letters: string;
+  cost: number;
+  /** District that must be unlocked first. */
+  zone?: ZoneId;
+  /** Racing reputation needed. */
+  rep?: number;
+  /** Empire Points earned (lifetime) needed. */
+  ep?: number;
+  /** Effects on the whole empire once it is open. */
+  effects: Effect[];
+}
+
+export const TERRITORIES: TerritoryConfig[] = [
+  { id: "raw", emoji: "⛏️", letters: "Qq", cost: 250_000, zone: "industrial", effects: [{ kind: "speed", mult: 1.05 }] },
+  { id: "suburbs", emoji: "🏡", letters: "Uu", cost: 1_500_000, zone: "downtown", effects: [{ kind: "dealerCap", mult: 1.1 }] },
+  { id: "campus", emoji: "🏢", letters: "C", cost: 0, zone: "automotive", effects: [] },
+  { id: "racing", emoji: "🏁", letters: "RZz", cost: 0, effects: [] },
+  { id: "mountain", emoji: "🏔️", letters: "Kk", cost: 8_000_000, rep: 800, effects: [{ kind: "rp", mult: 1.1 }] },
+  { id: "boulevard", emoji: "💎", letters: "VO", cost: 40_000_000, zone: "luxury", effects: [{ kind: "markup", add: 0.03 }] },
+  { id: "port", emoji: "⚓", letters: "PYp", cost: 100_000_000, rep: 5_000, effects: [{ kind: "delivery", mult: 1.15 }] },
+  { id: "airport", emoji: "✈️", letters: "X", cost: 500_000_000, rep: 20_000, ep: 25, zone: "global", effects: [{ kind: "income", mult: 1.1 }] },
+];
+export const TERRITORY_BY_ID = Object.fromEntries(TERRITORIES.map((t) => [t.id, t])) as Record<TerritoryId, TerritoryConfig>;
+/** Territories the player buys (the campus opens with its district, racing with its own unlock). */
+export const BUYABLE_TERRITORIES = TERRITORIES.filter((t) => t.id !== "campus" && t.id !== "racing");
 
 export const ZONE_BY_ID: Record<ZoneId, ZoneConfig> = Object.fromEntries(ZONES.map((z) => [z.id, z])) as Record<ZoneId, ZoneConfig>;
 export const ZONE_IDS = ZONES.map((z) => z.id);

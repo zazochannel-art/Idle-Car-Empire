@@ -43,6 +43,7 @@ import * as Ex from "@/game/engine/expansion";
 import * as Dn from "@/game/engine/car-dna";
 import * as Sh from "@/game/engine/showroom";
 import * as Br from "@/game/engine/brand";
+import * as Tr from "@/game/engine/territory";
 import { ENGINEER_BY_ID, type EngineerId, type ExportMarketId, type FleetProduct, type PayLevel, type ProtoFocus } from "@/game/config/expansion";
 import { HOT_CLASS, RECALL } from "@/game/config/market";
 import { claimUnlock, openPlantTypes } from "@/game/engine/unlocks";
@@ -139,6 +140,7 @@ interface GameStore {
   setShowroomPrice: (id: number, price: number) => boolean;
   startCampaign: () => boolean;
   claimEventGoal: () => void;
+  unlockTerritory: (id: import("@/game/config/city").TerritoryId) => boolean;
   setBrand: (patch: Parameters<typeof Br.setBrand>[1]) => boolean;
   cancelRaceOrder: (car: CarId) => boolean;
   selectRaceCar: (id: number) => void;
@@ -401,6 +403,11 @@ export const useGame = create<GameStore>((set, get) => {
       if (cash !== null) uiEvents.emit({ type: "toast", tone: "gold", icon: "🎯", title: tr("eventGoal.claimed", { money: formatMoney(cash) }) });
     },
     setBrand: (patch) => act((s) => Br.setBrand(s, patch)),
+    unlockTerritory: (id) => {
+      const ok = act((s) => Tr.unlockTerritory(s, id));
+      if (ok) uiEvents.emit({ type: "toast", tone: "gold", icon: "🗺️", title: tr("territory.opened", { name: tr(`territory.${id}`) }) });
+      return ok;
+    },
     cancelRaceOrder: (car) => act((s) => Rc.cancelOrder(s, car)),
     selectRaceCar: (id) =>
       act((s) => {

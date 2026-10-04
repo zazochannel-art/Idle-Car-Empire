@@ -6,7 +6,7 @@
 // forest, farmland, hills) each block belongs to, so districts have organic
 // shapes. A river follows one node column. Pure data — shared by the engine
 // (plot rules) and the renderer.
-import { BIG_LOTS, DEALER_LOTS, DEPOT_CELL, MARKET_CELL, RACING_PADDOCK_BLOCK, RIVER_LINE, STARTER_CELL, WORLD_BLOCKS, ZONES } from "../config/city";
+import { BIG_LOTS, DEALER_LOTS, DEPOT_CELL, LEGACY_OFFSET, MARKET_CELL, RACING_PADDOCK_BLOCK, RIVER_LINE, STARTER_CELL, TERRITORIES, WORLD_BLOCKS, ZONES, type TerritoryId } from "../config/city";
 import type { DealerId, ZoneId } from "../types";
 
 export const ROAD_STEP = 7;
@@ -53,8 +53,12 @@ export interface Plot {
 }
 
 export type DecorKind = "house" | "apartment" | "office" | "shop" | "industry" | "park";
-export type SceneryKind = "forest" | "farm" | "hills";
-export type BlockKind = ZoneId | SceneryKind | "sea" | "racing";
+export type SceneryKind = "forest" | "farm" | "hills" | "mountains";
+/** Landmark areas of the territories (config/city.ts TERRITORIES). */
+export type LandmarkKind = "testFacility" | "port" | "railyard" | "raw" | "suburbs" | "boulevard" | "skyline" | "airport" | "campus" | "racingAnnex";
+export type BlockKind = ZoneId | SceneryKind | LandmarkKind | "sea" | "lake" | "racing" | "road";
+/** What a block belongs to for unlocking: a district or a territory. */
+export type AreaId = ZoneId | TerritoryId;
 
 export interface Decor {
   kind: DecorKind;
@@ -64,6 +68,17 @@ export interface Decor {
   w: number;
   d: number;
   /** Stable pseudo-random number for variety. */
+  seed: number;
+}
+
+/** A territory's landmark block (drawn by the map as port, airport, test facility...). */
+export interface Landmark {
+  kind: LandmarkKind;
+  territory: TerritoryId;
+  bx: number;
+  by: number;
+  x: number;
+  y: number;
   seed: number;
 }
 
@@ -77,7 +92,13 @@ export interface Scenery {
 }
 
 const DECOR: Record<string, DecorKind> = { h: "house", a: "apartment", o: "office", s: "shop", i: "industry", t: "park" };
-const SCENERY: Record<string, SceneryKind | "sea"> = { w: "sea", f: "forest", a: "farm", h: "hills" };
+const SCENERY: Record<string, SceneryKind | "sea" | "lake"> = { w: "sea", l: "lake", f: "forest", a: "farm", h: "hills", m: "mountains" };
+const LANDMARK: Record<string, LandmarkKind | "racing" | "road"> = {
+  K: "testFacility", P: "port", Y: "railyard", Q: "raw", U: "suburbs", V: "boulevard", O: "skyline", X: "airport", C: "campus", R: "racing", Z: "racingAnnex",
+  k: "road", p: "road", q: "road", u: "road", z: "road",
+};
+/** Landmarks whose blocks hold one big thing (a runway, a circuit, test roads): no streets between their blocks. */
+const SOLID: ReadonlySet<BlockKind> = new Set<BlockKind>(["testFacility", "airport", "racing", "racingAnnex"]);
 
 /** Tile coordinate where cell `c` (global cell index) starts. */
 export const cellOrigin = (c: number) => ROAD_STEP * (c >> 1) + 1 + CELL * (c & 1);
@@ -136,6 +157,11 @@ export interface World {
   blockZone: (ZoneId | null)[][];
   /** Blocks of each district. */
   zoneBlocks: Record<ZoneId, [number, number][]>;
+  /** Territory of each block, indexed [by][bx]; null for districts and open country. */
+  blockTerritory: (TerritoryId | null)[][];
+  /** Blocks of each territory. */
+  territoryBlocks: Record<TerritoryId, [number, number][]>;
+  landmarks: Landmark[];
 }
 
 function build(): World {
@@ -145,19 +171,32 @@ function build(): World {
   const byLetter = new Map(ZONES.map((z) => [z.letter, z]));
   const zoneBlocks = Object.fromEntries(ZONES.map((z) => [z.id, [] as [number, number][]])) as Record<ZoneId, [number, number][]>;
 
-  const blocks: BlockKind[][] = WORLD_BLOCKS.map((row, by) =>
-    [...row].map((ch, bx) => {
+  const terrByLetter = new Map(TERRITORIES.flatMap((t) => [...t.letters].map((l) => [l, t.id] as const)));
+  const territoryBlocks = Object.fromEntries(TERRITORIES.map((t) => [t.id, [] as [number, number][]])) as Record<TerritoryId, [number, number][]>;
+  const landmarks: Landmark[] = [];
+  const blockTerritory: (TerritoryId | null)[][] = [];
+  const blocks: BlockKind[][] = WORLD_BLOCKS.map((row, by) => {
+    blockTerritory[by] = [];
+    return [...row].map((ch, bx) => {
+      blockTerritory[by][bx] = terrByLetter.get(ch) ?? null;
       const z = byLetter.get(ch);
       if (z) {
         zoneBlocks[z.id].push([bx, by]);
         return z.id;
       }
-      if (ch === "R") return "racing";
+      const seed = hash(bx * 7 + 3, by * 13 + 5);
+      const lm = LANDMARK[ch];
+      if (lm) {
+        const t = terrByLetter.get(ch)!;
+        territoryBlocks[t].push([bx, by]);
+        if (lm !== "racing" && lm !== "road") landmarks.push({ kind: lm, territory: t, bx, by, x: bx * ROAD_STEP + 1, y: by * ROAD_STEP + 1, seed });
+        return lm;
+      }
       const s = SCENERY[ch] ?? "sea";
-      if (s !== "sea") scenery.push({ kind: s, bx, by, x: bx * ROAD_STEP + 1, y: by * ROAD_STEP + 1, seed: hash(bx * 7 + 3, by * 13 + 5) });
+      if (s !== "sea" && s !== "lake") scenery.push({ kind: s, bx, by, x: bx * ROAD_STEP + 1, y: by * ROAD_STEP + 1, seed });
       return s;
-    }),
-  );
+    });
+  });
   const blockZone = blocks.map((row) => row.map((k) => (ZONES.some((z) => z.id === k) ? (k as ZoneId) : null)));
 
   // Special lots first, so the fill below skips their cells.
@@ -194,9 +233,8 @@ function build(): World {
     const [bx, by] = RACING_PADDOCK_BLOCK;
     const x = bx * ROAD_STEP + 1;
     const y = by * ROAD_STEP + 1;
-    const zone = blockZone[by + 1]?.[bx];
-    if (!zone) throw new Error("the racing paddock needs a district below it");
-    plots.push({ id: RACING, zone, kind: "racing", x, y, w: CELL * 2, d: CELL * 2, entry: { x: x + CELL, y: (by + 1) * ROAD_STEP + 0.5, line: by + 1, i0: bx, i1: bx + 1, inward: -1 } });
+    if (blocks[by]?.[bx] !== "racing") throw new Error("the racing paddock must be a racing block");
+    plots.push({ id: RACING, zone: "town", kind: "racing", x, y, w: CELL * 2, d: CELL * 2, entry: { x: x + CELL, y: (by + 1) * ROAD_STEP + 0.5, line: by + 1, i0: bx, i1: bx + 1, inward: -1 } });
   }
 
   // Every other district cell: a plot or scenery from the district's mix.
@@ -211,7 +249,8 @@ function build(): World {
           if (taken.has(key(cx, cy))) continue;
           const x = cellOrigin(cx);
           const y = cellOrigin(cy);
-          const seed = hash(cx, cy);
+          // seeded by the first map's cell coordinates, so the middle of the region is that map exactly
+          const seed = hash(cx - LEGACY_OFFSET * 2, cy - LEGACY_OFFSET * 2);
           const starter = cx === STARTER_CELL[0] && cy === STARTER_CELL[1];
           cells++;
           // Keep at least ~40% of the district buildable.
@@ -227,7 +266,7 @@ function build(): World {
   }
 
   const plotById = Object.fromEntries(plots.map((p) => [p.id, p]));
-  return { plots, plotById, decor, scenery, blocks, blockZone, zoneBlocks };
+  return { plots, plotById, decor, scenery, blocks, blockZone, zoneBlocks, blockTerritory, territoryBlocks, landmarks };
 }
 
 export const WORLD_MAP: World = build();
@@ -246,6 +285,14 @@ export function zoneOfBlock(bx: number, by: number): ZoneId | null {
   if (bx < 0 || by < 0 || bx >= BLOCKS || by >= BLOCKS) return null;
   return WORLD_MAP.blockZone[by][bx];
 }
+
+export function territoryOfBlock(bx: number, by: number): TerritoryId | null {
+  if (bx < 0 || by < 0 || bx >= BLOCKS || by >= BLOCKS) return null;
+  return WORLD_MAP.blockTerritory[by][bx];
+}
+
+/** District or territory a block belongs to (what unlocks it). */
+export const areaOfBlock = (bx: number, by: number): AreaId | null => zoneOfBlock(bx, by) ?? territoryOfBlock(bx, by);
 
 export function blockKind(bx: number, by: number): BlockKind {
   if (bx < 0 || by < 0 || bx >= BLOCKS || by >= BLOCKS) return "sea";
@@ -276,25 +323,46 @@ export const isRiver = (axis: "x" | "y", line: number) => axis === "y" && line =
 
 /**
  * Whether a road is built on a segment between two neighbouring nodes:
- * there is one wherever a district touches it (none along the river or
- * between fields and woods).
+ * wherever a district or a territory's built-up land (or access road)
+ * touches it; none along the river, between fields and woods, or inside a
+ * landmark that is one big thing (a runway, a circuit, the test roads).
  * axis "x": horizontal road at node row `line`, between columns k and k+1.
  * axis "y": vertical road at node column `line`, between rows k and k+1.
  */
-export function segmentSides(axis: "x" | "y", line: number, k: number): [ZoneId | null, ZoneId | null] {
-  return axis === "x" ? [zoneOfBlock(k, line - 1), zoneOfBlock(k, line)] : [zoneOfBlock(line - 1, k), zoneOfBlock(line, k)];
+export function segmentSides(axis: "x" | "y", line: number, k: number): [AreaId | null, AreaId | null] {
+  return axis === "x" ? [areaOfBlock(k, line - 1), areaOfBlock(k, line)] : [areaOfBlock(line - 1, k), areaOfBlock(line, k)];
+}
+
+const [PBX, PBY] = RACING_PADDOCK_BLOCK;
+/** Does this block have streets around it? */
+function bearsRoads(bx: number, by: number): boolean {
+  const k = blockKind(bx, by);
+  if (k === "racing") return bx === PBX && by === PBY;
+  if (k === "racingAnnex") return false;
+  return areaOfBlock(bx, by) !== null;
 }
 
 export function hasRoad(axis: "x" | "y", line: number, k: number): boolean {
   if (isRiver(axis, line)) return false;
-  const [a, b] = segmentSides(axis, line, k);
-  return a !== null || b !== null;
+  const [a, b] = axis === "x" ? [[k, line - 1], [k, line]] : [[line - 1, k], [line, k]];
+  if (!bearsRoads(a[0], a[1]) && !bearsRoads(b[0], b[1])) return false;
+  const ka = blockKind(a[0], a[1]);
+  return !(ka === blockKind(b[0], b[1]) && SOLID.has(ka));
 }
 
-/** A road is open to traffic when a district on either side is unlocked. */
-export function segmentOpen(axis: "x" | "y", line: number, k: number, unlocked: ReadonlySet<ZoneId>): boolean {
+/** A road is open to traffic when a district or territory on either side is unlocked. */
+export function segmentOpen(axis: "x" | "y", line: number, k: number, unlocked: ReadonlySet<string>): boolean {
   if (!hasRoad(axis, line, k)) return false;
   return segmentSides(axis, line, k).some((z) => z !== null && unlocked.has(z));
+}
+
+/** Centre of a territory in tiles (its block nearest to the average). */
+export function territoryCenterTile(t: TerritoryId) {
+  const list = WORLD_MAP.territoryBlocks[t].filter(([bx, by]) => blockKind(bx, by) !== "road");
+  const n = Math.max(1, list.length);
+  const x = list.reduce((a, [bx]) => a + bx * ROAD_STEP + 4, 0) / n;
+  const y = list.reduce((a, [, by]) => a + by * ROAD_STEP + 4, 0) / n;
+  return { x, y };
 }
 
 /** Tiles of the Racing District: the paddock block, and the circuit's blocks (no roads between them). */

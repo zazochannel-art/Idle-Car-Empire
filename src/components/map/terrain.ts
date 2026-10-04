@@ -5,7 +5,7 @@ import { BLOCKS, ROAD_STEP, WORLD, blockKind, hash } from "@/game/city/layout";
 
 type Pt = [number, number];
 
-const STEP = 0.5;
+const STEP = 0.75;
 const MARGIN = 9;
 
 function smoothNoise(x: number, y: number, scale: number, seed: number) {
@@ -30,9 +30,15 @@ export function noise(x: number, y: number, seed = 7) {
 /** Distance (tiles) from a point to the nearest land block, roads included. */
 function landDistance(x: number, y: number) {
   let best = Infinity;
-  for (let by = 0; by < BLOCKS; by++)
-    for (let bx = 0; bx < BLOCKS; bx++) {
-      if (blockKind(bx, by) === "sea") continue;
+  // the shore reaches at most ~12 tiles out: only the nearby blocks matter
+  const b0x = Math.max(0, Math.floor((x - 14) / ROAD_STEP));
+  const b1x = Math.min(BLOCKS - 1, Math.floor((x + 14) / ROAD_STEP));
+  const b0y = Math.max(0, Math.floor((y - 14) / ROAD_STEP));
+  const b1y = Math.min(BLOCKS - 1, Math.floor((y + 14) / ROAD_STEP));
+  for (let by = b0y; by <= b1y; by++)
+    for (let bx = b0x; bx <= b1x; bx++) {
+      const k = blockKind(bx, by);
+      if (k === "sea" || k === "lake") continue;
       const x0 = bx * ROAD_STEP;
       const y0 = by * ROAD_STEP;
       const dx = Math.max(x0 - x, 0, x - (x0 + ROAD_STEP + 1));
