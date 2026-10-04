@@ -1,7 +1,7 @@
 // Read-only helpers that explain the game to the player: what to aim for next
 // and why something is locked. They return data, not text — the UI words it
 // in the player's language. Never mutate state.
-import { racingCost } from "./racing";
+import { atTrack, racingCost } from "./racing";
 import { LOW_STOCK_UNITS, MATERIAL_BY_ID, RESERVE_UNITS, RESTOCK_UNITS, WAREHOUSE_MINUTES, type MaterialId } from "../config/economy";
 import { buyPlan, plantMaterials, restockPlan, stockTotal, supplierOf, unitsInStock, warehouseCap, warehouseCost } from "./materials";
 import { CARS } from "../config/cars";
@@ -12,7 +12,7 @@ import { ZONE_BY_ID } from "../config/city";
 import { WORLD_MAP, dealerPlot } from "../city/layout";
 import type { CarId, ComponentId, DealerId, GameState, ManagerId, MaterialStock, PlantType, ZoneId } from "../types";
 import { canOpenDealers, isManagerUnlocked } from "./actions";
-import { bestGrade, carLock, gradeCost, hasPlant, levelCost, plantBuildCost, plantLock, plantsOf, speedCost } from "./chain";
+import { bestGrade, carLock, carTrip, gradeCost, hasPlant, levelCost, plantBuildCost, plantLock, plantsOf, speedCost } from "./chain";
 import { isPlotUnlocked, nextZone, zoneBlocker } from "./city";
 import { dealerUpgradeCost, type EconomySnapshot } from "./economy";
 import { PRESTIGE } from "../config/prestige";
@@ -42,6 +42,7 @@ export type Goal =
   /** The Racing District: build it, send it a car, enter the first race. */
   | { kind: "racing"; icon: string; cost: number }
   | { kind: "raceCar"; icon: string }
+  | { kind: "sendCar"; icon: string; car: number; cost: number }
   | { kind: "firstRace"; icon: string }
   | { kind: "car"; icon: string; cost?: number; car: CarId; plot: string | null; requirement: Requirement | null }
   | { kind: "manager"; icon: string; cost: number; manager: ManagerId }
@@ -261,6 +262,12 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
     const R = s.racing;
     if (!R.unlocked) goals.push({ kind: "racing", icon: "🏁", cost: racingCost(s) });
     else if (!R.cars.length && !R.orders.length && !R.arrivals.length) goals.push({ kind: "raceCar", icon: "🚛" });
+    else if (R.cars.length && !R.cars.some((c) => atTrack(c) || c.location === "transit")) {
+      // every car is at the factory lot: one has to make the trip to the paddock
+      const rc = R.cars[0];
+      const trip = carTrip(s, rc, "racing");
+      if (trip) goals.push({ kind: "sendCar", icon: "🚚", car: rc.id, cost: trip.fee });
+    }
     else if (R.cars.length && R.stats.races === 0 && !R.live) goals.push({ kind: "firstRace", icon: "🏎️" });
   }
 

@@ -76,13 +76,14 @@ import type {
   PlantData,
   PlantType,
   QualityMode,
+  RaceCarState,
   Shipment,
 } from "../types";
 import { QUALITY_MODES } from "../config/market";
 import { carDemandMult, carPriceMult, defectRate, onCarBuilt, qualityOf, qualityTick } from "./market";
 import { vipBuilt } from "./live";
 import { dockCars, exportTick, fleetTick, isExportRoute, portPlot, protoValueMult } from "./expansion";
-import type { ExportMarketId } from "../config/expansion";
+import { EXPORT_BY_ID, type ExportMarketId } from "../config/expansion";
 import { designStats } from "./design";
 import { logisticsMods } from "./logistics";
 import { starMods } from "./imperium";
@@ -496,6 +497,46 @@ function ship(s: GameState, sh: Omit<Shipment, "id" | "t" | "back">) {
   s.chain.shipments.push({ ...sh, id: s.chain.nextShip++, t: 0, back: false });
 }
 
+// ───────────────────────────── My Cars on the road ─────────────────────────────
+
+/** The factory lot of a car in the collection: its own assembly plant, or any other one. */
+export function lotOf(s: GameState, rc: RaceCarState): string | null {
+  if (rc.home && s.city.buildings[rc.home]?.type === "assemblyPlant") return rc.home;
+  return plantsOf(s).find(([, b]) => b.type === "assemblyPlant")?.[0] ?? null;
+}
+
+export type CarDestination = "factory" | "racing";
+
+/** Driving time and fee of moving a car of the collection; null if it can't go there now. */
+export function carTrip(s: GameState, rc: RaceCarState, to: CarDestination): { from: string; to: string; dur: number; fee: number } | null {
+  const at = rc.location ?? "racing";
+  if (at === "transit" || at === to || s.racing.live?.car === rc.id) return null;
+  if (to === "racing" && !s.racing.unlocked) return null;
+  const lot = lotOf(s, rc);
+  if (!lot) return null;
+  const [a, b] = to === "racing" ? [lot, RACING] : [RACING, lot];
+  return { from: a, to: b, dur: legTime(a, b, 1), fee: TRIP_FEE.carrier };
+}
+
+/** Loads a car of the collection onto its own transporter, to the paddock or back to the factory lot. */
+export function sendCar(s: GameState, id: number, to: CarDestination): boolean {
+  const rc = s.racing.cars.find((c) => c.id === id);
+  const trip = rc && carTrip(s, rc, to);
+  if (!rc || !trip || s.cash < trip.fee) return false;
+  s.cash -= trip.fee;
+  book(s, "logistics", trip.fee);
+  ship(s, { from: trip.from, to: trip.to, item: "car", qty: 1, value: 0, dur: trip.dur, vehicle: "carrier", models: [rc.car], fleet: [rc.id] });
+  if (to === "factory" && !rc.home) rc.home = trip.to;
+  rc.location = "transit";
+  return true;
+}
+
+/** Where a car on the road is going (null: not on the road). */
+export function carEta(s: GameState, id: number): { to: CarDestination; left: number } | null {
+  const sh = s.chain.shipments.find((x) => !x.back && x.fleet?.includes(id));
+  return sh ? { to: sh.to === RACING ? "racing" : "factory", left: Math.max(0, sh.dur - sh.t) } : null;
+}
+
 // ───────────────────────────── tick ─────────────────────────────
 
 export interface ChainTickOut {
@@ -716,7 +757,7 @@ export function chainTick(
       s.racing.orders.splice(s.racing.orders.indexOf(st.car.id), 1);
       p.out -= 1;
       p.outValue -= value;
-      receiveRaceCar(s, st.car.id, "factory");
+      receiveRaceCar(s, st.car.id, "factory").home = id;
     }
     // …with it, the car leaves for the paddock on its own transporter
     if (!cfg.item && st.car && p.out >= 1 && s.racing.unlocked && s.racing.orders.includes(st.car.id) && busyTrucks(s, id) < st.trucks) {
@@ -878,6 +919,14 @@ function rescue(s: GameState) {
 
 /** Unloads a truck; returns how many cars it sold wholesale. */
 function arrive(s: GameState, sh: Shipment, snap: ChainSnapshot, earn: (n: number) => void, events?: GameEvent[]): number {
+  if (sh.fleet) {
+    // a car of the collection unloaded at the paddock or back at its factory lot
+    for (const id of sh.fleet) {
+      const rc = s.racing.cars.find((c) => c.id === id);
+      if (rc) rc.location = sh.to === RACING ? "racing" : "factory";
+    }
+    return 0;
+  }
   if (sh.to === MARKET) {
     if (sh.item === "car") {
       // the dealers were full: a wholesale buyer takes the whole load, below dealer price
@@ -1147,6 +1196,8 @@ export function migrateChain(raw: unknown, s: GameState): ChainState {
         vehicle: (["van", "truck", "semi", "trailer", "carrier"].includes(sh.vehicle as string) ? sh.vehicle : "truck") as Shipment["vehicle"],
         models: Array.isArray(sh.models) ? (sh.models.filter((m) => typeof m === "string" && m in CAR_BY_ID) as CarId[]) : undefined,
         materials: isObj(sh.materials) ? migrateStock(sh.materials) : undefined,
+        ...(typeof sh.market === "string" && sh.market in EXPORT_BY_ID ? { market: sh.market as ExportMarketId } : {}),
+        ...(Array.isArray(sh.fleet) ? { fleet: sh.fleet.filter((n): n is number => typeof n === "number") } : {}),
       });
     }
   }

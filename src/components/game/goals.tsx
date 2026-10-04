@@ -39,6 +39,8 @@ export function goalText(g: Goal, t: (k: MessageKey, v?: Vars) => string, n: Con
       return { title: t("goal.racing"), detail: t("goal.racingDetail") };
     case "raceCar":
       return { title: t("goal.raceCar"), detail: t("goal.raceCarDetail") };
+    case "sendCar":
+      return { title: t("goal.sendCar"), detail: t("goal.sendCarDetail") };
     case "firstRace":
       return { title: t("goal.firstRace"), detail: t("goal.firstRaceDetail") };
     case "warehouse":
@@ -112,6 +114,10 @@ export function runGoal(g: Goal, ready: boolean) {
       ui.setView("racing");
       break;
     case "raceCar":
+      ui.setView("racing");
+      break;
+    case "sendCar":
+      if (ready) game.sendCar(g.car, "racing");
       ui.setView("racing");
       break;
     case "firstRace":

@@ -132,6 +132,7 @@ interface GameStore {
   unlockRacing: () => boolean;
   orderRaceCar: (car: CarId) => boolean;
   runTest: (id: number) => void;
+  sendCar: (id: number, to: Ch.CarDestination) => boolean;
   cancelRaceOrder: (car: CarId) => boolean;
   selectRaceCar: (id: number) => void;
   enterRace: (event: string, special?: string) => boolean;
@@ -384,6 +385,7 @@ export const useGame = create<GameStore>((set, get) => {
       const r = act((s) => Dn.runTest(s, id));
       if (r) uiEvents.emit({ type: "toast", tone: "success", icon: "⏱️", title: tr("test.done", { t: r.zeroTo100.toFixed(1), v: r.topSpeed }) });
     },
+    sendCar: (id, to) => act((s) => Ch.sendCar(s, id, to)),
     cancelRaceOrder: (car) => act((s) => Rc.cancelOrder(s, car)),
     selectRaceCar: (id) =>
       act((s) => {

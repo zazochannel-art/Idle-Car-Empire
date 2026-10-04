@@ -206,7 +206,7 @@ export const testFee = (rc: RaceCarState) => Math.max(TEST_TRACK.feeMin, rc.valu
 
 export function runTest(s: GameState, id: number): TestReport | null {
   const rc = s.racing.cars.find((c) => c.id === id);
-  if (!rc || s.racing.live?.car === id) return null;
+  if (!rc || s.racing.live?.car === id || rc.location === "transit") return null;
   const fee = testFee(rc);
   if (s.cash < fee) return null;
   s.cash -= fee;

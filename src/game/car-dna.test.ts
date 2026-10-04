@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { WORLD_MAP } from "./city/layout";
 import { CAR_BY_ID } from "./config/cars";
+import { RACE_EVENTS } from "./config/racing";
 import * as Ch from "./engine/chain";
 import * as D from "./engine/car-dna";
 import * as R from "./engine/racing";
@@ -105,6 +106,60 @@ describe("Car DNA", () => {
     expect(s.racing.cars).toHaveLength(1);
     expect(s.racing.cars[0].location).toBe("factory");
     expect(s.racing.cars[0].built).toBe(s.lastActiveAt);
+    expect(s.racing.cars[0].home).toBe(free[1]);
+  });
+});
+
+describe("My Cars on the road", () => {
+  function lotWithCar() {
+    const s = createInitialState(T0);
+    s.cash = 1e6;
+    const free = WORLD_MAP.plots.filter((x) => x.kind === "plot" && x.zone === "town" && !x.big && !s.city.buildings[x.id]).map((x) => x.id);
+    s.city.buildings[free[0]] = { type: "assemblyPlant", level: 1, plant: Ch.newPlant() };
+    const rc = car(s);
+    return { s, rc, lot: free[0] };
+  }
+
+  it("a car at the factory lot can't race until a transporter takes it to the paddock", () => {
+    const { s, rc, lot } = lotWithCar();
+    expect(Ch.sendCar(s, rc.id, "racing")).toBe(false); // no Racing District yet
+    s.racing.unlocked = true;
+    const amateur = RACE_EVENTS.find((e) => e.type !== "championship" && e.classes.includes(R.classOf(rc.car)))!;
+    s.racing.rep = amateur.minRep;
+    expect(R.eventLock(s, amateur, rc)).toEqual({ kind: "away" });
+    expect(R.bestEventFor(s, rc)).toBeNull();
+
+    const cash = s.cash;
+    expect(Ch.sendCar(s, rc.id, "racing")).toBe(true);
+    expect(s.cash).toBeLessThan(cash);
+    expect(rc.location).toBe("transit");
+    const sh = s.chain.shipments.find((x) => x.fleet?.includes(rc.id))!;
+    expect(sh).toMatchObject({ from: lot, vehicle: "carrier", models: ["sports"] });
+    // on the road: no test, no second trip, no race
+    expect(Ch.sendCar(s, rc.id, "racing")).toBe(false);
+    expect(D.runTest(s, rc.id)).toBeNull();
+    expect(Ch.carEta(s, rc.id)?.to).toBe("racing");
+
+    for (let i = 0; i < 2000 && rc.location === "transit"; i++) tick(s, 0.5);
+    expect(rc.location).toBe("racing");
+    expect(R.eventLock(s, amateur, rc)).not.toEqual({ kind: "away" });
+    // and back home
+    expect(Ch.sendCar(s, rc.id, "factory")).toBe(true);
+    expect(s.chain.shipments.find((x) => x.fleet?.includes(rc.id) && !x.back)?.to).toBe(lot);
+    for (let i = 0; i < 2000 && rc.location === "transit"; i++) tick(s, 0.5);
+    expect(rc.location).toBe("factory");
+  });
+
+  it("a trip survives a save; a car whose transporter was lost is back at the lot", () => {
+    const { s, rc } = lotWithCar();
+    s.racing.unlocked = true;
+    Ch.sendCar(s, rc.id, "racing");
+    const kept = migrate(JSON.parse(JSON.stringify(s)), T0);
+    expect(kept.racing.cars[0].location).toBe("transit");
+    expect(kept.chain.shipments.some((x) => x.fleet?.includes(rc.id))).toBe(true);
+    const raw = JSON.parse(JSON.stringify(s));
+    raw.chain.shipments = [];
+    expect(migrate(raw, T0).racing.cars[0].location).toBe("factory");
   });
 });
 

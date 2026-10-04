@@ -371,6 +371,8 @@ export interface Shipment {
   materials?: MaterialStock;
   /** Cars for export: the market their ship sails to. */
   market?: import("./config/expansion").ExportMarketId;
+  /** My Cars moved between the factory lot and the paddock (car ids). */
+  fleet?: number[];
 }
 
 export interface DealerStock {
@@ -527,7 +529,10 @@ export interface RaceCarState {
   wins: number;
   /** My Cars: when it left the line (ms), where it is, its record and its last test. */
   built?: number;
-  location?: "factory" | "racing";
+  /** At the factory lot, at the paddock, or on a car transporter between them. */
+  location?: "factory" | "racing" | "transit";
+  /** The assembly plant whose lot it calls home (plot id). */
+  home?: string;
   mileage?: number;
   podiums?: number;
   /** Best lap time ever (s). */
