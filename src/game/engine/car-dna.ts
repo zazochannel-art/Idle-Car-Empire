@@ -104,6 +104,10 @@ export function dnaOf(x: DnaInput): CarDNA {
   const gg = gradeOf(x.grades, "glass", Math.max(1, cfg.grade - 1));
   const gel = gradeOf(x.grades, "electronics", Math.max(1, cfg.grade - 1));
   const rims = x.design.rims ?? 0;
+  // the drivetrain plants' work (older cars without them: what the tyres and suspension implied)
+  const gtr = x.grades.transmission;
+  const gw = x.grades.wheels;
+  const gbr = x.grades.brakes;
   const parts = recipe(cfg);
   return {
     car: x.car,
@@ -115,11 +119,11 @@ export function dnaOf(x: DnaInput): CarDNA {
     body: cfg.body,
     chassis: CHASSIS[g5(gb)],
     suspension: SUSPENSION[g5(gs + Math.floor(up("suspension") / 2))],
-    brakes: BRAKES[g5(Math.max(gt, gs) + Math.floor(up("brakes") / 2))],
+    brakes: BRAKES[g5((gbr ?? Math.max(gt, gs)) + Math.floor(up("brakes") / 2))],
     tires: TIRES[g5(gt + Math.floor(up("tires") / 2))],
-    wheels: WHEELS[g5(1 + rims + (up("weight") >= 2 ? 1 : 0))],
+    wheels: WHEELS[g5((gw ?? 1) + rims + (up("weight") >= 2 ? 1 : 0))],
     aero: Math.round(st.aero),
-    gearbox: gearboxOf(cfg, ge, up("transmission")),
+    gearbox: gearboxOf(cfg, gtr ?? ge, up("transmission")),
     interior: INTERIOR[g5(gi)],
     glass: GLASS[g5(gg)],
     lights: LIGHTS[g5(parts.includes("electronics") ? gel + 1 : gel)],

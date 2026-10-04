@@ -70,6 +70,8 @@ export const BODY_GRADE_WEIGHT = 0.05;
 /** Handling and braking per grade of tyres and suspension. */
 export const TIRE_GRADE_GRIP = 4;
 export const SUSPENSION_GRADE_GRIP = 3.5;
+/** Per grade above Standard: transmission → acceleration, wheels → handling, brakes → braking. */
+export const DRIVETRAIN_GRADE = { transmission: 3, wheels: 2, brakes: 4 };
 
 /**
  * Turning raw numbers into 0–100 stats:

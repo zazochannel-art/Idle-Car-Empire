@@ -412,6 +412,28 @@ export function buildPlant(T: Three, kit: MaterialKit, spec: PlantSpec, W: numbe
         g.add(box(T, std(T, "#365314", 0.3, 0.5), W - 0.73 + i * 0.22, 0.05, yardZ + 0.3, 0.14, 0.04, 0.004));
       }
       break;
+    case "transmissionFactory":
+      // pallets of gearbox casings in the yard
+      for (let i = 0; i < 3; i++) {
+        g.add(box(T, std(T, "#64748b", 0.6, 0.35), W - 0.75 + i * 0.22, 0.012, yardZ, 0.16, 0.1, 0.2));
+        g.add(cyl(T, steel, W - 0.67 + i * 0.22, 0.11, yardZ + 0.1, 0.04, 0.03, 12));
+      }
+      break;
+    case "wheelFactory":
+      // stacks of bright rims
+      for (let i = 0; i < 3; i++)
+        for (let k = 0; k < 3; k++) g.add(cyl(T, std(T, "#e2e8f0", 0.9, 0.2), W - 0.3 - i * 0.14, 0.012 + k * 0.035, yardZ + 0.05, 0.05, 0.03, 18));
+      break;
+    case "brakeFactory":
+      // racks of discs with red calipers
+      for (let i = 0; i < 4; i++) {
+        const disc = new T.Mesh(new T.CylinderGeometry(0.05, 0.05, 0.012, 18), std(T, "#9ca3af", 0.8, 0.3));
+        disc.rotation.x = Math.PI / 2;
+        disc.position.set(W - 0.3 - i * 0.12, 0.07, yardZ + 0.05);
+        g.add(disc);
+        g.add(box(T, std(T, "#dc2626", 0.3, 0.4), W - 0.33 - i * 0.12, 0.08, yardZ + 0.04, 0.03, 0.03, 0.03));
+      }
+      break;
     case "assemblyPlant":
       // a test pad with a painted track loop
       g.add(box(T, asphalt, W - 1.1 * s, 0.014, yardZ - 0.05, 1.0 * s, 0.004, 0.45));

@@ -241,6 +241,36 @@ export const RECIPES: Record<string, StationDef[]> = {
     qc("pack", "testBench"),
     store("goods", "goodsRack", "pack"),
   ]),
+  // steel bars → cut gears → hardened → shafts assembled → tested gearboxes
+  transmissionFactory: line7([
+    store("rawStore", "rawRack", "bar", "bar", ["sheetPallet", "boxPallet"]),
+    { id: "gearCut", machine: "cnc", unlock: 1, upgrade: "speed", icon: "⚙️", robotsFrom: 3, part: "spring", staff: 1, tool: "gripper", robot: "floor", props: ["binRack", "toolCabinet"] },
+    { id: "hardening", machine: "furnace", variant: "tunnel", unlock: 2, upgrade: "speed", icon: "🔥", robotsFrom: 2, part: "arm", staff: 1, tool: "gripper", robot: "floor", fx: "heat", props: ["drumPallet", "dieBlock"] },
+    { id: "gearboxAsm", machine: "assemblyStand", variant: "engine", unlock: 1, upgrade: "automation", icon: "🕹️", robotsFrom: 1, part: "block", staff: 2, tool: "gripper", robot: "reach", props: ["partsCage", "binRack"] },
+    { id: "gearboxFill", machine: "filler", unlock: 3, upgrade: "automation", icon: "🛢️", robotsFrom: 2, part: "block", staff: 1, tool: "gripper", robot: "floor", props: ["drumPallet", "boxPallet"] },
+    qc("block", "testBench"),
+    store("goods", "goodsRack", "block"),
+  ]),
+  // alloy ingots → cast rims → machined → painted → balanced wheels
+  wheelFactory: line7([
+    store("rawStore", "rawRack", "ingot", "ingot", ["drumPallet", "boxPallet"]),
+    { id: "rimCast", machine: "furnace", unlock: 1, upgrade: "speed", icon: "🔥", robotsFrom: 3, part: "casting", staff: 1, tool: "gripper", robot: "floor", fx: "heat", props: ["dieBlock", "drumPallet"] },
+    { id: "rimTurn", machine: "cnc", unlock: 2, upgrade: "speed", icon: "⭕", robotsFrom: 2, part: "tire", staff: 1, tool: "gripper", robot: "floor", props: ["binRack", "toolCabinet"] },
+    { id: "rimPaint", machine: "sprayBooth", unlock: 1, upgrade: "automation", icon: "🎨", robotsFrom: 1, part: "tire", staff: 1, tool: "spray", robot: "embedded", fx: "spray", props: ["drumPallet", "toolCabinet"] },
+    { id: "balancing", machine: "assemblyStand", variant: "drum", unlock: 3, upgrade: "automation", icon: "⚖️", robotsFrom: 2, part: "tire", staff: 2, tool: "gripper", robot: "reach", props: ["partsCage", "binRack"] },
+    qc("tire"),
+    store("goods", "goodsRack", "tire"),
+  ]),
+  // iron → cast discs → machined → calipers fitted → bench-tested brake kits
+  brakeFactory: line7([
+    store("rawStore", "rawRack", "ingot", "ingot", ["drumPallet", "boxPallet"]),
+    { id: "discCast", machine: "furnace", unlock: 1, upgrade: "speed", icon: "🔥", robotsFrom: 3, part: "casting", staff: 1, tool: "gripper", robot: "floor", fx: "heat", props: ["dieBlock", "drumPallet"] },
+    { id: "discMachine", machine: "cnc", unlock: 2, upgrade: "speed", icon: "⚙️", robotsFrom: 2, part: "arm", staff: 1, tool: "gripper", robot: "floor", props: ["binRack", "toolCabinet"] },
+    { id: "padPress", machine: "press", unlock: 1, upgrade: "automation", icon: "🧱", robotsFrom: 1, part: "arm", staff: 2, tool: "gripper", robot: "embedded", fx: "heat", props: ["dieBlock", "binRack"] },
+    { id: "caliperAsm", machine: "assemblyStand", variant: "bench", unlock: 3, upgrade: "automation", icon: "🛑", robotsFrom: 2, part: "strut", staff: 2, tool: "gripper", robot: "reach", props: ["partsCage", "toolCabinet"] },
+    qc("strut", "testBench"),
+    store("goods", "goodsRack", "strut"),
+  ]),
   // the car takes shape: body → powertrain → interior and glass → wheels → paint and finish
   assemblyPlant: line7([
     store("bodyStore", "bodyRack", "car", undefined, ["partsCage", "partsCage"], 0),

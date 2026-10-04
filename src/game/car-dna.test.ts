@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { WORLD_MAP } from "./city/layout";
+import { CAR_BY_ID } from "./config/cars";
 import * as Ch from "./engine/chain";
 import * as D from "./engine/car-dna";
 import * as R from "./engine/racing";
@@ -104,5 +105,33 @@ describe("Car DNA", () => {
     expect(s.racing.cars).toHaveLength(1);
     expect(s.racing.cars[0].location).toBe("factory");
     expect(s.racing.cars[0].built).toBe(s.lastActiveAt);
+  });
+});
+
+describe("drivetrain plants: transmission, wheels, brakes", () => {
+  it("Sedans and up need them; the supplier delivers them until the plants exist", () => {
+    expect(Ch.recipe(CAR_BY_ID.city)).not.toContain("brakes");
+    for (const c of ["transmission", "wheels", "brakes"] as const) expect(Ch.recipe(CAR_BY_ID.sedan)).toContain(c);
+    const s = createInitialState(T0);
+    expect(Ch.supplied(s, "brakes")).toBe(true);
+    // a Grade-2 model is not locked by them: the supplier delivers at the model's grade
+    expect(Ch.suppliedGrade("brakes", CAR_BY_ID.suv)).toBe(2);
+    expect(Ch.supplierPrice("brakes", 2)).toBeGreaterThan(Ch.supplierPrice("brakes", 1));
+    const plot = WORLD_MAP.plots.find((x) => x.kind === "plot" && x.zone === "town" && !x.big && !s.city.buildings[x.id])!.id;
+    s.city.buildings[plot] = { type: "brakeFactory", level: 1, plant: Ch.newPlant() };
+    expect(Ch.supplied(s, "brakes")).toBe(false);
+  });
+
+  it("better brakes, gearboxes and wheels make a measurably better car", () => {
+    const s = createInitialState(T0);
+    const base = car(s, { engine: 3, tires: 3, body: 3, suspension: 3, transmission: 1, wheels: 1, brakes: 1 });
+    const good = car(s, { engine: 3, tires: 3, body: 3, suspension: 3, transmission: 5, wheels: 5, brakes: 5 });
+    const a = D.testCar(base);
+    const b = D.testCar(good);
+    expect(b.braking).toBeLessThan(a.braking);
+    expect(b.zeroTo100).toBeLessThanOrEqual(a.zeroTo100);
+    expect(b.cornering).toBeGreaterThan(a.cornering);
+    expect(D.carDNA(s, good).brakes).toBe("Carbon-ceramic");
+    expect(D.carDNA(s, good).gearbox).not.toBe(D.carDNA(s, base).gearbox);
   });
 });
