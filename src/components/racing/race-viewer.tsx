@@ -161,6 +161,8 @@ export function lockText(t: (k: MessageKey, v?: Record<string, string | number>)
       return t("racing.lock.noCar");
     case "away":
       return t("racing.lock.away");
+    case "fitting":
+      return t("racing.lock.fitting", { time: `${Math.ceil(lock.seconds)}s` });
     case "busy":
       return t("racing.lock.busy");
     case "championship":
@@ -302,7 +304,7 @@ function RaceWatch() {
               {ev.emoji} {raceName(t, rec.event, rec.special)}
             </div>
             <div className="text-[10px] text-white/60">
-              {TRACK_BY_ID[rec.track].emoji} {trackName(t, rec.track)} · {done ? t("racing.finished") : t("racing.lap", { n: Math.max(1, lap), of: rec.laps })}
+              {TRACK_BY_ID[rec.track].emoji} {trackName(t, rec.track)}{rec.wet ? " · 🌧️" : ""} · {done ? t("racing.finished") : t("racing.lap", { n: Math.max(1, lap), of: rec.laps })}
             </div>
           </div>
           <button onClick={() => setRace(null)} className="rounded-full bg-black/55 p-2 ring-1 ring-white/20 backdrop-blur" aria-label="close">

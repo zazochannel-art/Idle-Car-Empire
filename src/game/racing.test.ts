@@ -133,11 +133,47 @@ describe("racing district", () => {
     expect(R.upgradeRaceCar(s, rc.id, "engine")).toBe(true);
     expect(s.cash).toBeCloseTo(cash - cost.money);
     expect(s.city.buildings[STARTER_PLOT].plant!.out).toBe(2);
-    expect(rc.upgrades.engine).toBe(1);
-    // racing parts can stand in for components
+    // the mechanics fit it first: no level yet, no race, no second job
+    expect(rc.upgrades.engine ?? 0).toBe(0);
+    expect(rc.install).toMatchObject({ u: "engine", left: R.installTime(s, 1) });
+    s.racing.rep = 1e6;
+    expect(R.eventLock(s, RACE_EVENT_BY_ID.citySprint, rc)).toMatchObject({ kind: "fitting" });
     s.racing.parts = 5;
+    expect(R.upgradeRaceCar(s, rc.id, "tires", true)).toBe(false);
+    R.garageTick(s, R.installTime(s, 1) + 0.1);
+    expect(rc.upgrades.engine).toBe(1);
+    expect(rc.install).toBeUndefined();
+    // racing parts can stand in for components
     expect(R.upgradeRaceCar(s, rc.id, "tires", true)).toBe(true);
     expect(s.racing.parts).toBe(4);
+  });
+
+  it("power costs reliability: turbo and ECU add pace, cooling buys the reliability back", () => {
+    const s = team();
+    const rc = R.receiveRaceCar(s, "sports");
+    const base = R.carStats(rc);
+    rc.upgrades.turbo = 3;
+    rc.upgrades.ecu = 2;
+    const tuned = R.carStats(rc);
+    expect(tuned.hp).toBeGreaterThan(base.hp * 1.25);
+    expect(tuned.reliability).toBeLessThan(base.reliability - 8);
+    rc.upgrades.cooling = 3;
+    expect(R.carStats(rc).reliability).toBeGreaterThan(tuned.reliability + 10);
+    // the rivals don't get the player's tuning
+    const ref = R.referenceRating(RACE_EVENT_BY_ID.citySprint);
+    expect(Number.isFinite(ref)).toBe(true);
+  });
+
+  it("the weather: a forecast that holds, and rain hurts a car without grip more", () => {
+    const s = team();
+    const w = R.weatherAt(s, 0);
+    expect(R.weatherAt(s, 1).wet).toBe(w.wet);
+    let wet = 0;
+    for (let b = 0; b < 400; b++) if (R.weatherAt(s, b * 600 + 1).wet) wet++;
+    expect(wet / 400).toBeGreaterThan(0.2);
+    expect(wet / 400).toBeLessThan(0.4);
+    expect(R.wetPace({ handling: 90, braking: 90 })).toBeGreaterThan(R.wetPace({ handling: 40, braking: 40 }));
+    expect(R.wetPace({ handling: 100, braking: 100 })).toBe(1);
   });
 
   it("a championship scores every round and crowns a champion after the final", () => {

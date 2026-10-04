@@ -63,8 +63,8 @@ const g5 = (g: number) => Math.max(0, Math.min(4, Math.round(g) - 1));
 const gradeOf = (grades: Partial<Record<ComponentId, number>>, c: ComponentId, dflt: number) => Math.max(1, grades[c] ?? dflt);
 
 /** Engine name: the platform's engine with the Engine Factory's grade. */
-function engineName(cfg: CarConfig, g: number, upg: number): string {
-  const turbo = upg >= 2 && !/Turbo|Electric/.test(cfg.engine) ? " Turbo" : "";
+function engineName(cfg: CarConfig, g: number, turboed: boolean): string {
+  const turbo = turboed && !/Turbo|Electric/.test(cfg.engine) ? " Turbo" : "";
   return `${cfg.engine}${turbo} ${TIER[g5(g)]}`;
 }
 
@@ -109,12 +109,14 @@ export function dnaOf(x: DnaInput): CarDNA {
   const gw = x.grades.wheels;
   const gbr = x.grades.brakes;
   const parts = recipe(cfg);
+  // a turbo kit, or an engine developed far enough to get one
+  const turbo = up("turbo") >= 1 || up("engine") >= 2;
   return {
     car: x.car,
     model: x.name ?? cfg.name,
-    engine: engineName(cfg, ge, up("engine")),
+    engine: engineName(cfg, ge, turbo) + (up("ecu") ? ` · ECU ${up("ecu")}` : ""),
     hp: st.hp,
-    torque: torqueOf(cfg, st.hp, up("engine") >= 2),
+    torque: torqueOf(cfg, st.hp, turbo),
     weight: st.weight,
     body: cfg.body,
     chassis: CHASSIS[g5(gb)],

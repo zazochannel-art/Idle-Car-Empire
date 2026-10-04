@@ -540,6 +540,8 @@ export interface RaceCarState {
   /** Last races: event and finishing place (0 = win). */
   history?: { event: string; pos: number }[];
   test?: import("./engine/car-dna").TestReport;
+  /** Racing Garage: a development level being fitted (seconds left of total). */
+  install?: { u: import("./config/racing").RaceUpgrade; left: number; total: number };
 }
 
 export interface RaceEntrant {
@@ -575,6 +577,8 @@ export interface RaceRecord {
   order: string[];
   /** Championship round (0-based) when it is one. */
   round?: number;
+  /** Raced in the rain. */
+  wet?: boolean;
   /** Entry fee paid for it. */
   fee?: number;
   /** Filled in when the race is settled. */
