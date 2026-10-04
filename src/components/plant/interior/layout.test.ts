@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { HALL_LEVELS, interiorLayout, lineStops } from "./layout";
+import { PLANTS } from "@/game/config/chain";
+import { HALL_LEVELS, interiorLayout, lineStops, RECIPES } from "./layout";
 
 describe("factory interior layout", () => {
   it("grows with the plant: more halls, stations and a conveyor", () => {
@@ -36,5 +37,33 @@ describe("factory interior layout", () => {
   it("shows the plant's manager", () => {
     expect(interiorLayout({ level: 3, automation: 0, manager: true }).people.some((h) => h.role === "manager")).toBe(true);
     expect(interiorLayout({ level: 3, automation: 0, manager: false }).people.some((h) => h.role === "manager")).toBe(false);
+  });
+
+  it("every plant has its own line of seven bays", () => {
+    for (const p of PLANTS) {
+      const r = RECIPES[p.id];
+      expect(r, p.id).toBeDefined();
+      expect(r).toHaveLength(7);
+      expect(new Set(r.map((d) => d.id)).size).toBe(7);
+      // a store at each end, quality control before the finished goods
+      expect(r[0].upgrade).toBe("level");
+      expect(r[6].upgrade).toBe("level");
+      expect(r[5].id).toBe("qc");
+      // bays line up left to right without overlapping
+      for (let i = 1; i < 7; i++) expect(r[i].x).toBeGreaterThanOrEqual(r[i - 1].x + r[i - 1].w);
+      const big = interiorLayout({ level: 13, automation: 4, manager: true }, r);
+      expect(big.lines).toHaveLength(4);
+      expect(big.robots.length).toBeGreaterThan(0);
+      const small = interiorLayout({ level: 1, automation: 0, manager: false }, r);
+      expect(lineStops(small.lines[0]).length).toBeGreaterThanOrEqual(4);
+      expect(small.people.some((h) => h.station)).toBe(true);
+    }
+  });
+
+  it("the assembly plant builds the car up stage by stage", () => {
+    const stages = RECIPES.assemblyPlant.map((d) => d.stage ?? -1);
+    for (let i = 1; i < stages.length; i++) expect(stages[i]).toBeGreaterThanOrEqual(stages[i - 1]);
+    expect(stages[0]).toBe(0);
+    expect(stages[6]).toBe(8);
   });
 });

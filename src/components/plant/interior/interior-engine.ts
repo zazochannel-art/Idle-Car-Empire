@@ -11,10 +11,12 @@ import { attachControls, Camera } from "../../map/camera";
 import { Painter, sx, sy, toTile } from "../../map/iso";
 import { drawModel, drawTruck, type CarModel } from "../../map/vehicles";
 import { sprites3d, tierFor, type SpriteSize } from "../../three/sprites";
-import type { PartKind, PropKind, WorkerRole } from "../../three/interior-models";
-import { interiorLayout, lineStops, type Interior, type InteriorSpec, type Line, type PlacedStation, type StationId } from "./layout";
+import type { WorkerRole } from "../../three/interior-models";
+import { interiorLayout, lineStops, recipeFor, type Interior, type InteriorSpec, type Line, type PartKind, type PlacedStation, type PropKind, type StationDef, type StationId } from "./layout";
 
 export interface InteriorScene {
+  /** The plant type: picks its line (machines, parts) from the recipes. */
+  type: string;
   spec: InteriorSpec;
   /** The line is moving (materials in, room for the output). */
   running: boolean;
@@ -45,20 +47,11 @@ const MOVE = 0.9;
 const STATION_SIZE: SpriteSize = { w: 230, h: 230, ax: 115, ay: 150 };
 const PERSON_SIZE: SpriteSize = { w: 34, h: 44, ax: 17, ay: 36 };
 const PROP_SIZE: SpriteSize = { w: 56, h: 50, ax: 28, ay: 32 };
-/** What stands in the back of each bay, behind the machine. */
-const BACK_PROPS: Partial<Record<StationId, PropKind[]>> = {
-  rawStore: ["sheetPallet", "sheetPallet"],
-  cutting: ["sheetPallet", "binRack"],
-  press: ["dieBlock", "dieBlock"],
-  welding: ["partsCage", "partsCage"],
-  assembly: ["partsCage", "toolCabinet"],
-  qc: ["toolCabinet", "binRack"],
-};
 const VEHICLE_SIZE: SpriteSize = { w: 44, h: 40, ax: 22, ay: 26 };
 const PART_SIZE: SpriteSize = { w: 40, h: 30, ax: 20, ay: 18 };
 const ROBOT_SIZE: SpriteSize = { w: 90, h: 100, ax: 45, ay: 76 };
 /** How many poses each animated machine has. */
-const POSES: Record<string, number> = { laserCutter: 4, press: 3, welder: 1, bodyJig: 2, sheetRack: 1, qcTunnel: 1, bodyRack: 1 };
+const POSES: Record<string, number> = { laserCutter: 4, press: 3, bodyJig: 2, furnace: 2, cnc: 4, curing: 2, filler: 4 };
 const FLOOR = "#9ba4ae";
 
 export class InteriorEngine {
@@ -105,10 +98,10 @@ export class InteriorEngine {
 
   setScene(s: InteriorScene) {
     this.scene = s;
-    const key = `${s.spec.level}|${s.spec.automation}|${s.spec.manager}`;
+    const key = `${s.type}|${s.spec.level}|${s.spec.automation}|${s.spec.manager}`;
     if (key !== this.layoutKey) {
       const grew = this.layout !== null;
-      this.layout = interiorLayout(s.spec);
+      this.layout = interiorLayout(s.spec, recipeFor(s.type));
       this.layoutKey = key;
       this.frame(grew);
     }
@@ -329,8 +322,8 @@ export class InteriorEngine {
 
     // 0. the back of each bay: steel columns, and pallets, dies and cages by the machines
     for (const st of line.stations) {
-      const props = st.mode === "planned" ? [] : (BACK_PROPS[st.def.id] ?? []);
-      props.forEach((kind, j) => this.prop(kind, st.x + 0.65 + j * 1.6, line.y0 + 0.75, s.accent, k));
+      const props = st.mode === "planned" ? [] : (st.def.props ?? []);
+      props.forEach((kind, j) => this.prop(kind, st.x + 0.65 + j * 1.6, line.y0 + 0.75, s, k));
     }
     // columns stand along the back wall only, so they never hide a hall behind them
     if (line.index === 0) for (const cx of [4.1, 11.2, 18.3]) {
@@ -373,40 +366,56 @@ export class InteriorEngine {
         if (i === n - 1) continue; // the last one went onto the rack
         const a = stops[i];
         const b = stops[i + 1];
-        this.part(s, a.def.id, a.stop.x + (b.stop.x - a.stop.x) * mk, line.belt, line.conveyor ? 4 : 3, k);
+        this.part(s, a.def, a.stop.x + (b.stop.x - a.stop.x) * mk, line.belt, line.conveyor ? 4 : 3, k);
       } else {
         const st = stops[i];
-        const shown = i === 0 || late ? st.def.id : stops[i - 1].def.id;
+        const shown = i === 0 || late ? st.def : stops[i - 1].def;
         this.part(s, shown, st.stop.x, line.belt, line.conveyor ? 4 : 3, k);
       }
     }
-    // the store of finished bodies fills with the plant's real stock
+    // the finished store fills with the plant's real stock (cars and bodies on the racks)
     const fin = stops[n - 1];
-    const racked = Math.min(6, Math.round(s.out * 6));
-    for (let r = 0; r < racked; r++) {
-      const rx = fin.x + 0.6 + (r % 3) * 0.95;
-      const lv = Math.floor(r / 3);
-      drawModel(p, rx, line.belt - 0.62, 0, s.model ?? "sedan", "#c3cad3", 0.75, { lift: 18 + lv * 20, noShadow: true, stage: 0 });
+    if (fin.def.part === "car") {
+      const racked = Math.min(6, Math.round(s.out * 6));
+      for (let r = 0; r < racked; r++) {
+        const rx = fin.x + 0.6 + (r % 3) * 0.95;
+        const lv = Math.floor(r / 3);
+        this.car(s, fin.def.stage ?? 0, rx, line.belt - 0.62, 18 + lv * 20);
+      }
     }
 
     // 4. what stands in front of the belt
     for (const st of stops) this.station(s, st, "front", working, k);
 
-    // effects: sparks at the welding cell, the QC scan, warning beacons
+    // effects: sparks, laser, heat, paint mist, the QC scan; warning beacons when stopped
     for (const st of stops) {
       if (!working) continue;
-      if (st.def.id === "welding" || (st.def.id === "assembly" && st.mode === "robot")) this.sparks(st.stop.x, st.stop.y);
-      if (st.def.id === "cutting") p.light(sx(st.stop.x, st.stop.y), sy(st.stop.x, st.stop.y, 8), 18, "#ff6a3d", 0.6);
-      if (st.def.id === "qc") {
-        const u = st.x + 0.4 + ((this.t * 0.8) % 1) * (st.w - 0.8);
-        p.line(u, line.belt - 0.6, u, line.belt + 0.6, "rgba(56,189,248,0.9)", 2, 14);
-        p.light(sx(u, line.belt), sy(u, line.belt, 14), 22, "#38bdf8", 0.5);
+      const { x, y } = st.stop;
+      switch (st.def.fx) {
+        case "sparks":
+          if (st.mode === "robot" || st.def.role === "welder") this.sparks(x, y);
+          break;
+        case "laser":
+          p.light(sx(x, y), sy(x, y, 8), 18, "#ff6a3d", 0.6);
+          break;
+        case "heat":
+          p.light(sx(x - 0.4, y - 0.5), sy(x - 0.4, y - 0.5, 10), 34 + Math.sin(this.t * 3 + x) * 4, "#ff8a3d", 0.55);
+          break;
+        case "spray":
+          for (let i = 0; i < 3; i++) p.light(sx(x - 0.6 + i * 0.6, y - 0.2), sy(x - 0.6 + i * 0.6, y - 0.2, 12), 16 + ((this.t * 40 + i * 7) % 8), s.color, 0.45);
+          break;
+        case "scan": {
+          const u = st.x + 0.4 + ((this.t * 0.8) % 1) * (st.w - 0.8);
+          p.line(u, line.belt - 0.6, u, line.belt + 0.6, "rgba(56,189,248,0.9)", 2, 14);
+          p.light(sx(u, line.belt), sy(u, line.belt, 14), 22, "#38bdf8", 0.5);
+          break;
+        }
       }
     }
     if (!s.running) {
       const on = Math.sin(this.t * 6) > 0;
       for (const st of stops) {
-        if (st.def.id === "rawStore" || st.def.id === "finished") continue;
+        if (st.def.staff === 0) continue;
         p.box(st.x + st.w - 0.35, line.belt - 0.95, 0.12, 0.12, 0, 24, "#475569");
         p.box(st.x + st.w - 0.38, line.belt - 0.98, 0.18, 0.18, 24, 4, on ? "#f59e0b" : "#78350f");
         if (on) p.light(sx(st.x + st.w - 0.3, line.belt - 0.9), sy(st.x + st.w - 0.3, line.belt - 0.9, 26), 30, "#f59e0b", 0.7);
@@ -415,12 +424,12 @@ export class InteriorEngine {
 
     // 5. robots and people in front of the line
     for (const r of L.robots) {
-      if (r.line !== line.index || r.station === "welding" || r.station === "assembly" || r.station === "cutting" || r.station === "press") continue;
+      if (r.line !== line.index || r.reach) continue;
       this.robot(r.x, r.y, working ? Math.floor(this.t * 4 + r.x) % 4 : 0, r.tool, k);
     }
     for (const r of L.robots) {
-      if (r.line !== line.index || (r.station !== "welding" && r.station !== "assembly")) continue;
-      // welding and framing robots reach over the part from the front
+      if (r.line !== line.index || !r.reach) continue;
+      // welding, framing and assembly robots reach over the part from the front
       this.robot(r.x, line.belt + 0.75, working ? Math.floor(this.t * 5 + r.x * 3) % 4 : 0, r.tool, k);
     }
     for (const [i, h] of L.people.entries()) {
@@ -515,8 +524,9 @@ export class InteriorEngine {
     const poses = POSES[model] ?? 1;
     const pose = working && poses > 1 ? Math.floor(this.t * (model === "press" ? 3 : 4)) % poses : 0;
     const robots = st.mode === "robot";
-    const key = `ist|${model}|${pose}|${robots ? 1 : 0}|${part}|${s.accent}`;
-    const spr = sprites3d.get(key, STATION_SIZE, k, (T, { kit, interior }) => interior.buildStation(T, kit, model, pose, s.accent, robots, part), part === "back");
+    const variant = st.def.variant ?? "";
+    const key = `ist|${model}|${variant}|${pose}|${robots ? 1 : 0}|${part}|${s.accent}|${s.color}`;
+    const spr = sprites3d.get(key, STATION_SIZE, k, (T, { kit, interior }) => interior.buildStation(T, kit, model, pose, s.accent, robots, part, variant, s.color), part === "back");
     if (!spr) {
       // until the 3D model is ready: a simple block
       if (part === "back") this.p.box(st.x + 0.2, st.stop.y - 0.9, st.w - 0.4, 0.6, 0, 22, "#64748b", "#94a3b8");
@@ -527,14 +537,14 @@ export class InteriorEngine {
   }
 
   /** A part on the belt, as it looks after station `after`. */
-  private part(s: InteriorScene, after: StationId, x: number, y: number, z: number, k: number) {
-    if (after === "assembly" || after === "qc" || after === "finished") {
-      // a body in white, then inspected
-      drawModel(this.p, x, y, 0, s.model ?? "sedan", "#c3cad3", 0.75, { lift: z, noShadow: true, stage: 0 });
+  private part(s: InteriorScene, after: StationDef, x: number, y: number, z: number, k: number) {
+    if (after.part === "car") {
+      this.car(s, after.stage ?? 0, x, y, z);
       return;
     }
-    const kind: PartKind = after === "rawStore" ? "coil" : after === "cutting" ? "blank" : after === "press" ? "panel" : "frame";
-    const spr = sprites3d.get(`ipart|${kind}`, PART_SIZE, k, (T, { interior }) => interior.buildPart(T, kind), false);
+    const kind: PartKind = after.part;
+    const color = s.color;
+    const spr = sprites3d.get(`ipart|${kind}|${color}`, PART_SIZE, k, (T, { interior }) => interior.buildPart(T, kind, color), false);
     if (!spr) {
       this.p.box(x - 0.25, y - 0.18, 0.5, 0.36, z, 2, "#aeb6c1");
       return;
@@ -542,8 +552,14 @@ export class InteriorEngine {
     this.ctx.drawImage(spr.img, sx(x, y) - PART_SIZE.ax, sy(x, y, z) - PART_SIZE.ay, PART_SIZE.w, PART_SIZE.h);
   }
 
-  private prop(kind: PropKind, x: number, y: number, accent: string, k: number) {
-    const spr = sprites3d.get(`iprop|${kind}|${accent}`, PROP_SIZE, k, (T, { interior }) => interior.buildProp(T, kind, accent));
+  /** A car on the line at an assembly stage (0: a body in white … 8: finished). */
+  private car(s: InteriorScene, stage: number, x: number, y: number, z: number) {
+    drawModel(this.p, x, y, 0, s.model ?? "sedan", stage >= 6 ? "#ef4444" : "#c3cad3", 1.1, { lift: z, noShadow: true, stage });
+  }
+
+  private prop(kind: PropKind, x: number, y: number, s: InteriorScene, k: number) {
+    const { accent, color } = s;
+    const spr = sprites3d.get(`iprop|${kind}|${accent}|${color}`, PROP_SIZE, k, (T, { interior }) => interior.buildProp(T, kind, accent, color));
     if (!spr) return;
     this.ctx.drawImage(spr.img, sx(x, y) - PROP_SIZE.ax, sy(x, y) - PROP_SIZE.ay, PROP_SIZE.w, PROP_SIZE.h);
   }
