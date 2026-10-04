@@ -3,7 +3,7 @@
 // Prices are set from the *standard* cost (a Level 1, manual plant buying at
 // list price), so upgrades that make a plant cheaper to run widen the margin
 // instead of changing the price.
-import { CARRIER_CAPACITY, PLANT_BY_ID, TRAFFIC_ALLOWANCE } from "../config/chain";
+import { CARRIER_CAPACITY, GRADES, PLANT_BY_ID } from "../config/chain";
 import type { CarConfig } from "../config/cars";
 import {
   ASSEMBLY_TIME,
@@ -24,12 +24,8 @@ import {
   WORKERS_PER_LINE,
   type MaterialId,
 } from "../config/economy";
-import { GRADES } from "../config/chain";
-void 0;
 import type { ComponentId, PlantType } from "../types";
 import { unitMaterials } from "./materials";
-
-void TRAFFIC_ALLOWANCE;
 
 export interface OpRates {
   /** $/s while the plant runs. */
