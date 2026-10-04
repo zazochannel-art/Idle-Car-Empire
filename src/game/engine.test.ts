@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CAR_BY_ID } from "./config/cars";
 import { CHASSIS_BONUS, MAX_WAIT, PLANT_BY_ID, VEHICLE_CAPACITY } from "./config/chain";
-import { COMPONENT_TIME, DEALER_FEE, SALES_TAX, START_CASH } from "./config/economy";
+import { COMPONENT_TIME, DEALER_FEE, PARTS_MARGIN, SALES_TAX, START_CASH } from "./config/economy";
 import * as M from "./engine/materials";
 import { componentStdCost } from "./engine/costs";
 import { MANAGER_BY_ID } from "./config/managers";
@@ -764,7 +764,7 @@ describe("no money from nothing", () => {
       const net = Ch.componentValue(c, 1, gm) * (1 - SALES_TAX);
       const cost = componentStdCost(c, 1);
       expect(net / cost).toBeGreaterThan(1);
-      expect(net / cost).toBeLessThan(1.1);
+      expect(net / cost).toBeLessThanOrEqual(1 + PARTS_MARGIN + 1e-9);
     }
     const city = CAR_BY_ID.city;
     const cost = Ch.carPartsValue(city);
@@ -773,18 +773,99 @@ describe("no money from nothing", () => {
     expect(net / cost).toBeLessThan(1.25);
   });
 
-  it("a stuck company gets a small supplier credit, and only then", () => {
+  it("a stuck company gets material on supplier credit — never cash — and only then", () => {
     const s = createInitialState(T0);
     const p = s.city.buildings[STARTER_PLOT].plant!;
     p.stock = {};
-    s.cash = 0;
+    s.cash = 100;
     run(s, 1);
-    expect(s.cash).toBeGreaterThan(0);
-    expect(s.cash).toBeLessThan(10_000);
-    // with anything left to sell, no credit
+    expect(s.cash).toBeLessThanOrEqual(100);
+    const gift = s.chain.shipments.find((sh) => sh.to === STARTER_PLOT && sh.materials);
+    expect(gift?.materials?.steel).toBeGreaterThan(0);
+    // not again before the cooldown, even when stuck again
+    s.chain.shipments = [];
+    run(s, 60);
+    expect(s.chain.shipments.some((sh) => sh.materials)).toBe(false);
+    // with material to work with (or cash for one unit), no credit
     const t = createInitialState(T0);
     t.cash = 0;
     run(t, 1);
-    expect(t.cash).toBeLessThanOrEqual(0.01);
+    expect(t.chain.shipments.some((sh) => sh.materials)).toBe(false);
+    const u = createInitialState(T0);
+    u.city.buildings[STARTER_PLOT].plant!.stock = {};
+    u.cash = 5_000;
+    run(u, 1);
+    expect(u.chain.shipments.some((sh) => sh.materials)).toBe(false);
+  });
+});
+
+describe("economy audit fixes", () => {
+  it("a one-tap order never exceeds the warehouse or the cash", () => {
+    const s = createInitialState(T0);
+    const p = s.city.buildings[STARTER_PLOT].plant!;
+    p.stock = {};
+    const need = M.unitMaterials("bodyWorks", 1);
+    // a level 1 warehouse can't hold 10 bodies' worth of steel: the plan shrinks to what fits
+    const plan = M.restockPlan(s, STARTER_PLOT, need, 10, true);
+    expect(plan.units).toBeGreaterThan(0);
+    expect(plan.units).toBeLessThan(10);
+    expect(M.stockTotal(plan.want)).toBeLessThanOrEqual(M.warehouseCap(p));
+    s.cash = 1e6;
+    expect(M.buyPlan(s, STARTER_PLOT, plan)).toBe(true);
+    // with little cash it plans fewer units, or none
+    const t = createInitialState(T0);
+    t.city.buildings[STARTER_PLOT].plant!.stock = {};
+    t.cash = 2_000;
+    const small = M.restockPlan(t, STARTER_PLOT, need, 10);
+    expect(small.cost).toBeLessThanOrEqual(2_000);
+    expect(small.units).toBe(1);
+    t.cash = 100;
+    expect(M.restockPlan(t, STARTER_PLOT, need, 10).units).toBe(0);
+  });
+
+  it("materials are a cost when used, not when bought", () => {
+    const s = createInitialState(T0);
+    const p = s.city.buildings[STARTER_PLOT].plant!;
+    p.stock = {};
+    p.stockCost = 0;
+    const r = M.buyMaterial(s, STARTER_PLOT, "steel", 300);
+    expect(r.ok).toBe(true);
+    expect(s.chain.ledger.pending.materials + s.chain.ledger.run.materials).toBe(0);
+    M.buyMaterial(s, STARTER_PLOT, "plastic", 30);
+    run(s, 60);
+    // delivered: the stock carries what it cost, and each body made books its share
+    expect(s.chain.ledger.run.materials).toBeGreaterThan(0);
+    const paid = (r.ok ? r.cost : 0) + M.orderCost(s, "plastic", 30);
+    expect(s.chain.ledger.run.materials + (p.stockCost ?? 0)).toBeCloseTo(paid, -1);
+  });
+
+  it("auto-restock keeps minutes of work in stock, not a full warehouse", () => {
+    const s = createInitialState(T0);
+    s.market.bought = 1e6; // a supplier with deliveries
+    const p = s.city.buildings[STARTER_PLOT].plant!;
+    p.warehouse = 10;
+    p.stock = {};
+    p.autoBuy = true;
+    s.cash = 1e9;
+    const rate = snapshot(s).chain.plants[STARTER_PLOT].unitsPerSec;
+    M.autoRestock(s, STARTER_PLOT, rate);
+    const coming = M.stockTotal(M.incomingMaterials(s, STARTER_PLOT));
+    expect(coming).toBeGreaterThan(0);
+    expect(coming).toBeLessThan(M.warehouseCap(p) * 0.1);
+  });
+
+  it("the first goal of a new company is buying materials, not an upgrade", async () => {
+    const { nextGoals } = await import("./engine/insights");
+    const s = createInitialState(T0);
+    expect(nextGoals(s, snapshot(s), 2)[0].kind).toBe("materials");
+  });
+
+  it("rewards are sized on the steady income, not a lucky second", () => {
+    const s = createInitialState(T0);
+    s.chain.rate = 5_000;
+    s.chain.steady = 50;
+    const snap = snapshot(s);
+    expect(snap.incomePerSec).toBeGreaterThan(4_000);
+    expect(snap.steadyIncomePerSec).toBeLessThan(100);
   });
 });

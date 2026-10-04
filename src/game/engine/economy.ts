@@ -55,6 +55,8 @@ export interface EconomySnapshot {
   carsPerSec: number;
   /** Net income per second: chain sales minus materials (measured), plus the Empire Map. */
   incomePerSec: number;
+  /** The same, averaged over ~10 minutes (rewards are sized on it). */
+  steadyIncomePerSec: number;
   rpPerSec: number;
   city: CitySnapshot;
 }
@@ -71,12 +73,13 @@ export function snapshot(s: GameState): EconomySnapshot {
     chain,
     carsPerSec: chain.carsPerSec,
     incomePerSec: Math.max(0, s.chain.rate) + city.incomePerSec,
+    steadyIncomePerSec: Math.max(0, s.chain.steady ?? s.chain.rate) + city.incomePerSec,
     rpPerSec,
     city,
   };
 }
 
-/** Income that keeps running on its own — used to size rewards. */
+/** Income that keeps running on its own — used to size rewards (averaged, so timing a claim doesn't pay). */
 export function passiveIncome(snap: EconomySnapshot): number {
-  return snap.incomePerSec;
+  return snap.steadyIncomePerSec;
 }

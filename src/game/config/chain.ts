@@ -196,4 +196,4 @@ export const DEALER_SALE = { interval: 30, stock: 10, perLevelSpeed: 0.2, perLev
 export const WHOLESALE = 0.7;
 
 /** Smoothing of the HUD income rate (seconds). */
-export const RATE_WINDOW = 30;
+export const RATE_WINDOW = 120;

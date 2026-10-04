@@ -5,8 +5,8 @@
 // the panel only shows them and sends the orders.
 import { Minus, Plus } from "lucide-react";
 import { useState } from "react";
-import { MATERIAL_BY_ID, POWER_SYSTEM, SUPPLIERS, type MaterialId } from "@/game/config/economy";
-import { bulkDiscount, marketPrice, maxOrder, orderCost, plantMaterials, powerCost, shortfall, stockTotal, supplierOf, warehouseCap, warehouseCost, warehouseRoom, incomingMaterials } from "@/game/engine/materials";
+import { MATERIAL_BY_ID, POWER_SYSTEM, RESTOCK_UNITS, SUPPLIERS, type MaterialId } from "@/game/config/economy";
+import { bulkDiscount, marketPrice, maxOrder, orderCost, plantMaterials, powerCost, restockPlan, stockTotal, supplierOf, warehouseCap, warehouseCost, warehouseRoom, incomingMaterials } from "@/game/engine/materials";
 import { formatMoney, formatNumber, formatPercent } from "@/game/format";
 import type { PlantType } from "@/game/types";
 import type { MessageKey } from "@/i18n";
@@ -35,10 +35,10 @@ export function MaterialsPanel({ id }: { id: string }) {
   const coming = stockTotal(incomingMaterials(state, id));
   const sp = supplierOf(state);
   const next = SUPPLIERS[SUPPLIERS.indexOf(sp) + 1];
-  // one click: materials for the next 10 units (whatever is missing)
-  const forTen = shortfall(p, st.need, 10);
-  const tenCost = (Object.entries(forTen) as [MaterialId, number][]).reduce((a, [m, n]) => a + orderCost(state, m, n), 0);
-  const tenUnits = stockTotal(forTen);
+  // one click: materials for the next units (up to 10, as many as fit and the cash allows)
+  const fit = restockPlan(state, id, st.need, RESTOCK_UNITS, true);
+  const plan = fit.units ? restockPlan(state, id, st.need, fit.units) : fit;
+  const shown = plan.units ? plan : restockPlan(state, id, st.need, 1, true);
   return (
     <div className="space-y-2 rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.07]">
       <div className="flex items-center justify-between text-[11px]">
@@ -65,8 +65,8 @@ export function MaterialsPanel({ id }: { id: string }) {
       {mats.map((m) => (
         <MaterialRow key={m} id={id} m={m} per={st.need[m] ?? 0} />
       ))}
-      {tenUnits > 0 && (
-        <CostButton className="w-full" cost={tenCost} onBuy={() => (Object.entries(forTen) as [MaterialId, number][]).every(([m, n]) => g.buyMaterial(id, m, n))} label={t("mat.buyFor", { n: 10 })} />
+      {fit.units > 0 && stockTotal(shown.want) > 0 && (
+        <CostButton className="w-full" cost={shown.cost} onBuy={() => g.buyPlan(id, plan)} label={t("mat.buyFor", { n: Math.max(1, shown.units) })} />
       )}
       {next && <p className="text-[10px] text-white/40">{t("mat.nextSupplier", { name: t(`supplier.${next.id}` as MessageKey), n: formatNumber(next.unlockBought - state.market.bought), pct: formatPercent(next.discount) })}</p>}
       {/* automatic restocking: from the Wholesale supplier on */}

@@ -1,7 +1,7 @@
 "use client";
 
-import { shortfall } from "@/game/engine/materials";
-import type { MaterialId } from "@/game/config/economy";
+import { restockPlan } from "@/game/engine/materials";
+import { RESTOCK_UNITS } from "@/game/config/economy";
 import { ArrowRight, CheckCircle2, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -34,7 +34,11 @@ export function goalText(g: Goal, t: (k: MessageKey, v?: Vars) => string, n: Con
       return { title: t(g.what === "speed" ? "goal.speed" : "goal.level", { name: plantName(s, g.plot, t) }), detail: t("goal.upgradeDetail") };
     }
     case "materials":
-      return { title: t("goal.materials", { m: t(`mat.${g.material}` as MessageKey) }), detail: t("goal.materialsDetail", { name: plantName(useGame.getState().state, g.plot, t) }) };
+      return { title: t("goal.materials", { m: t(`mat.${g.material}` as MessageKey) }), detail: t("goal.materialsDetail", { name: plantName(useGame.getState().state, g.plot, t), n: g.units }) };
+    case "warehouse":
+      return { title: t("goal.warehouse", { name: plantName(useGame.getState().state, g.plot, t) }), detail: t("goal.warehouseDetail", { n: formatNumber(Math.max(0.1, Math.round(g.minutes * 10) / 10)) }) };
+    case "autoBuy":
+      return { title: t("goal.autoBuy"), detail: t("goal.autoBuyDetail", { n: g.plots.length }) };
     case "shortage":
       return {
         title: t("goal.shortage", { item: t(`item.${g.component}`) }),
@@ -92,13 +96,19 @@ export function runGoal(g: Goal, ready: boolean) {
       break;
     case "materials": {
       // one tap buys what is missing for the next 10 units
-      const s = game.state;
       const st = game.snap.chain.plants[g.plot];
-      const p = s.city.buildings[g.plot]?.plant;
-      if (ready && st && p) for (const [m, n] of Object.entries(shortfall(p, st.need, 10)) as [MaterialId, number][]) game.buyMaterial(g.plot, m, n);
+      if (ready && st) game.buyPlan(g.plot, restockPlan(game.state, g.plot, st.need, RESTOCK_UNITS));
       ui.selectPlot(g.plot);
       break;
     }
+    case "warehouse":
+      if (ready) game.upgradeWarehouse(g.plot);
+      ui.selectPlot(g.plot);
+      break;
+    case "autoBuy":
+      for (const plot of g.plots) game.setAutoBuy(plot, true);
+      ui.selectPlot(g.plots[0]);
+      break;
     case "shortage":
       // one tap fixes it: buy the maker's cheapest upgrade
       if (ready && g.what) {
@@ -156,9 +166,12 @@ export function NextGoals() {
   return (
     <div className="grid gap-2 @sm:grid-cols-2">
       {goals.map((g) => {
-        const cost = "cost" in g ? g.cost : undefined;
+        // a new plant is "ready" once its price and the materials to keep the others running are there
+        const reserve = g.kind === "plant" ? g.reserve : 0;
+        const cost = "cost" in g && g.cost !== undefined ? g.cost + reserve : undefined;
         const pct = g.kind === "made" ? Math.min(100, (g.have / g.n) * 100) : cost ? Math.min(100, (state.cash / cost) * 100) : 100;
         const ready = !cost || state.cash >= cost;
+        const keep = !ready && reserve > 0 && cost !== undefined && state.cash >= cost - reserve;
         const eta = cost && !ready && snap.incomePerSec > 0 && (cost - state.cash) / snap.incomePerSec < 86400 * 30 ? (cost - state.cash) / snap.incomePerSec : null;
         const text = goalText(g, t, n);
         const onGo = () => runGoal(g, ready);
@@ -176,7 +189,7 @@ export function NextGoals() {
                 <Target className="size-3" /> {t("goal.next")}
               </div>
               <div className="truncate text-sm font-semibold">{text.title}</div>
-              <div className="truncate text-[11px] text-white/45">{text.detail}</div>
+              <div className={cn("truncate text-[11px]", keep ? "text-amber-300/80" : "text-white/45")}>{keep ? t("goal.keepCash", { money: formatMoney(reserve) }) : text.detail}</div>
               {g.kind === "made" && (
                 <div className="mt-1.5 flex items-center gap-2">
                   <Progress value={pct} className="h-1.5" />

@@ -1,15 +1,15 @@
 // Read-only helpers that explain the game to the player: what to aim for next
 // and why something is locked. They return data, not text — the UI words it
 // in the player's language. Never mutate state.
-import { MATERIAL_BY_ID, type MaterialId } from "../config/economy";
-import { orderCost, shortfall } from "./materials";
+import { LOW_STOCK_UNITS, MATERIAL_BY_ID, RESERVE_UNITS, RESTOCK_UNITS, WAREHOUSE_MINUTES, type MaterialId } from "../config/economy";
+import { plantMaterials, restockPlan, stockTotal, supplierOf, unitsInStock, warehouseCap, warehouseCost } from "./materials";
 import { CARS } from "../config/cars";
 import { MAKER, PLANTS, PLANT_BY_ID } from "../config/chain";
 import { DEALERS } from "../config/dealerships";
 import { MANAGERS } from "../config/managers";
 import { ZONE_BY_ID } from "../config/city";
 import { WORLD_MAP, dealerPlot } from "../city/layout";
-import type { CarId, ComponentId, DealerId, GameState, ManagerId, PlantType, ZoneId } from "../types";
+import type { CarId, ComponentId, DealerId, GameState, ManagerId, MaterialStock, PlantType, ZoneId } from "../types";
 import { canOpenDealers, isManagerUnlocked } from "./actions";
 import { bestGrade, carLock, gradeCost, hasPlant, levelCost, plantBuildCost, plantLock, plantsOf, speedCost } from "./chain";
 import { isPlotUnlocked, nextZone, zoneBlocker } from "./city";
@@ -27,15 +27,17 @@ export type Requirement =
   | { kind: "unavailable" };
 
 export type Goal =
-  | { kind: "plant"; icon: string; cost: number; plant: PlantType }
+  | { kind: "plant"; icon: string; cost: number; plant: PlantType; /** Cash to keep for materials after building. */ reserve: number }
   | { kind: "upgrade"; icon: string; cost: number; plot: string; what: "speed" | "level" }
   /** cost/what: the cheapest upgrade on the maker plot, bought by tapping the goal. */
   | { kind: "shortage"; icon: string; plot: string; component: ComponentId; cost?: number; what?: "speed" | "level" }
   | { kind: "dealer"; icon: string; cost: number; dealer: DealerId }
   /** Every dealer is full and cars wait at the plants: the cheapest way to sell more (perMin: cars waiting). */
   | { kind: "dealerFull"; icon: string; cost: number; dealer: DealerId; open: boolean; perMin: number }
-  /** A plant ran out of a material and nothing is on the way: buy enough for 10 units. */
-  | { kind: "materials"; icon: string; plot: string; material: MaterialId; cost: number }
+  /** A plant is out of (or low on) material and nothing is on the way: buy for up to 10 units (`units`: what fits and is affordable). */
+  | { kind: "materials"; icon: string; plot: string; material: MaterialId; cost: number; units: number }
+  | { kind: "autoBuy"; icon: string; plots: string[] }
+  | { kind: "warehouse"; icon: string; plot: string; cost: number; minutes: number }
   | { kind: "car"; icon: string; cost?: number; car: CarId; plot: string | null; requirement: Requirement | null }
   | { kind: "manager"; icon: string; cost: number; manager: ManagerId }
   /** gain: extra income share the points add; stalled: income stopped growing. */
@@ -76,15 +78,50 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
   const goals: Goal[] = [];
   const gm = snap.gm;
 
-  // A plant out of material, with nothing on the way, is the most urgent thing on the map.
-  for (const [id, b] of plantsOf(s)) {
-    const st = snap.chain.plants[id];
-    if (b.plant.status !== "noRaw" || !b.plant.short || !st) continue;
-    if (s.chain.shipments.some((sh) => !sh.back && sh.to === id && sh.materials)) continue;
-    const want = shortfall(b.plant, st.need, 10);
-    const cost = (Object.entries(want) as [MaterialId, number][]).reduce((a, [m, n]) => a + orderCost(s, m, n), 0);
-    goals.push({ kind: "materials", icon: MATERIAL_BY_ID[b.plant.short].emoji, plot: id, material: b.plant.short, cost });
-    break;
+  // A plant out of material (or about to be), with nothing on the way, is the most urgent thing on the map.
+  {
+    const auto = supplierOf(s).autoBuy;
+    let low: { id: string; units: number; material: MaterialId; need: MaterialStock } | null = null;
+    for (const [id, b] of plantsOf(s)) {
+      const st = snap.chain.plants[id];
+      if (!st || !Object.keys(st.need).length) continue;
+      if (s.chain.shipments.some((sh) => !sh.back && sh.to === id && sh.materials)) continue;
+      const have = unitsInStock(b.plant, st.need);
+      const out = b.plant.status === "noRaw";
+      // auto-restock looks after a plant that is only running low
+      if (!out && (have.n >= LOW_STOCK_UNITS || (auto && b.plant.autoBuy))) continue;
+      const material = b.plant.short ?? have.short ?? (Object.keys(st.need)[0] as MaterialId);
+      const units = out ? -1 : have.n;
+      if (!low || units < low.units) low = { id, units, material, need: st.need };
+    }
+    if (low) {
+      // the biggest order (up to 10 units) that fits the warehouse and the cash; else what one unit costs
+      const plan = restockPlan(s, low.id, low.need, RESTOCK_UNITS);
+      const shown = plan.units ? plan : restockPlan(s, low.id, low.need, 1, true);
+      goals.push({ kind: "materials", icon: MATERIAL_BY_ID[low.material].emoji, plot: low.id, material: low.material, cost: shown.cost, units: Math.max(1, shown.units) });
+    }
+  }
+
+  // Once the supplier delivers automatically, switch it on: no more buying by hand.
+  if (supplierOf(s).autoBuy) {
+    const off = plantsOf(s)
+      .filter(([, b]) => !b.plant.autoBuy && plantMaterials(b.type as PlantType).length > 0)
+      .map(([id]) => id);
+    if (off.length) goals.push({ kind: "autoBuy", icon: "🔁", plots: off });
+  }
+
+  // A warehouse that holds only a few minutes of work keeps running dry: make it bigger.
+  {
+    let worst: Extract<Goal, { kind: "warehouse" }> | null = null;
+    for (const [id, b] of plantsOf(s)) {
+      const st = snap.chain.plants[id];
+      const per = st ? stockTotal(st.need) : 0;
+      if (!st || per <= 0 || st.unitsPerSec <= 0) continue;
+      const minutes = warehouseCap(b.plant) / per / st.unitsPerSec / 60;
+      const cost = warehouseCost(b, gm.costMult);
+      if (minutes < WAREHOUSE_MINUTES && cost !== null && (!worst || minutes < worst.minutes)) worst = { kind: "warehouse", icon: "🏬", plot: id, cost, minutes };
+    }
+    if (worst) goals.push(worst);
   }
 
   // An assembly line starved of parts is next.
@@ -130,7 +167,7 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
   // The next plant in the chain.
   const next = PLANTS.find((p) => !hasPlant(s, p.id) && plantLock(s, p.id) === null);
   if (next) {
-    if (freePlot(s)) goals.push({ kind: "plant", icon: next.emoji, cost: plantBuildCost(s, next.id), plant: next.id });
+    if (freePlot(s)) goals.push({ kind: "plant", icon: next.emoji, cost: plantBuildCost(s, next.id), plant: next.id, reserve: workingCapital(s, snap) });
     else {
       const z = nextZone(s);
       if (z && !zoneBlocker(s, z.id)) goals.push({ kind: "zone", icon: "🗺️", cost: ZONE_BY_ID[z.id].cost, zone: z.id });
@@ -155,16 +192,26 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
 
   // While saving up: the cheapest upgrade that makes more of something.
   // When it is affordable now and the next plant is still far away, it comes first.
+  // Never at the cost of the materials: keep enough cash to restock every plant for a few units,
+  // and don't speed up a plant that is waiting for material anyway.
+  const reserve = workingCapital(s, snap);
+  // While an assembly line is busy with every part it needs, it is the bottleneck: upgrade it first.
+  const busyLine = plantsOf(s).some(([, b]) => b.type === "assemblyPlant" && b.plant.status === "ok");
   let best: Extract<Goal, { kind: "upgrade" }> | null = null;
   for (const [id, b] of plantsOf(s)) {
+    if (b.plant.status === "noRaw") continue;
+    if (busyLine && b.type !== "assemblyPlant") continue;
     for (const what of ["speed", "level"] as const) {
       const cost = what === "speed" ? speedCost(b, gm) : levelCost(b, gm);
       if (cost !== null && (!best || cost < best.cost)) best = { kind: "upgrade", icon: what === "speed" ? "⚡" : "⬆️", cost, plot: id, what };
     }
   }
   const plantGoal = goals.find((g) => g.kind === "plant");
-  if (best && best.cost <= s.cash && (!plantGoal || ("cost" in plantGoal && plantGoal.cost > s.cash * 3))) {
-    const urgent = goals[0]?.kind === "shortage" || goals[0]?.kind === "dealer" ? 1 : 0;
+  if (best && best.cost <= s.cash && best.cost + reserve > s.cash) best = null;
+  // the next plant is "far" when it takes more than ~10 minutes of income to save up for it
+  const far = !plantGoal || ("cost" in plantGoal && plantGoal.cost - s.cash > Math.max(s.cash * 2, snap.incomePerSec * 600));
+  if (best && best.cost <= s.cash && far) {
+    const urgent = goals[0]?.kind === "shortage" || goals[0]?.kind === "dealer" || goals[0]?.kind === "materials" ? 1 : 0;
     goals.splice(urgent, 0, best);
   } else if (best && goals.length < max) goals.push(best);
 
@@ -194,6 +241,16 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
     else goals.splice(Math.min(goals.length, max - 1), 0, g);
   }
   return goals.slice(0, max);
+}
+
+/** Cash that should stay free to buy materials for the next few units of every plant. */
+export function workingCapital(s: GameState, snap: EconomySnapshot): number {
+  let c = 0;
+  for (const [id] of plantsOf(s)) {
+    const st = snap.chain.plants[id];
+    if (st && Object.keys(st.need).length) c += restockPlan(s, id, st.need, RESERVE_UNITS, true).cost;
+  }
+  return c;
 }
 
 /** The cheaper of a plant's speed and level upgrades. */
