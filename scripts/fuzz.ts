@@ -28,6 +28,8 @@ import * as Rc from "../src/game/engine/racing";
 import * as Rt from "../src/game/engine/retention";
 import { carBaseValue } from "../src/game/engine/chain";
 import { snapshot } from "../src/game/engine/economy";
+import * as U from "../src/game/engine/unlocks";
+import { restockLow } from "../src/game/engine/insights";
 import { nextGoals } from "../src/game/engine/insights";
 import { collectOffline, settleOffline } from "../src/game/engine/offline";
 import { createInitialState } from "../src/game/engine/state";
@@ -151,6 +153,8 @@ const actions: [string, () => unknown][] = [
   ["auto", () => Rc.setAutoRacing(s, rnd() < 0.7)],
   ["select", () => s.racing.cars.length && (s.racing.selected = pick(s.racing.cars).id)],
   ["autoUpgrade", () => plantPlots().length && (s.city.buildings[pick(plantPlots())].plant!.auto = rnd() < 0.5)],
+  ["claimUnlock", () => U.claimUnlock(s, rnd() < 0.5 ? "car" : "plant", rnd() < 0.5 ? pick(CARS).id : pick(PLANTS).id)],
+  ["restockLow", () => restockLow(s, snapshot(s))],
 ];
 
 for (let step = 0; step < steps; step++) {

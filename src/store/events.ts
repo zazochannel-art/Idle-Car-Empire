@@ -6,7 +6,8 @@ export type UiEvent =
   | { type: "firstCar"; plot: string; car: CarId }
   | { type: "toast"; tone: "success" | "gold" | "info" | "warn"; title: string; body?: string; icon?: string }
   | { type: "prestige"; points: number; stars?: boolean }
-  | { type: "race"; id: number };
+  | { type: "race"; id: number }
+  | { type: "unlock"; kind: "car" | "plant"; id: string };
 
 type Listener = (e: UiEvent) => void;
 const listeners = new Set<Listener>();

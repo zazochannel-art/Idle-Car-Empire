@@ -14,6 +14,8 @@ import * as D from "./engine/design";
 import * as K from "./engine/contracts";
 import * as R from "./engine/retention";
 import { seasonAt } from "./engine/season";
+import * as U from "./engine/unlocks";
+import { restockLow } from "./engine/insights";
 import * as Ev from "./engine/events";
 import * as I from "./engine/imperium";
 import * as L from "./engine/logistics";
@@ -195,6 +197,51 @@ describe("growing the chain", () => {
     run(s, 120);
     expect(s.lifetime.parts.engine).toBeGreaterThan(0);
     expect(s.chain.shipments.some((sh) => sh.from === a && sh.to === MARKET && sh.item === "engine")).toBe(true);
+  });
+});
+
+describe("tyre supplier and unlock moments", () => {
+  it("builds the first cars with supplier tyres before the Tire Factory", () => {
+    const s = createInitialState(T0);
+    const [a, b] = freePlots();
+    build(s, a, "engineFactory");
+    // the first assembly plant is cheap and needs only the engine factory
+    expect(Ch.plantLock(s, "assemblyPlant")).toBeNull();
+    expect(Ch.plantBuildCost(s, "assemblyPlant")).toBe(6_000);
+    build(s, b, "assemblyPlant");
+    expect(Ch.plantBuildCost(s, "assemblyPlant")).toBe(30_000 * 2.5);
+    expect(Ch.supplied(s, "tires")).toBe(true);
+    expect(Ch.supplied(s, "engine")).toBe(false);
+    expect(Ch.carLock(s, CAR_BY_ID.city, snapshot(s).gm)).toBeNull();
+    // but not a car that needs better parts than the supplier's
+    expect(Ch.carLock(s, CAR_BY_ID.sedan, snapshot(s).gm)).not.toBeNull();
+    s.cash = 50_000;
+    run(s, 900);
+    expect(s.lifetime.carsProduced).toBeGreaterThan(0);
+    expect(s.chain.ledger.run.materials).toBeGreaterThan(0);
+  });
+
+  it("pays an unlock bonus once per run", () => {
+    const s = createInitialState(T0);
+    const cash = s.cash;
+    const bonus = U.unlockBonus(s);
+    expect(bonus).toBeGreaterThanOrEqual(U.UNLOCK_BONUS_MIN);
+    expect(U.claimUnlock(s, "car", "city")).toBe(bonus);
+    expect(s.cash).toBe(cash + bonus);
+    expect(U.claimUnlock(s, "car", "city")).toBe(0);
+    // a new kind of plant on the menu: the Engine Factory after 12 bodies
+    expect(U.openPlantTypes(s).has("engineFactory")).toBe(false);
+    s.lifetime.parts.body = 12;
+    expect(U.openPlantTypes(s).has("engineFactory")).toBe(true);
+  });
+
+  it("restocks every plant running low in one tap", () => {
+    const s = createInitialState(T0);
+    const [a] = freePlots();
+    build(s, a, "engineFactory", 0);
+    for (const id of [a, STARTER_PLOT]) s.city.buildings[id].plant!.stock = {};
+    s.cash = 1e6;
+    expect(restockLow(s, snapshot(s))).toBe(2);
   });
 });
 

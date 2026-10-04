@@ -35,6 +35,9 @@ import type { BuyAmount, CarId, DealerId, FacilityType, GameState, Lang, Manager
 import { applyLanguage, detectLanguage, translate, type MessageKey, type Vars } from "@/i18n";
 import { contentFor } from "@/i18n/content";
 import { uiEvents } from "./events";
+import { claimUnlock, openPlantTypes } from "@/game/engine/unlocks";
+import { restockLow } from "@/game/engine/insights";
+import { hasPlant as hasPlantType } from "@/game/engine/chain";
 
 const TICK_MS = 100;
 const SAVE_MS = 5_000;
@@ -58,6 +61,8 @@ interface GameStore {
   setCombine: (plot: string, on: boolean) => void;
   buyMaterial: (plot: string, m: MaterialId, qty: number) => boolean;
   buyPlan: (plot: string, plan: Mat.RestockPlan) => boolean;
+  restockLow: () => number;
+  claimUnlock: (kind: "car" | "plant", id: string) => number;
   upgradeWarehouse: (plot: string) => boolean;
   upgradePower: (plot: string) => boolean;
   setAutoBuy: (plot: string, on: boolean) => void;
@@ -136,14 +141,13 @@ export const useGame = create<GameStore>((set, get) => {
         uiEvents.emit({ type: "toast", tone: "gold", icon: a.icon, title: tr("toast.achievement", { name: names().achievement(a) }), body: tr("toast.achievementBody", { desc: names().achievementDesc(a) }) });
       }
     }
-    if (prevSnap) {
-      const before = unlockedCarIds(get().state, prevSnap.gm);
-      for (const id of unlockedCarIds(next, snap.gm)) {
-        if (!before.has(id)) {
-          const car = CAR_BY_ID[id];
-          uiEvents.emit({ type: "toast", tone: "info", icon: car.emoji, title: tr("toast.newCar", { name: names().car(car) }), body: names().carTagline(car) });
-        }
-      }
+    const prev = get().state;
+    // unlock moments (not across a new run: everything "unlocks" again then)
+    if (prevSnap && prev.runStartedAt === next.runStartedAt) {
+      const before = unlockedCarIds(prev, prevSnap.gm);
+      for (const id of unlockedCarIds(next, snap.gm)) if (!before.has(id)) uiEvents.emit({ type: "unlock", kind: "car", id });
+      const open = openPlantTypes(prev);
+      for (const id of openPlantTypes(next)) if (!open.has(id) && !hasPlantType(prev, id)) uiEvents.emit({ type: "unlock", kind: "plant", id });
     }
     set({ state: next, snap });
   }
@@ -208,7 +212,7 @@ export const useGame = create<GameStore>((set, get) => {
         }
       }
     }
-    commit(next);
+    commit(next, snap);
     if (now - lastSave > SAVE_MS) persist();
   }
 
@@ -276,6 +280,8 @@ export const useGame = create<GameStore>((set, get) => {
     },
     buyMaterial: (plot, m, qty) => act((s) => Mat.buyMaterial(s, plot, m, qty).ok),
     buyPlan: (plot, plan) => act((s) => Mat.buyPlan(s, plot, plan)),
+    restockLow: () => act((s) => restockLow(s, get().snap)),
+    claimUnlock: (kind, id) => act((s) => claimUnlock(s, kind, id)),
     upgradeWarehouse: (plot) => act((s) => Ch.upgradeWarehouse(s, plot, get().snap.gm)),
     upgradePower: (plot) => act((s) => Ch.upgradePower(s, plot, get().snap.gm)),
     setAutoBuy: (plot, on) => {

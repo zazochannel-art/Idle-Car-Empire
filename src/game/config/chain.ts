@@ -31,6 +31,13 @@ export const COMPONENT_BY_ID = Object.fromEntries(COMPONENTS.map((c) => [c.id, c
  */
 export const BASE_RECIPE: ComponentId[] = ["body", "engine", "tires"];
 
+/**
+ * Until the company builds a plant for a base part, an outside supplier
+ * delivers it to the assembly line at its standard cost × this: the first
+ * cars come early, and building the plant later doubles their margin.
+ */
+export const SUPPLIER_MARKUP = 1.08;
+
 export interface PlantConfig {
   id: PlantType;
   emoji: string;
@@ -43,6 +50,8 @@ export interface PlantConfig {
   time: number;
   /** Price to build the first one (second one ×PLANT_COPY_COST…). Also the base of every upgrade price. */
   cost: number;
+  /** A cheaper price for the very first one (upgrades still scale with `cost`). */
+  firstCost?: number;
   /** The plant that must exist before this one can be built. */
   requires: PlantType | null;
   /** Research needed first. */
@@ -55,10 +64,11 @@ export interface PlantConfig {
 
 export const PLANTS: PlantConfig[] = [
   // the first car: body + engine + tyres, put together by the assembly plant
+  // (tyres come from a supplier until the Tire Factory is built)
   { id: "bodyWorks", emoji: "🚙", item: "body", raw: "steel", rawPer: 10, time: 20, cost: 8_000, requires: null, color: "#e2e8f0", roof: "#64748b" },
   { id: "engineFactory", emoji: "⚙️", item: "engine", raw: "metal", rawPer: 10, time: 30, cost: 6_000, requires: "bodyWorks", unlockMade: { item: "body", n: 12 }, color: "#e7e5e4", roof: "#b91c1c" },
+  { id: "assemblyPlant", emoji: "🏭", item: null, raw: "", rawPer: 0, time: 60, cost: 30_000, firstCost: 6_000, requires: "engineFactory", color: "#f1f5f9", roof: "#1d4ed8" },
   { id: "tireFactory", emoji: "🛞", item: "tires", raw: "rubber", rawPer: 10, time: 30, cost: 15_000, requires: "engineFactory", color: "#d4d4d8", roof: "#27272a" },
-  { id: "assemblyPlant", emoji: "🏭", item: null, raw: "", rawPer: 0, time: 60, cost: 30_000, requires: "tireFactory", color: "#f1f5f9", roof: "#1d4ed8" },
   // better cars need more parts
   { id: "interiorFactory", emoji: "💺", item: "interior", raw: "fabric", rawPer: 10, time: 40, cost: 150_000, requires: "assemblyPlant", color: "#fef3c7", roof: "#a16207" },
   { id: "suspensionFactory", emoji: "🔩", item: "suspension", raw: "alloy", rawPer: 10, time: 40, cost: 400_000, requires: "interiorFactory", color: "#fef3c7", roof: "#b45309" },
