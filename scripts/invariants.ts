@@ -35,5 +35,8 @@ export function checkInvariants(s: GameState): string[] {
   for (const rc of s.racing.cars) for (const [k, w] of Object.entries(rc.wear)) if (w < 0.05 - 1e-9 || w > 1 + 1e-9) out.push(`race car ${rc.id} wear.${k} ${w}`);
   if (s.racing.selected !== null && !s.racing.cars.some((c) => c.id === s.racing.selected)) out.push(`racing.selected ${s.racing.selected} missing`);
   if (s.racing.live && !s.racing.cars.some((c) => c.id === s.racing.live!.car)) out.push("live race without its car");
+  const q = s.quality;
+  if (!(q.rep >= 0 && q.rep <= 100)) out.push(`reputation out of range: ${q.rep}`);
+  if (q.defects < 0) out.push(`negative defects: ${q.defects}`);
   return out;
 }

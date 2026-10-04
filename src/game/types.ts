@@ -309,6 +309,28 @@ export interface PlantData {
   status: PlantStatus;
   /** With status noParts: the first missing component. */
   missing?: ComponentId;
+  /** Quality against quantity (balanced when unset). */
+  mode?: QualityMode;
+  /** Assembly: where its cars go (best price when unset). */
+  carRoute?: CarRoute;
+}
+
+export type QualityMode = "fast" | "balanced" | "premium";
+/** "fast" = the dealer that will sell it soonest, or one dealer first. */
+export type CarRoute = "price" | "fast" | DealerId;
+
+/** Build quality, the company's reputation and product recalls. */
+export interface QualityState {
+  /** 0–100; 50 is neutral. Moves car prices a little either way. */
+  rep: number;
+  /** Defective cars sold since the last recall (fractional). */
+  defects: number;
+  /** A recall waiting for the player's decision. */
+  recall: { car: CarId; cars: number } | null;
+  /** Market clock (s) until which a scandal cuts car prices. */
+  scandalUntil: number;
+  /** Recalls handled (paid or ignored). */
+  recalls: number;
 }
 
 export interface BuildingState {
@@ -450,6 +472,7 @@ export interface GameState {
   chain: ChainState;
   racing: RacingState;
   pendingOffline: OfflineReport | null;
+  quality: QualityState;
   /** Unlock bonuses already claimed this run ("car:sedan", "plant:engineFactory"). */
   unlocks: string[];
   settings: { buyAmount: BuyAmount; lang: Lang; lowGraphics: boolean; sound: boolean; haptics: boolean };

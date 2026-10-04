@@ -1,5 +1,6 @@
 "use client";
 
+import { MarketNewsCard } from "../panels/market-controls";
 import { plantsOf } from "@/game/engine/chain";
 import { DEALERS } from "@/game/config/dealerships";
 import { dealerStats } from "@/game/engine/chain";
@@ -33,6 +34,7 @@ export function DealersView() {
           <Metric label={t("dealers.inStock")} value={formatNumber(inStock)} gold />
         </div>
       </ViewHeader>
+      <MarketNewsCard />
       {waiting >= 1 && (
         <div className="rounded-2xl bg-amber-500/10 p-3 text-xs text-amber-200 ring-1 ring-amber-400/30">
           ⚠️ {t("dealers.wholesale", { n: formatNumber(waiting) })}

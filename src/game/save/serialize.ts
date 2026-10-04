@@ -1,5 +1,6 @@
 import { migrateChain } from "../engine/chain";
 import { migrateRacing } from "../engine/racing";
+import { migrateQuality } from "../engine/market";
 import { migrateCity, unlockOwnedZones } from "../engine/city";
 import { applyStartPerks } from "../engine/prestige";
 import { createInitialState, SAVE_VERSION } from "../engine/state";
@@ -62,6 +63,7 @@ export function migrate(raw: unknown, now: number): GameState {
   }
   state.chain = migrateChain(raw.chain, state);
   state.racing = migrateRacing(raw.racing);
+  state.quality = migrateQuality(raw.quality);
   state.unlocks = state.unlocks.filter((u) => typeof u === "string");
   // a missing or future start date would skew rivals, contracts and stats
   if (!(state.createdAt > 0 && state.createdAt <= now)) state.createdAt = Math.min(now, state.lastActiveAt > 0 ? state.lastActiveAt : now);

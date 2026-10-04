@@ -29,12 +29,14 @@ import { prestige as doPrestige } from "@/game/engine/prestige";
 import { checkAchievements, claimDaily, claimMilestone, recordHistory, refreshDaily } from "@/game/engine/progress";
 import { cloneState, createInitialState } from "@/game/engine/state";
 import { tick as engineTick } from "@/game/engine/tick";
-import { formatMoney } from "@/game/format";
+import { formatMoney, formatPercent } from "@/game/format";
 import { decodeSave, encodeSave, SaveManager } from "@/game/save";
-import type { BuyAmount, CarId, DealerId, FacilityType, GameState, Lang, ManagerId, Specialization, StructureType, ZoneId } from "@/game/types";
+import type { BuyAmount, CarId, CarRoute, DealerId, FacilityType, GameState, Lang, ManagerId, QualityMode, Specialization, StructureType, ZoneId } from "@/game/types";
 import { applyLanguage, detectLanguage, translate, type MessageKey, type Vars } from "@/i18n";
 import { contentFor } from "@/i18n/content";
 import { uiEvents } from "./events";
+import * as Mk from "@/game/engine/market";
+import { HOT_CLASS, RECALL } from "@/game/config/market";
 import { claimUnlock, openPlantTypes } from "@/game/engine/unlocks";
 import { restockLow } from "@/game/engine/insights";
 import { hasPlant as hasPlantType } from "@/game/engine/chain";
@@ -62,6 +64,10 @@ interface GameStore {
   buyMaterial: (plot: string, m: MaterialId, qty: number) => boolean;
   buyPlan: (plot: string, plan: Mat.RestockPlan) => boolean;
   restockLow: () => number;
+  setQualityMode: (plot: string, mode: QualityMode) => void;
+  setCarRoute: (plot: string, route: CarRoute) => void;
+  payRecall: (cost: number) => void;
+  ignoreRecall: () => void;
   claimUnlock: (kind: "car" | "plant", id: string) => number;
   upgradeWarehouse: (plot: string) => boolean;
   upgradePower: (plot: string) => boolean;
@@ -212,6 +218,10 @@ export const useGame = create<GameStore>((set, get) => {
         }
       }
     }
+    const trend = Mk.trendOf(next);
+    if (trend.hot && trend.block !== Mk.trendOf(state).block) {
+      uiEvents.emit({ type: "toast", tone: "info", icon: "📰", title: tr("news.toast"), body: tr("news.hot", { cls: tr(`class.${trend.hot}` as MessageKey), price: formatPercent(HOT_CLASS.price), demand: formatPercent(HOT_CLASS.demand - 1) }) });
+    }
     commit(next, snap);
     if (now - lastSave > SAVE_MS) persist();
   }
@@ -281,6 +291,20 @@ export const useGame = create<GameStore>((set, get) => {
     buyMaterial: (plot, m, qty) => act((s) => Mat.buyMaterial(s, plot, m, qty).ok),
     buyPlan: (plot, plan) => act((s) => Mat.buyPlan(s, plot, plan)),
     restockLow: () => act((s) => restockLow(s, get().snap)),
+    setQualityMode: (plot, mode) => {
+      act((s) => Ch.setQualityMode(s, plot, mode));
+    },
+    setCarRoute: (plot, route) => {
+      act((s) => Ch.setCarRoute(s, plot, route));
+    },
+    payRecall: (cost) => {
+      if (act((s) => Mk.payRecall(s, cost))) uiEvents.emit({ type: "toast", tone: "success", icon: "🛠️", title: tr("recall.paidToast", { n: RECALL.repPaid }) });
+    },
+    ignoreRecall: () => {
+      const out = act((s) => Mk.ignoreRecall(s));
+      if (out === "scandal") uiEvents.emit({ type: "toast", tone: "warn", icon: "📰", title: tr("recall.scandalToast") });
+      else if (out === "quiet") uiEvents.emit({ type: "toast", tone: "info", icon: "🤫", title: tr("recall.quietToast") });
+    },
     claimUnlock: (kind, id) => act((s) => claimUnlock(s, kind, id)),
     upgradeWarehouse: (plot) => act((s) => Ch.upgradeWarehouse(s, plot, get().snap.gm)),
     upgradePower: (plot) => act((s) => Ch.upgradePower(s, plot, get().snap.gm)),

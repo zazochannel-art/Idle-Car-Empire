@@ -2,6 +2,7 @@
 // plant's warehouse, buying (a depot truck brings the order), automatic
 // restocking, and the ledger that records where every dollar goes.
 // All numbers come from config/economy.ts.
+import { materialTrendMult } from "./market";
 import {
   AUTO_BUY,
   BULK_DISCOUNT,
@@ -67,7 +68,7 @@ export function marketPrice(s: GameState, m: MaterialId): number {
   const span = PRICE_DRIFT.maxPeriod - PRICE_DRIFT.minPeriod;
   const period = PRICE_DRIFT.minPeriod + ((i * 7919) % 97) / 97 * span;
   const phase = i * 1.7;
-  return MATERIAL_BY_ID[m].price * (1 + PRICE_DRIFT.amp * Math.sin((2 * Math.PI * s.market.t) / period + phase));
+  return MATERIAL_BY_ID[m].price * (1 + PRICE_DRIFT.amp * Math.sin((2 * Math.PI * s.market.t) / period + phase)) * materialTrendMult(s, m);
 }
 
 /** The best supplier the company has unlocked (by material bought so far). */
