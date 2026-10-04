@@ -29,6 +29,7 @@ import * as Rt from "../src/game/engine/retention";
 import { carBaseValue } from "../src/game/engine/chain";
 import { snapshot } from "../src/game/engine/economy";
 import * as U from "../src/game/engine/unlocks";
+import * as Mk from "../src/game/engine/market";
 import { restockLow } from "../src/game/engine/insights";
 import { nextGoals } from "../src/game/engine/insights";
 import { collectOffline, settleOffline } from "../src/game/engine/offline";
@@ -155,6 +156,10 @@ const actions: [string, () => unknown][] = [
   ["autoUpgrade", () => plantPlots().length && (s.city.buildings[pick(plantPlots())].plant!.auto = rnd() < 0.5)],
   ["claimUnlock", () => U.claimUnlock(s, rnd() < 0.5 ? "car" : "plant", rnd() < 0.5 ? pick(CARS).id : pick(PLANTS).id)],
   ["restockLow", () => restockLow(s, snapshot(s))],
+  ["quality", () => plantPlots().length && Ch.setQualityMode(s, pick(plantPlots()), pick(["fast", "balanced", "premium"] as const))],
+  ["carRoute", () => plantPlots().length && Ch.setCarRoute(s, pick(plantPlots()), pick(["price", "fast", ...DEALERS.map((d) => d.id)] as const))],
+  ["recall", () => (rnd() < 0.5 ? Mk.payRecall(s, rnd() * 1e5) : Mk.ignoreRecall(s, rnd()))],
+  ["defects", () => Mk.onCarBuilt(s, pick(CARS).id, rnd() * 3, "fast")],
 ];
 
 for (let step = 0; step < steps; step++) {

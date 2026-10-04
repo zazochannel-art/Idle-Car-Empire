@@ -46,6 +46,7 @@ import { Hud } from "./hud";
 import { OfflineDialog, PrestigeOverlay, SettingsDialog, Toasts } from "./overlays";
 import { FirstCarOverlay } from "./first-car";
 import { UnlockCard } from "./unlock-card";
+import { RecallDialog } from "./recall-dialog";
 import { PlantFloor } from "../plant/plant-floor";
 import { FactoryInterior, HAS_INTERIOR } from "../plant/interior/factory-interior";
 
@@ -174,6 +175,7 @@ function Shell() {
       </AnimatePresence>
       <FirstCarOverlay />
       <UnlockCard />
+      <RecallDialog />
 
       <Toasts />
       <FeedbackBridge />

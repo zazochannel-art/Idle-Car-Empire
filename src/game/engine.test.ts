@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CAR_BY_ID } from "./config/cars";
+import { CARS, CAR_BY_ID } from "./config/cars";
 import { CHASSIS_BONUS, MAX_WAIT, PLANT_BY_ID, VEHICLE_CAPACITY } from "./config/chain";
 import { COMPONENT_TIME, DEALER_FEE, PARTS_MARGIN, SALES_TAX, START_CASH } from "./config/economy";
 import * as M from "./engine/materials";
@@ -15,6 +15,8 @@ import * as K from "./engine/contracts";
 import * as R from "./engine/retention";
 import { seasonAt } from "./engine/season";
 import * as U from "./engine/unlocks";
+import * as Mk from "./engine/market";
+import { TREND_SEC } from "./config/market";
 import { restockLow } from "./engine/insights";
 import * as Ev from "./engine/events";
 import * as I from "./engine/imperium";
@@ -242,6 +244,85 @@ describe("tyre supplier and unlock moments", () => {
     for (const id of [a, STARTER_PLOT]) s.city.buildings[id].plant!.stock = {};
     s.cash = 1e6;
     expect(restockLow(s, snapshot(s))).toBe(2);
+  });
+});
+
+describe("market dynamics", () => {
+  it("trends change every 15 minutes and wait for the first car", () => {
+    const s = createInitialState(T0);
+    expect(Mk.trendOf(s).hot).toBeNull();
+    expect(Mk.materialTrendMult(s, Mk.trendAt(0).material)).toBe(1);
+    s.chain.firstCar = true;
+    const a = Mk.trendOf(s);
+    expect(a.hot).not.toBeNull();
+    // the same block gives the same trend; the material swing moves the market price
+    s.market.t += 10;
+    expect(Mk.trendOf(s)).toMatchObject({ block: a.block, hot: a.hot, material: a.material });
+    expect(Mk.materialTrendMult(s, a.material)).toBe(a.materialMult);
+    s.market.t = TREND_SEC * 7 + 1;
+    expect(Mk.trendOf(s).block).toBe(7);
+    // the hot class sells for more, and faster
+    const hot = CARS.find((c) => c.class === Mk.trendOf(s).hot)!;
+    const cold = CARS.find((c) => c.class !== Mk.trendOf(s).hot)!;
+    expect(Mk.carPriceMult(s, hot.id)).toBeCloseTo(1.2);
+    expect(Mk.carPriceMult(s, cold.id)).toBeCloseTo(1);
+    expect(Mk.carDemandMult(s, hot.id)).toBe(1.5);
+  });
+
+  it("quality modes trade speed for value", () => {
+    const s = createInitialState(T0);
+    const base = snapshot(s).chain.plants[STARTER_PLOT];
+    expect(Ch.setQualityMode(s, STARTER_PLOT, "fast")).toBe(true);
+    const fast = snapshot(s).chain.plants[STARTER_PLOT];
+    expect(fast.unitsPerSec).toBeCloseTo(base.unitsPerSec * 1.25);
+    expect(fast.unitValue).toBeLessThan(base.unitValue);
+    Ch.setQualityMode(s, STARTER_PLOT, "premium");
+    const prem = snapshot(s).chain.plants[STARTER_PLOT];
+    expect(prem.unitsPerSec).toBeCloseTo(base.unitsPerSec * 0.8);
+    expect(prem.unitValue).toBeGreaterThan(base.unitValue);
+    expect(Ch.setQualityMode(s, STARTER_PLOT, "premium")).toBe(false);
+    // kept in the save
+    expect(migrate(JSON.parse(JSON.stringify(s)), T0).city.buildings[STARTER_PLOT].plant!.mode).toBe("premium");
+  });
+
+  it("defects pile up into a recall: pay for trust, or risk a scandal", () => {
+    const s = createInitialState(T0);
+    for (let i = 0; i < 6 / 0.05; i++) Mk.onCarBuilt(s, "city", 0.05, "fast");
+    expect(s.quality.recall).toEqual({ car: "city", cars: 6 });
+    expect(s.quality.rep).toBeLessThan(50);
+    const cost = Mk.recallCost(s, 10_000);
+    expect(cost).toBe(6 * 10_000 * 0.25);
+    s.cash = cost - 1;
+    expect(Mk.payRecall(s, cost)).toBe(false);
+    s.cash = cost;
+    const rep = s.quality.rep;
+    expect(Mk.payRecall(s, cost)).toBe(true);
+    expect(s.quality.rep).toBeCloseTo(rep + 6);
+    // ignoring: a scandal cuts prices for a while
+    s.quality.recall = { car: "city", cars: 6 };
+    const before = Mk.repPriceMult(s);
+    expect(Mk.ignoreRecall(s, 0)).toBe("scandal");
+    expect(Mk.repPriceMult(s)).toBeLessThan(before * 0.85);
+    s.quality.recall = { car: "city", cars: 6 };
+    expect(Mk.ignoreRecall(s, 0.99)).toBe("quiet");
+    // reputation drifts back to neutral, and survives a save
+    s.quality.rep = 40;
+    Mk.qualityTick(s, 600);
+    expect(s.quality.rep).toBeCloseTo(40.5);
+    expect(migrate(JSON.parse(JSON.stringify(s)), T0).quality.rep).toBeCloseTo(40.5);
+  });
+
+  it("cars go where the plant's route says", () => {
+    const { s, assembly } = fullChain();
+    s.dealers.city.owned = true;
+    s.chain.dealers.city = Ch.emptyDealerStock();
+    s.cash = 1e7;
+    // the Sport Dealer, though economy cars pay more at the Economy Dealer
+    expect(Ch.setCarRoute(s, assembly, "city")).toBe(true);
+    run(s, 900);
+    expect(s.chain.shipments.filter((sh) => sh.item === "car").every((sh) => sh.to === "d:city")).toBe(true);
+    expect(migrate(JSON.parse(JSON.stringify(s)), T0).city.buildings[assembly].plant!.carRoute).toBe("city");
+    expect(Ch.setCarRoute(s, STARTER_PLOT, "fast")).toBe(false);
   });
 });
 

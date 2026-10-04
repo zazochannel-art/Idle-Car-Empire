@@ -26,6 +26,7 @@ import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { CostButton } from "../game/cost-button";
 import { MaterialsPanel, RunningCosts, materialName } from "./materials-panel";
+import { CarRoutePicker, QualityPicker } from "./market-controls";
 
 type T = (k: MessageKey, v?: Vars) => string;
 
@@ -131,8 +132,10 @@ export function PlantPanel({ id }: { id: string }) {
       {/* engine factory before assembly: sell engines, or motorized chassis */}
       {st.type === "engineFactory" && <EngineStrategy id={id} />}
 
-      {/* assembly: what car is on the line */}
+      {/* assembly: what car is on the line, and where the cars go */}
       {!cfg.item && <ModelPicker id={id} />}
+      {!cfg.item && <CarRoutePicker id={id} />}
+      <QualityPicker id={id} />
 
       {/* stock */}
       <div className="rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.07]">

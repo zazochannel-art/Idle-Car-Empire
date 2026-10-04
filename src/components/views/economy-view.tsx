@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { materialName } from "../panels/materials-panel";
+import { MarketNewsCard, ReputationCard } from "../panels/market-controls";
 import { plantName } from "../panels/plant-panel";
 import { LEDGER_ICON, LedgerTable } from "./ledger-table";
 import { SectionTitle } from "./section-title";
@@ -45,6 +46,11 @@ export function EconomyView() {
         <Tile label={`🚘 ${t("eco.carsMin")}`} value={formatNumber(Math.round(carsMin * 100) / 100)} />
         <Tile label={`📅 ${t("eco.carsDay")}`} value={formatNumber(Math.round(carsMin * 60 * 24))} />
         <Tile label={`🧾 ${t("eco.owed")}`} value={formatMoney(state.chain.owed)} tone={state.chain.owed > 0 ? "down" : undefined} />
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-2">
+        <MarketNewsCard />
+        <ReputationCard />
       </div>
 
       <SectionTitle title={t("eco.perMinute")} />

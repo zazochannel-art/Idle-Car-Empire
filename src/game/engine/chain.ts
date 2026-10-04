@@ -62,6 +62,7 @@ import { MARKET, RACING, plotOf, roadRoute } from "../city/layout";
 import type {
   BuildingState,
   CarId,
+  CarRoute,
   ChainState,
   ComponentId,
   DealerId,
@@ -72,8 +73,11 @@ import type {
   MaterialStock,
   PlantData,
   PlantType,
+  QualityMode,
   Shipment,
 } from "../types";
+import { QUALITY_MODES } from "../config/market";
+import { carDemandMult, carPriceMult, defectRate, onCarBuilt, qualityOf, qualityTick } from "./market";
 import { designStats } from "./design";
 import { logisticsMods } from "./logistics";
 import { starMods } from "./imperium";
@@ -362,12 +366,13 @@ export function plantStats(s: GameState, plotId: string, gm: GlobalMods, cars: C
   const lv = PLANT_LEVELS[b.level - 1];
   const mm = managerMods(s, plotId);
   const big = plotOf(plotId)?.big ? 1.5 : 1;
-  const speed = Math.pow(SPEED.mult, p.speed) * AUTOMATION[p.automation].speed * gm.speed * mm.speed * big;
+  const qm = QUALITY_MODES[qualityOf(p)];
+  const speed = Math.pow(SPEED.mult, p.speed) * AUTOMATION[p.automation].speed * gm.speed * mm.speed * big * qm.speed;
   const car = cfg.item ? null : activeCar(s, p, cars);
   const baseTime = cfg.item ? componentTime(cfg.item, p.grade) : car ? assemblyTime(car) * modelStats(s, car).timeMult : assemblyTime(CAR_BY_ID.city);
   const cycle = baseTime / speed;
   const lines = lv.lines;
-  const itemValue = cfg.item ? componentValue(cfg.item, p.grade, gm, mm.value) : car ? carValue(s, car, gm, mm.value) : 0;
+  const itemValue = cfg.item ? componentValue(cfg.item, p.grade, gm, mm.value * qm.value) : car ? carValue(s, car, gm, mm.value * qm.value) : 0;
   // engine + the best body you make, worth a little more together
   const chassisValue = b.type === "engineFactory" ? (itemValue + componentValue("body", Math.max(1, bestGrade(s, "body")), gm)) * CHASSIS_BONUS : null;
   const combine = combines(s, b);
@@ -500,16 +505,24 @@ function destination(s: GameState, snap: ChainSnapshot, id: string, b: BuildingS
   // motorized chassis are sold at the market
   if (snap.plants[id]?.combine) return { to: MARKET, room: Infinity };
   if (!cfg.item) {
-    // cars: to the dealer that pays most for this model (its speciality first) and has room
+    // cars: by the plant's route: the dealer that pays most for this model (its speciality first),
+    // the one that will sell it soonest, or a chosen dealer first; always one with room
     const car = snap.plants[id]?.car?.id;
-    let best: { to: string; room: number; markup: number } | null = null;
+    const route = b.plant.carRoute ?? "price";
+    let best: { to: string; room: number; score: number } | null = null;
     for (const d of Object.values(snap.dealers)) {
       if (!d) continue;
       const to = `d:${d.id}`;
       const stock = s.chain.dealers[d.id]?.cars ?? 0;
-      const room = d.stockCap - stock - incoming(s, to, "car");
-      const markup = d.markup + (car && dealerMatches(d.id, car) ? DEALER_SPECIALTY.price : 0);
-      if (room > 0 && (!best || markup > best.markup)) best = { to, room, markup };
+      const queued = stock + incoming(s, to, "car");
+      const room = d.stockCap - queued;
+      if (room <= 0) continue;
+      const match = !!car && dealerMatches(d.id, car);
+      const markup = d.markup + (match ? DEALER_SPECIALTY.price : 0);
+      // soonest sale: fewer cars ahead of it and quicker customers for this model
+      const wait = ((queued + 1) * d.interval) / ((match ? DEALER_SPECIALTY.speed : 1) * (car ? CLASS_DEMAND[CAR_BY_ID[car].class] : 1));
+      const score = route === "fast" ? -wait : route !== "price" && route === d.id ? 1e9 + markup : markup;
+      if (!best || score > best.score) best = { to, room, score };
     }
     // every dealer is full: the cars wait in the plant's car storage
     return best;
@@ -556,6 +569,7 @@ export function chainTick(
     s.chain.owed -= pay;
   }
   rescue(s);
+  qualityTick(s, dt);
   const earn = (amount: number) => {
     credit(amount);
     out.earned += amount;
@@ -668,6 +682,8 @@ export function chainTick(
             s.chain.dealers.local = emptyDealerStock();
           }
           events?.push({ type: "carBuilt", plot: id, car: st.car.id, first });
+          const partModes = recipe(st.car).flatMap((c) => plantsOf(s).filter(([, o]) => o.type === MAKER[c]).map(([, o]) => qualityOf(o.plant)));
+          for (let k = 0; k < n; k++) onCarBuilt(s, st.car.id, defectRate(s, p, partModes), qualityOf(p));
         }
         p.made += n;
         out.rp += n * st.rp;
@@ -754,7 +770,7 @@ export function chainTick(
       const model = stock.models.shift();
       const match = !!model && dealerMatches(d.id, model);
       // export (top transport tier) sells every car for more
-      const price = each * (1 + d.markup + (match ? DEALER_SPECIALTY.price : 0)) * (1 + lm.cars);
+      const price = each * (1 + d.markup + (match ? DEALER_SPECIALTY.price : 0)) * (1 + lm.cars) * carPriceMult(s, model);
       stock.cars -= 1;
       stock.value -= each;
       stock.sold += 1;
@@ -774,7 +790,7 @@ export function chainTick(
       out.carsSold += 1;
       events?.push({ type: "sale", plot: `d:${d.id}`, item: "car", count: 1, amount: price - fee - tax });
       // the next customer: popular classes sell faster than exotic ones
-      const demand = model ? CLASS_DEMAND[CAR_BY_ID[model].class] : 1;
+      const demand = (model ? CLASS_DEMAND[CAR_BY_ID[model].class] : 1) * carDemandMult(s, model);
       stock.next += d.interval / ((match ? DEALER_SPECIALTY.speed : 1) * demand);
     }
   }
@@ -991,6 +1007,24 @@ export function setAutoBuy(s: GameState, plotId: string, on: boolean): boolean {
 }
 
 /** Engine factory strategy before assembly: sell engines, or motorized chassis. */
+/** Quality against quantity for one plant. */
+export function setQualityMode(s: GameState, plotId: string, mode: QualityMode): boolean {
+  const b = plantAt(s, plotId);
+  if (!b || qualityOf(b.plant) === mode) return false;
+  if (mode === "balanced") delete b.plant.mode;
+  else b.plant.mode = mode;
+  return true;
+}
+
+/** Where an assembly plant sends its cars. */
+export function setCarRoute(s: GameState, plotId: string, route: CarRoute): boolean {
+  const b = plantAt(s, plotId);
+  if (!b || b.type !== "assemblyPlant" || (b.plant.carRoute ?? "price") === route) return false;
+  if (route === "price") delete b.plant.carRoute;
+  else b.plant.carRoute = route;
+  return true;
+}
+
 export function setCombine(s: GameState, plotId: string, on: boolean): boolean {
   const b = plantAt(s, plotId);
   if (!b || b.type !== "engineFactory" || !!b.plant.combine === on) return false;
@@ -1042,6 +1076,8 @@ export function migratePlant(type: PlantType, raw: unknown): PlantData {
   if (raw.status === "noRaw" || raw.status === "full" || raw.status === "noParts" || raw.status === "noModel" || raw.status === "noCash") p.status = raw.status;
   if (typeof raw.missing === "string" && raw.missing in COMPONENT_BY_ID) p.missing = raw.missing as ComponentId;
   p.car = typeof raw.car === "string" && raw.car in CAR_BY_ID ? (raw.car as CarId) : null;
+  if (raw.mode === "fast" || raw.mode === "premium") p.mode = raw.mode;
+  if (raw.carRoute === "fast" || (typeof raw.carRoute === "string" && raw.carRoute in DEALER_BY_ID)) p.carRoute = raw.carRoute as CarRoute;
   if (isObj(raw.inputs)) for (const c of Object.keys(COMPONENT_BY_ID) as ComponentId[]) if (raw.inputs[c] !== undefined) p.inputs[c] = num(raw.inputs[c]);
   return p;
 }
