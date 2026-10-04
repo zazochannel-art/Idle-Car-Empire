@@ -100,8 +100,25 @@ export const BULK_DISCOUNT: [number, number][] = [
   [100, 0.05],
 ];
 
-/** Auto-restock: refill to this share of the warehouse when a material drops below `below`. */
-export const AUTO_BUY = { below: 0.3, upTo: 0.7 };
+/** The one-tap "buy materials" order (goal card, plant panel) is for this many units, or as many as fit. */
+export const RESTOCK_UNITS = 10;
+
+/** Goals suggest buying material once a plant has this many units' worth left (and nothing on the way). */
+export const LOW_STOCK_UNITS = 4;
+
+/** Goals only suggest spending on upgrades while this many units of materials per plant stay affordable. */
+export const RESERVE_UNITS = 5;
+
+/**
+ * Auto-restock keeps a few minutes of production in stock — not a full
+ * warehouse, so the cash stays free for building: it orders when a material
+ * drops below `belowMin` minutes of work and fills up to `upToMin` minutes
+ * (at least `minUnits` units), within the warehouse.
+ */
+export const AUTO_BUY = { belowMin: 2, upToMin: 5, minUnits: 3 };
+
+/** Goals suggest a bigger warehouse once it holds less than this many minutes of a plant's work. */
+export const WAREHOUSE_MINUTES = 3;
 
 // ───────────────────────────── warehouse ─────────────────────────────
 
@@ -152,10 +169,10 @@ export const CLASS_MARGIN: Record<CarClass, number> = { economy: 0.16, sport: 0.
 export const CLASS_DEMAND: Record<CarClass, number> = { economy: 1.3, sport: 1, premium: 0.8, luxury: 0.6, supercar: 0.35, hypercar: 0.25 };
 
 /** Surplus parts sold to the Parts Market: a thin margin over their standard cost. */
-export const PARTS_MARGIN = 0.06;
+export const PARTS_MARGIN = 0.1;
 
 /** Final assembly plus quality control, per car at Level 1 (seconds): × the car's own factor. */
-export const ASSEMBLY_TIME = { assembly: 90, qc: 20 };
+export const ASSEMBLY_TIME = { assembly: 50, qc: 10 };
 
 /** Finished cars a plant's car storage holds at Level 1 (grows with the level's storage). */
 export const CAR_STORAGE = 6;
@@ -181,6 +198,13 @@ export const UPGRADE_SCALING = {
  * construction: materials are always paid up front, so a plant can only
  * work on account for as long as its warehouse has material.
  */
+
+/**
+ * A company that is completely stuck (can't afford one unit of material
+ * anywhere, nothing made, nothing on the road or at a dealer) gets material
+ * for a few units on supplier credit — never cash, at most once per cooldown.
+ */
+export const RESCUE = { units: 2, cooldown: 15 * 60 };
 
 /** Money every new company starts with. */
 export const START_CASH = 10_000;

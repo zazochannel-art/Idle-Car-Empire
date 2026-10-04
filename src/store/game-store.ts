@@ -55,6 +55,7 @@ interface GameStore {
   setPlantCar: (plot: string, car: CarId | null) => void;
   setCombine: (plot: string, on: boolean) => void;
   buyMaterial: (plot: string, m: MaterialId, qty: number) => boolean;
+  buyPlan: (plot: string, plan: Mat.RestockPlan) => boolean;
   upgradeWarehouse: (plot: string) => boolean;
   upgradePower: (plot: string) => boolean;
   setAutoBuy: (plot: string, on: boolean) => void;
@@ -244,6 +245,7 @@ export const useGame = create<GameStore>((set, get) => {
       act((s) => Ch.setCombine(s, plot, on));
     },
     buyMaterial: (plot, m, qty) => act((s) => Mat.buyMaterial(s, plot, m, qty).ok),
+    buyPlan: (plot, plan) => act((s) => Mat.buyPlan(s, plot, plan)),
     upgradeWarehouse: (plot) => act((s) => Ch.upgradeWarehouse(s, plot, get().snap.gm)),
     upgradePower: (plot) => act((s) => Ch.upgradePower(s, plot, get().snap.gm)),
     setAutoBuy: (plot, on) => {

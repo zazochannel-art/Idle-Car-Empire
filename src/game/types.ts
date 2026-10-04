@@ -273,6 +273,8 @@ export interface PlantData {
   progress: number;
   /** Materials in the plant's warehouse. */
   stock: MaterialStock;
+  /** What the materials in the warehouse cost (booked as a cost when they are used). */
+  stockCost?: number;
   /** Warehouse level (capacity, see WAREHOUSE_CAP). */
   warehouse: number;
   /** ⚡ Power System upgrades (cheaper energy). */
@@ -352,6 +354,10 @@ export interface ChainState {
   ledger: Ledger;
   /** Trip fees not yet paid (the trucks left before the cash was there): paid from the next revenue. */
   owed: number;
+  /** Net income per second averaged over ~10 minutes: sizes rewards, so a lucky moment doesn't. */
+  steady?: number;
+  /** Market time (s) of the last supplier rescue. */
+  rescueT?: number;
 }
 
 export interface CityState {

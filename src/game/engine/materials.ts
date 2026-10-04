@@ -166,6 +166,13 @@ function depotTrip(to: string) {
   return DOCK_TIME + (tiles / ROAD_SPEED) * (1 + TRAFFIC_ALLOWANCE);
 }
 
+/** A free delivery (supplier credit): sent like an order, but nothing is paid or booked. */
+export function grantMaterials(s: GameState, plotId: string, stock: MaterialStock) {
+  const qty = stockTotal(stock);
+  if (qty <= 0) return;
+  s.chain.shipments.push({ id: s.chain.nextShip++, from: DEPOT, to: plotId, item: "raw", qty, value: 0, t: 0, dur: depotTrip(plotId), back: false, vehicle: qty > 600 ? "semi" : "truck", materials: { ...stock } });
+}
+
 export type BuyResult = { ok: true; cost: number; qty: number } | { ok: false; why: "plant" | "material" | "qty" | "room" | "cash" };
 
 /**
@@ -185,7 +192,7 @@ export function buyMaterial(s: GameState, plotId: string, m: MaterialId, qty: nu
   if (!Number.isFinite(cost) || cost > s.cash) return { ok: false, why: "cash" };
   s.cash -= cost;
   s.market.bought += qty;
-  book(s, "materials", cost);
+  // booked as a cost when the plant uses the material (see spendMaterials)
   s.chain.shipments.push({ id: s.chain.nextShip++, from: DEPOT, to: plotId, item: "raw", qty, value: cost, t: 0, dur: depotTrip(plotId), back: false, vehicle: qty > 600 ? "semi" : "truck", materials: { [m]: qty } });
   return { ok: true, cost, qty };
 }
@@ -215,12 +222,57 @@ export function shortfall(p: PlantData, need: MaterialStock, units: number): Mat
   return out;
 }
 
+export interface RestockPlan {
+  /** Finished units the order is for (0 when not even one fits or is affordable). */
+  units: number;
+  want: MaterialStock;
+  cost: number;
+}
+
+/**
+ * The biggest "buy for N units" order (up to `maxUnits`) that fits the
+ * warehouse, the supplier's limit and — unless `ignoreCash` — the cash.
+ * Materials in stock or on the way count. With nothing possible it plans one
+ * unit, so the UI can show what the next unit costs.
+ */
+export function restockPlan(s: GameState, plotId: string, need: MaterialStock, maxUnits: number, ignoreCash = false): RestockPlan {
+  const p = s.city.buildings[plotId]?.plant;
+  if (!p) return { units: 0, want: {}, cost: 0 };
+  const coming = incomingMaterials(s, plotId);
+  const room = Math.max(0, warehouseCap(p) - stockTotal(p.stock) - stockTotal(coming));
+  const maxQty = supplierOf(s).maxOrder;
+  const plan = (n: number): RestockPlan => {
+    const want: MaterialStock = {};
+    for (const [m, per] of Object.entries(need) as [MaterialId, number][]) {
+      const q = Math.ceil(per * n - (p.stock[m] ?? 0) - (coming[m] ?? 0));
+      if (q > 0) want[m] = q;
+    }
+    const cost = (Object.entries(want) as [MaterialId, number][]).reduce((a, [m, q]) => a + orderCost(s, m, q), 0);
+    return { units: n, want, cost };
+  };
+  const ok = (r: RestockPlan) => stockTotal(r.want) <= room && Object.values(r.want).every((q) => (q ?? 0) <= maxQty) && (ignoreCash || r.cost <= s.cash);
+  for (let n = Math.max(1, Math.floor(maxUnits)); n >= 1; n--) {
+    const r = plan(n);
+    if (ok(r)) return r;
+  }
+  return { ...plan(1), units: 0 };
+}
+
+/** Places the orders of a restock plan; true if every order went through. */
+export function buyPlan(s: GameState, plotId: string, r: RestockPlan): boolean {
+  if (r.units < 1) return false;
+  let all = true;
+  for (const [m, q] of Object.entries(r.want) as [MaterialId, number][]) all = buyMaterial(s, plotId, m, q).ok && all;
+  return all;
+}
+
 /**
  * Automatic restocking (from the Wholesale supplier on, when switched on):
- * a material below AUTO_BUY.below of its share of the warehouse is topped up
- * to AUTO_BUY.upTo, if the cash allows. One delivery at a time per plant.
+ * a material that would last less than AUTO_BUY.belowMin minutes at the
+ * plant's pace is topped up to AUTO_BUY.upToMin minutes (within its share of
+ * the warehouse), if the cash allows. One delivery at a time per plant.
  */
-export function autoRestock(s: GameState, plotId: string) {
+export function autoRestock(s: GameState, plotId: string, unitsPerSec: number) {
   const b = s.city.buildings[plotId];
   const p = b?.plant;
   if (!p?.autoBuy || !b || !isPlantType(b.type) || !supplierOf(s).autoBuy) return;
@@ -232,12 +284,28 @@ export function autoRestock(s: GameState, plotId: string) {
   for (const [m, n] of Object.entries(need) as [MaterialId, number][]) {
     // each material's share of the warehouse follows the recipe
     const share = (cap * n) / per;
+    const low = Math.min(share, n * Math.max(1, unitsPerSec * 60 * AUTO_BUY.belowMin));
+    const high = Math.min(share, n * Math.max(AUTO_BUY.minUnits, unitsPerSec * 60 * AUTO_BUY.upToMin));
     const have = p.stock[m] ?? 0;
-    if (have >= share * AUTO_BUY.below) continue;
-    let qty = Math.floor(Math.min(share * AUTO_BUY.upTo - have, supplierOf(s).maxOrder, warehouseRoom(s, plotId)));
+    if (have >= low) continue;
+    let qty = Math.floor(Math.min(high - have, supplierOf(s).maxOrder, warehouseRoom(s, plotId)));
     while (qty >= 1 && orderCost(s, m, qty) > s.cash) qty = Math.floor(qty / 2);
     if (qty >= 1) buyMaterial(s, plotId, m, qty);
   }
+}
+
+/**
+ * Takes the materials for `units` finished units out of the warehouse and
+ * books what they cost (their share of what was paid for the stock).
+ */
+export function spendMaterials(s: GameState, p: PlantData, need: MaterialStock, units: number): number {
+  const before = stockTotal(p.stock);
+  const used = consume(p, need, units);
+  const paid = Math.max(0, p.stockCost ?? 0);
+  const cost = before > 0 ? (paid * Math.min(used, before)) / before : 0;
+  p.stockCost = paid - cost;
+  if (cost > 0) book(s, "materials", cost);
+  return used;
 }
 
 /** Takes the materials for `units` finished units out of the warehouse. */

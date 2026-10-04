@@ -35,19 +35,21 @@ import {
   isPlantType,
 } from "../config/chain";
 import { DEALERS, DEALER_BY_ID, DEALER_MARKUP_PER_LEVEL, DEALER_SPECIALTY } from "../config/dealerships";
-import { MATERIALS as MATERIALS_LIST, CAR_STORAGE, CLASS_DEMAND, DEALER_FEE, SALES_TAX, TRIP_FEE, UPGRADE_SCALING, WAREHOUSE_CAP, POWER_SYSTEM, type MaterialId } from "../config/economy";
+import { MATERIALS as MATERIALS_LIST, CAR_STORAGE, CLASS_DEMAND, DEALER_FEE, RESCUE, SALES_TAX, TRIP_FEE, UPGRADE_SCALING, WAREHOUSE_CAP, POWER_SYSTEM, type MaterialId } from "../config/economy";
 import { assemblyTime, carListPrice, carStdCost, componentPrice, componentStdCost, componentTime, opRates, opTotal, type OpRates } from "./costs";
 import {
   autoRestock,
   book,
-  consume,
+  spendMaterials,
   createLedger,
+  grantMaterials,
   ledgerNet,
   migrateLedger,
   migrateStock,
+  orderCost,
   powerCost,
   settleLedger,
-  stockTotal,
+  shortfall,
   unitMaterials,
   unitsInStock,
   warehouseCap,
@@ -89,6 +91,7 @@ export function newPlant(): PlantData {
     progress: 0,
     // the warehouse starts empty: materials are bought at the market
     stock: {},
+    stockCost: 0,
     warehouse: 1,
     power: 0,
     inputs: {},
@@ -552,7 +555,7 @@ export function chainTick(
     const p = b.plant;
 
     // 1. materials: restock automatically when the plant is set to (Wholesale supplier and up)
-    if (cfg.item && p.autoBuy) autoRestock(s, id);
+    if (cfg.item && p.autoBuy) autoRestock(s, id, st.unitsPerSec);
 
     // 2. production
     const canMake = () => {
@@ -614,7 +617,7 @@ export function chainTick(
         p.progress -= 1;
         const n = can.n;
         if (cfg.item) {
-          out.materials += consume(p, st.need, n);
+          out.materials += spendMaterials(s, p, st.need, n);
           if (st.combine) p.inputs.body = (p.inputs.body ?? 0) - n;
           p.out += n;
           p.outValue += n * st.unitValue;
@@ -739,13 +742,17 @@ export function chainTick(
 
   s.rp += out.rp;
   const k = Math.min(1, dt / RATE_WINDOW);
-  // net income: revenue minus everything paid (materials booked from the market UI included)
+  // net income: revenue minus every cost (materials count when a plant uses them)
   const net = ledgerNet(s.chain.ledger.pending) - s.chain.ledger.pending.services; // garage income is counted by the city
   s.chain.rate += (net / dt - s.chain.rate) * k;
-  settleLedger(s, dt);
+  s.chain.steady = (s.chain.steady ?? s.chain.rate) + (net / dt - (s.chain.steady ?? s.chain.rate)) * Math.min(1, dt / STEADY_WINDOW);
+  settleLedger(s, dt, RATE_WINDOW);
   s.chain.wholesale += (out.wholesale / dt - s.chain.wholesale) * Math.min(1, dt / 120);
   return out;
 }
+
+/** Seconds the steady income averages over. */
+const STEADY_WINDOW = 600;
 
 /** Pays a cost now, or puts it on the company's account (paid from the next revenue). */
 function payOrOwe(s: GameState, amount: number) {
@@ -755,27 +762,31 @@ function payOrOwe(s: GameState, amount: number) {
 }
 
 /**
- * A company that is completely stuck (no cash, no material, nothing made,
- * nothing on the road or at a dealer) gets a small supplier credit: enough
- * material money for a couple of car bodies, so it can never soft-lock.
- * It cannot be farmed: any stock, goods or money anywhere disables it.
+ * A company that is completely stuck — no plant can work, it can't afford one
+ * unit of material anywhere, and nothing is made, on the road or at a dealer
+ * — gets material for a couple of units on supplier credit, and what it owes
+ * is written off. Material, never cash, and at most once per cooldown: it
+ * can't be farmed into upgrades.
  */
-export const RESCUE_UNITS = 2;
 function rescue(s: GameState) {
-  if (s.cash >= 50 || s.chain.shipments.length) return;
-  const plants = plantsOf(s);
-  for (const [, b] of plants) {
-    const p = b.plant;
-    if (p.out >= 1 || stockTotal(p.stock) > 0 || Object.values(p.inputs).some((v) => (v ?? 0) >= 1)) return;
-  }
+  if (s.chain.shipments.length) return;
+  if (s.chain.rescueT !== undefined && s.market.t - s.chain.rescueT < RESCUE.cooldown) return;
   for (const d of Object.values(s.chain.dealers)) if ((d?.cars ?? 0) >= 1) return;
-  const body = plants.find(([, b]) => b.type === "bodyWorks");
-  if (!body) return;
-  const need = unitMaterials("bodyWorks", body[1].plant.grade);
-  const grant = stockValue(need) * 1.1 * RESCUE_UNITS + 200;
-  // the suppliers write off what is owed and extend a small credit
+  const short: [string, MaterialStock][] = [];
+  for (const [id, b] of plantsOf(s)) {
+    const p = b.plant;
+    if (p.out >= 1 || p.status === "ok") return;
+    if (!PLANT_BY_ID[b.type as PlantType]?.item) continue;
+    const need = unitMaterials(b.type as PlantType, p.grade);
+    if (unitsInStock(p, need).n >= 1) return;
+    const missing = shortfall(p, need, RESCUE.units);
+    if ((Object.entries(shortfall(p, need, 1)) as [MaterialId, number][]).reduce((a, [m, n]) => a + orderCost(s, m, n), 0) <= s.cash) return;
+    short.push([id, missing]);
+  }
+  if (!short.length) return;
   s.chain.owed = 0;
-  s.cash += grant;
+  s.chain.rescueT = s.market.t;
+  for (const [id, missing] of short) grantMaterials(s, id, missing);
 }
 
 /** Unloads a truck; returns how many cars it sold wholesale. */
@@ -818,6 +829,7 @@ function arrive(s: GameState, sh: Shipment, snap: ChainSnapshot, earn: (n: numbe
   if (sh.item === "raw") {
     // a materials delivery: into the warehouse
     for (const [m, n] of Object.entries(sh.materials ?? {}) as [MaterialId, number][]) p.stock[m] = (p.stock[m] ?? 0) + n;
+    p.stockCost = (p.stockCost ?? 0) + sh.value;
   }
   else if (sh.item !== "car" && sh.item !== "chassis") p.inputs[sh.item] = (p.inputs[sh.item] ?? 0) + sh.qty;
   return 0;
@@ -836,6 +848,7 @@ export function simulateChain(s: GameState, seconds: number, snap: ChainSnapshot
   const steps = Math.max(1, Math.min(Math.ceil(seconds), 20_000));
   const dt = seconds / steps;
   const rate = s.chain.rate;
+  const steady = s.chain.steady;
   for (let i = 0; i < steps; i++) {
     const r = chainTick(s, dt, snap, credit, undefined, true);
     total.earned += r.earned;
@@ -849,6 +862,7 @@ export function simulateChain(s: GameState, seconds: number, snap: ChainSnapshot
     total.materials += r.materials;
   }
   s.chain.rate = rate;
+  s.chain.steady = steady;
   return total;
 }
 
@@ -975,6 +989,8 @@ export function migratePlant(type: PlantType, raw: unknown): PlantData {
   if (typeof raw.short === "string") p.short = raw.short as MaterialId;
   // saves from before the materials market: the old raw yard becomes a starter stock
   if (raw.stock === undefined && PLANT_BY_ID[type].item) p.stock = starterStock(type, p.grade, 6);
+  // saves from before materials were costed on use: value the stock at list price
+  p.stockCost = typeof raw.stockCost === "number" && Number.isFinite(raw.stockCost) && raw.stockCost >= 0 ? raw.stockCost : stockValue(p.stock);
   p.out = num(raw.out);
   p.outValue = num(raw.outValue);
   p.made = num(raw.made);
@@ -994,6 +1010,8 @@ export function migrateChain(raw: unknown, s: GameState): ChainState {
   chain.wholesale = 0;
   chain.ledger = migrateLedger(raw.ledger);
   chain.owed = num(raw.owed);
+  if (typeof raw.steady === "number" && Number.isFinite(raw.steady)) chain.steady = raw.steady;
+  if (typeof raw.rescueT === "number" && Number.isFinite(raw.rescueT)) chain.rescueT = raw.rescueT;
   chain.nextShip = int(raw.nextShip, 1, 1e12, 1);
   if (Array.isArray(raw.shipments)) {
     for (const sh of raw.shipments) {

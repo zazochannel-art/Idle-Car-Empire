@@ -12,7 +12,7 @@ import { DEPOT, MARKET, plotOf } from "@/game/city/layout";
 import { MATERIALS } from "@/game/config/economy";
 import { marketPrice, usedMaterials } from "@/game/engine/materials";
 import { REGIONS } from "@/game/config/regions";
-import { AUTO_UPGRADE_FROM, plantProfitPerMin, plantUnitCost, automationCost, bestGrade, carLock, carValue, componentValue, dealerStats, trucksOf, gradeCost, levelCost, plantNumber, plantsOf, recipe, speedCost } from "@/game/engine/chain";
+import { AUTO_UPGRADE_FROM, plantNetValue, plantProfitPerMin, plantUnitCost, automationCost, bestGrade, carLock, carValue, componentValue, dealerStats, trucksOf, gradeCost, levelCost, plantNumber, plantsOf, recipe, speedCost } from "@/game/engine/chain";
 import { isManagerUnlocked } from "@/game/engine/actions";
 import { dealerUpgradeCost, managerUpgradeCost } from "@/game/engine/economy";
 import { dealerRequirement } from "@/game/engine/insights";
@@ -120,7 +120,7 @@ export function PlantPanel({ id }: { id: string }) {
         <div className="mt-2 grid grid-cols-3 gap-2 text-center">
           <Stat label={t("plant.unitCost")} value={formatMoney(unitCost)} />
           <Stat label={t("plant.unitValue")} value={formatMoney(st.unitValue)} />
-          <Stat label={t("plant.unitProfit")} value={formatMoney(st.unitValue - unitCost)} gold />
+          <Stat label={t("plant.unitProfit")} value={formatMoney(plantNetValue(st) - unitCost)} gold />
         </div>
       </div>
 
