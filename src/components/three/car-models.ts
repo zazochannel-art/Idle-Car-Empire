@@ -99,6 +99,21 @@ export interface CarLook {
   /** Wheel rotation, radians. */
   spin?: number;
   stage?: BuildStage;
+  /** What the factories actually fitted (Car DNA): overrides the model's factory look. */
+  build?: BuildLook;
+}
+
+/** The parts a car really got, as they show: paint, rims, engine and brakes. */
+export interface BuildLook {
+  /** Design studio paint ("" = the model's factory colour). */
+  color?: string;
+  rims?: "silver" | "black" | "dark" | "chrome";
+  /** Rim size from the Wheel Factory's grade (1 = standard). */
+  rimScale?: number;
+  /** Engine Factory grade 1–5: a bigger block, a turbo, a red cam cover. */
+  engine?: number;
+  /** Brake Factory grade 1–5: performance brakes get coloured calipers. */
+  brakes?: number;
 }
 
 // ───────────────────────────── materials ─────────────────────────────
@@ -345,7 +360,9 @@ function strut(T: Three, a: THREE_NS.Vector3, b: THREE_NS.Vector3, r: number, ma
 
 // ───────────────────────────── wheel ─────────────────────────────
 
-function wheel(T: Three, kit: MaterialKit, R: number, w: number, spokes: number, sporty: boolean, spin: number, showTyre = true, rims: CarSpec["rims"] = "silver") {
+function wheel(T: Three, kit: MaterialKit, R: number, w: number, spokes: number, sporty: boolean, spin: number, showTyre = true, rims: CarSpec["rims"] = "silver", rimScale = 1, caliperM?: THREE_NS.Material) {
+  // a bigger rim means a lower-profile tyre around it (the wheel itself keeps its size)
+  const rs = Math.max(0.85, Math.min(1.18, rimScale));
   const rimM = rims === "black" ? kit.rimBlack : rims === "dark" ? kit.rimDark : rims === "chrome" ? kit.chrome : kit.rim;
   const g = new T.Group();
   // the wheel spins about its axle, which runs along Z (across the car)
@@ -357,17 +374,17 @@ function wheel(T: Three, kit: MaterialKit, R: number, w: number, spokes: number,
   }
   // rim barrel and face
   // dark wheels keep a polished lip
-  const face = new T.Mesh(new T.CylinderGeometry(R * 0.67, R * 0.67, w * 0.86, 24, 1, true), rims === "dark" ? kit.chrome : rimM);
+  const face = new T.Mesh(new T.CylinderGeometry(R * 0.67 * rs, R * 0.67 * rs, w * 0.86, 24, 1, true), rims === "dark" ? kit.chrome : rimM);
   face.rotation.x = Math.PI / 2;
   turn.add(face);
-  const dish = new T.Mesh(new T.CylinderGeometry(R * 0.62, R * 0.62, 0.01, 24), kit.trim);
+  const dish = new T.Mesh(new T.CylinderGeometry(R * 0.62 * rs, R * 0.62 * rs, 0.01, 24), kit.trim);
   dish.rotation.x = Math.PI / 2;
   dish.position.z = w * 0.18;
   turn.add(dish);
   for (let i = 0; i < spokes; i++) {
     const a = (i / spokes) * Math.PI * 2;
-    const sp = new T.Mesh(new T.BoxGeometry(R * 0.58, sporty ? 0.026 : 0.045, 0.03), rimM);
-    sp.position.set(Math.cos(a) * R * 0.33, Math.sin(a) * R * 0.33, w * 0.28);
+    const sp = new T.Mesh(new T.BoxGeometry(R * 0.58 * rs, sporty ? 0.026 : 0.045, 0.03), rimM);
+    sp.position.set(Math.cos(a) * R * 0.33 * rs, Math.sin(a) * R * 0.33 * rs, w * 0.28);
     sp.rotation.z = a;
     turn.add(sp);
   }
@@ -383,7 +400,7 @@ function wheel(T: Three, kit: MaterialKit, R: number, w: number, spokes: number,
   disc.position.z = w * 0.08;
   g.add(disc);
   if (sporty) {
-    const cal = box(T, R * 0.25, R * 0.42, 0.06, kit.caliper, R * 0.3, R * 0.12, w * 0.14);
+    const cal = box(T, R * 0.25, R * 0.42, 0.06, caliperM ?? kit.caliper, R * 0.3, R * 0.12, w * 0.14);
     g.add(cal);
   }
   return g;
@@ -398,7 +415,9 @@ export function buildCar(T: Three, kit: MaterialKit, look: CarLook): THREE_NS.Gr
   const painted = st >= 6;
   // every model leaves the line in its own factory colour
   const liv = liveryOf(look.model);
-  const body = painted ? kit.paint(liv.color, liv.finish) : kit.primer;
+  const bl = look.build ?? {};
+  const paintColor = bl.color || liv.color;
+  const body = painted ? kit.paint(paintColor, bl.color ? "metallic" : liv.finish) : kit.primer;
   const roofM = painted && sp.roofColor ? kit.paint(sp.roofColor, "gloss") : body;
   const car = new T.Group();
   const { L, W, R } = sp;
@@ -560,8 +579,17 @@ export function buildCar(T: Three, kit: MaterialKit, look: CarLook): THREE_NS.Gr
   // engine (visible before the hood goes on at final assembly)
   if (st >= 1 && st < 7) {
     const ex = x(sp.intakes ? 0.62 : 0.16);
-    car.add(box(T, 0.7, 0.32, 0.6, kit.engine, ex, sp.hood + 0.05, 0));
-    car.add(box(T, 0.5, 0.1, 0.5, kit.trim, ex, sp.hood + 0.26, 0));
+    // the engine the Engine Factory made: bigger blocks, a turbo, a red cam cover on the best
+    const eg = Math.max(1, Math.min(5, bl.engine ?? 1));
+    const len = 0.55 + eg * 0.06;
+    car.add(box(T, len, 0.28 + eg * 0.02, 0.6, kit.engine, ex, sp.hood + 0.05, 0));
+    car.add(box(T, len * 0.75, 0.1, 0.5, eg >= 4 ? kit.paint("#b91c1c", "gloss") : kit.trim, ex, sp.hood + 0.24 + eg * 0.02, 0));
+    if (eg >= 2) {
+      const turbo = new T.Mesh(new T.CylinderGeometry(0.09, 0.09, 0.12, 14), kit.chrome);
+      turbo.rotation.x = Math.PI / 2;
+      turbo.position.set(ex - len * 0.35, sp.hood + 0.2, 0.32);
+      car.add(turbo);
+    }
   }
 
   const done = st >= 7;
@@ -571,7 +599,9 @@ export function buildCar(T: Three, kit: MaterialKit, look: CarLook): THREE_NS.Gr
     for (const au of [fu, ru])
       for (const side of [-1, 1]) {
         const wz = side * (hw + sp.flare * 0.6 - sp.tw * 0.5);
-        const wg = st >= 5 ? wheel(T, kit, R, sp.tw, sp.spokes, sporty, look.spin ?? 0, true, sp.rims) : wheel(T, kit, R, sp.tw, 0, false, 0, false);
+        // the rims the Wheel Factory made (bigger with its grade) and the Brake Factory's calipers
+        const caliper = (bl.brakes ?? 1) >= 4 ? kit.paint(bl.brakes! >= 5 ? "#facc15" : "#dc2626", "gloss") : undefined;
+        const wg = st >= 5 ? wheel(T, kit, R, sp.tw, sp.spokes, sporty || !!caliper, look.spin ?? 0, true, bl.rims ?? sp.rims, bl.rimScale ?? 1, caliper) : wheel(T, kit, R, sp.tw, 0, false, 0, false);
         if (side < 0) wg.rotation.y = Math.PI;
         const holder = new T.Group();
         holder.add(wg);

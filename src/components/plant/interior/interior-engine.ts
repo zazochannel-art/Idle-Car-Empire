@@ -7,6 +7,7 @@
 // The line works like a real transfer line: every few seconds all parts
 // move one station forward together, then each station works on its part
 // (the press strokes, the laser sweeps, the welding robots spark).
+import { liveryOf } from "../../three/livery";
 import { attachControls, Camera } from "../../map/camera";
 import { Painter, sx, sy, toTile } from "../../map/iso";
 import { drawModel, drawTruck, type CarModel } from "../../map/vehicles";
@@ -34,6 +35,8 @@ export interface InteriorScene {
   /** Text for locked halls ("Hall 2 · Level 5"), by hall index. */
   lockedLabel: (hall: number, level: number) => string;
   model?: CarModel;
+  /** The parts the cars on this line get (paint, rims, engine, brakes). */
+  build?: import("../../three/car-models").BuildLook;
 }
 
 export interface StationPick {
@@ -554,7 +557,9 @@ export class InteriorEngine {
 
   /** A car on the line at an assembly stage (0: a body in white … 8: finished). */
   private car(s: InteriorScene, stage: number, x: number, y: number, z: number) {
-    drawModel(this.p, x, y, 0, s.model ?? "sedan", stage >= 6 ? "#ef4444" : "#c3cad3", 1.1, { lift: z, noShadow: true, stage });
+    // primer grey until the paint shop, then the model's own paint
+    const paint = stage >= 6 ? s.build?.color || (s.model ? liveryOf(s.model).color : "#ef4444") : "#c3cad3";
+    drawModel(this.p, x, y, 0, s.model ?? "sedan", paint, 1.1, { lift: z, noShadow: true, stage, build: s.build });
   }
 
   private prop(kind: PropKind, x: number, y: number, s: InteriorScene, k: number) {

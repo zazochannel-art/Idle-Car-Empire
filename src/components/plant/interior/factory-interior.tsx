@@ -1,5 +1,6 @@
 "use client";
 
+import { lineBuildLook } from "@/game/engine/car-dna";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -90,9 +91,11 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
       color: cfg.item ? COMPONENT_BY_ID[cfg.item].color : "#ef4444",
       labels,
       lockedLabel: (hall, level) => t("interior.locked", { n: hall + 1, level }),
-      model: CAR_MODEL_FOR.city,
+      // the model on the line, with the parts the factories make today
+      model: CAR_MODEL_FOR[st.car?.id ?? "city"],
+      build: st.car ? lineBuildLook(state, st.car.id) : undefined,
     });
-  }, [p, st, b, labels, manager, plotId, state.chain.shipments, t]);
+  }, [p, st, b, labels, manager, plotId, state, t]);
 
   if (!b?.plant || !st || !p) return null;
   const cfg = PLANT_BY_ID[st.type];

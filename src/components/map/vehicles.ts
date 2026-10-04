@@ -65,6 +65,8 @@ export interface CarOpts {
   noShadow?: boolean;
   /** Keep the given colour (race liveries) instead of the model's factory colour. */
   paint?: boolean;
+  /** The parts this car really got (Car DNA): paint, rims, engine, brakes. */
+  build?: import("../three/car-models").BuildLook;
 }
 
 /** Axis-aligned box centred on (x, y), long along the travel direction. */
@@ -345,7 +347,9 @@ export function drawCarSprite(p: Painter, x: number, y: number, yaw: number, mod
   const stage = opts.stage ?? 8;
   const shadow = !opts.noShadow;
   const paint = opts.paint ? color : liveryOf(model).color;
-  const keyOf = (yi: number) => `car|${model}|${paint}|${yi}|${steer}|${phase}|${stage}`;
+  const b = opts.build;
+  const bkey = b ? `${b.color ?? ""}:${b.rims ?? ""}:${b.rimScale ?? 1}:${b.engine ?? 1}:${b.brakes ?? 1}` : "";
+  const keyOf = (yi: number) => `car|${model}|${paint}|${yi}|${steer}|${phase}|${stage}|${bkey}`;
   const spr = yawSprite(
     keyOf,
     CAR_SIZE,
@@ -360,6 +364,7 @@ export function drawCarSprite(p: Painter, x: number, y: number, yaw: number, mod
         steer: steer * 0.42,
         spin: (phase * (Math.PI * 2)) / spokes / spins,
         stage: { station: stage },
+        build: b,
       });
       car.scale.setScalar(CAR_TPM);
       car.rotation.y = -(yi * Math.PI * 2) / YAW_STEPS;

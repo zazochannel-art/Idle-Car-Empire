@@ -43,7 +43,7 @@ Regula de lucru: **extindem ce există, nu creăm sisteme paralele.**
 |---|---|---|
 | **1. Car DNA + My Cars + Test Track** ✅ | Modul `engine/car-dna.ts`: DNA complet calculat din piesele reale (grad pe componentă, design, upgrade-uri): motor (nume, CP, cuplu), greutate, caroserie/șasiu, suspensie, frâne, anvelope, jante, aero, cutie, interior, geamuri, faruri, vopsea, calitate, fiabilitate, cost, timp de producție, valoare, performanță. Statisticile de racing se mută în DNA (o singură sursă). Mașinile curselor devin „My Cars” (locație: garaj, racing, showroom), cu istoric. Test Track: 0–100, 0–200, viteză maximă, frânare, viraj, timp pe tur și fiabilitate, toate calculate din DNA. | `racing.statsOf`, `RaceCarState`, `receiveRaceCar` |
 | **2. Fabrici noi + integrare în asamblare** ✅ | Transmission, Brakes, Wheels (+ QC ca stație la asamblare); componente noi intră în rețete; gradul lor intră în DNA; furnizor până la construirea fabricii | `config/chain.ts`, rețete, interioare |
-| **3. Producție vizuală** | Linia de asamblare arată mașina pe etape folosind DNA-ul real (jantele, culoarea, motorul instalat) | `interior-engine`, `car-models` |
+| **3. Producție vizuală** ✅ | Linia de asamblare arată mașina pe etape folosind DNA-ul real (jantele, culoarea, motorul instalat) | `interior-engine`, `car-models` |
 | **4. Transport** | Fabricile noi au transport vizibil; trimitere mașină din garaj → test track / racing / showroom cu transportor | `traffic.ts` |
 | **5. Racing garage** | Upgrade-uri cu durată de montaj și impact pe fiabilitate; turbo, ECU; vremea modifică aderența | `racing.ts` |
 | **6. Dealership** | Mașini din My Cars puse în showroom cu preț stabilit de jucător; marketing; cererea depinde de DNA + brand | dealeri existenți |

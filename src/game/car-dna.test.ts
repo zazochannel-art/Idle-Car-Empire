@@ -135,3 +135,21 @@ describe("drivetrain plants: transmission, wheels, brakes", () => {
     expect(D.carDNA(s, good).gearbox).not.toBe(D.carDNA(s, base).gearbox);
   });
 });
+
+describe("the look of the build", () => {
+  it("paint, rims, engine and brakes on the line come from the design studio and the factories", () => {
+    const s = createInitialState(T0);
+    s.designs.city.color = "#1b46b8";
+    s.designs.city.rims = 2;
+    const a = D.lineBuildLook(s, "city");
+    expect(a.color).toBe("#1b46b8");
+    expect(a.engine).toBe(1);
+    const plot = WORLD_MAP.plots.find((x) => x.kind === "plot" && x.zone === "town" && !x.big && !s.city.buildings[x.id])!.id;
+    s.city.buildings[plot] = { type: "engineFactory", level: 1, plant: { ...Ch.newPlant(), grade: 4 } };
+    expect(D.lineBuildLook(s, "city").engine).toBe(4);
+    // forged wheels grow the rims
+    const w = D.buildLookFrom({ wheels: 5 }, { rims: 0 });
+    expect(w.rimScale).toBeGreaterThan(D.buildLookFrom({ wheels: 1 }, { rims: 0 }).rimScale);
+    expect(w.rims).toBe("black");
+  });
+});
