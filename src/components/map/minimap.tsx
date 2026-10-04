@@ -4,6 +4,7 @@ import { unlockedAreas } from "@/game/engine/territory";
 import { Home, Minus, Plus } from "lucide-react";
 import { useEffect, useRef, type RefObject } from "react";
 import { STRUCTURE_BY_ID, WORLD_BLOCKS, ZONES, ZONE_BY_ID } from "@/game/config/city";
+import { WAYS } from "@/game/city/network";
 import { RIVER, WORLD, WORLD_MAP, blockKind, territoryOfBlock, zoneCenterTile, zoneOfBlock } from "@/game/city/layout";
 
 /** Territory landmark colours on the minimap. */
@@ -106,6 +107,22 @@ export function Minimap({ engine }: { engine: RefObject<MapEngine | null> }) {
         ctx.fillText("🔒", cx, cy);
       }
       poly(rect(RIVER * 7 - 0.3, 0, 1.6, WORLD), "#2b8fd0");
+      // the motorway (orange) and the railway (dark, dashed)
+      for (const w of WAYS) {
+        const pts = w.loop ? [...w.pts, w.pts[0]] : w.pts;
+        ctx.beginPath();
+        pts.forEach(([x, y], i) => {
+          const [px, py] = mm(x, y);
+          if (i) ctx.lineTo(px, py);
+          else ctx.moveTo(px, py);
+        });
+        const lit = !w.area || unlocked.has(w.area);
+        ctx.strokeStyle = w.kind === "highway" ? (lit ? "#fb923c" : "#7c5a3e") : lit ? "#1f2937" : "#334155";
+        ctx.lineWidth = w.kind === "highway" ? 2 : 1;
+        ctx.setLineDash(w.kind === "rail" ? [2, 1.5] : []);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
       for (const p of WORLD_MAP.plots) {
         if (!unlocked.has(p.zone)) continue;
         const b = s.city.buildings[p.id];

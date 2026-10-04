@@ -1,6 +1,7 @@
 // Runs the Empire Map: owns the canvas, camera, scene and traffic, renders
 // every animation frame and turns taps into selections. React only feeds it
 // state and listens to its callbacks.
+import { networkTraffic } from "./highway";
 import { LEGACY_OFFSET } from "@/game/config/city";
 import { ROAD_STEP as STEP_TILES, territoryCenterTile } from "@/game/city/layout";
 import type { TerritoryId } from "@/game/config/city";
@@ -451,7 +452,7 @@ export class MapEngine {
     const inView = (b: [number, number, number, number]) => b[2] >= view[0] && b[0] <= view[2] && b[3] >= view[1] && b[1] <= view[3];
 
     // merge static scene with moving traffic, both sorted by depth
-    const moving = [...this.traffic.drawables(), ...(this.race?.drawables(this.t) ?? [])].sort((a, b) => a.depth - b.depth);
+    const moving = [...this.traffic.drawables(), ...networkTraffic(this.t, this.unlocked, this.traffic.density, this.cam.zoom), ...(this.race?.drawables(this.t) ?? [])].sort((a, b) => a.depth - b.depth);
     let mi = 0;
     const visible: Drawable[] = [];
     const drawMoving = (upTo: number) => {
