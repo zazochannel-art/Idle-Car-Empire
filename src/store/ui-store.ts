@@ -67,6 +67,8 @@ interface UiStore {
   setTimeMode: (m: TimeMode) => void;
   setPreview: (p: { plot: string; type: StructureType } | null) => void;
   setView: (v: View | null) => void;
+  /** Every screen opened, newest last (the pillars reopen on the last one of theirs). */
+  seen: View[];
   selectPlot: (id: string | null, focus?: boolean) => void;
   selectZone: (id: ZoneId | null, focus?: boolean) => void;
   enterGarage: (id: string) => void;
@@ -105,7 +107,8 @@ export const useUi = create<UiStore>((set) => ({
     set({ timeMode });
   },
   setPreview: (preview) => set({ preview }),
-  setView: (view) => set({ view, plot: null, zone: null, preview: null, showcase: null }),
+  seen: [],
+  setView: (view) => set((u) => ({ view, plot: null, zone: null, preview: null, showcase: null, seen: view ? [...u.seen.filter((x) => x !== view), view] : u.seen })),
   selectPlot: (plot, focus = true) =>
     set(() => ({ plot, zone: null, view: null, preview: null, showcase: null, ...(plot && focus ? { command: { kind: "plot" as const, id: plot, n: ++n } } : {}) })),
   selectZone: (zone, focus = true) =>

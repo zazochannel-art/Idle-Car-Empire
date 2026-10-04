@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, Crown, Factory, FlaskConical, Hammer, ListChecks, Map as MapIcon, Store, TrendingUp, Users, Warehouse } from "lucide-react";
+import { ArrowRight, Briefcase, Car, Crown, Factory, Flag, Hammer, ListChecks, Map as MapIcon, TrendingUp, Users } from "lucide-react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Progress } from "@/components/ui/progress";
 import { MANAGERS } from "@/game/config/managers";
@@ -148,7 +148,12 @@ function Shell() {
     key = `zone:${zone}`;
   } else if (view) {
     title = viewTitle(view, t);
-    body = <ViewSwitch view={view} onSettings={() => setSettings(true)} />;
+    body = (
+      <>
+        <PillarTabs view={view} />
+        <ViewSwitch view={view} onSettings={() => setSettings(true)} />
+      </>
+    );
     key = `view:${view}`;
   }
 
@@ -251,13 +256,19 @@ function ViewSwitch({ view, onSettings }: { view: View; onSettings: () => void }
   }
 }
 
-const RAIL: { id: "map" | View; icon: Icon; label: "map.nav.map" | "map.nav.garages" | "map.nav.factories" | "map.nav.dealers" | "map.nav.research" }[] = [
-  { id: "map", icon: MapIcon, label: "map.nav.map" },
-  { id: "garages", icon: Warehouse, label: "map.nav.garages" },
-  { id: "empire", icon: Factory, label: "map.nav.factories" },
-  { id: "dealers", icon: Store, label: "map.nav.dealers" },
-  { id: "research", icon: FlaskConical, label: "map.nav.research" },
+/**
+ * The four pillars of the game. Every screen belongs to one; the left rail
+ * opens a pillar and the screen shows its siblings as tabs, so nothing is
+ * more than two taps away and nothing is lost from the old menus.
+ */
+export type PillarId = "empire" | "cars" | "racing" | "business";
+export const PILLARS: { id: PillarId; icon: Icon; views: View[] }[] = [
+  { id: "empire", icon: Factory, views: ["empire", "garages", "logistics", "research", "managers", "prestige"] },
+  { id: "cars", icon: Car, views: ["cars"] },
+  { id: "racing", icon: Flag, views: ["racing"] },
+  { id: "business", icon: Briefcase, views: ["dealers", "economy", "missions", "stats", "achievements"] },
 ];
+export const pillarOf = (v: View | null) => (v ? (PILLARS.find((p) => p.views.includes(v))?.id ?? null) : null);
 
 function LeftRail() {
   const view = useUi((u) => u.view);
@@ -267,11 +278,17 @@ function LeftRail() {
   const badges = useBadges();
   const { t } = useT();
   const nothing = !view && !plot && !zone;
+  const current = pillarOf(view);
+  const seen = useUi((u) => u.seen);
+  const items: { id: "map" | PillarId; icon: Icon; badge: number }[] = [
+    { id: "map", icon: MapIcon, badge: 0 },
+    ...PILLARS.map((p) => ({ id: p.id, icon: p.icon, badge: p.id === "empire" ? badges.research : p.id === "business" ? badges.missions : 0 })),
+  ];
   return (
     <nav className="absolute left-[calc(env(safe-area-inset-left)+0.5rem)] top-[6.75rem] z-20 flex flex-col gap-1 rounded-2xl border border-white/10 bg-ink/75 p-1 backdrop-blur-xl md:left-[calc(env(safe-area-inset-left)+0.75rem)] md:top-[5.5rem]">
-      {RAIL.map((r) => {
-        const active = r.id === "map" ? nothing : view === r.id;
-        const badge = r.id === "research" ? badges.research : 0;
+      {items.map((r) => {
+        const active = r.id === "map" ? nothing : current === r.id;
+        const label = r.id === "map" ? t("map.nav.map") : t(`pillar.${r.id}`);
         return (
           <button
             key={r.id}
@@ -279,21 +296,51 @@ function LeftRail() {
               if (r.id === "map") {
                 closeAll();
                 map({ kind: "home" });
-              } else setView(view === r.id ? null : r.id);
+                return;
+              }
+              const pillar = PILLARS.find((p) => p.id === r.id)!;
+              // a pillar reopens on the screen last seen in it
+              const last = [...seen].reverse().find((v) => pillar.views.includes(v));
+              setView(active ? null : (last ?? pillar.views[0]));
             }}
             className={cn(
               "relative flex flex-col items-center gap-0.5 rounded-xl px-1.5 py-2 text-[9px] font-bold uppercase tracking-wide transition md:w-[4.5rem] md:text-[10px]",
               active ? "bg-electric/25 text-white ring-1 ring-electric/50" : "text-white/55 hover:bg-white/5 hover:text-white",
             )}
-            aria-label={t(r.label)}
+            aria-label={label}
           >
             <r.icon className={cn("size-5", active && "text-sky-300")} />
-            <span className="hidden md:block">{t(r.label)}</span>
-            <NavBadge n={badge} className="absolute right-0.5 top-0.5" />
+            <span className="hidden md:block">{label}</span>
+            <NavBadge n={r.badge} className="absolute right-0.5 top-0.5" />
           </button>
         );
       })}
     </nav>
+  );
+}
+
+/** The screens of the pillar the open screen belongs to. */
+function PillarTabs({ view }: { view: View }) {
+  const setView = useUi((u) => u.setView);
+  const { t } = useT();
+  const pillar = PILLARS.find((p) => p.views.includes(view));
+  if (!pillar || pillar.views.length < 2) return null;
+  return (
+    <div className="scrollbar-none -mx-1 mb-3 flex gap-1 overflow-x-auto px-1">
+      <span className="flex shrink-0 items-center gap-1 pr-1 text-[10px] font-black uppercase tracking-[0.18em] text-white/35">
+        <pillar.icon className="size-3.5" />
+        {t(`pillar.${pillar.id}`)}
+      </span>
+      {pillar.views.map((v) => (
+        <button
+          key={v}
+          onClick={() => setView(v)}
+          className={cn("shrink-0 rounded-full px-3 py-1 text-[11px] font-bold ring-1 transition", v === view ? "bg-electric/25 text-white ring-electric/50" : "bg-white/[0.04] text-white/60 ring-white/10 hover:text-white")}
+        >
+          {viewTitle(v, t)}
+        </button>
+      ))}
+    </div>
   );
 }
 
