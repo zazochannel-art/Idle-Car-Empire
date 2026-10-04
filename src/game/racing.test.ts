@@ -22,18 +22,18 @@ function team(): GameState {
 }
 
 describe("racing district", () => {
-  it("opens after the first car, with the Industrial District and the money", () => {
+  it("opens after the first car, with the money (and the road through the Industrial District)", () => {
     const s = createInitialState(T0);
     expect(R.racingBlocker(s)).toBe("firstCar");
     s.chain.firstCar = true;
+    // the road there runs through the Industrial District: it opens with the circuit
     s.city.zones = s.city.zones.filter((z) => z !== "industrial");
-    expect(R.racingBlocker(s)).toBe("industrial");
-    s.city.zones.push("industrial");
-    s.cash = 0;
-    expect(R.racingBlocker(s)).toBe("cash");
     s.cash = RACING_DISTRICT.cost;
+    expect(R.racingBlocker(s)).toBe("cash");
+    s.cash = R.racingCost(s);
     expect(R.unlockRacing(s)).toBe(true);
     expect(s.cash).toBe(0);
+    expect(s.city.zones).toContain("industrial");
   });
 
   it("race cars come off the assembly line on a car transporter", () => {
@@ -142,6 +142,9 @@ describe("racing district", () => {
     R.receiveRaceCar(s, "city");
     const ev = RACE_EVENT_BY_ID.amateurChampionship;
     for (let round = 0; round < ev.tracks.length; round++) {
+      // rounds are a few minutes apart
+      expect(R.cooldownLeft(s, ev.id) > 0).toBe(round > 0);
+      s.racing.clock += 5 * 60;
       const rec = R.enterRace(s, ev.id)!;
       expect(rec.round).toBe(round);
       expect(rec.track).toBe(ev.tracks[round]);
@@ -149,6 +152,19 @@ describe("racing district", () => {
     }
     expect(s.racing.championship).toBeNull();
     expect(s.racing.last!.result!.title).toBeDefined();
+  });
+
+  it("races cost an entry fee and can't be repeated straight away", () => {
+    const s = team();
+    R.receiveRaceCar(s, "city");
+    const cash = s.cash;
+    const rec = R.enterRace(s, "amateurCup")!;
+    expect(s.cash).toBeCloseTo(cash - 500);
+    expect(rec.fee).toBe(500);
+    for (let i = 0; i < 400 && s.racing.live; i++) tick(s, 0.5);
+    expect(R.eventLock(s, RACE_EVENT_BY_ID.amateurCup, R.raceCar(s, s.racing.selected))?.kind).toBe("cooldown");
+    s.racing.clock += 5 * 60;
+    expect(R.eventLock(s, RACE_EVENT_BY_ID.amateurCup, R.raceCar(s, s.racing.selected))).toBeNull();
   });
 
   it("automatic racing keeps going offline, with a report", () => {

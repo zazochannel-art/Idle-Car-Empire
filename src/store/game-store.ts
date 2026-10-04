@@ -1,5 +1,7 @@
 "use client";
 
+import * as Rc from "@/game/engine/racing";
+import type { RaceUpgrade } from "@/game/config/racing";
 import type { StarUpgradeId } from "@/game/config/imperium";
 import { buyStarUpgrade, imperium as doImperium } from "@/game/engine/imperium";
 import { create } from "zustand";
@@ -91,6 +93,19 @@ interface GameStore {
   prestige: () => void;
   imperium: () => void;
   buyStarUpgrade: (id: StarUpgradeId) => boolean;
+  unlockRacing: () => boolean;
+  orderRaceCar: (car: CarId) => boolean;
+  cancelRaceOrder: (car: CarId) => boolean;
+  selectRaceCar: (id: number) => void;
+  enterRace: (event: string, special?: string) => boolean;
+  repairRaceCar: (id: number) => boolean;
+  upgradeRaceCar: (id: number, u: RaceUpgrade, racingParts?: boolean) => boolean;
+  setRaceSkin: (id: number, skin: string) => boolean;
+  retireRaceCar: (id: number) => boolean;
+  upgradeRacingGarage: () => boolean;
+  signSponsor: (id: string | null) => boolean;
+  setAutoRacing: (on: boolean) => boolean;
+  setAutoRepair: (on: boolean) => void;
   setBuyAmount: (a: BuyAmount) => void;
   setPref: (key: "lowGraphics" | "sound" | "haptics", on: boolean) => void;
   setLang: (lang: Lang) => void;
@@ -177,6 +192,21 @@ export const useGame = create<GameStore>((set, get) => {
     for (const e of events) {
       if (e.type === "sale") uiEvents.emit(e);
       else if (e.type === "carBuilt" && e.first) uiEvents.emit({ type: "firstCar", plot: e.plot, car: e.car });
+      else if (e.type === "raceFinished") {
+        const rec = next.racing.last;
+        const rw = rec?.result;
+        if (rec && rw) {
+          const n = contentFor(next.settings.lang);
+          uiEvents.emit({ type: "race", id: rec.id });
+          uiEvents.emit({
+            type: "toast",
+            tone: rw.position === 0 ? "gold" : rw.position <= 2 ? "success" : "info",
+            icon: rw.position === 0 ? "🏆" : rw.position <= 2 ? "🏅" : "🏁",
+            title: tr("racing.toast", { pos: rw.position + 1, event: n.raceEvent(rec.event) }),
+            body: tr("racing.toastBody", { money: formatMoney(rw.prize + rw.sponsor), rep: rw.rep }),
+          });
+        }
+      }
     }
     commit(next);
     if (now - lastSave > SAVE_MS) persist();
@@ -277,6 +307,28 @@ export const useGame = create<GameStore>((set, get) => {
     upgradeDealer: (id) => act((s) => A.upgradeDealer(s, id)),
     upgradeCarModel: (id) => act((s) => A.upgradeCarModel(s, id)),
     buyLogistics: (id) => act((s) => L.buyLogistics(s, id, get().snap.gm.costMult)),
+    unlockRacing: () => act((s) => Rc.unlockRacing(s)),
+    orderRaceCar: (car) => act((s) => Rc.orderRaceCar(s, car)),
+    cancelRaceOrder: (car) => act((s) => Rc.cancelOrder(s, car)),
+    selectRaceCar: (id) =>
+      act((s) => {
+        if (!Rc.raceCar(s, id)) return false;
+        s.racing.selected = id;
+        return true;
+      }),
+    enterRace: (event, special) => act((s) => !!Rc.enterRace(s, event, special)),
+    repairRaceCar: (id) => act((s) => Rc.repairCar(s, id)),
+    upgradeRaceCar: (id, u, racingParts) => act((s) => Rc.upgradeRaceCar(s, id, u, racingParts)),
+    setRaceSkin: (id, skin) => act((s) => Rc.setSkin(s, id, skin)),
+    retireRaceCar: (id) => act((s) => Rc.retireRaceCar(s, id) > 0),
+    upgradeRacingGarage: () => act((s) => Rc.upgradeGarage(s)),
+    signSponsor: (id) => act((s) => Rc.signSponsor(s, id)),
+    setAutoRacing: (on) => act((s) => Rc.setAutoRacing(s, on)),
+    setAutoRepair: (on) =>
+      act((s) => {
+        s.racing.auto.repair = on;
+        return true;
+      }),
     buyTransportTier: () => act((s) => L.buyTier(s, get().snap.gm.costMult)),
     developDesign: (id, option) =>
       act((s) => D.develop(s, id, option, D.developCost(Ch.carBaseValue(s, CAR_BY_ID[id], get().snap.gm), s.designs[id], option))),

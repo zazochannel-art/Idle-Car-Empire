@@ -1,6 +1,8 @@
 // Runs the Empire Map: owns the canvas, camera, scene and traffic, renders
 // every animation frame and turns taps into selections. React only feeds it
 // state and listens to its callbacks.
+import { RaceLayer } from "./race-layer";
+import { RACING_CENTER, drawRacingGround } from "./racing-district";
 import { seasonAt } from "@/game/engine/season";
 import { ROAD_STEP, WORLD, WORLD_MAP, zoneOfBlock, type Plot } from "@/game/city/layout";
 import type { ZoneId } from "@/game/types";
@@ -37,6 +39,10 @@ export class MapEngine {
   private scene: Drawable[] = [];
   private unlocked = new Set<ZoneId>();
   readonly traffic = new Traffic();
+  /** Race cars on the circuit (set by the map component, which knows the state). */
+  race: RaceLayer | null = null;
+  /** Whether the Racing District is built (it is drawn faded until then). */
+  racingOpen = false;
   private pops: Pop[] = [];
   private raf = 0;
   private last = 0;
@@ -434,12 +440,13 @@ export class MapEngine {
 
     this.drawShips();
     drawGround(p, this.unlocked, view, this.t);
+    drawRacingGround(p, this.racingOpen);
 
     const info: DrawInfo = { zoom: cam.zoom, selected: this.selected, t: this.t };
     const inView = (b: [number, number, number, number]) => b[2] >= view[0] && b[0] <= view[2] && b[3] >= view[1] && b[1] <= view[3];
 
     // merge static scene with moving traffic, both sorted by depth
-    const moving = this.traffic.drawables().sort((a, b) => a.depth - b.depth);
+    const moving = [...this.traffic.drawables(), ...(this.race?.drawables(this.t) ?? [])].sort((a, b) => a.depth - b.depth);
     let mi = 0;
     const visible: Drawable[] = [];
     const drawMoving = (upTo: number) => {
@@ -552,9 +559,9 @@ export class MapEngine {
     const cards = this.overlay?.children ?? [];
     for (const node of cards) {
       const el = node as HTMLElement;
-      const id = el.dataset.zone as ZoneId | undefined;
+      const id = el.dataset.zone as ZoneId | "racing" | undefined;
       if (!id) continue;
-      const c = zoneCenter(id);
+      const c = id === "racing" ? RACING_CENTER : zoneCenter(id);
       const [px, py] = cam.toScreen(sx(c.x, c.y), sy(c.x, c.y));
       const off = px < -200 || py < -200 || px > cam.w + 200 || py > cam.h + 200;
       el.style.transform = `translate(${Math.round(px)}px, ${Math.round(py)}px) translate(-50%, -50%)`;

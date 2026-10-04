@@ -97,7 +97,8 @@ export function Minimap({ engine }: { engine: RefObject<MapEngine | null> }) {
         if (!unlocked.has(p.zone)) continue;
         const b = s.city.buildings[p.id];
         let color: string | null = null;
-        if (p.kind === "market") color = "#22c55e";
+        if (p.kind === "racing") color = s.racing.unlocked ? "#f5c451" : null;
+        else if (p.kind === "market") color = "#22c55e";
         else if (p.kind === "depot") color = "#a16207";
         else if (b?.plant) color = "#fb923c";
         else if (p.kind === "dealer" && s.dealers[p.dealer!].owned) color = "#facc15";

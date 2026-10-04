@@ -1,6 +1,7 @@
 // Read-only helpers that explain the game to the player: what to aim for next
 // and why something is locked. They return data, not text — the UI words it
 // in the player's language. Never mutate state.
+import { racingCost } from "./racing";
 import { LOW_STOCK_UNITS, MATERIAL_BY_ID, RESERVE_UNITS, RESTOCK_UNITS, WAREHOUSE_MINUTES, type MaterialId } from "../config/economy";
 import { plantMaterials, restockPlan, stockTotal, supplierOf, unitsInStock, warehouseCap, warehouseCost } from "./materials";
 import { CARS } from "../config/cars";
@@ -38,6 +39,10 @@ export type Goal =
   | { kind: "materials"; icon: string; plot: string; material: MaterialId; cost: number; units: number }
   | { kind: "autoBuy"; icon: string; plots: string[] }
   | { kind: "warehouse"; icon: string; plot: string; cost: number; minutes: number }
+  /** The Racing District: build it, send it a car, enter the first race. */
+  | { kind: "racing"; icon: string; cost: number }
+  | { kind: "raceCar"; icon: string }
+  | { kind: "firstRace"; icon: string }
   | { kind: "car"; icon: string; cost?: number; car: CarId; plot: string | null; requirement: Requirement | null }
   | { kind: "manager"; icon: string; cost: number; manager: ManagerId }
   /** gain: extra income share the points add; stalled: income stopped growing. */
@@ -226,6 +231,14 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
       goals.push({ kind: "worker", icon: "👷", plot, idle: st.workstations - st.staffed });
       break;
     }
+  }
+
+  // the Racing District, once there is a car to race
+  if (s.chain.firstCar) {
+    const R = s.racing;
+    if (!R.unlocked) goals.push({ kind: "racing", icon: "🏁", cost: racingCost(s) });
+    else if (!R.cars.length && !R.orders.length && !R.arrivals.length) goals.push({ kind: "raceCar", icon: "🚛" });
+    else if (R.cars.length && R.stats.races === 0 && !R.live) goals.push({ kind: "firstRace", icon: "🏎️" });
   }
 
   const nextManager = MANAGERS.find((m) => !s.managers[m.id].hired && isManagerUnlocked(s, m.id));

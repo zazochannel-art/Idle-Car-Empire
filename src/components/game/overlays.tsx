@@ -69,6 +69,43 @@ export function OfflineDialog() {
             <LedgerTable values={report.ledger} compact />
           </div>
         )}
+        {report.racing && (
+          <div className="mt-2 rounded-2xl bg-white/[0.04] p-3 text-left text-xs ring-1 ring-white/[0.07]">
+            <div className="mb-1 text-[11px] font-bold uppercase tracking-wider text-white/45">🏁 {t("offline.racing")}</div>
+            <div className="grid grid-cols-3 gap-1 text-center">
+              <div>
+                <div className="text-[10px] text-white/45">{t("racing.st.races")}</div>
+                <b>{formatNumber(report.racing.races)}</b>
+              </div>
+              <div>
+                <div className="text-[10px] text-white/45">{t("racing.st.wins")}</div>
+                <b>{formatNumber(report.racing.wins)}</b>
+              </div>
+              <div>
+                <div className="text-[10px] text-white/45">{t("racing.st.podiums")}</div>
+                <b>{formatNumber(report.racing.podiums)}</b>
+              </div>
+            </div>
+            <div className="mt-1.5 space-y-0.5">
+              <div className="flex justify-between">
+                <span className="text-white/55">{t("racing.prize")}</span>
+                <b className="text-emerald-300">+{formatMoney(report.racing.prize)}</b>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-white/55">{t("racing.repLabel")}</span>
+                <b className="text-sky-300">+{formatNumber(Math.round(report.racing.rep))}</b>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-white/55">{t("racing.costs")}</span>
+                <b className="text-rose-300">−{formatMoney(report.racing.repairs + (report.racing.fees ?? 0))}</b>
+              </div>
+              <div className="flex justify-between border-t border-white/10 pt-0.5">
+                <span className="font-bold">{t("racing.net")}</span>
+                <b>{formatMoney(report.racing.prize - report.racing.repairs - (report.racing.fees ?? 0))}</b>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="mt-2 rounded-2xl bg-gradient-to-br from-gold/15 to-transparent p-4 ring-1 ring-gold/30">
           <div className="text-[11px] uppercase tracking-wider text-gold/70">{t("offline.money")}</div>
           <div className="text-3xl font-black tabular-nums text-gradient-gold">{formatMoney(report.money)}</div>

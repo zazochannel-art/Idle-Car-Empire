@@ -12,6 +12,7 @@ import {
   BODY_DYNAMICS,
   BODY_GRADE_WEIGHT,
   CHAMPIONSHIP_POINTS,
+  ENTRY_FEE,
   ENDURANCE_WEAR,
   ENGINE_GRADE_POWER,
   FINAL_POINTS_MULT,
@@ -22,6 +23,7 @@ import {
   OFFLINE_RACES_MAX,
   PRIZE_SHARE,
   RACE_CLASS_OF,
+  RACE_COOLDOWN_MIN,
   RACE_COUNTDOWN,
   RACE_EVENTS,
   RACE_EVENT_BY_ID,
@@ -58,6 +60,7 @@ import {
   type Trophy,
   type WearPart,
 } from "../config/racing";
+import { ZONE_BY_ID } from "../config/city";
 import { carListPrice } from "./costs";
 import { designStats } from "./design";
 import { book } from "./materials";
@@ -95,6 +98,7 @@ export function createRacing(): RacingState {
     last: null,
     championship: null,
     wins: {},
+    cooldowns: {},
     auto: { on: false, next: 0, repair: true },
     stats: { races: 0, wins: 0, podiums: 0, prize: 0, repairs: 0, titles: 0, best: {} },
     nextRace: 1,
@@ -114,19 +118,24 @@ function earn(s: GameState, amount: number) {
 
 // ───────────────────────────── the district ─────────────────────────────
 
-export type RacingBlocker = "firstCar" | "industrial" | "cash" | null;
+export type RacingBlocker = "firstCar" | "cash" | null;
+
+/** The road to the circuit runs through the Industrial District: building it opens that district too (and costs it). */
+export function racingCost(s: GameState): number {
+  return RACING_DISTRICT.cost + (s.city.zones.includes("industrial") ? 0 : ZONE_BY_ID.industrial.cost);
+}
 
 /** What stands between the player and the Racing District. */
 export function racingBlocker(s: GameState): RacingBlocker {
   if (!s.chain.firstCar) return "firstCar";
-  if (!s.city.zones.includes("industrial")) return "industrial";
-  if (s.cash < RACING_DISTRICT.cost) return "cash";
+  if (s.cash < racingCost(s)) return "cash";
   return null;
 }
 
 export function unlockRacing(s: GameState): boolean {
   if (s.racing.unlocked || racingBlocker(s) !== null) return false;
-  s.cash -= RACING_DISTRICT.cost;
+  s.cash -= racingCost(s);
+  if (!s.city.zones.includes("industrial")) s.city.zones.push("industrial");
   s.racing.unlocked = true;
   return true;
 }
@@ -335,7 +344,25 @@ export function activeSpecials(now: number): SpecialEventConfig[] {
   });
 }
 
-export type EventLock = { kind: "rep"; need: number } | { kind: "class"; classes: RaceClass[] } | { kind: "noCar" } | { kind: "busy" } | { kind: "championship"; event: string } | null;
+export type EventLock =
+  | { kind: "rep"; need: number }
+  | { kind: "class"; classes: RaceClass[] }
+  | { kind: "noCar" }
+  | { kind: "busy" }
+  | { kind: "championship"; event: string }
+  | { kind: "cooldown"; seconds: number }
+  | { kind: "fee"; fee: number }
+  | null;
+
+/** Entry fee of an event's next race (a championship round pays a share). */
+export function entryFee(ev: RaceEventConfig, specialMult = 1): number {
+  return ev.prize * (ev.type === "championship" ? ROUND_PRIZE : 1) * ENTRY_FEE * specialMult;
+}
+
+/** Seconds until an event takes entries again (0: open). */
+export function cooldownLeft(s: GameState, id: string): number {
+  return Math.max(0, (s.racing.cooldowns[id] ?? 0) - s.racing.clock);
+}
 
 /** Why this car can't enter this event right now, or null. */
 export function eventLock(s: GameState, ev: RaceEventConfig, rc: RaceCarState | null): EventLock {
@@ -346,6 +373,9 @@ export function eventLock(s: GameState, ev: RaceEventConfig, rc: RaceCarState | 
   // one championship at a time
   const ch = s.racing.championship;
   if (ev.type === "championship" && ch && ch.event !== ev.id) return { kind: "championship", event: ch.event };
+  const wait = cooldownLeft(s, ev.id);
+  if (wait > 0) return { kind: "cooldown", seconds: wait };
+  if (s.cash < entryFee(ev)) return { kind: "fee", fee: entryFee(ev) };
   return null;
 }
 
@@ -355,6 +385,7 @@ export function bestEventFor(s: GameState, rc: RaceCarState): RaceEventConfig | 
   for (const ev of RACE_EVENTS) {
     if (ev.type === "championship") continue;
     if (s.racing.rep < ev.minRep || !ev.classes.includes(classOf(rc.car))) continue;
+    if (cooldownLeft(s, ev.id) > 0 || s.cash < entryFee(ev)) continue;
     if (!best || ev.prize > best.prize) best = ev;
   }
   return best;
@@ -479,6 +510,16 @@ export function runRace(s: GameState, setup: RaceSetup, rc: RaceCarState, startT
   return { id, event: setup.event.id, special: setup.special?.id, track: setup.track, type: setup.type, laps: setup.laps, startT, car: rc.id, entrants, order, round: setup.round };
 }
 
+/** Pays the entry fee and starts the event's pause; returns the fee. */
+function signUp(s: GameState, ev: RaceEventConfig, specialMult = 1): number {
+  const fee = entryFee(ev, specialMult);
+  s.cash -= fee;
+  s.racing.stats.fees = (s.racing.stats.fees ?? 0) + fee;
+  book(s, "repairs", fee);
+  s.racing.cooldowns[ev.id] = s.racing.clock + RACE_COOLDOWN_MIN * 60;
+  return fee;
+}
+
 /** Real seconds from the countdown to the last car home. */
 export function raceDuration(rec: RaceRecord): number {
   return RACE_COUNTDOWN + Math.max(...rec.entrants.map((e) => e.total)) / RACE_TIME_SCALE;
@@ -490,7 +531,9 @@ export function enterRace(s: GameState, eventId: string, specialId?: string, car
   const setup = setupFor(s, eventId, specialId);
   if (!setup || !rc || eventLock(s, setup.event, rc) !== null) return null;
   if (specialId && !activeSpecials(Date.now()).some((e) => e.id === specialId)) return null;
+  const fee = signUp(s, setup.event, setup.special?.mult ?? 1);
   const rec = runRace(s, setup, rc, s.racing.clock);
+  rec.fee = fee;
   s.racing.live = rec;
   return rec;
 }
@@ -509,7 +552,7 @@ export function settleRace(s: GameState, rec: RaceRecord, seed = rec.id): RaceRe
   const rep = Math.round(ev.rep * (champ ? 0.15 : 1) * (REP_SHARE[pos] ?? 0) * mult);
   const sponsor = R.sponsor ? (SPONSOR_BY_ID[R.sponsor]?.perRace ?? 0) : 0;
   const parts = pos === 0 ? (ev.parts ?? 0) : pos <= 2 ? Math.floor((ev.parts ?? 0) / 2) : 0;
-  const reward: RaceReward = { position: pos, prize, sponsor, rep, parts };
+  const reward: RaceReward = { position: pos, fee: rec.fee ?? 0, prize, sponsor, rep, parts };
 
   earn(s, prize + sponsor);
   R.rep += rep;
@@ -748,7 +791,11 @@ export function racingTick(s: GameState, dt: number): RaceRecord | null {
     if (rc) {
       autoRepair(s, rc);
       const ev = bestEventFor(s, rc);
-      if (ev) R.live = runRace(s, { event: ev, type: ev.type, track: ev.tracks[0], laps: ev.laps ?? TRACK_BY_ID[ev.tracks[0]].laps }, rc, R.clock);
+      if (ev) {
+        const fee = signUp(s, ev);
+        R.live = runRace(s, { event: ev, type: ev.type, track: ev.tracks[0], laps: ev.laps ?? TRACK_BY_ID[ev.tracks[0]].laps }, rc, R.clock);
+        R.live.fee = fee;
+      }
     }
   }
   return finished;
@@ -778,7 +825,10 @@ export function offlineRacing(s: GameState, seconds: number): OfflineRacing | nu
     out.repairs += R.stats.repairs - before;
     const ev = bestEventFor(s, rc);
     if (!ev) break;
+    const fee = signUp(s, ev);
+    out.fees = (out.fees ?? 0) + fee;
     const rec = runRace(s, { event: ev, type: ev.type, track: ev.tracks[0], laps: ev.laps ?? TRACK_BY_ID[ev.tracks[0]].laps }, rc, R.clock);
+    rec.fee = fee;
     const rw = settleRace(s, rec);
     R.last = rec;
     out.races += 1;
@@ -809,7 +859,7 @@ export function expectedHourly(s: GameState, rc: RaceCarState): { money: number;
     probe.racing.nextRace = 1_000_000 + i * 7;
     const rec = runRace(probe, { event: ev, type: ev.type, track: ev.tracks[0], laps: ev.laps ?? TRACK_BY_ID[ev.tracks[0]].laps }, rc, 0);
     const pos = rec.order.indexOf("player");
-    money += ev.prize * (PRIZE_SHARE[pos] ?? 0) + sponsor;
+    money += ev.prize * (PRIZE_SHARE[pos] ?? 0) + sponsor - entryFee(ev);
     rep += ev.rep * (REP_SHARE[pos] ?? 0);
     if (pos === 0) wins++;
   }
@@ -841,10 +891,11 @@ export function migrateRacing(raw: unknown): RacingState {
   if (Array.isArray(raw.orders)) R.orders = raw.orders.filter(isCar);
   if (Array.isArray(raw.arrivals)) R.arrivals = raw.arrivals.filter(isCar);
   if (isObj(raw.wins)) for (const [k, v] of Object.entries(raw.wins)) R.wins[k] = Math.max(0, Math.floor(num(v)));
+  if (isObj(raw.cooldowns)) for (const [k, v] of Object.entries(raw.cooldowns)) if (RACE_EVENT_BY_ID[k]) R.cooldowns[k] = num(v);
   if (isObj(raw.auto)) R.auto = { on: raw.auto.on === true, next: num(raw.auto.next), repair: raw.auto.repair !== false };
   if (isObj(raw.stats)) {
     const st = raw.stats;
-    R.stats = { races: num(st.races), wins: num(st.wins), podiums: num(st.podiums), prize: num(st.prize), repairs: num(st.repairs), titles: num(st.titles), best: {} };
+    R.stats = { races: num(st.races), wins: num(st.wins), podiums: num(st.podiums), prize: num(st.prize), repairs: num(st.repairs), fees: num(st.fees), titles: num(st.titles), best: {} };
     if (isObj(st.best)) for (const [k, v] of Object.entries(st.best)) if (k in TRACK_BY_ID && num(v) > 0) R.stats.best[k] = num(v);
   }
   if (Array.isArray(raw.cars))

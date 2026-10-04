@@ -172,6 +172,7 @@ export interface OfflineReport {
 
 export interface OfflineRacing {
   races: number;
+  fees?: number;
   wins: number;
   podiums: number;
   prize: number;
@@ -519,12 +520,16 @@ export interface RaceRecord {
   order: string[];
   /** Championship round (0-based) when it is one. */
   round?: number;
+  /** Entry fee paid for it. */
+  fee?: number;
   /** Filled in when the race is settled. */
   result?: RaceReward;
 }
 
 export interface RaceReward {
   position: number;
+  /** Entry fee paid. */
+  fee: number;
   prize: number;
   sponsor: number;
   rep: number;
@@ -566,7 +571,9 @@ export interface RacingState {
   championship: ChampionshipState | null;
   /** Wins per event (rivals grow stronger with them). */
   wins: Record<string, number>;
+  /** Racing clock when each event takes entries again. */
+  cooldowns: Record<string, number>;
   auto: { on: boolean; next: number; repair: boolean };
-  stats: { races: number; wins: number; podiums: number; prize: number; repairs: number; titles: number; best: Record<string, number> };
+  stats: { races: number; wins: number; podiums: number; prize: number; repairs: number; fees?: number; titles: number; best: Record<string, number> };
   nextRace: number;
 }

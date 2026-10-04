@@ -6,7 +6,9 @@ import { CAR_BY_ID } from "@/game/config/cars";
 import { COMPONENT_BY_ID } from "@/game/config/chain";
 import { ZONES, ZONE_BY_ID, buildableIn } from "@/game/config/city";
 import { DEALER_BY_ID } from "@/game/config/dealerships";
-import { BLOCKS, WORLD_MAP, dealerPlot, plotOf } from "@/game/city/layout";
+import { BLOCKS, RACING, WORLD_MAP, dealerPlot, plotOf } from "@/game/city/layout";
+import { racingBlocker, racingCost } from "@/game/engine/racing";
+import { RaceLayer } from "./race-layer";
 import { structureCost, zoneBlocker } from "@/game/engine/city";
 import type { EconomySnapshot } from "@/game/engine/economy";
 import { formatMoney } from "@/game/format";
@@ -125,10 +127,13 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
       if (!target) ui.closeAll();
       else if (target.kind === "zone") ui.selectZone(target.id);
       else if (target.kind === "vehicle") ui.setShowcase(target.v);
+      else if (target.id === RACING) ui.setView("racing");
       else if (hasInterior(target.id)) enterFactory(engine, target.id);
       else ui.selectPlot(target.id);
     });
     engine.money = (v) => formatMoney(v);
+    engine.race = new RaceLayer(() => useGame.getState().state);
+    engine.racingOpen = useGame.getState().state.racing.unlocked;
     engine.setLowGraphics(useGame.getState().state.settings.lowGraphics);
     engine.overlay = overlayRef.current;
     engineRef.current = engine;
@@ -156,7 +161,10 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
     const offPaint = useGame.subscribe((g, prev) => {
       if (g.state.designs !== prev.state.designs) paint(g.state.designs);
     });
-    const offGfx = useGame.subscribe((g) => engine.setLowGraphics(g.state.settings.lowGraphics));
+    const offGfx = useGame.subscribe((g) => {
+      engine.setLowGraphics(g.state.settings.lowGraphics);
+      engine.racingOpen = g.state.racing.unlocked;
+    });
     // trucks follow the engine's shipments
     const offShips = useGame.subscribe((g, prev) => {
       if (g.state.chain.shipments !== prev.state.chain.shipments) engine.traffic.setShipments(shipViews(g.state));
@@ -211,6 +219,7 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
       structure: (type) => t(`structure.${type}`),
       level: (lv) => t("common.lv", { level: lv }),
       money: (v) => formatMoney(v),
+      racing: t("racing.district"),
     }, () => useGame.getState().state);
     e.setScene(scene, new Set(s.city.zones), trafficWorld(s, sn));
     e.traffic.setShipments(shipViews(s));
@@ -288,6 +297,7 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
         {locked.map((z) => (
           <ZoneCard key={z.id} id={z.id} full={z.id === nextLocked?.id} />
         ))}
+        {!state.racing.unlocked && state.chain.firstCar && <RacingCard />}
       </div>
       <div className="pointer-events-none absolute right-[calc(env(safe-area-inset-right)+0.5rem)] top-[9.25rem] z-20 md:right-[calc(env(safe-area-inset-right)+0.75rem)] md:top-[5.5rem]">
         <Minimap engine={engineRef} />
@@ -334,6 +344,35 @@ function ZoneCard({ id, full }: { id: ZoneId; full: boolean }) {
           <span>{t(`zone.${id}`)}</span>
         </button>
       )}
+    </div>
+  );
+}
+
+/** Over the fenced-off circuit: what it takes to build the Racing District. */
+function RacingCard() {
+  const blocker = useGame((g) => racingBlocker(g.state));
+  const cost = useGame((g) => racingCost(g.state));
+  const unlock = useGame((g) => g.unlockRacing);
+  const setView = useUi((u) => u.setView);
+  const { t } = useT();
+  const can = blocker === null;
+  return (
+    <div data-zone="racing" className="pointer-events-auto absolute left-0 top-0 will-change-transform" style={{ visibility: "hidden" }}>
+      <div className="w-56 rounded-2xl border border-gold/40 bg-ink/85 p-3 text-center shadow-[0_20px_50px_-10px_rgba(0,0,0,.8)] backdrop-blur-md">
+        <div className="text-2xl">🏁</div>
+        <div className="text-sm font-black uppercase tracking-wide">{t("racing.district")}</div>
+        <div className="mt-0.5 text-[11px] leading-snug text-white/55">{t("racing.districtDesc")}</div>
+        <button
+          onClick={() => (can ? unlock() : setView("racing"))}
+          className={cn(
+            "mt-2 w-full rounded-xl px-3 py-2 text-xs font-black uppercase tracking-wider transition",
+            can ? "bg-gradient-to-b from-gold to-gold-deep text-black shadow-[0_0_20px_rgba(245,196,81,.45)] hover:brightness-110" : "bg-white/10 text-white/70",
+          )}
+        >
+          🔓 {t("racing.build")} · {formatMoney(cost)}
+        </button>
+        {blocker === "firstCar" && <div className="mt-1 text-[10px] text-amber-300/80">{t("racing.blocker.firstCar")}</div>}
+      </div>
     </div>
   );
 }

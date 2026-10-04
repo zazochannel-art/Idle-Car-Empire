@@ -200,21 +200,25 @@ export const REP_SHARE = [1, 0.6, 0.4, 0.1, 0.05, 0, 0, 0];
 
 export const RACE_EVENTS: RaceEventConfig[] = [
   { id: "amateurCup", emoji: "🏁", type: "circuit", tracks: ["small"], classes: ["D"], field: 4, laps: 3, minRep: 0, prize: 5_000, rep: 25, trophy: "bronze", ref: { car: "city", grade: 1, upgrades: 0 }, parts: 1, skin: "checker" },
-  { id: "citySprint", emoji: "💨", type: "sprint", tracks: ["industrial"], classes: ["D"], field: 5, laps: 2, minRep: 60, prize: 9_000, rep: 35, trophy: "bronze", ref: { car: "city", grade: 1, upgrades: 1 }, parts: 1 },
-  { id: "dragDay", emoji: "🚦", type: "drag", tracks: ["industrial"], classes: ["D", "C"], field: 4, laps: 1, minRep: 120, prize: 14_000, rep: 40, trophy: "bronze", ref: { car: "sedan", grade: 1, upgrades: 1 }, parts: 2, skin: "flames" },
+  { id: "citySprint", emoji: "💨", type: "sprint", tracks: ["industrial"], classes: ["D"], field: 5, laps: 2, minRep: 60, prize: 20_000, rep: 35, trophy: "bronze", ref: { car: "city", grade: 1, upgrades: 1 }, parts: 1 },
+  { id: "dragDay", emoji: "🚦", type: "drag", tracks: ["industrial"], classes: ["D", "C"], field: 4, laps: 1, minRep: 120, prize: 30_000, rep: 40, trophy: "bronze", ref: { car: "sedan", grade: 1, upgrades: 1 }, parts: 2, skin: "flames" },
   { id: "amateurChampionship", emoji: "🏆", type: "championship", tracks: ["small", "industrial", "small", "mountain", "small"], classes: ["D"], field: 6, laps: 3, minRep: 200, prize: 100_000, rep: 500, trophy: "gold", ref: { car: "sedan", grade: 1, upgrades: 2 }, parts: 3, skin: "gold" },
-  { id: "sportCup", emoji: "🥈", type: "circuit", tracks: ["coastal"], classes: ["C"], field: 6, laps: 3, minRep: 600, prize: 40_000, rep: 80, trophy: "silver", ref: { car: "suv", grade: 2, upgrades: 1 }, parts: 2, skin: "ocean" },
-  { id: "hillClimb", emoji: "⛰️", type: "hillClimb", tracks: ["mountain"], classes: ["C", "B"], field: 5, laps: 2, minRep: 800, prize: 60_000, rep: 100, trophy: "silver", ref: { car: "suv", grade: 2, upgrades: 2 }, parts: 2 },
-  { id: "streetRace", emoji: "🌃", type: "street", tracks: ["nightCity"], classes: ["B"], field: 6, laps: 3, minRep: 2_500, prize: 120_000, rep: 140, trophy: "silver", ref: { car: "sports", grade: 2, upgrades: 2 }, parts: 3, skin: "neon" },
-  { id: "proRacing", emoji: "🏎️", type: "circuit", tracks: ["desert"], classes: ["B"], field: 8, laps: 4, minRep: 1_500, prize: 250_000, rep: 220, trophy: "silver", ref: { car: "sports", grade: 3, upgrades: 2 }, parts: 3 },
-  { id: "endurance", emoji: "⏱️", type: "endurance", tracks: ["desert"], classes: ["B", "A"], field: 8, laps: 8, minRep: 3_000, prize: 500_000, rep: 300, trophy: "silver", ref: { car: "sports", grade: 3, upgrades: 3 }, parts: 4, skin: "desert" },
-  { id: "timeTrial", emoji: "⏲️", type: "timeTrial", tracks: ["mountain"], classes: ["A"], field: 6, laps: 2, minRep: 3_500, prize: 700_000, rep: 260, trophy: "silver", ref: { car: "supercar", grade: 4, upgrades: 1 }, parts: 4 },
-  { id: "grandPrix", emoji: "🏆", type: "grandPrix", tracks: ["grandPrix"], classes: ["A"], field: 8, laps: 5, minRep: 4_000, prize: 1_500_000, rep: 400, trophy: "gold", ref: { car: "supercar", grade: 4, upgrades: 3 }, parts: 5, skin: "carbon" },
-  { id: "supercarChampionship", emoji: "🥇", type: "championship", tracks: ["coastal", "nightCity", "desert", "mountain", "grandPrix"], classes: ["A"], field: 8, laps: 4, minRep: 6_000, prize: 8_000_000, rep: 1_500, trophy: "gold", ref: { car: "supercar", grade: 4, upgrades: 4 }, parts: 8 },
-  { id: "hypercarChampionship", emoji: "💎", type: "championship", tracks: ["grandPrix", "coastal", "nightCity", "desert", "international"], classes: ["S"], field: 8, laps: 4, minRep: 10_000, prize: 40_000_000, rep: 3_000, trophy: "gold", ref: { car: "hypercar", grade: 5, upgrades: 3 }, parts: 12, skin: "diamond" },
-  { id: "worldChampionship", emoji: "🌍", type: "championship", tracks: ["international", "grandPrix", "mountain", "nightCity", "international"], classes: ["S"], field: 8, laps: 5, minRep: 15_000, prize: 200_000_000, rep: 6_000, trophy: "gold", ref: { car: "hypercar", grade: 5, upgrades: 5 }, parts: 20, skin: "world" },
+  { id: "sportCup", emoji: "🥈", type: "circuit", tracks: ["coastal"], classes: ["C"], field: 6, laps: 3, minRep: 600, prize: 120_000, rep: 80, trophy: "silver", ref: { car: "suv", grade: 2, upgrades: 1 }, parts: 2, skin: "ocean" },
+  { id: "hillClimb", emoji: "⛰️", type: "hillClimb", tracks: ["mountain"], classes: ["C", "B"], field: 5, laps: 2, minRep: 800, prize: 180_000, rep: 100, trophy: "silver", ref: { car: "suv", grade: 2, upgrades: 2 }, parts: 2 },
+  { id: "streetRace", emoji: "🌃", type: "street", tracks: ["nightCity"], classes: ["B"], field: 6, laps: 3, minRep: 2_500, prize: 400_000, rep: 140, trophy: "silver", ref: { car: "sports", grade: 2, upgrades: 2 }, parts: 3, skin: "neon" },
+  { id: "proRacing", emoji: "🏎️", type: "circuit", tracks: ["desert"], classes: ["B"], field: 8, laps: 4, minRep: 1_500, prize: 800_000, rep: 220, trophy: "silver", ref: { car: "sports", grade: 3, upgrades: 2 }, parts: 3 },
+  { id: "endurance", emoji: "⏱️", type: "endurance", tracks: ["desert"], classes: ["B", "A"], field: 8, laps: 8, minRep: 3_000, prize: 1_600_000, rep: 300, trophy: "silver", ref: { car: "sports", grade: 3, upgrades: 3 }, parts: 4, skin: "desert" },
+  { id: "timeTrial", emoji: "⏲️", type: "timeTrial", tracks: ["mountain"], classes: ["A"], field: 6, laps: 2, minRep: 3_500, prize: 2_000_000, rep: 260, trophy: "silver", ref: { car: "supercar", grade: 4, upgrades: 1 }, parts: 4 },
+  { id: "grandPrix", emoji: "🏆", type: "grandPrix", tracks: ["grandPrix"], classes: ["A"], field: 8, laps: 5, minRep: 4_000, prize: 5_000_000, rep: 400, trophy: "gold", ref: { car: "supercar", grade: 4, upgrades: 3 }, parts: 5, skin: "carbon" },
+  { id: "supercarChampionship", emoji: "🥇", type: "championship", tracks: ["coastal", "nightCity", "desert", "mountain", "grandPrix"], classes: ["A"], field: 8, laps: 4, minRep: 6_000, prize: 25_000_000, rep: 1_500, trophy: "gold", ref: { car: "supercar", grade: 4, upgrades: 4 }, parts: 8 },
+  { id: "hypercarChampionship", emoji: "💎", type: "championship", tracks: ["grandPrix", "coastal", "nightCity", "desert", "international"], classes: ["S"], field: 8, laps: 4, minRep: 10_000, prize: 120_000_000, rep: 3_000, trophy: "gold", ref: { car: "hypercar", grade: 5, upgrades: 3 }, parts: 12, skin: "diamond" },
+  { id: "worldChampionship", emoji: "🌍", type: "championship", tracks: ["international", "grandPrix", "mountain", "nightCity", "international"], classes: ["S"], field: 8, laps: 5, minRep: 15_000, prize: 600_000_000, rep: 6_000, trophy: "gold", ref: { car: "hypercar", grade: 5, upgrades: 5 }, parts: 20, skin: "world" },
 ];
 export const RACE_EVENT_BY_ID = Object.fromEntries(RACE_EVENTS.map((e) => [e.id, e])) as Record<string, RaceEventConfig>;
+
+/** Every race has an entry fee (a share of its 1st prize) and runs again only after a pause (racing-clock minutes). */
+export const ENTRY_FEE = 0.1;
+export const RACE_COOLDOWN_MIN = 5;
 
 /** Championship points by finishing position; the final round counts double. */
 export const CHAMPIONSHIP_POINTS = [25, 18, 15, 12, 10, 8, 6, 4];

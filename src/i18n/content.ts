@@ -68,6 +68,7 @@ export function contentFor(lang: Lang) {
     event: (x: MarketEvent) => c(lang, `event.${x.id}.name`, x.name),
     eventDesc: (x: MarketEvent) => c(lang, `event.${x.id}.desc`, x.description),
     region: (x: RegionConfig) => c(lang, `region.${x.id}.name`, x.name),
+    raceEvent: (id: string) => t(`race.ev.${id}` as Parameters<typeof translate>[1]),
     regionFlavor: (x: RegionConfig) => c(lang, `region.${x.id}.flavor`, x.flavor),
     /** Daily missions are stored with an English title; rebuild it per language. */
     daily: (m: MissionState) => {

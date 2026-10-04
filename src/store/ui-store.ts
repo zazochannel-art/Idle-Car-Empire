@@ -27,6 +27,7 @@ export type View =
   | "achievements"
   | "stats"
   | "economy"
+  | "racing"
   | "prestige"
   | "build"
   | "upgrade"
@@ -59,6 +60,9 @@ interface UiStore {
   preview: { plot: string; type: StructureType } | null;
   /** The vehicle in the 3D showcase (tapped on the map). */
   showcase: VehiclePick | null;
+  /** The race viewer: preparing a race (event chosen, not started) or watching the live one. */
+  race: { phase: "prep"; event: string; special?: string } | { phase: "watch" } | null;
+  setRace: (r: UiStore["race"]) => void;
   setShowcase: (v: VehiclePick | null) => void;
   setTimeMode: (m: TimeMode) => void;
   setPreview: (p: { plot: string; type: StructureType } | null) => void;
@@ -89,6 +93,8 @@ export const useUi = create<UiStore>((set) => ({
   timeMode: savedTime(),
   preview: null,
   showcase: null,
+  race: null,
+  setRace: (race) => set({ race }),
   setShowcase: (showcase) => set(showcase ? { showcase, view: null, plot: null, zone: null, preview: null } : { showcase }),
   setTimeMode: (timeMode) => {
     try {
