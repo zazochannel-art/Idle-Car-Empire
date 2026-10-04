@@ -10,6 +10,7 @@ import { tick } from "../src/game/engine/tick";
 import { buyDealer, hireManager, upgradeDealer } from "../src/game/engine/actions";
 import { freePlot, nextGoals } from "../src/game/engine/insights";
 import { formatMoney } from "../src/game/format";
+import { checkInvariants } from "./invariants";
 import * as Rc from "../src/game/engine/racing";
 import { RACING_DISTRICT } from "../src/game/config/racing";
 import { CAR_BY_ID } from "../src/game/config/cars";
@@ -18,6 +19,10 @@ import { RESTOCK_UNITS } from "../src/game/config/economy";
 const hours = Number(process.argv[2] ?? 3);
 const quiet = process.argv[3] === "q" || process.argv[3] === "race";
 const racing = process.argv.includes("race");
+const audit = process.argv.includes("audit");
+/** Where to write the final save: the first argument after the hours that is a file name, not a flag. */
+const savePath = process.argv.slice(4).find((a) => !["q", "race", "audit"].includes(a));
+const problems = new Map<string, string>();
 const s = createInitialState(0);
 s.tips = ["start", "engine", "market", "dealers"];
 const fmtT = (t: number) => `${Math.floor(t / 3600)}h${String(Math.floor((t % 3600) / 60)).padStart(2, "0")}m${String(t % 60).padStart(2, "0")}`;
@@ -73,6 +78,14 @@ for (let t = 0; t < hours * 3600; t++) {
     const dl = Object.entries(s.chain.dealers).map(([k, v]) => `${k}:${Math.floor(v?.cars ?? 0)}`).join(",");
     console.log(`   ~ ${fmtT(t)} per s: ${JSON.stringify(d)} | ${st} | dealers ${dl} | sold ${s.lifetime.carsSold}${racing ? ` | rep ${Math.round(s.racing.rep)} races ${s.racing.stats.races} wins ${s.racing.stats.wins} car ${Rc.raceCar(s, s.racing.selected)?.car ?? "-"}` : ""}`);
   }
+  if (audit && t % 5 === 0)
+    for (const pr of checkInvariants(s)) {
+      const key = pr.replace(/[-0-9.e]+/g, "#");
+      if (!problems.has(key)) {
+        problems.set(key, `${fmtT(t)} ${pr}`);
+        console.log(`!! INVARIANT ${fmtT(t)} ${pr}`);
+      }
+    }
   if (t % 10 !== 0) continue;
   const goals = nextGoals(s, snap, 2);
   const key = goals.map((g) => g.kind + ("plant" in g && typeof g.plant === "string" ? ":" + g.plant : "") + ("what" in g && g.what ? ":" + g.what : "")).join(" | ");
@@ -114,7 +127,7 @@ for (const [id, b] of Ch.plantsOf(s)) console.log(" ", id, b.type, "L" + b.level
   for (const [id, b] of Ch.plantsOf(s)) if (b.type === "assemblyPlant") { const st = sn.chain.plants[id]; console.log("asm", "out", b.plant.out, "outCap", st?.outCap, "fleet", b.plant.fleet, "load", st?.load, "status", b.plant.status, "ships", s.chain.shipments.filter((x) => x.from === id).length); }
 }
 // optional: write the end state as a save file (to load it in the browser)
-if (process.argv[4]) {
+if (savePath) {
   s.lastActiveAt = Date.now();
-  writeFileSync(process.argv[4], JSON.stringify({ version: 1, savedAt: Date.now(), state: s }));
+  writeFileSync(savePath, JSON.stringify({ version: 1, savedAt: Date.now(), state: s }));
 }
