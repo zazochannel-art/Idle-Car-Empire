@@ -1,5 +1,7 @@
 "use client";
 
+import { shortfall } from "@/game/engine/materials";
+import type { MaterialId } from "@/game/config/economy";
 import { ArrowRight, CheckCircle2, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -31,6 +33,8 @@ export function goalText(g: Goal, t: (k: MessageKey, v?: Vars) => string, n: Con
       const s = useGame.getState().state;
       return { title: t(g.what === "speed" ? "goal.speed" : "goal.level", { name: plantName(s, g.plot, t) }), detail: t("goal.upgradeDetail") };
     }
+    case "materials":
+      return { title: t("goal.materials", { m: t(`mat.${g.material}` as MessageKey) }), detail: t("goal.materialsDetail", { name: plantName(useGame.getState().state, g.plot, t) }) };
     case "shortage":
       return {
         title: t("goal.shortage", { item: t(`item.${g.component}`) }),
@@ -86,6 +90,15 @@ export function runGoal(g: Goal, ready: boolean) {
       }
       ui.selectPlot(g.plot);
       break;
+    case "materials": {
+      // one tap buys what is missing for the next 10 units
+      const s = game.state;
+      const st = game.snap.chain.plants[g.plot];
+      const p = s.city.buildings[g.plot]?.plant;
+      if (ready && st && p) for (const [m, n] of Object.entries(shortfall(p, st.need, 10)) as [MaterialId, number][]) game.buyMaterial(g.plot, m, n);
+      ui.selectPlot(g.plot);
+      break;
+    }
     case "shortage":
       // one tap fixes it: buy the maker's cheapest upgrade
       if (ready && g.what) {

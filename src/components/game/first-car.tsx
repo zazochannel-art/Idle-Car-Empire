@@ -45,7 +45,7 @@ export function FirstCarOverlay() {
   if (!celebrate) return null;
   const car = CAR_BY_ID[celebrate.car];
   const { state, snap } = useGame.getState();
-  const cost = carPartsValue(car) * snap.gm.value[1] * snap.gm.income;
+  const cost = carPartsValue(car);
   const value = carValue(state, car, snap.gm);
   const close = () => {
     setCelebrate(null);

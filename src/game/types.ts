@@ -151,6 +151,10 @@ export interface Stats {
 }
 
 export interface OfflineReport {
+  /** Revenue and costs while away. */
+  ledger?: LedgerValues;
+  carsSold?: number;
+  materialsUsed?: number;
   seconds: number;
   cappedSeconds: number;
   cars: number;
@@ -233,7 +237,22 @@ export interface GarageData {
 export type Route = "use" | "sell" | "store";
 
 /** Why a plant is not producing right now. */
-export type PlantStatus = "ok" | "noRaw" | "full" | "noParts" | "noModel";
+export type PlantStatus = "ok" | "noRaw" | "full" | "noParts" | "noModel" | "noCash";
+
+/** Units of each raw material (see config/economy.ts). */
+export type MaterialStock = Partial<Record<import("./config/economy").MaterialId, number>>;
+
+/** Where the money went: revenue and every kind of cost. */
+export type LedgerKey = "carSales" | "partSales" | "services" | "materials" | "labor" | "energy" | "maintenance" | "logistics" | "dealerFees" | "tax";
+export type LedgerValues = Record<LedgerKey, number>;
+export interface Ledger {
+  /** Smoothed $/s per category (for the dashboard). */
+  rate: LedgerValues;
+  /** Totals this run. */
+  run: LedgerValues;
+  /** Booked since the last tick (folded into `rate` and `run` by the next tick). */
+  pending: LedgerValues;
+}
 
 export interface PlantData {
   /** Speed upgrade level. */
@@ -252,8 +271,16 @@ export interface PlantData {
   auto?: boolean;
   /** Progress of the current batch, 0..1. */
   progress: number;
-  /** Raw material on site (steel, rubber…). */
-  raw: number;
+  /** Materials in the plant's warehouse. */
+  stock: MaterialStock;
+  /** Warehouse level (capacity, see WAREHOUSE_CAP). */
+  warehouse: number;
+  /** ⚡ Power System upgrades (cheaper energy). */
+  power: number;
+  /** Restock materials automatically (from the Wholesale supplier on). */
+  autoBuy?: boolean;
+  /** With status noRaw: the material that ran out. */
+  short?: import("./config/economy").MaterialId;
   /** Components waiting at an assembly plant. */
   inputs: Partial<Record<ComponentId, number>>;
   /** Finished units waiting for a truck. */
@@ -299,6 +326,8 @@ export interface Shipment {
   vehicle: Vehicle;
   /** Car models on a car transporter, for drawing. */
   models?: CarId[];
+  /** A materials delivery from the depot: what it carries. */
+  materials?: MaterialStock;
 }
 
 export interface DealerStock {
@@ -318,8 +347,11 @@ export interface ChainState {
   rate: number;
   /** The FIRST CAR COMPLETED moment has been shown. */
   firstCar: boolean;
-  /** Smoothed cars per second sold wholesale because every dealer was full. */
+  /** Smoothed cars per second sold wholesale because every dealer was full (no longer happens: cars wait). */
   wholesale: number;
+  ledger: Ledger;
+  /** Trip fees not yet paid (the trucks left before the cash was there): paid from the next revenue. */
+  owed: number;
 }
 
 export interface CityState {
@@ -385,6 +417,8 @@ export interface GameState {
   /** Tutorial tips the player has dismissed. */
   tips: string[];
   logistics: LogisticsState;
+  /** The materials market: its clock (price drift) and lifetime units bought (supplier tiers). */
+  market: { t: number; bought: number };
   research: string[];
   achievements: string[];
   missions: {

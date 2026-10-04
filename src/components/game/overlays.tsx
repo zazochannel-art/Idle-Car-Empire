@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { uiEvents, type UiEvent } from "@/store/events";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
+import { LedgerTable } from "../views/ledger-table";
 
 /** "Welcome Back!" — shown while an offline report is waiting to be collected. */
 export function OfflineDialog() {
@@ -27,7 +28,7 @@ export function OfflineDialog() {
 
   return (
     <Dialog open onOpenChange={(o) => !o && collect()}>
-      <DialogContent hideClose className="text-center">
+      <DialogContent hideClose className="max-h-[92dvh] overflow-y-auto text-center">
         <motion.div initial={{ scale: 0.6, rotate: -8 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring", stiffness: 260, damping: 14 }} className="mx-auto mb-2 text-6xl">
           🏭
         </motion.div>
@@ -59,6 +60,15 @@ export function OfflineDialog() {
             <div className="mt-1 text-lg font-bold tabular-nums">{formatNumber(report.deliveries ?? 0)}</div>
           </div>
         </div>
+        {report.ledger && (
+          <div className="mt-2 text-left">
+            <div className="mb-1 flex justify-between text-[11px] uppercase tracking-wider text-white/45">
+              <span>{t("offline.breakdown")}</span>
+              <span>{t("offline.sold", { n: formatNumber(report.carsSold ?? 0) })}</span>
+            </div>
+            <LedgerTable values={report.ledger} compact />
+          </div>
+        )}
         <div className="mt-2 rounded-2xl bg-gradient-to-br from-gold/15 to-transparent p-4 ring-1 ring-gold/30">
           <div className="text-[11px] uppercase tracking-wider text-gold/70">{t("offline.money")}</div>
           <div className="text-3xl font-black tabular-nums text-gradient-gold">{formatMoney(report.money)}</div>

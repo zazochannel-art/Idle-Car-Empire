@@ -23,7 +23,7 @@ export const IMPERIUM = {
   /** Expansions needed first: the empire must reach the Global Empire region. */
   minExpansions: 6,
   /** Run earnings needed for the reset. */
-  minRunEarnings: 1e12,
+  minRunEarnings: 5e9,
   /** Stars = max(1, floor(perDecade × log10(earned since last reset / base))). */
   perDecade: 3,
   base: 1e11,

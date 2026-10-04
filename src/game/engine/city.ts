@@ -24,7 +24,7 @@ import {
   buildableIn,
 } from "../config/city";
 import { PLANT_MAX_LEVEL, isPlantType } from "../config/chain";
-import { migratePlant, newPlant, plantBuildCost, plantLock } from "./chain";
+import { migratePlant, newPlant, plantBuildCost, plantLock, starterStock } from "./chain";
 import { STARTER_PLOT, plotOf, WORLD_MAP, type Plot } from "../city/layout";
 import type {
   BuildingState,
@@ -46,7 +46,9 @@ export function newGarage(no: number): BuildingState {
 
 /** A new company: the Small Car Body Works and nothing else. */
 export function createCity(): CityState {
-  return { zones: ["town"], buildings: { [STARTER_PLOT]: { type: "bodyWorks", level: 1, plant: newPlant("bodyWorks") } }, nextUid: 1, nextGarageNo: 1, carsServiced: 0 };
+  // the first few car bodies' worth of material is already in the warehouse
+  const plant = { ...newPlant(), stock: starterStock("bodyWorks", 1, 3) };
+  return { zones: ["town"], buildings: { [STARTER_PLOT]: { type: "bodyWorks", level: 1, plant } }, nextUid: 1, nextGarageNo: 1, carsServiced: 0 };
 }
 
 export const isZoneUnlocked = (s: GameState, zone: ZoneId) => s.city.zones.includes(zone);
@@ -395,7 +397,7 @@ export function buildStructure(s: GameState, plotId: string, type: StructureType
   if (!plot || !canBuildOn(s, plotId) || !buildableIn(plot.zone, plot.big).includes(type)) return false;
   if (isPlantType(type)) {
     if (plantLock(s, type) || !spend(s, structureCost(s, plotId, type))) return false;
-    s.city.buildings[plotId] = { type, level: 1, plant: newPlant(type) };
+    s.city.buildings[plotId] = { type, level: 1, plant: newPlant() };
     return true;
   }
   if (type !== "garage" && builtInZone(s, plot.zone, type)) return false;

@@ -3,6 +3,7 @@ import type { GameState, OfflineReport } from "../types";
 import { simulateChain } from "./chain";
 import { snapshot } from "./economy";
 import { credit } from "./tick";
+import { book, LEDGER_KEYS, settleLedger } from "./materials";
 
 /**
  * Plays out the time between `lastActiveAt` and `now`: plants keep producing
@@ -21,6 +22,7 @@ export function computeOffline(s: GameState, now: number): OfflineReport {
   const cash = s.cash;
   const byType = { ...s.lifetime.carsByType };
   const rp = s.rp;
+  const before = { ...s.chain.ledger.run };
   const r = simulateChain(s, capped, snap.chain, (amount) => credit(s, amount));
   // Hold the net earnings back for the COLLECT button (they already count as earned).
   const net = s.cash - cash;
@@ -43,6 +45,14 @@ export function computeOffline(s: GameState, now: number): OfflineReport {
   s.cash -= city;
   report.money += city;
   report.serviced = Math.floor(snap.city.carsPerSec * capped * eff);
+  if (city > 0) {
+    book(s, "services", city);
+    settleLedger(s, capped);
+  }
+  // where the money came from and where it went while away
+  report.ledger = Object.fromEntries(LEDGER_KEYS.map((k) => [k, Math.max(0, s.chain.ledger.run[k] - before[k])])) as OfflineReport["ledger"];
+  report.carsSold = r.carsSold;
+  report.materialsUsed = r.materials;
   return report;
 }
 
@@ -78,6 +88,12 @@ export function settleOffline(s: GameState, now: number): OfflineReport | null {
     p.serviced = (p.serviced ?? 0) + (report.serviced ?? 0);
     p.money += report.money;
     p.rp += report.rp;
+    p.carsSold = (p.carsSold ?? 0) + (report.carsSold ?? 0);
+    p.materialsUsed = (p.materialsUsed ?? 0) + (report.materialsUsed ?? 0);
+    if (report.ledger) {
+      const L = (p.ledger ??= Object.fromEntries(LEDGER_KEYS.map((k) => [k, 0])) as NonNullable<OfflineReport["ledger"]>);
+      for (const k of LEDGER_KEYS) L[k] += report.ledger[k];
+    }
     for (const [car, n] of Object.entries(report.carsByType)) {
       const k = car as keyof typeof p.carsByType;
       p.carsByType[k] = (p.carsByType[k] ?? 0) + (n ?? 0);

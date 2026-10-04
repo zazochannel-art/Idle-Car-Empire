@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { FACILITY_BY_ID, ZONES } from "./config/city";
+import { FACILITY_BY_ID, SERVICE_FEE, ZONES } from "./config/city";
 import { DEPOT, DRIVEWAY, MARKET, STARTER_PLOT, WORLD, WORLD_MAP, roadRoute, segmentOpen } from "./city/layout";
 import type { GameState } from "./types";
 import * as C from "./engine/city";
 import { snapshot } from "./engine/economy";
 import { computeOffline } from "./engine/offline";
 import { prestige } from "./engine/prestige";
+import { PRESTIGE } from "./config/prestige";
 import { createInitialState } from "./engine/state";
 import { tick } from "./engine/tick";
 import { decodeSave, encodeSave, migrate } from "./save/serialize";
@@ -69,8 +70,8 @@ describe("garages", () => {
     const st = snap.city.garages[GAR];
     expect(st.workstations).toBe(1);
     expect(st.staffed).toBe(1);
-    expect(st.incomePerSec).toBeCloseTo((20 * 2) / 16); // fee 20 × repair bonus ×2 / 16s
-    for (const [, b] of Object.entries(s.city.buildings)) if (b.plant) b.plant.raw = 0; // keep the body works quiet
+    expect(st.incomePerSec).toBeCloseTo((SERVICE_FEE * 2) / 16); // fee × repair bonus ×2 / 16s
+    for (const [, b] of Object.entries(s.city.buildings)) if (b.plant) b.plant.stock = { steel: 1 }; // keep the body works quiet (too little for a body)
     tick(s, 32);
     expect(s.cash).toBeCloseTo(st.incomePerSec * 32);
     expect(s.city.buildings[GAR].garage!.serviced).toBe(2);
@@ -149,8 +150,10 @@ describe("zones and plots", () => {
     expect(report.money).toBeGreaterThan(0);
     expect(report.serviced).toBeGreaterThan(0);
 
-    s.run.moneyEarned = 1e10;
-    s.lifetime.moneyEarned = 1e10;
+    // just enough for a first expansion (more would unlock start-of-run perks that build plants)
+    s.run.moneyEarned = PRESTIGE.minRunEarnings;
+    s.lifetime.moneyEarned = PRESTIGE.minRunEarnings;
+    s.cash += 1e6;
     C.unlockZone(s, "industrial");
     expect(prestige(s, T0)).toBeGreaterThan(0);
     expect(s.city.zones).toEqual(["town"]);

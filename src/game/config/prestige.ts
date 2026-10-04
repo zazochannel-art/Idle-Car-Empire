@@ -2,10 +2,10 @@ import type { Effect, PlantType } from "../types";
 
 export const PRESTIGE = {
   /** Run earnings required before Global Expansion is allowed. */
-  minRunEarnings: 1e10,
+  minRunEarnings: 5e7,
   /** Total points ever = floor(scale × cbrt(lifetime earned / divisor)). */
   scale: 10,
-  divisor: 1e9,
+  divisor: 5e6,
   /** Each Empire Point held: +2% global income. */
   incomePerPoint: 0.02,
 };
@@ -24,13 +24,13 @@ export interface EmpirePerk {
 
 /** Permanent perks unlocked by how many Empire Points you hold. */
 export const EMPIRE_PERKS: EmpirePerk[] = [
-  { points: 1, name: "Seed Capital", description: "Start every run with $1,000.", effects: [], startCash: 1_000 },
+  { points: 1, name: "Seed Capital", description: "Start every run with $5,000 more.", effects: [], startCash: 5_000 },
   { points: 5, name: "Turnkey Works", description: "Your Body Works starts Semi-Automated.", effects: [], startAutomation: true },
-  { points: 15, name: "Investor Network", description: "Start with $25,000 and +25% speed.", effects: [{ kind: "speed", mult: 1.25 }], startCash: 25_000 },
+  { points: 15, name: "Investor Network", description: "Start with $40,000 and +25% speed.", effects: [{ kind: "speed", mult: 1.25 }], startCash: 40_000 },
   { points: 40, name: "Night Shift", description: "+4h offline limit, +25% offline income.", effects: [{ kind: "offlineCap", hours: 4 }, { kind: "offline", add: 0.25 }] },
   { points: 100, name: "Franchise", description: "Start with an Engine Factory. Research +50%.", effects: [{ kind: "rp", mult: 1.5 }], startPlants: ["engineFactory"] },
   { points: 250, name: "Brand Power", description: "×2 car value.", effects: [{ kind: "value", mult: 2 }] },
-  { points: 600, name: "Continental", description: "Start with Engine and Tyre factories and $10M.", effects: [], startPlants: ["engineFactory", "tireFactory"], startCash: 1e7 },
+  { points: 600, name: "Continental", description: "Start with Engine and Tyre factories and $2M.", effects: [], startPlants: ["engineFactory", "tireFactory"], startCash: 2e6 },
   { points: 1_500, name: "Legacy", description: "×2 speed, +8h offline limit.", effects: [{ kind: "speed", mult: 2 }, { kind: "offlineCap", hours: 8 }] },
   { points: 5_000, name: "Icon", description: "×3 global income.", effects: [{ kind: "income", mult: 3 }] },
 ];

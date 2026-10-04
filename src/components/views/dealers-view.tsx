@@ -1,5 +1,6 @@
 "use client";
 
+import { plantsOf } from "@/game/engine/chain";
 import { DEALERS } from "@/game/config/dealerships";
 import { dealerStats } from "@/game/engine/chain";
 import { formatNumber } from "@/game/format";
@@ -12,6 +13,8 @@ import { ViewHeader } from "./section-title";
 
 export function DealersView() {
   const state = useGame((g) => g.state);
+  // finished cars waiting at the plants because every dealer lot is full
+  const waiting = plantsOf(state).reduce((a, [, b]) => (b.type === "assemblyPlant" && b.plant.status === "full" ? a + Math.floor(b.plant.out) : a), 0);
   const snap = useGame((g) => g.snap);
   const selectPlot = useUi((u) => u.selectPlot);
   const { t, lang } = useT();
@@ -30,9 +33,9 @@ export function DealersView() {
           <Metric label={t("dealers.inStock")} value={formatNumber(inStock)} gold />
         </div>
       </ViewHeader>
-      {state.chain.wholesale * 60 >= 1 && (
+      {waiting >= 1 && (
         <div className="rounded-2xl bg-amber-500/10 p-3 text-xs text-amber-200 ring-1 ring-amber-400/30">
-          ⚠️ {t("dealers.wholesale", { n: formatNumber(state.chain.wholesale * 60) })}
+          ⚠️ {t("dealers.wholesale", { n: formatNumber(waiting) })}
         </div>
       )}
       <div className="grid gap-3 @xl:grid-cols-2">

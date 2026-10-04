@@ -2,6 +2,7 @@ import { CARS } from "../config/cars";
 import { COMPONENTS } from "../config/chain";
 import { DEALER_IDS } from "../config/dealerships";
 import { MANAGER_IDS } from "../config/managers";
+import { START_CASH } from "../config/economy";
 import { createChain } from "./chain";
 import { createCity } from "./city";
 import { createLogistics } from "./logistics";
@@ -55,8 +56,8 @@ export function createStats(): Stats {
 export function createInitialState(now: number): GameState {
   return {
     version: SAVE_VERSION,
-    // enough for the first upgrades right away
-    cash: 250,
+    // starting capital: materials, the first upgrades, saving for the next plant
+    cash: START_CASH,
     rp: 0,
     empirePoints: 0,
     empirePointsEarned: 0,
@@ -76,6 +77,7 @@ export function createInitialState(now: number): GameState {
     rivalsBeaten: [],
     contracts: { offer: null, active: null, nextAt: 0, done: 0 },
     logistics: createLogistics(),
+    market: { t: 0, bought: 0 },
     research: [],
     achievements: [],
     missions: { dailyDate: "", daily: [], milestonesClaimed: [] },

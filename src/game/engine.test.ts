@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { CAR_BY_ID } from "./config/cars";
-import { MAX_WAIT, PLANT_BY_ID, VEHICLE_CAPACITY } from "./config/chain";
+import { CHASSIS_BONUS, MAX_WAIT, PLANT_BY_ID, VEHICLE_CAPACITY } from "./config/chain";
+import { COMPONENT_TIME, DEALER_FEE, SALES_TAX, START_CASH } from "./config/economy";
+import * as M from "./engine/materials";
+import { componentStdCost } from "./engine/costs";
 import { MANAGER_BY_ID } from "./config/managers";
 import { PRESTIGE } from "./config/prestige";
 import { DEPOT, MARKET, STARTER_PLOT, WORLD_MAP } from "./city/layout";
@@ -17,7 +20,7 @@ import * as L from "./engine/logistics";
 import { geometricCost, maxAffordable, snapshot } from "./engine/economy";
 import { collectOffline, settleOffline } from "./engine/offline";
 import { canPrestige, pendingPoints, prestige } from "./engine/prestige";
-import { incomeStalled, nextGoals } from "./engine/insights";
+import { incomeStalled } from "./engine/insights";
 import { checkAchievements, claimDaily, claimMilestone, dailyProgress, recordHistory, refreshDaily } from "./engine/progress";
 import { currentTip } from "./engine/tips";
 import { createInitialState } from "./engine/state";
@@ -38,11 +41,23 @@ function run(s: GameState, seconds: number, step = 0.5): GameEvent[] {
   return events;
 }
 
-function build(s: GameState, plot: string, type: PlantType) {
+function build(s: GameState, plot: string, type: PlantType, units = 30) {
   // the Engine Factory unlocks after 12 bodies
   s.lifetime.parts.body = Math.max(s.lifetime.parts.body, 12);
   s.cash += Ch.plantBuildCost(s, type);
   expect(C.buildStructure(s, plot, type)).toBe(true);
+  supply(s, plot, units);
+}
+
+/** Puts materials for `units` finished units straight into a plant's warehouse (and the body works'). */
+function supply(s: GameState, plot: string, units: number) {
+  for (const id of [plot, STARTER_PLOT]) {
+    const b = s.city.buildings[id];
+    if (b?.plant && PLANT_BY_ID[b.type as PlantType].item) {
+      b.plant.warehouse = 10;
+      b.plant.stock = Ch.starterStock(b.type as PlantType, b.plant.grade, units);
+    }
+  }
 }
 
 describe("number formatting", () => {
@@ -72,49 +87,63 @@ describe("the start: a small car body works", () => {
     expect(b.type).toBe("bodyWorks");
     expect(b.level).toBe(1);
     expect(Ch.plantsOf(s)).toHaveLength(1);
-    expect(b.plant!.raw).toBeGreaterThan(0);
-    expect(s.cash).toBe(250);
+    expect(M.stockTotal(b.plant!.stock)).toBeGreaterThan(0);
+    expect(s.cash).toBe(START_CASH);
     expect(Object.values(s.dealers).some((d) => d.owned)).toBe(false);
   });
 
-  it("makes a body every 20s and a truck sells it at the Body Market for $150", () => {
+  it("makes a body every 45s out of steel and plastic, and a truck sells it at the Parts Market", () => {
     const s = createInitialState(T0);
-    run(s, 19);
+    const p = s.city.buildings[STARTER_PLOT].plant!;
+    const steel = p.stock.steel!;
+    run(s, COMPONENT_TIME.body - 1);
     expect(s.lifetime.parts.body).toBe(0);
     run(s, 2);
     expect(s.lifetime.parts.body).toBe(1);
-    expect(s.city.buildings[STARTER_PLOT].plant!.out).toBe(1);
-    // the truck waits a little for a fuller load, then drives to the market
+    expect(p.stock.steel).toBe(steel - 60); // one body uses 60 steel and 6 plastic
+    expect(p.out).toBe(1);
+    // wages, energy and upkeep were paid while it worked
+    expect(s.cash).toBeLessThan(START_CASH);
     run(s, MAX_WAIT + 1);
     const truck = s.chain.shipments.find((sh) => sh.from === STARTER_PLOT);
-    expect(truck).toMatchObject({ to: MARKET, item: "body", qty: 1, back: false });
-    expect(s.cash).toBe(250);
+    expect(truck).toMatchObject({ to: MARKET, item: "body", back: false });
+    const value = Ch.componentValue("body", 1, snapshot(s).gm);
     const events = run(s, truck!.dur - truck!.t + 0.6);
-    expect(s.cash).toBeCloseTo(400);
-    expect(events.some((e) => e.type === "sale" && e.plot === MARKET && e.amount === 150)).toBe(true);
-    expect(s.lifetime.deliveries).toBe(1);
+    // the market pays the body's value; the tax comes off
+    const sale = events.find((e): e is Extract<GameEvent, { type: "sale" }> => e.type === "sale" && e.plot === MARKET);
+    expect(sale!.amount / sale!.count).toBeCloseTo(value * (1 - SALES_TAX));
+    expect(s.chain.ledger.run.partSales).toBeGreaterThan(0);
+    expect(s.chain.ledger.run.labor).toBeGreaterThan(0);
+    expect(s.lifetime.deliveries).toBeGreaterThan(0);
     // and comes back empty
     expect(s.chain.shipments.find((sh) => sh.from === STARTER_PLOT)?.back).toBe(true);
   });
 
-  it("buys steel from the depot when it runs low, and stops without cash", () => {
+  it("stops without materials; bought materials arrive by truck into the warehouse", () => {
     const s = createInitialState(T0);
     const p = s.city.buildings[STARTER_PLOT].plant!;
-    s.cash = 0;
-    p.raw = 0;
+    p.stock = {};
     run(s, 5);
-    expect(s.chain.shipments.some((sh) => sh.from === DEPOT)).toBe(false); // couldn't pay
-    expect(p.raw).toBe(0);
     expect(p.status).toBe("noRaw");
-    s.cash = 10_000;
-    run(s, 1);
-    const supply = s.chain.shipments.find((sh) => sh.from === DEPOT);
-    expect(supply?.item).toBe("raw");
-    expect(s.cash).toBeLessThan(10_000); // paid when the truck left
-    run(s, supply!.dur + 1);
-    expect(p.raw).toBeGreaterThan(0);
-    run(s, 31);
+    expect(p.short).toBe("steel");
+    expect(s.chain.shipments.some((sh) => sh.from === DEPOT)).toBe(false); // nobody buys for you
+    // only materials the plant uses, only what fits, only what you can pay for
+    expect(M.buyMaterial(s, STARTER_PLOT, "rubber", 10).ok).toBe(false);
+    expect(M.buyMaterial(s, STARTER_PLOT, "steel", 100_000).ok).toBe(false);
+    const cash = s.cash;
+    const cost = M.orderCost(s, "steel", 120);
+    expect(M.buyMaterial(s, STARTER_PLOT, "steel", 120)).toMatchObject({ ok: true });
+    expect(M.buyMaterial(s, STARTER_PLOT, "plastic", 12)).toMatchObject({ ok: true });
+    expect(s.cash).toBeLessThan(cash - cost + 1); // paid up front
+    const supplyTruck = s.chain.shipments.find((sh) => sh.from === DEPOT)!;
+    expect(supplyTruck.materials).toEqual({ steel: 120 });
+    run(s, supplyTruck.dur + 1);
+    expect(p.stock.steel).toBe(120);
+    run(s, 2);
     expect(p.status).toBe("ok");
+    // volume discounts and a bigger order never cost less in total
+    expect(M.orderCost(s, "steel", 100)).toBeGreaterThan(M.orderCost(s, "steel", 99) * 0.9);
+    expect(M.orderCost(s, "steel", 100) / 100).toBeLessThan(M.orderCost(s, "steel", 99) / 99);
   });
 
   it("upgrades: levels add lines and trucks, speed shortens the cycle, grades add value", () => {
@@ -129,7 +158,9 @@ describe("the start: a small car body works", () => {
     const after = snapshot(s).chain.plants[STARTER_PLOT];
     expect(after.lines).toBe(2);
     expect(after.unitsPerSec).toBeGreaterThan(before.unitsPerSec * 2);
-    expect(after.unitValue).toBeCloseTo(before.unitValue * 2.5);
+    // a better grade uses more material and sells for more
+    expect(after.unitValue).toBeGreaterThan(before.unitValue * 1.5);
+    expect(after.unitCost).toBeGreaterThan(before.unitCost * 1.5);
     expect(Ch.trucksOf(s.city.buildings[STARTER_PLOT])).toBe(2);
   });
 });
@@ -144,15 +175,15 @@ describe("growing the chain", () => {
     expect(Ch.plantLock(s, "engineFactory")).toBeNull();
     expect(Ch.plantLock(s, "tireFactory")).toEqual({ kind: "plant", plant: "engineFactory" });
     expect(Ch.plantLock(s, "interiorFactory")).toEqual({ kind: "plant", plant: "assemblyPlant" });
-    expect(Ch.plantBuildCost(s, "engineFactory")).toBe(1_500);
-    s.cash = 1_499;
+    expect(Ch.plantBuildCost(s, "engineFactory")).toBe(6_000);
+    s.cash = 5_999;
     expect(C.buildStructure(s, a, "engineFactory")).toBe(false);
-    s.cash = 1_500;
+    s.cash = 6_000;
     expect(C.buildStructure(s, a, "engineFactory")).toBe(true);
     expect(s.cash).toBe(0);
     expect(Ch.plantLock(s, "tireFactory")).toBeNull();
     // a second engine factory costs more
-    expect(Ch.plantBuildCost(s, "engineFactory")).toBe(1_500 * 6);
+    expect(Ch.plantBuildCost(s, "engineFactory")).toBe(6_000 * 2.5);
     expect(Ch.plantLock(s, "batteryFactory")).not.toBeNull();
     expect(C.buildStructure(s, b, "assemblyPlant")).toBe(false);
   });
@@ -161,7 +192,7 @@ describe("growing the chain", () => {
     const s = createInitialState(T0);
     const [a] = freePlots();
     build(s, a, "engineFactory");
-    run(s, 60);
+    run(s, 120);
     expect(s.lifetime.parts.engine).toBeGreaterThan(0);
     expect(s.chain.shipments.some((sh) => sh.from === a && sh.to === MARKET && sh.item === "engine")).toBe(true);
   });
@@ -187,7 +218,7 @@ describe("motorized chassis", () => {
     expect(Ch.setCombine(s, a, true)).toBe(true);
     const st = snapshot(s).chain.plants[a];
     expect(st.combine).toBe(true);
-    expect(st.unitValue).toBeCloseTo((st0.engineValue + 150) * 1.3);
+    expect(st.unitValue).toBeCloseTo((st0.engineValue + Ch.componentValue("body", 1, snapshot(s).gm)) * CHASSIS_BONUS);
     // without bodies it waits for them
     run(s, 40);
     const p = s.city.buildings[a].plant!;
@@ -204,7 +235,7 @@ describe("motorized chassis", () => {
     const engine = Ch.plantsOf(s).find(([, b]) => b.type === "engineFactory")![0];
     Ch.setCombine(s, engine, true);
     expect(snapshot(s).chain.plants[engine].combine).toBe(false);
-    run(s, 300);
+    run(s, 700);
     expect(s.city.buildings[assembly].plant!.made).toBeGreaterThan(0);
   });
 });
@@ -223,7 +254,7 @@ describe("automotive milestones", () => {
     expect(s.stars).toBe(1);
     // car sales count towards "Earn $100,000 from cars"
     const { s: c } = fullChain();
-    run(c, 600);
+    run(c, 1200);
     expect(c.lifetime.carRevenue).toBeGreaterThan(0);
   });
 });
@@ -292,7 +323,9 @@ describe("design studio", () => {
     const cost = D.developCost(Ch.carBaseValue(s, city, gm), s.designs.city, "engine");
     expect(D.develop(s, "city", "engine", cost)).toBe(true);
     expect(s.designs.city.engine).toBe(1);
-    expect(Ch.carValue(s, city, gm)).toBeCloseTo(before * 1.08);
+    // options widen the car's margin: it sells for more, but not 8% more of its cost
+    expect(Ch.carValue(s, city, gm)).toBeGreaterThan(before);
+    expect(Ch.carValue(s, city, gm)).toBeLessThan(before * 1.08);
     expect(snapshot(s).chain.plants[assembly].cycle).toBeCloseTo(t0 * 1.05);
     expect(Ch.modelStats(s, city).hp).toBeGreaterThan(city.hp);
     D.renameDesign(s, "city", "  MC Rocket  ");
@@ -314,7 +347,7 @@ describe("assembly and sales", () => {
     expect(p.status).toBe("noParts");
     expect(p.missing).toBeDefined();
     // every part arrives by truck…
-    const events = run(s, 400);
+    const events = run(s, 900);
     for (const c of ["body", "engine", "tires"] as const) expect(s.lifetime.parts[c]).toBeGreaterThan(0);
     expect(s.lifetime.carsProduced).toBeGreaterThan(0);
     expect(events.filter((e) => e.type === "carBuilt" && e.first)).toHaveLength(1);
@@ -327,26 +360,27 @@ describe("assembly and sales", () => {
     const { s } = fullChain();
     s.cash = 1e12;
     expect(A.buyDealer(s, "city")).toBe(false); // no car yet
-    run(s, 400);
+    run(s, 900);
     expect(s.dealers.local.owned).toBe(true); // opened by the first car, for free
     const earned = s.lifetime.moneyEarned;
-    run(s, 300);
+    run(s, 600);
     expect(s.lifetime.carsSold).toBeGreaterThan(0);
     expect(s.chain.dealers.local?.sold).toBe(s.lifetime.carsSold);
     expect(s.lifetime.moneyEarned).toBeGreaterThan(earned);
   });
 
-  it("dealers specialise in classes: their cars sell for +20%", () => {
+  it("dealers specialise in classes: their cars sell for a little more; fees and tax come off", () => {
     expect(Ch.dealerMatches("local", "city")).toBe(true);
     expect(Ch.dealerMatches("local", "sports")).toBe(false);
     expect(Ch.dealerMatches("supercar", "hypercar")).toBe(true);
     const { s } = fullChain();
-    const events = run(s, 600);
+    const events = run(s, 1500);
     const sale = events.find((e): e is Extract<GameEvent, { type: "sale" }> => e.type === "sale" && e.plot === "d:local");
     expect(sale).toBeDefined();
-    // a City Car at the Economy Dealer: value × (1 + 0% markup + 20% speciality)
+    // a City Car at the Economy Dealer: value × (1 + 0% markup + 6% speciality), less the dealer's fee and tax
     const each = Ch.carValue(s, CAR_BY_ID.city, snapshot(s).gm);
-    expect(sale!.amount / each).toBeGreaterThan(1.15);
+    expect(sale!.amount / each).toBeCloseTo(1.06 * (1 - DEALER_FEE - SALES_TAX), 2);
+    expect(s.chain.ledger.run.dealerFees).toBeGreaterThan(0);
   });
 
   it("better cars need better component grades", () => {
@@ -362,10 +396,14 @@ describe("assembly and sales", () => {
 describe("offline progress", () => {
   it("plants keep producing and trucks keep selling while away; money waits for COLLECT", () => {
     const s = createInitialState(T0);
-    s.cash = 5_000;
+    supply(s, STARTER_PLOT, 40);
     const report = settleOffline(s, T0 + 3600 * 1000);
     expect(report).not.toBeNull();
-    expect(report!.components).toBeGreaterThan(50);
+    // only what the warehouse held could be made: no material, no production
+    expect(report!.components).toBeGreaterThan(20);
+    expect(report!.components).toBeLessThanOrEqual(40);
+    expect(report!.ledger!.partSales).toBeGreaterThan(0);
+    expect(report!.ledger!.labor).toBeGreaterThan(0);
     expect(report!.deliveries).toBeGreaterThan(0);
     expect(report!.money).toBeGreaterThan(0);
     const before = s.cash;
@@ -412,7 +450,7 @@ describe("achievements and missions", () => {
     s.lifetime.parts.body = 1;
     expect(checkAchievements(s)).toContain("first_body");
     expect(checkAchievements(s)).toEqual([]);
-    expect(s.cash).toBe(350);
+    expect(s.cash).toBe(START_CASH + 100);
   });
 
   it("daily missions count progress from when they were handed out", () => {
@@ -659,58 +697,94 @@ describe("insight", () => {
     const s = createInitialState(T0);
     const st = Object.values(snapshot(s).chain.plants)[0];
     const per = Ch.plantProfitPerMin(st, snapshot(s).gm);
-    expect(per).toBeCloseTo(st.unitsPerSec * 60 * (st.unitValue - Ch.plantUnitCost(st, snapshot(s).gm)));
+    expect(per).toBeCloseTo(st.unitsPerSec * 60 * (st.unitValue * (1 - SALES_TAX) - Ch.plantUnitCost(st, snapshot(s).gm)));
+    // a thin but real margin on parts
     expect(per).toBeGreaterThan(0);
+    expect(st.unitValue * (1 - SALES_TAX)).toBeLessThan(st.unitCost * 1.15);
   });
 });
 
 describe("selling cars", () => {
-  it("sells the surplus wholesale when every dealer is full, so the line never stops", () => {
+  it("cars wait in storage when every dealer is full: nothing is sold off instantly", () => {
     const { s, assembly } = fullChain();
-    // a big chain, one small dealer: it can sell ~6 cars a minute
-    for (const [, b] of Ch.plantsOf(s)) {
+    // a big chain, one small dealer
+    for (const [id, b] of Ch.plantsOf(s)) {
       b.level = 8;
       b.plant.speed = 24;
+      supply(s, id, 400);
     }
     s.cash = 1e12;
-    run(s, 600);
+    run(s, 1500);
     const made = s.lifetime.carsProduced;
-    expect(made).toBeGreaterThan(200);
-    // nearly everything made was sold: dealers first, the rest wholesale
-    const waiting = s.city.buildings[assembly].plant!.out + s.chain.shipments.filter((sh) => sh.item === "car" && !sh.back).reduce((a, sh) => a + sh.qty, 0) + (s.chain.dealers.local?.cars ?? 0);
-    expect(s.lifetime.carsSold + waiting).toBeGreaterThanOrEqual(made - 1);
-    expect(s.lifetime.carsSold).toBeGreaterThan(made * 0.8);
-    expect(s.chain.wholesale).toBeGreaterThan(0);
-    // and the player is told the dealers are the bottleneck
-    expect(nextGoals(s, snapshot(s), 5).some((g) => g.kind === "dealerFull")).toBe(true);
+    expect(made).toBeGreaterThan(20);
+    // the dealer sells one car at a time; the rest wait on its lot or at the plant
+    expect(s.lifetime.carsSold).toBeLessThan(made);
+    const st = snapshot(s).chain.plants[assembly];
+    expect(s.city.buildings[assembly].plant!.out).toBeLessThanOrEqual(st.outCap);
+    expect(s.chain.wholesale).toBe(0);
+    expect(s.chain.shipments.some((sh) => sh.item === "car" && sh.to === MARKET)).toBe(false);
   });
 
-  it("keeps dealers first: no wholesale while they have room", () => {
+  it("dealers sell at their pace, popular classes faster", () => {
     const { s } = fullChain();
-    s.cash = 1e9;
-    run(s, 600);
-    expect(s.lifetime.carsProduced).toBeGreaterThan(0);
-    expect(s.chain.wholesale).toBe(0);
+    const ds = snapshot(s).chain.dealers;
+    expect(ds.local).toBeUndefined();
+    run(s, 900);
+    const d = snapshot(s).chain.dealers.local!;
+    // about one customer every 30 s at Level 1 (a City Car finds one faster)
+    expect(d.interval).toBeCloseTo(30);
+    expect(d.stockCap).toBe(10);
   });
 });
 
-describe("cars go to the dealers", () => {
-  it("leaves no cars waiting at the plant: they are stored on the dealer's lot", () => {
-    const { s, assembly } = fullChain();
-    for (const [, b] of Ch.plantsOf(s)) {
-      b.level = 4;
-      b.plant.speed = 12;
+describe("no money from nothing", () => {
+  it("upgrades, purchases and refunds never create money", () => {
+    const s = createInitialState(T0);
+    const gm = snapshot(s).gm;
+    const cash = s.cash;
+    // buying material spends cash; there is no way to sell material back
+    M.buyMaterial(s, STARTER_PLOT, "steel", 100);
+    expect(s.cash).toBeLessThan(cash);
+    const after = s.cash;
+    Ch.upgradePlantSpeed(s, STARTER_PLOT, gm);
+    expect(s.cash).toBeLessThan(after);
+    // a plant with no materials makes nothing, and earns nothing
+    const t = createInitialState(T0);
+    t.city.buildings[STARTER_PLOT].plant!.stock = {};
+    const e0 = t.lifetime.moneyEarned;
+    run(t, 300);
+    expect(t.lifetime.moneyEarned).toBe(e0);
+    expect(t.lifetime.parts.body).toBe(0);
+  });
+
+  it("parts sell for barely more than they cost; cars earn their class margin", () => {
+    const s = createInitialState(T0);
+    const gm = snapshot(s).gm;
+    for (const c of ["body", "engine", "tires", "interior"] as const) {
+      const net = Ch.componentValue(c, 1, gm) * (1 - SALES_TAX);
+      const cost = componentStdCost(c, 1);
+      expect(net / cost).toBeGreaterThan(1);
+      expect(net / cost).toBeLessThan(1.1);
     }
-    s.cash = 1e12;
-    let worst = 0;
-    for (let t = 0; t < 400; t += 0.5) {
-      tick(s, 0.5);
-      if (t > 100) worst = Math.max(worst, s.city.buildings[assembly].plant!.out);
-    }
-    // at most one transporter load waits by the dock
-    expect(worst).toBeLessThanOrEqual(Object.values(snapshot(s).chain.plants).find((p) => p.type === "assemblyPlant")!.capacity + 1);
-    // the dealer's storage lot holds the cars until customers buy them
-    expect(s.chain.dealers.local!.cars).toBeGreaterThan(6);
-    expect(snapshot(s).chain.dealers.local!.stockCap).toBeGreaterThanOrEqual(40);
+    const city = CAR_BY_ID.city;
+    const cost = Ch.carPartsValue(city);
+    const net = Ch.carValue(s, city, gm) * (1 - DEALER_FEE - SALES_TAX);
+    expect(net / cost).toBeGreaterThan(1.1);
+    expect(net / cost).toBeLessThan(1.25);
+  });
+
+  it("a stuck company gets a small supplier credit, and only then", () => {
+    const s = createInitialState(T0);
+    const p = s.city.buildings[STARTER_PLOT].plant!;
+    p.stock = {};
+    s.cash = 0;
+    run(s, 1);
+    expect(s.cash).toBeGreaterThan(0);
+    expect(s.cash).toBeLessThan(10_000);
+    // with anything left to sell, no credit
+    const t = createInitialState(T0);
+    t.cash = 0;
+    run(t, 1);
+    expect(t.cash).toBeLessThanOrEqual(0.01);
   });
 });

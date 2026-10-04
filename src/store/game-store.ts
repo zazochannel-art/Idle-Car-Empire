@@ -10,6 +10,8 @@ import { MANAGER_BY_ID } from "@/game/config/managers";
 import { RESEARCH_BY_ID } from "@/game/config/research";
 import * as A from "@/game/engine/actions";
 import * as Ch from "@/game/engine/chain";
+import * as Mat from "@/game/engine/materials";
+import type { MaterialId } from "@/game/config/economy";
 import * as K from "@/game/engine/contracts";
 import * as R from "@/game/engine/retention";
 import * as D from "@/game/engine/design";
@@ -52,6 +54,10 @@ interface GameStore {
   plantGrade: (plot: string) => boolean;
   setPlantCar: (plot: string, car: CarId | null) => void;
   setCombine: (plot: string, on: boolean) => void;
+  buyMaterial: (plot: string, m: MaterialId, qty: number) => boolean;
+  upgradeWarehouse: (plot: string) => boolean;
+  upgradePower: (plot: string) => boolean;
+  setAutoBuy: (plot: string, on: boolean) => void;
   setAutoUpgrade: (plot: string, on: boolean) => void;
   hireManager: (id: ManagerId, assignTo?: string) => boolean;
   upgradeManager: (id: ManagerId) => boolean;
@@ -236,6 +242,12 @@ export const useGame = create<GameStore>((set, get) => {
     },
     setCombine: (plot, on) => {
       act((s) => Ch.setCombine(s, plot, on));
+    },
+    buyMaterial: (plot, m, qty) => act((s) => Mat.buyMaterial(s, plot, m, qty).ok),
+    upgradeWarehouse: (plot) => act((s) => Ch.upgradeWarehouse(s, plot, get().snap.gm)),
+    upgradePower: (plot) => act((s) => Ch.upgradePower(s, plot, get().snap.gm)),
+    setAutoBuy: (plot, on) => {
+      act((s) => Ch.setAutoBuy(s, plot, on));
     },
     setPlantCar: (plot, car) => {
       act((s) => Ch.setPlantCar(s, plot, car, get().snap.gm));

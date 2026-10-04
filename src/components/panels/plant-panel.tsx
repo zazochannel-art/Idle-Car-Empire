@@ -5,12 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { CARS, CAR_BY_ID } from "@/game/config/cars";
-import { AUTOMATION, BASE_MAX_LEVEL, CHASSIS_BONUS, COMPONENTS, COMPONENT_BY_ID, GRADES, PLANTS, PLANT_BY_ID, PLANT_LEVELS, PLANT_TRUCKS, SPEED } from "@/game/config/chain";
+import { AUTOMATION, BASE_MAX_LEVEL, CHASSIS_BONUS, COMPONENTS, COMPONENT_BY_ID, GRADES, PLANT_BY_ID, PLANT_LEVELS, PLANT_TRUCKS, SPEED } from "@/game/config/chain";
 import { DEALER_BY_ID, DEALER_SPECIALTY } from "@/game/config/dealerships";
 import { MANAGERS } from "@/game/config/managers";
 import { DEPOT, MARKET, plotOf } from "@/game/city/layout";
+import { MATERIALS } from "@/game/config/economy";
+import { marketPrice, usedMaterials } from "@/game/engine/materials";
 import { REGIONS } from "@/game/config/regions";
-import { AUTO_UPGRADE_FROM, plantProfitPerMin, plantUnitCost, automationCost, bestGrade, carLock, carValue, componentBase, dealerStats, trucksOf, gradeCost, levelCost, plantNumber, plantsOf, recipe, speedCost } from "@/game/engine/chain";
+import { AUTO_UPGRADE_FROM, plantProfitPerMin, plantUnitCost, automationCost, bestGrade, carLock, carValue, componentValue, dealerStats, trucksOf, gradeCost, levelCost, plantNumber, plantsOf, recipe, speedCost } from "@/game/engine/chain";
 import { isManagerUnlocked } from "@/game/engine/actions";
 import { dealerUpgradeCost, managerUpgradeCost } from "@/game/engine/economy";
 import { dealerRequirement } from "@/game/engine/insights";
@@ -23,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { CostButton } from "../game/cost-button";
+import { MaterialsPanel, RunningCosts, materialName } from "./materials-panel";
 
 type T = (k: MessageKey, v?: Vars) => string;
 
@@ -121,6 +124,10 @@ export function PlantPanel({ id }: { id: string }) {
         </div>
       </div>
 
+      {/* 📦 the warehouse and the material market, then what running the plant costs */}
+      <MaterialsPanel id={id} />
+      <RunningCosts id={id} />
+
       {/* engine factory before assembly: sell engines, or motorized chassis */}
       {st.type === "engineFactory" && <EngineStrategy id={id} />}
 
@@ -131,7 +138,6 @@ export function PlantPanel({ id }: { id: string }) {
       <div className="rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.07]">
         <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-white/55">{t("plant.stock")}</div>
         <div className="space-y-2">
-          {cfg.item && <StockBar label={`${rawName(st.type, t)}`} value={p.raw} cap={st.rawCap} color="#a8a29e" />}
           {st.combine && (
             <StockBar label={`${COMPONENT_BY_ID.body.emoji} ${itemName("body", t)}`} value={p.inputs.body ?? 0} cap={st.inCap} color={COMPONENT_BY_ID.body.color} warn={p.missing === "body"} />
           )}
@@ -380,8 +386,12 @@ function StatusLine({ id }: { id: string }) {
   let text = t("status.ok");
   if (p.status === "noRaw") {
     const inbound = state.chain.shipments.some((sh) => sh.to === id && sh.item === "raw" && !sh.back);
+    const raw = p.short ? materialName(p.short, t) : t("chain.raw");
     tone = inbound ? "wait" : "bad";
-    text = inbound ? t("status.rawComing", { raw: rawName(st.type, t) }) : t("status.noCash", { raw: rawName(st.type, t) });
+    text = inbound ? t("status.rawComing", { raw }) : t("status.noRaw", { raw });
+  } else if (p.status === "noCash") {
+    tone = "bad";
+    text = t("status.noCash");
   } else if (p.status === "full") {
     tone = "wait";
     text = t("status.full");
@@ -530,7 +540,7 @@ export function MarketPanel() {
                 <span>
                   {c.emoji} {itemName(c.id, t)} <span className="text-white/40">· {gradeName(c.id, g, t)}</span>
                 </span>
-                <span className="font-bold tabular-nums text-gold">{formatMoney(componentBase(c.id, g) * snap.gm.value[1] * snap.gm.income)}</span>
+                <span className="font-bold tabular-nums text-gold">{formatMoney(componentValue(c.id, g, snap.gm))}</span>
               </div>
             );
           })}
@@ -545,25 +555,22 @@ export function MarketPanel() {
 
 export function DepotPanel() {
   const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
   const { t } = useT();
   const out = state.chain.shipments.filter((sh) => sh.from === DEPOT && !sh.back);
-  const types = [...new Set(plantsOf(state).map(([, b]) => b.type))].filter((ty) => PLANT_BY_ID[ty].item);
   return (
     <div className="space-y-3 pb-2">
       <p className="text-sm text-white/65">{t("depot.desc")}</p>
       <div className="rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.07]">
         <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-white/55">{t("depot.prices")}</div>
         <div className="space-y-1.5">
-          {PLANTS.filter((pl) => pl.item).map((pl) => {
-            const st = Object.values(snap.chain.plants).find((x) => x.type === pl.id);
-            const price = st?.rawPrice ?? (componentBase(pl.item!, 1) * 0.6) / pl.rawPer;
+          {MATERIALS.map((m) => {
+            const used = usedMaterials(state).includes(m.id);
             return (
-              <div key={pl.id} className={cn("flex items-center justify-between text-xs", !types.includes(pl.id) && "opacity-40")}>
+              <div key={m.id} className={cn("flex items-center justify-between text-xs", !used && "opacity-40")}>
                 <span>
-                  {pl.emoji} {rawName(pl.id, t)} <span className="text-white/40">→ {t(`structure.${pl.id}`)}</span>
+                  {m.emoji} {materialName(m.id, t)}
                 </span>
-                <span className="tabular-nums text-white/80">{t("depot.per", { price: formatMoney(price) })}</span>
+                <span className="tabular-nums text-white/80">{t("depot.per", { price: formatMoney(marketPrice(state, m.id)) })}</span>
               </div>
             );
           })}

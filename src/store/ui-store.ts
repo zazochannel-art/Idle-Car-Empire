@@ -26,6 +26,7 @@ export type View =
   | "missions"
   | "achievements"
   | "stats"
+  | "economy"
   | "prestige"
   | "build"
   | "upgrade"

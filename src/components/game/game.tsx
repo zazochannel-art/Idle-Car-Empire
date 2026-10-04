@@ -33,6 +33,7 @@ import { MissionsView } from "../views/missions-view";
 import { PrestigeView } from "../views/prestige-view";
 import { ResearchView } from "../views/research-view";
 import { StatsView } from "../views/stats-view";
+import { EconomyView } from "../views/economy-view";
 import { Coach } from "./coach";
 import { FeedbackBridge } from "./feedback-bridge";
 import { ServiceWorker } from "./service-worker";
@@ -232,6 +233,8 @@ function ViewSwitch({ view, onSettings }: { view: View; onSettings: () => void }
       return <AchievementsView />;
     case "stats":
       return <StatsView />;
+    case "economy":
+      return <EconomyView />;
     case "prestige":
       return <PrestigeView />;
   }

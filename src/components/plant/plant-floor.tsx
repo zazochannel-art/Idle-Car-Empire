@@ -9,6 +9,7 @@ import { COMPONENT_BY_ID, PLANT_BY_ID } from "@/game/config/chain";
 import { formatDuration, formatNumber } from "@/game/format";
 import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
+import { stockTotal } from "@/game/engine/materials";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { CAR_MODEL_FOR } from "../map/vehicles";
@@ -51,7 +52,7 @@ export function PlantFloor({ plotId }: { plotId: string }) {
       progress: p.progress,
       running: p.status === "ok",
       steps: processSteps(st.type, t),
-      raw: cfg.item ? p.raw / st.rawCap : Math.min(1, Object.values(p.inputs).reduce((a, v) => a + (v ?? 0), 0) / (st.inCap * 6)),
+      raw: cfg.item ? stockTotal(p.stock) / st.rawCap : Math.min(1, Object.values(p.inputs).reduce((a, v) => a + (v ?? 0), 0) / (st.inCap * 6)),
       out: p.out / st.outCap,
       docked: p.out >= 1 ? 1 : 0,
       color: cfg.item ? COMPONENT_BY_ID[cfg.item].color : "#ef4444",
@@ -95,7 +96,7 @@ export function PlantFloor({ plotId }: { plotId: string }) {
       </div>
       <footer className="grid gap-2 border-t border-white/10 bg-ink/90 p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur-xl sm:grid-cols-[1fr_auto]">
         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-          {cfg.item && <StockBar label={t(`raw.${cfg.raw}` as MessageKey)} value={b.plant.raw} cap={st.rawCap} color="#a8a29e" />}
+          {cfg.item && <StockBar label={t(`raw.${cfg.raw}` as MessageKey)} value={stockTotal(b.plant.stock)} cap={st.rawCap} color="#a8a29e" />}
           <StockBar label={`📦 ${itemName(item, t)}`} value={b.plant.out} cap={st.outCap} color="#38bdf8" />
         </div>
         <Button
