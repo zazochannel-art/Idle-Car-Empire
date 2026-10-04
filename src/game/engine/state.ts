@@ -6,6 +6,7 @@ import { START_CASH } from "../config/economy";
 import { createChain } from "./chain";
 import { createCity } from "./city";
 import { createLogistics } from "./logistics";
+import { createRacing } from "./racing";
 import type { CarDesign, CarId, ComponentId, DealerId, DealerState, GameState, ManagerId, ManagerState, Stats } from "../types";
 
 /** v3: the supply-chain economy (older saves start a new company). */
@@ -85,6 +86,7 @@ export function createInitialState(now: number): GameState {
     lifetime: createStats(),
     city: createCity(),
     chain: createChain(),
+    racing: createRacing(),
     pendingOffline: null,
     settings: { buyAmount: 1, lang: "en", lowGraphics: false, sound: true, haptics: true },
     createdAt: now,

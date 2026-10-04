@@ -71,21 +71,26 @@ export const ZONES: ZoneConfig[] = [
 ];
 
 /**
- * The world, block by block (9×9 blocks of 6×6 tiles between roads).
+ * The world, block by block (10×10 blocks of 6×6 tiles between roads).
  * District letters as in ZONES; scenery: w sea, f forest, a farmland,
- * h hills. A river runs down node column RIVER_LINE, crossed by bridges.
+ * h hills; R the Racing District (the paddock block and the circuit, with
+ * no roads between its blocks). A river runs down node column RIVER_LINE,
+ * crossed by bridges.
  */
 export const WORLD_BLOCKS = [
-  "hfTTTIIhh",
-  "fTTTTIIIh",
-  "aaTDDILLh",
-  "aDDDDALLL",
-  "wDDAAAALw",
-  "wwMAASSSw",
-  "wMMMASSSh",
-  "wMMGGGShh",
-  "wwGGGwwww",
+  "hfTTTIIRRR",
+  "fTTTTIIIRR",
+  "aaTDDILLRR",
+  "aDDDDALLLh",
+  "wDDAAAALww",
+  "wwMAASSSww",
+  "wMMMASSShw",
+  "wMMGGGShhw",
+  "wwGGGwwwww",
+  "wwwwwwwwww",
 ];
+/** The Racing District's paddock block (garage, pits, stands) — the rest of its blocks hold the circuit. */
+export const RACING_PADDOCK_BLOCK: [number, number] = [7, 0];
 export const RIVER_LINE = 5;
 
 /** Special lots, as global cell coordinates (two cells per block). */

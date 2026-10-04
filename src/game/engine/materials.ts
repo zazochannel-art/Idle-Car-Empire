@@ -24,8 +24,8 @@ import type { BuildingState, GameState, Ledger, LedgerKey, LedgerValues, Materia
 
 // ───────────────────────────── ledger ─────────────────────────────
 
-export const LEDGER_KEYS: LedgerKey[] = ["carSales", "partSales", "services", "materials", "labor", "energy", "maintenance", "logistics", "dealerFees", "tax"];
-export const REVENUE_KEYS: LedgerKey[] = ["carSales", "partSales", "services"];
+export const LEDGER_KEYS: LedgerKey[] = ["carSales", "partSales", "services", "racing", "materials", "labor", "energy", "maintenance", "logistics", "dealerFees", "tax", "repairs"];
+export const REVENUE_KEYS: LedgerKey[] = ["carSales", "partSales", "services", "racing"];
 export const emptyLedgerValues = (): LedgerValues => Object.fromEntries(LEDGER_KEYS.map((k) => [k, 0])) as LedgerValues;
 export const createLedger = (): Ledger => ({ rate: emptyLedgerValues(), run: emptyLedgerValues(), pending: emptyLedgerValues() });
 
@@ -34,6 +34,11 @@ export function ledgerNet(v: LedgerValues): number {
   let n = 0;
   for (const k of LEDGER_KEYS) n += REVENUE_KEYS.includes(k) ? v[k] : -v[k];
   return n;
+}
+
+/** Net of the production chain alone: garages (services) and racing are counted on their own. */
+export function chainNet(v: LedgerValues): number {
+  return ledgerNet(v) - v.services - v.racing + v.repairs;
 }
 
 /** Books revenue or a cost; the next tick folds it into the rates and run totals. */

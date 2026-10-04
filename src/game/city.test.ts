@@ -25,7 +25,7 @@ function withGarage(cash = 0): GameState {
 
 describe("world layout", () => {
   it("has the market, the depot, industrial lots and the starter works", () => {
-    expect(WORLD).toBe(64);
+    expect(WORLD).toBe(71);
     expect(WORLD_MAP.plotById[MARKET].zone).toBe("town");
     expect(WORLD_MAP.plotById[DEPOT].zone).toBe("town");
     expect(WORLD_MAP.plots.filter((p) => p.big)).toHaveLength(9);

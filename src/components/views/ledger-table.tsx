@@ -13,6 +13,7 @@ export const LEDGER_ICON: Record<LedgerKey, string> = {
   carSales: "🚘",
   partSales: "⚙️",
   services: "🔧",
+  racing: "🏁",
   materials: "📦",
   labor: "👷",
   energy: "⚡",
@@ -20,6 +21,7 @@ export const LEDGER_ICON: Record<LedgerKey, string> = {
   logistics: "🚚",
   dealerFees: "🏪",
   tax: "🏛️",
+  repairs: "🧰",
 };
 
 /** `suffix` is appended to every amount (e.g. "/min"); `scale` converts the values (e.g. ×60 for per-minute rates). */

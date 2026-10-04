@@ -3,6 +3,7 @@ import { chainTick } from "./chain";
 import { cityTick } from "./city";
 import { snapshot, type EconomySnapshot } from "./economy";
 import { book } from "./materials";
+import { racingTick } from "./racing";
 
 /** Adds money to the wallet and to the earnings stats. */
 export function credit(s: GameState, amount: number) {
@@ -31,6 +32,9 @@ export function tick(s: GameState, dt: number, snap?: EconomySnapshot): GameEven
     credit(s, amount);
     book(s, "services", amount);
   });
+
+  const race = racingTick(s, dt);
+  if (race) events.push({ type: "raceFinished", race: race.id });
 
   s.run.playTime += dt;
   s.lifetime.playTime += dt;

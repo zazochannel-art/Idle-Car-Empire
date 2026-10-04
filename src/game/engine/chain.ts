@@ -43,7 +43,7 @@ import {
   spendMaterials,
   createLedger,
   grantMaterials,
-  ledgerNet,
+  chainNet,
   migrateLedger,
   migrateStock,
   orderCost,
@@ -57,7 +57,7 @@ import {
 } from "./materials";
 import { MANAGERS } from "../config/managers";
 import { OFFLINE } from "../config/prestige";
-import { MARKET, plotOf, roadRoute } from "../city/layout";
+import { MARKET, RACING, plotOf, roadRoute } from "../city/layout";
 import type {
   BuildingState,
   CarId,
@@ -647,6 +647,18 @@ export function chainTick(
       }
     }
 
+    // 3a. a car the racing team asked for leaves on its own transporter
+    if (!cfg.item && st.car && p.out >= 1 && s.racing.unlocked && s.racing.orders.includes(st.car.id) && busyTrucks(s, id) < st.trucks) {
+      const value = p.outValue / p.out;
+      payOrOwe(s, TRIP_FEE.carrier);
+      out.spent += TRIP_FEE.carrier;
+      book(s, "logistics", TRIP_FEE.carrier);
+      ship(s, { from: id, to: RACING, item: "car", qty: 1, value, dur: legTime(id, RACING, st.pace, st.load), vehicle: "carrier", models: [st.car.id] });
+      s.racing.orders.splice(s.racing.orders.indexOf(st.car.id), 1);
+      p.out -= 1;
+      p.outValue -= value;
+    }
+
     // 3. loading dock: send a truck when there is a full load (or it waited long enough)
     if (p.out >= 1 && busyTrucks(s, id) < st.trucks) {
       p.wait += dt;
@@ -743,7 +755,7 @@ export function chainTick(
   s.rp += out.rp;
   const k = Math.min(1, dt / RATE_WINDOW);
   // net income: revenue minus every cost (materials count when a plant uses them)
-  const net = ledgerNet(s.chain.ledger.pending) - s.chain.ledger.pending.services; // garage income is counted by the city
+  const net = chainNet(s.chain.ledger.pending); // garages and racing are counted on their own
   s.chain.rate += (net / dt - s.chain.rate) * k;
   s.chain.steady = (s.chain.steady ?? s.chain.rate) + (net / dt - (s.chain.steady ?? s.chain.rate)) * Math.min(1, dt / STEADY_WINDOW);
   settleLedger(s, dt, RATE_WINDOW);
@@ -822,6 +834,11 @@ function arrive(s: GameState, sh: Shipment, snap: ChainSnapshot, earn: (n: numbe
     stock.cars += sh.qty;
     stock.value += sh.value;
     stock.models.push(...(sh.models ?? []));
+    return 0;
+  }
+  if (sh.to === RACING) {
+    // a car for the racing team: the paddock unloads it
+    for (const m of sh.models ?? []) s.racing.arrivals.push(m);
     return 0;
   }
   const p = s.city.buildings[sh.to]?.plant;
