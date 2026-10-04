@@ -6,92 +6,20 @@
 import type * as THREE_NS from "three";
 import type { MaterialKit } from "./car-models";
 import { buildRobot } from "./industrial-models";
-import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { box, cabinet, cyl, fence, H, roll, rollers, std, type Three } from "./interior-kit";
+import { addMachine, addPart, addProp } from "./interior-machines";
+import type { PartKind, PropKind, StationMachine } from "../plant/interior/layout";
 
-type Three = typeof THREE_NS;
-type Mat = THREE_NS.Material;
-
-const H = 1 / 39;
-
-export type StationModel = "sheetRack" | "laserCutter" | "press" | "welder" | "bodyJig" | "qcTunnel" | "bodyRack";
+export type { PartKind, PropKind };
+export type StationModel = StationMachine;
 export type WorkerRole = "worker" | "welder" | "inspector" | "driver" | "supervisor" | "manager";
-export type PartKind = "coil" | "blank" | "panel" | "frame";
-
-function std(T: Three, color: string, metal = 0.3, rough = 0.5) {
-  return new T.MeshStandardMaterial({ color, metalness: metal, roughness: rough });
-}
-
-/** A box with softly rounded edges (machined castings, not cubes); thin parts stay sharp. */
-function box(T: Three, m: Mat, x: number, y: number, z: number, w: number, h: number, d: number) {
-  const r = Math.min(0.03, Math.min(w, h, d) * 0.18);
-  const geo = r > 0.006 ? new RoundedBoxGeometry(w, h, d, 2, r) : new T.BoxGeometry(w, h, d);
-  const b = new T.Mesh(geo, m);
-  b.position.set(x + w / 2, y + h / 2, z + d / 2);
-  return b;
-}
-
-function cyl(T: Three, m: Mat, x: number, y: number, z: number, r: number, h: number, seg = 14) {
-  const c = new T.Mesh(new T.CylinderGeometry(r, r, h, seg), m);
-  c.position.set(x, y + h / 2, z);
-  return c;
-}
-
-/** A lying cylinder along x (a steel coil, a roller). */
-function roll(T: Three, m: Mat, x: number, y: number, z: number, r: number, len: number, alongZ = false) {
-  const c = new T.Mesh(new T.CylinderGeometry(r, r, len, 20), m);
-  c.rotation.z = alongZ ? 0 : Math.PI / 2;
-  if (alongZ) c.rotation.x = Math.PI / 2;
-  c.position.set(x, y + r, z);
-  return c;
-}
-
-/** Safety fence panels along a rectangle's back and sides (open toward the camera). */
-function fence(T: Three, x0: number, x1: number, z0: number, z1: number, h: number, sides: ("back" | "left" | "right" | "front")[]) {
-  const g = new T.Group();
-  const post = std(T, "#f5b301", 0.3, 0.45);
-  const mesh = new T.MeshStandardMaterial({ color: "#3b4250", metalness: 0.6, roughness: 0.45, transparent: true, opacity: 0.5 });
-  const run = (ax: number, az: number, bx: number, bz: number) => {
-    const len = Math.hypot(bx - ax, bz - az);
-    const n = Math.max(1, Math.round(len / 0.5));
-    for (let i = 0; i <= n; i++) g.add(box(T, post, ax + ((bx - ax) * i) / n - 0.015, 0, az + ((bz - az) * i) / n - 0.015, 0.03, h, 0.03));
-    const p = new T.Mesh(new T.BoxGeometry(Math.max(0.01, Math.abs(bx - ax)), h * 0.8, Math.max(0.01, Math.abs(bz - az))), mesh);
-    p.position.set((ax + bx) / 2, h * 0.45, (az + bz) / 2);
-    g.add(p);
-  };
-  if (sides.includes("back")) run(x0, z0, x1, z0);
-  if (sides.includes("left")) run(x0, z0, x0, z1);
-  if (sides.includes("right")) run(x1, z0, x1, z1);
-  if (sides.includes("front")) run(x0, z1, x1, z1);
-  return g;
-}
-
-/** A control cabinet with a screen and a status light. */
-function cabinet(T: Three, kit: MaterialKit, x: number, z: number, light: string) {
-  const g = new T.Group();
-  g.add(box(T, std(T, "#d5dae1", 0.3, 0.4), x, 0, z, 0.22, 9 * H, 0.14));
-  g.add(box(T, kit.glass, x + 0.03, 4 * H, z + 0.071, 0.14, 3 * H, 0.004));
-  const lamp = new T.MeshStandardMaterial({ color: light, emissive: light, emissiveIntensity: 1.2 });
-  g.add(cyl(T, lamp, x + 0.11, 9 * H, z + 0.07, 0.018, 3 * H, 8));
-  return g;
-}
-
-/** Roller conveyor section (part of a station, under the stopping point). */
-function rollers(T: Three, x0: number, x1: number, y: number) {
-  const g = new T.Group();
-  const frame = std(T, "#5b6470", 0.6, 0.4);
-  const r = std(T, "#a5adb8", 0.9, 0.25);
-  g.add(box(T, frame, x0, 0, -0.32, x1 - x0, y, 0.05));
-  g.add(box(T, frame, x0, 0, 0.27, x1 - x0, y, 0.05));
-  for (let x = x0 + 0.06; x < x1; x += 0.12) g.add(roll(T, r, x, y - 0.03, 0, 0.025, 0.56, true));
-  return g;
-}
 
 /**
  * One station of the line. `pose` animates the moving parts (press ram,
  * laser head, clamps); `part` picks what stands behind the belt ("back") or
  * in front of it ("front"), so the unit on the belt can pass through.
  */
-export function buildStation(T: Three, kit: MaterialKit, model: StationModel, pose: number, accent: string, robots: boolean, part: "back" | "front"): THREE_NS.Group {
+export function buildStation(T: Three, kit: MaterialKit, model: StationModel, pose: number, accent: string, robots: boolean, part: "back" | "front", variant = "", color = "#94a3b8"): THREE_NS.Group {
   const all = new T.Group();
   const steel = std(T, "#8f98a3", 0.75, 0.3);
   const grey = std(T, "#4b5563", 0.4, 0.5);
@@ -212,7 +140,9 @@ export function buildStation(T: Three, kit: MaterialKit, model: StationModel, po
         all.add(box(T, frameM, -0.8, 0, z, 1.6, 30 * H, 0.06));
         for (let i = 0; i < 5; i++) all.add(box(T, lamp, -0.7, 5 * H + i * 5 * H, z + (z < 0 ? 0.06 : -0.01), 1.4, 1 * H, 0.01));
       }
-      all.add(box(T, frameM, -0.8, 30 * H, -0.6, 1.6, 2.5 * H, 1.21));
+      // a light-grey canopy with the lamp bars on its underside
+      all.add(box(T, std(T, "#c3cad3", 0.5, 0.4), -0.8, 30 * H, -0.6, 1.6, 2.5 * H, 1.21));
+      all.add(box(T, acc, -0.8, 32.5 * H, -0.6, 1.6, 0.6 * H, 1.21));
       for (let i = 0; i < 4; i++) all.add(box(T, lamp, -0.7, 29.5 * H, -0.45 + i * 0.3, 1.4, 0.6 * H, 0.05));
       // desk with screens behind the tunnel
       all.add(box(T, white, 1.0, 0, -0.75, 0.45, 5 * H, 0.3));
@@ -230,6 +160,8 @@ export function buildStation(T: Three, kit: MaterialKit, model: StationModel, po
       all.add(box(T, yellow, -1.5, 0, 0.55, 3, 0.2 * H, 0.05));
       break;
     }
+    default:
+      addMachine(T, kit, all, model, variant, pose, accent, color, robots);
   }
   // keep only what stands behind (or in front of) the belt
   const out = new T.Group();
@@ -357,7 +289,7 @@ export function buildAGV(T: Three, yaw: number, loaded: boolean, cargo: string):
 }
 
 /** What rides the belt before it is a car body: a steel coil, a cut blank, a pressed panel, a welded underbody. */
-export function buildPart(T: Three, kind: PartKind): THREE_NS.Group {
+export function buildPart(T: Three, kind: PartKind, color = "#94a3b8"): THREE_NS.Group {
   const g = new T.Group();
   const steel = std(T, "#aeb6c1", 0.85, 0.3);
   const bright = std(T, "#cfd6de", 0.9, 0.2);
@@ -390,15 +322,16 @@ export function buildPart(T: Three, kind: PartKind): THREE_NS.Group {
       for (const x of [-0.18, 0.12]) for (const z of [-0.14, 0.12]) g.add(box(T, steel, x, 0.06, z, 0.03, 0.08, 0.03)); // pillar stubs
       break;
     }
+    default:
+      addPart(T, g, kind, color);
   }
   g.traverse((o) => ((o as THREE_NS.Mesh).isMesh ? (o.castShadow = true) : null));
   return g;
 }
 
-export type PropKind = "sheetPallet" | "partsCage" | "dieBlock" | "toolCabinet" | "binRack";
 
 /** Floor clutter that makes a hall look worked in: pallets, cages, dies, cabinets, bins. Origin: floor centre. */
-export function buildProp(T: Three, kind: PropKind, accent: string): THREE_NS.Group {
+export function buildProp(T: Three, kind: PropKind, accent: string, color = "#94a3b8"): THREE_NS.Group {
   const g = new T.Group();
   const wood = std(T, "#a16207", 0, 0.8);
   const steel = std(T, "#aeb6c1", 0.85, 0.3);
@@ -436,6 +369,8 @@ export function buildProp(T: Three, kind: PropKind, accent: string): THREE_NS.Gr
       for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) g.add(box(T, std(T, cols[(r + c) % 3], 0.1, 0.6), -0.26 + c * 0.17, 1 * H + r * 5 * H, -0.1, 0.15, 3 * H, 0.2));
       break;
     }
+    default:
+      addProp(T, g, kind, color);
   }
   g.traverse((o) => {
     const m = o as THREE_NS.Mesh;

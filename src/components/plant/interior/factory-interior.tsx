@@ -17,10 +17,10 @@ import { useUi } from "@/store/ui-store";
 import { CAR_MODEL_FOR } from "../../map/vehicles";
 import { gradeName, itemName, plantName } from "../../panels/plant-panel";
 import { InteriorEngine, type StationPick } from "./interior-engine";
-import { BODY_STATIONS, interiorLayout, type StationId } from "./layout";
+import { interiorLayout, RECIPES, recipeFor, type StationId } from "./layout";
 
-/** Plants that already have a walk-in interior (the others keep the factory floor view). */
-export const HAS_INTERIOR = new Set(["bodyWorks"]);
+/** Plants with a walk-in interior (every plant with a recipe; others keep the factory floor view). */
+export const HAS_INTERIOR = new Set(Object.keys(RECIPES));
 
 /**
  * Inside a plant: the halls and lines live, with the money, income and
@@ -70,13 +70,15 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [openFloor]);
 
-  const labels = useMemo(() => Object.fromEntries(BODY_STATIONS.map((d) => [d.id, t(`interior.station.${d.id}` as MessageKey)])) as Record<StationId, string>, [t]);
+  const type = st?.type ?? "bodyWorks";
+  const labels = useMemo(() => Object.fromEntries(recipeFor(type).map((d) => [d.id, t(`interior.station.${d.id}` as MessageKey)])) as Record<StationId, string>, [t, type]);
 
   useEffect(() => {
     if (!p || !st || !b) return;
     const cfg = PLANT_BY_ID[st.type];
     const inbound = state.chain.shipments.some((sh) => sh.to === plotId && sh.item === "raw" && !sh.back);
     engineRef.current?.setScene({
+      type: st.type,
       spec: { level: b.level, automation: p.automation, manager },
       running: p.status === "ok",
       raw: cfg.item ? p.raw / st.rawCap : 0,
@@ -94,7 +96,8 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
   if (!b?.plant || !st || !p) return null;
   const cfg = PLANT_BY_ID[st.type];
   const perMin = st.unitsPerSec * 60;
-  const layout = interiorLayout({ level: b.level, automation: p.automation, manager });
+  const layout = interiorLayout({ level: b.level, automation: p.automation, manager }, recipeFor(st.type));
+  const picked = pick ? layout.lines[pick.line]?.stations.find((x) => x.def.id === pick.id) : undefined;
   return (
     <motion.div
       className="fixed inset-0 z-40 bg-[#0b1220]"
@@ -141,7 +144,7 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
                   plotId={plotId}
                   id={pick.id}
                   people={layout.people.filter((h) => h.line === pick.line && h.station === pick.id).length}
-                  robots={layout.robots.filter((r) => r.line === pick.line && r.station === pick.id).length}
+                  robots={layout.robots.filter((r) => r.line === pick.line && r.station === pick.id).length || (picked?.mode === "robot" ? 1 : 0)}
                   onClose={() => {
                     if (engineRef.current) engineRef.current.selected = null;
                     setPick(null);
@@ -198,7 +201,8 @@ function StationCard({ plotId, id, people, robots, onClose }: { plotId: string; 
   if (!b?.plant || !st) return null;
   const p = b.plant;
   const gm = snap.gm;
-  const def = BODY_STATIONS.find((d) => d.id === id)!;
+  const recipe = recipeFor(st.type);
+  const def = recipe.find((d) => d.id === id) ?? recipe[0];
   const cfg = PLANT_BY_ID[st.type];
   const item = cfg.item ?? "body";
   const perMin = st.unitsPerSec * 60;
@@ -232,7 +236,7 @@ function StationCard({ plotId, id, people, robots, onClose }: { plotId: string; 
       break;
     case "level":
       level = t("common.lv", { level: b.level });
-      stat = id === "rawStore" ? [t("interior.stock"), `${formatNumber(Math.floor(p.raw))}/${formatNumber(st.rawCap)}`] : [t("interior.stock"), `${formatNumber(Math.floor(p.out))}/${formatNumber(st.outCap)}`];
+      stat = def === recipe[0] && cfg.item ? [t("interior.stock"), `${formatNumber(Math.floor(p.raw))}/${formatNumber(st.rawCap)}`] : [t("interior.stock"), `${formatNumber(Math.floor(p.out))}/${formatNumber(st.outCap)}`];
       title = b.level < PLANT_LEVELS.length ? t("interior.upgradeLevel", { name: t(`plantLevel.${b.level + 1}` as MessageKey) }) : level;
       cost = levelCost(b, gm);
       buy = () => g.plantLevel(plotId);
