@@ -9,6 +9,7 @@ import { useGame } from "@/store/game-store";
 import { MissionRow } from "../game/goals";
 import { EventCard } from "../game/event-chip";
 import { ContractCard } from "./contract-card";
+import { ClassicsPanel, SeasonCard, ShowCard, VipCard } from "./live-cards";
 import { SectionTitle, ViewHeader } from "./section-title";
 
 function untilMidnight() {
@@ -34,6 +35,18 @@ export function MissionsView() {
       <section className="space-y-2">
         <SectionTitle title={t("contract.title")} subtitle={t("contract.subtitle", { n: state.contracts.done })} />
         <ContractCard />
+      </section>
+
+      <section className="space-y-2">
+        <SectionTitle title={t("vip.title")} subtitle={t("vip.subtitle", { n: state.vip.done })} />
+        <VipCard />
+      </section>
+
+      <section className="space-y-2">
+        <SectionTitle title={t("live.title")} subtitle={t("live.subtitle")} />
+        <ShowCard />
+        <SeasonCard />
+        <ClassicsPanel />
       </section>
 
       <section className="space-y-2">

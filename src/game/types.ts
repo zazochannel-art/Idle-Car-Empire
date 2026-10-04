@@ -202,6 +202,7 @@ export type StructureType =
   | "exportTerminal"
   | "hq"
   | "airport"
+  | "museum"
   | PlantType;
 
 /** Things built inside a garage, on its tile grid. */
@@ -473,6 +474,10 @@ export interface GameState {
   racing: RacingState;
   pendingOffline: OfflineReport | null;
   quality: QualityState;
+  vip: import("./engine/live").VipState;
+  season: import("./engine/live").SeasonState;
+  show: import("./engine/live").ShowState;
+  classics: import("./engine/classics").ClassicsState;
   /** Unlock bonuses already claimed this run ("car:sedan", "plant:engineFactory"). */
   unlocks: string[];
   settings: { buyAmount: BuyAmount; lang: Lang; lowGraphics: boolean; sound: boolean; haptics: boolean };

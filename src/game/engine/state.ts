@@ -7,6 +7,8 @@ import { createChain } from "./chain";
 import { createCity } from "./city";
 import { createLogistics } from "./logistics";
 import { createRacing } from "./racing";
+import { createSeason, createShow, createVip } from "./live";
+import { createClassics } from "./classics";
 import type { CarDesign, CarId, ComponentId, DealerId, DealerState, GameState, ManagerId, ManagerState, Stats } from "../types";
 
 /** v3: the supply-chain economy (older saves start a new company). */
@@ -89,6 +91,10 @@ export function createInitialState(now: number): GameState {
     racing: createRacing(),
     pendingOffline: null,
     unlocks: [],
+    classics: createClassics(),
+    vip: createVip(),
+    season: createSeason(),
+    show: createShow(),
     quality: { rep: 50, defects: 0, recall: null, scandalUntil: 0, recalls: 0 },
     settings: { buyAmount: 1, lang: "en", lowGraphics: false, sound: true, haptics: true },
     createdAt: now,

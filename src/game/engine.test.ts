@@ -16,6 +16,9 @@ import * as R from "./engine/retention";
 import { seasonAt } from "./engine/season";
 import * as U from "./engine/unlocks";
 import * as Mk from "./engine/market";
+import * as Lv from "./engine/live";
+import * as Cl from "./engine/classics";
+import { RACE_EVENTS } from "./config/racing";
 import { TREND_SEC } from "./config/market";
 import { restockLow } from "./engine/insights";
 import * as Ev from "./engine/events";
@@ -32,7 +35,7 @@ import { tick } from "./engine/tick";
 import { formatMoney, formatNumber } from "./format";
 import { decodeSave, encodeSave, migrate } from "./save/serialize";
 import { decodeTransfer, transferCodeIn, transferLink } from "./save/transfer";
-import type { GameEvent, GameState, PlantType } from "./types";
+import type { CarId, GameEvent, GameState, PlantType } from "./types";
 
 // outside every season (seasons add income) and outside market events
 const T0 = Date.UTC(2026, 2, 1, 12);
@@ -323,6 +326,98 @@ describe("market dynamics", () => {
     expect(s.chain.shipments.filter((sh) => sh.item === "car").every((sh) => sh.to === "d:city")).toBe(true);
     expect(migrate(JSON.parse(JSON.stringify(s)), T0).city.buildings[assembly].plant!.carRoute).toBe("city");
     expect(Ch.setCarRoute(s, STARTER_PLOT, "fast")).toBe(false);
+  });
+});
+
+describe("VIP orders, racing season, Auto Show, classics", () => {
+  it("a VIP order counts cars in the client's colour, and pays on delivery", () => {
+    const { s, assembly } = fullChain();
+    s.cash = 1e7;
+    const snap0 = snapshot(s);
+    expect(Lv.vipTick(s, T0, snap0)).toBeNull(); // no car yet
+    s.chain.firstCar = true;
+    expect(Lv.vipTick(s, T0, snap0)).toBeNull(); // the first one waits a while
+    expect(Lv.vipTick(s, T0 + 16 * 60_000, snapshot(s))).toBe("offer");
+    const o = s.vip.offer!;
+    expect(o.pay).toBeGreaterThan(0);
+    expect(Lv.acceptVip(s, T0 + 16 * 60_000)).toBe(true);
+    // wrong colour: doesn't count
+    Lv.vipBuilt(s, o.car, 1, o.premium ? "premium" : "balanced");
+    expect(s.vip.active!.made).toBe(0);
+    s.designs[o.car].color = o.color;
+    Lv.vipBuilt(s, o.car, o.n, "balanced");
+    expect(s.vip.active!.made).toBe(o.premium ? 0 : o.n);
+    Lv.vipBuilt(s, o.car, o.n, "premium");
+    expect(s.vip.active!.made).toBe(o.n);
+    const cash = s.cash;
+    const stars = s.stars;
+    expect(Lv.claimVip(s, T0 + 20 * 60_000)).toBe(true);
+    expect(s.cash).toBeCloseTo(cash + o.pay);
+    expect(s.stars).toBe(stars + o.stars);
+    // a missed deadline fails it
+    s.vip.nextAt = 1;
+    Lv.vipTick(s, T0 + 100 * 60_000, snapshot(s));
+    Lv.acceptVip(s, T0 + 100 * 60_000);
+    expect(Lv.vipTick(s, T0 + 400 * 60_000, snapshot(s))).toBe("failed");
+    expect(migrate(JSON.parse(JSON.stringify(s)), T0).vip.done).toBe(1);
+    void assembly;
+  });
+
+  it("races score season points; a new week pays the table", () => {
+    const s = createInitialState(T0);
+    Lv.seasonTick(s, T0);
+    Lv.addSeasonPoints(s, 0, RACE_EVENTS[0].id);
+    Lv.addSeasonPoints(s, 1, RACE_EVENTS[2].id);
+    expect(s.season.points).toBeCloseTo(10 + 7 * 1.5);
+    // at the start of the week the rivals have nothing yet: the team leads
+    expect(Lv.seasonTable(s, Lv.weekStart(T0))[0].you).toBe(true);
+    s.season.points = 10_000;
+    expect(Lv.seasonTick(s, T0 + 7 * 86_400_000)).toBe(true);
+    expect(s.season.last).toMatchObject({ rank: 0, claimed: false });
+    expect(s.season.points).toBe(0);
+    const stars = s.stars;
+    expect(Lv.claimSeason(s)).toBe(true);
+    expect(s.stars).toBe(stars + 3);
+    expect(Lv.claimSeason(s)).toBe(false);
+  });
+
+  it("the Auto Show opens at the weekend, once", () => {
+    const s = createInitialState(T0);
+    const sat = new Date(2026, 2, 7, 12).getTime(); // a Saturday
+    const mon = new Date(2026, 2, 9, 12).getTime();
+    expect(Lv.showOpen(sat)).toBe(true);
+    expect(Lv.showOpen(mon)).toBe(false);
+    const cars = new Set<CarId>(["city"]);
+    expect(Lv.enterShow(s, "city", mon, cars)).toBe(false);
+    expect(Lv.enterShow(s, "sedan", sat, cars)).toBe(false);
+    expect(Lv.enterShow(s, "city", sat, cars)).toBe(true);
+    expect(s.show.board).toHaveLength(6);
+    expect(Lv.enterShow(s, "city", sat + 86_400_000, cars)).toBe(false); // Sunday: same weekend
+    expect(Lv.claimShow(s)).toBe(true);
+    expect(Lv.claimShow(s)).toBe(false);
+  });
+
+  it("classics are restored in a garage and sell museum tickets", () => {
+    const s = createInitialState(T0);
+    s.cash = 1e7;
+    expect(Cl.classicLock(s, "arrow55")).toBe("garage");
+    const [g, m] = freePlots();
+    expect(C.buildStructure(s, g, "garage")).toBe(true);
+    expect(Cl.restoreClassic(s, "arrow55", T0)).toBe(true);
+    expect(Cl.classicLock(s, "riviera63")).toBe("busy");
+    expect(Cl.classicsTick(s, T0 + 60_000)).toBeNull();
+    expect(Cl.classicsTick(s, T0 + 5 * 60_000)).toBe("arrow55");
+    // the museum: base income plus tickets
+    s.city.zones.push("downtown");
+    const plot = WORLD_MAP.plots.find((p) => p.zone === "downtown" && p.kind === "plot" && !p.big)!.id;
+    expect(C.buildStructure(s, plot, "museum")).toBe(true);
+    const inc = snapshot(s).city.structureIncome[plot];
+    s.classics.owned = [];
+    expect(snapshot(s).city.structureIncome[plot]).toBeLessThan(inc);
+    // the collection survives an expansion and a save
+    s.classics.owned = ["arrow55"];
+    expect(migrate(JSON.parse(JSON.stringify(s)), T0).classics.owned).toEqual(["arrow55"]);
+    void m;
   });
 });
 

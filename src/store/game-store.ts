@@ -36,6 +36,8 @@ import { applyLanguage, detectLanguage, translate, type MessageKey, type Vars } 
 import { contentFor } from "@/i18n/content";
 import { uiEvents } from "./events";
 import * as Mk from "@/game/engine/market";
+import * as Lv from "@/game/engine/live";
+import * as Cl from "@/game/engine/classics";
 import { HOT_CLASS, RECALL } from "@/game/config/market";
 import { claimUnlock, openPlantTypes } from "@/game/engine/unlocks";
 import { restockLow } from "@/game/engine/insights";
@@ -98,6 +100,13 @@ interface GameStore {
   dismissTip: (id: string) => void;
   claimLogin: () => void;
   acceptContract: () => void;
+  acceptVip: () => void;
+  declineVip: () => void;
+  claimVip: () => void;
+  enterShow: (car: CarId) => void;
+  claimShow: () => void;
+  claimSeason: () => void;
+  restoreClassic: (id: string) => void;
   declineContract: () => void;
   claimContract: () => void;
   collectOffline: () => void;
@@ -218,6 +227,13 @@ export const useGame = create<GameStore>((set, get) => {
         }
       }
     }
+    const vip = Lv.vipTick(next, now, snap);
+    if (vip === "offer") uiEvents.emit({ type: "toast", tone: "gold", icon: "💎", title: tr("vip.offerToast"), body: tr(`vip.client.${next.vip.offer!.client}` as MessageKey) });
+    else if (vip === "failed") uiEvents.emit({ type: "toast", tone: "warn", icon: "⌛", title: tr("vip.failed") });
+    if (Lv.seasonTick(next, now) && next.season.last && !next.season.last.claimed)
+      uiEvents.emit({ type: "toast", tone: "gold", icon: "🏆", title: tr("season.over", { rank: next.season.last.rank + 1 }) });
+    const restored = Cl.classicsTick(next, now);
+    if (restored) uiEvents.emit({ type: "toast", tone: "gold", icon: "🏛️", title: tr("classics.done", { name: tr(`classic.${restored}` as MessageKey) }), body: tr("classics.doneBody") });
     const trend = Mk.trendOf(next);
     if (trend.hot && trend.block !== Mk.trendOf(state).block) {
       uiEvents.emit({ type: "toast", tone: "info", icon: "📰", title: tr("news.toast"), body: tr("news.hot", { cls: tr(`class.${trend.hot}` as MessageKey), price: formatPercent(HOT_CLASS.price), demand: formatPercent(HOT_CLASS.demand - 1) }) });
@@ -400,6 +416,30 @@ export const useGame = create<GameStore>((set, get) => {
     setSpecialization: (plot, spec) => act((s) => C.setSpecialization(s, plot, spec)),
     claimDaily: (id) => {
       act((s) => claimDaily(s, id));
+    },
+    acceptVip: () => {
+      act((s) => Lv.acceptVip(s, Date.now()));
+    },
+    declineVip: () => {
+      act((s) => Lv.declineVip(s, Date.now()));
+    },
+    claimVip: () => {
+      if (act((s) => Lv.claimVip(s, Date.now()))) uiEvents.emit({ type: "toast", tone: "gold", icon: "💎", title: tr("vip.paid"), body: tr("vip.paidBody") });
+    },
+    enterShow: (car) => {
+      if (act((s) => Lv.enterShow(s, car, Date.now(), unlockedCarIds(s, get().snap.gm)))) {
+        const rank = get().state.show.rank;
+        uiEvents.emit({ type: "toast", tone: rank === 0 ? "gold" : "info", icon: rank === 0 ? "🏆" : "🎪", title: tr("show.result", { rank: rank + 1 }) });
+      }
+    },
+    claimShow: () => {
+      act((s) => Lv.claimShow(s));
+    },
+    claimSeason: () => {
+      if (act((s) => Lv.claimSeason(s))) uiEvents.emit({ type: "toast", tone: "gold", icon: "🏆", title: tr("season.claimed") });
+    },
+    restoreClassic: (id) => {
+      if (act((s) => Cl.restoreClassic(s, id, Date.now()))) uiEvents.emit({ type: "toast", tone: "info", icon: "🔧", title: tr("classics.started", { name: tr(`classic.${id}` as MessageKey) }) });
     },
     acceptContract: () => {
       act((s) => K.acceptContract(s, Date.now()));
