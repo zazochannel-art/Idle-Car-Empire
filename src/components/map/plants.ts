@@ -108,6 +108,17 @@ function signature(p: Painter, type: PlantType, X: number, Y: number, W: number,
         p.onLeft(X + W - 0.9, Y + 0.6 + i * 0.5, 0, 0.25, 0.45, 5, 10, "#365314");
       }
       break;
+    case "transmissionFactory":
+      for (let i = 0; i < 3; i++) p.box(X + W - 0.8, Y + 0.2 + i * 0.3, 0.5, 0.22, 0, 4, "#64748b", "#94a3b8");
+      cyl(p, X + 0.4, Y + 0.4, 0, 4, h + 16, "#475569");
+      break;
+    case "wheelFactory":
+      for (let i = 0; i < 3; i++) for (let k = 0; k < 3; k++) cyl(p, X + W - 0.4 - i * 0.22, Y + 0.45, k * 2, 5, 2, "#e2e8f0");
+      break;
+    case "brakeFactory":
+      for (let i = 0; i < 3; i++) cyl(p, X + W - 0.4 - i * 0.25, Y + 0.4, 0, 5, 3, i === 1 ? "#dc2626" : "#9ca3af");
+      if (active) p.light(sx(X + 0.4, Y + 0.4), sy(X + 0.4, Y + 0.4, h + 10), 18, "#fb923c", 0.7);
+      break;
     case "assemblyPlant":
       break;
   }

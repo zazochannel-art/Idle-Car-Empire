@@ -12,7 +12,7 @@ import { DEPOT, MARKET, plotOf } from "@/game/city/layout";
 import { MATERIALS } from "@/game/config/economy";
 import { marketPrice, usedMaterials } from "@/game/engine/materials";
 import { REGIONS } from "@/game/config/regions";
-import { AUTO_UPGRADE_FROM, plantNetValue, plantProfitPerMin, plantUnitCost, automationCost, bestGrade, carLock, carValue, componentValue, dealerStats, trucksOf, gradeCost, levelCost, plantNumber, plantsOf, recipe, speedCost, supplied, supplierPrice } from "@/game/engine/chain";
+import { AUTO_UPGRADE_FROM, plantNetValue, plantProfitPerMin, plantUnitCost, automationCost, bestGrade, carLock, carValue, componentValue, dealerStats, trucksOf, gradeCost, levelCost, plantNumber, plantsOf, recipe, speedCost, supplied, suppliedGrade, supplierPrice } from "@/game/engine/chain";
 import { isManagerUnlocked } from "@/game/engine/actions";
 import { dealerUpgradeCost, managerUpgradeCost } from "@/game/engine/economy";
 import { dealerRequirement } from "@/game/engine/insights";
@@ -157,7 +157,7 @@ export function PlantPanel({ id }: { id: string }) {
             .filter((c) => supplied(state, c))
             .map((c) => (
               <p key={c} className="mt-2 rounded-lg bg-sky-400/10 px-2 py-1.5 text-[11px] text-sky-200 ring-1 ring-sky-400/25">
-                🚚 {t("supplier.note", { item: itemName(c, t), price: formatMoney(supplierPrice(c)), plant: t(`structure.${PLANT_BY_ID[MAKER[c]].id}` as MessageKey) })}
+                🚚 {t("supplier.note", { item: itemName(c, t), price: formatMoney(supplierPrice(c, suppliedGrade(c, st.car!))), plant: t(`structure.${PLANT_BY_ID[MAKER[c]].id}` as MessageKey) })}
               </p>
             ))}
       </div>

@@ -7,7 +7,7 @@
 import { addSeasonPoints } from "./live";
 import { CAR_BY_ID, CARS, type CarConfig } from "../config/cars";
 import { MAKER } from "../config/chain";
-import {
+import { DRIVETRAIN_GRADE,
   AUTO_REPAIR_BELOW,
   BASE_WEIGHT,
   BODY_DYNAMICS,
@@ -277,10 +277,13 @@ export function statsOf(car: CarId, grades: Partial<Record<ComponentId, number>>
   const dyn = BODY_DYNAMICS[car];
   const aero = clamp(dyn.aero + design.design / 10 + all("aero"));
   const speed = clamp(100 * (1 - Math.exp((-hp * (0.85 + aero / 330)) / STAT_CURVE.speedHp)));
-  const accel = clamp(100 * (1 - Math.exp(-(hp / (weight / 1000)) / STAT_CURVE.accelPtw)) + all("accel"));
+  // the gearbox puts the power down: each transmission grade shaves the launch
+  const accel = clamp(100 * (1 - Math.exp(-(hp / (weight / 1000)) / STAT_CURVE.accelPtw)) + all("accel") + DRIVETRAIN_GRADE.transmission * Math.max(0, g("transmission") - 1));
   const heavy = weight - STAT_CURVE.weightRef;
-  const handling = clamp(dyn.handling + TIRE_GRADE_GRIP * (g("tires") - 1) + SUSPENSION_GRADE_GRIP * Math.max(0, g("suspension") - 1) + all("handling") - heavy * STAT_CURVE.handlingPerKg);
-  const braking = clamp(40 + 3 * (g("tires") - 1) + 2 * Math.max(0, g("suspension") - 1) + all("braking") - heavy * STAT_CURVE.brakingPerKg);
+  const handling = clamp(
+    dyn.handling + TIRE_GRADE_GRIP * (g("tires") - 1) + SUSPENSION_GRADE_GRIP * Math.max(0, g("suspension") - 1) + DRIVETRAIN_GRADE.wheels * Math.max(0, g("wheels") - 1) + all("handling") - heavy * STAT_CURVE.handlingPerKg,
+  );
+  const braking = clamp(40 + 3 * (g("tires") - 1) + 2 * Math.max(0, g("suspension") - 1) + DRIVETRAIN_GRADE.brakes * Math.max(0, g("brakes") - 1) + all("braking") - heavy * STAT_CURVE.brakingPerKg);
   const reliability = clamp(design.quality * 0.8 + 12 + all("reliability"));
   const cond = wear ? WEAR_PARTS.reduce((a, p) => a + wear[p], 0) / WEAR_PARTS.length : 1;
   const k = WEAR_FLOOR + (1 - WEAR_FLOOR) * cond;

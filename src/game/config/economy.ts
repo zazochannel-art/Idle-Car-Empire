@@ -47,6 +47,9 @@ export const COMPONENT_RECIPE: Record<ComponentId, Partial<Record<MaterialId, nu
   paint: { paint: 5, fluids: 2 },
   electronics: { electronics: 10, copper: 4, plastic: 3 },
   battery: { battery: 20, copper: 6, aluminum: 5 },
+  transmission: { steel: 14, aluminum: 8, fluids: 3 },
+  wheels: { aluminum: 16, steel: 3 },
+  brakes: { steel: 10, copper: 2, plastic: 2 },
 };
 
 /** Material per unit grows with the component grade (Standard … Carbon). */
@@ -63,6 +66,9 @@ export const COMPONENT_TIME: Record<ComponentId, number> = {
   paint: 25,
   electronics: 35,
   battery: 60,
+  transmission: 45,
+  wheels: 30,
+  brakes: 30,
 };
 
 /** Prices drift a little, slowly and predictably (no wild swings): ±amp over a period of minutes. */
