@@ -46,7 +46,7 @@ async function main() {
         tryBuild(`car ${model} st${st}`, () => cars.buildCar(T, kit, { model, color: "#c0392b", finish: "metallic", steer: 0.3, spin, stage: { station: st } }));
         for (const g of [1, 3, 5])
           tryBuild(`car ${model} st${st} build${g}`, () =>
-            cars.buildCar(T, kit, { model, color: "#c0392b", spin, stage: { station: st }, build: { color: "#1b46b8", rims: g === 5 ? "black" : "chrome", rimScale: 1 + 0.04 * (g - 1), engine: g, brakes: g } }),
+            cars.buildCar(T, kit, { model, color: "#c0392b", spin, stage: { station: st }, build: { color: "#1b46b8", rims: g === 5 ? "black" : "chrome", rimScale: 1 + 0.04 * (g - 1), engine: g, brakes: g, aero: g >= 3, carbon: g >= 4 } }),
           );
       }
   for (const kind of ["van", "truck", "semi", "trailer"] as const)

@@ -10,7 +10,7 @@ import type { TechId } from "../config/tech";
 import type { CarId, ComponentId, GameState, RaceCarState } from "../types";
 import { carStdCost, assemblyTime } from "./costs";
 import { bestGrade, recipe, supplied, suppliedGrade } from "./chain";
-import { carStats, rating, statsOf, type RaceStats } from "./racing";
+import { carStats, carTech, rating, statsOf, type RaceStats } from "./racing";
 
 /** Names of the parts by grade (1–5). */
 const TIER = ["Standard", "Tuned", "Sport", "Performance", "Racing"] as const;
@@ -236,12 +236,14 @@ export interface BuildLookData {
   rimScale: number;
   engine: number;
   brakes: number;
+  aero: boolean;
+  carbon: boolean;
 }
 
 const RIM_STYLES = ["silver", "silver", "dark", "chrome"] as const;
 
 /** From the grades of a car's parts and its Design studio options. */
-export function buildLookFrom(grades: Partial<Record<ComponentId, number>>, design: { rims?: number; color?: string } | undefined): BuildLookData {
+export function buildLookFrom(grades: Partial<Record<ComponentId, number>>, design: { rims?: number; color?: string } | undefined, tech: readonly TechId[] = []): BuildLookData {
   const rimsLvl = design?.rims ?? 0;
   const wheels = Math.max(1, grades.wheels ?? 1);
   return {
@@ -250,6 +252,8 @@ export function buildLookFrom(grades: Partial<Record<ComponentId, number>>, desi
     rimScale: 1 + 0.04 * (wheels - 1) + 0.02 * rimsLvl,
     engine: Math.max(1, grades.engine ?? 1),
     brakes: Math.max(1, grades.brakes ?? 1),
+    aero: tech.includes("wind_tunnel"),
+    carbon: tech.includes("carbon_body"),
   };
 }
 
@@ -258,5 +262,8 @@ export function lineBuildLook(s: GameState, car: CarId): BuildLookData {
   const cfg = CAR_BY_ID[car];
   const grades: Partial<Record<ComponentId, number>> = {};
   for (const c of recipe(cfg)) grades[c] = supplied(s, c) ? suppliedGrade(c, cfg) : Math.max(1, bestGrade(s, c));
-  return buildLookFrom(grades, s.designs[car]);
+  return buildLookFrom(grades, s.designs[car], carTech(s));
 }
+
+/** How a car of the collection looks: the parts it was built with, its rims and its R&D tech. */
+export const carLook = (s: GameState, rc: RaceCarState): BuildLookData => buildLookFrom(rc.grades, { rims: s.designs[rc.car]?.rims }, rc.tech);

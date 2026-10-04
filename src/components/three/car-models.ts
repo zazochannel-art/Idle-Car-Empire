@@ -114,6 +114,9 @@ export interface BuildLook {
   engine?: number;
   /** Brake Factory grade 1–5: performance brakes get coloured calipers. */
   brakes?: number;
+  /** R&D: wind-tunnel aero (a bigger wing) and carbon body panels (a carbon bonnet). */
+  aero?: boolean;
+  carbon?: boolean;
 }
 
 // ───────────────────────────── materials ─────────────────────────────
@@ -425,7 +428,9 @@ export function buildCar(T: Three, kit: MaterialKit, look: CarLook): THREE_NS.Gr
   const x = (u: number) => L / 2 - u * L; // u = 0 nose … 1 tail
   const fu = sp.fa;
   const ru = sp.fa + sp.wb / L;
-  const sporty = !!sp.spoiler || !!sp.intakes || sp.rims === "black" || sp.rims === "dark";
+  // wind-tunnel development puts a bigger wing on the car
+  const spoiler = bl.aero ? (sp.spoiler === "wing" || sp.spoiler === "big" ? "big" : "wing") : sp.spoiler;
+  const sporty = !!spoiler || !!sp.intakes || sp.rims === "black" || sp.rims === "dark";
 
   // body top line: nose → hood → windshield base → deck → tail
   const top = curve([
@@ -724,9 +729,16 @@ export function buildCar(T: Three, kit: MaterialKit, look: CarLook): THREE_NS.Gr
         car.add(ex);
       }
     // spoilers
-    if (sp.spoiler === "lip") car.add(box(T, 0.18, 0.035, W * 0.8, body, x(0.965), sp.tail + 0.06, 0));
-    if (sp.spoiler === "wing" || sp.spoiler === "big") {
-      const big = sp.spoiler === "big";
+    if (bl.carbon && painted) {
+      // carbon body panels: a bare-carbon bonnet
+      const carbon = kit.paint("#1b1d22", "gloss");
+      const hood = box(T, sp.ws * L * 0.78, 0.014, W * 0.62, carbon, x(sp.ws * 0.52), top(sp.ws * 0.52) + 0.012, 0);
+      hood.rotation.z = Math.atan2(sp.hood - sp.nose, sp.ws * L) * 0.7;
+      car.add(hood);
+    }
+    if (spoiler === "lip") car.add(box(T, 0.18, 0.035, W * 0.8, body, x(0.965), sp.tail + 0.06, 0));
+    if (spoiler === "wing" || spoiler === "big") {
+      const big = spoiler === "big";
       const wy = sp.tail + (big ? 0.34 : 0.24);
       const wingM = big ? kit.trim : body;
       const wing = box(T, big ? 0.36 : 0.28, 0.035, W * (big ? 0.98 : 0.86), wingM, x(0.955), wy, 0);

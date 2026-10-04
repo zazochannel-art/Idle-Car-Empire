@@ -348,7 +348,7 @@ export function drawCarSprite(p: Painter, x: number, y: number, yaw: number, mod
   const shadow = !opts.noShadow;
   const paint = opts.paint ? color : liveryOf(model).color;
   const b = opts.build;
-  const bkey = b ? `${b.color ?? ""}:${b.rims ?? ""}:${b.rimScale ?? 1}:${b.engine ?? 1}:${b.brakes ?? 1}` : "";
+  const bkey = b ? `${b.color ?? ""}:${b.rims ?? ""}:${b.rimScale ?? 1}:${b.engine ?? 1}:${b.brakes ?? 1}:${b.aero ? "a" : ""}${b.carbon ? "c" : ""}` : "";
   const keyOf = (yi: number) => `car|${model}|${paint}|${yi}|${steer}|${phase}|${stage}|${bkey}`;
   const spr = yawSprite(
     keyOf,

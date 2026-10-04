@@ -5,7 +5,8 @@
 // on the podium for a while.
 import { CAR_BY_ID } from "@/game/config/cars";
 import { RACE_COUNTDOWN } from "@/game/config/racing";
-import { liveryOf, raceDuration } from "@/game/engine/racing";
+import { atTrack, liveryOf, raceCar, raceDuration } from "@/game/engine/racing";
+import { carLook as lookOf } from "@/game/engine/car-dna";
 import { distanceAt, pointAt, raceState, type CarOnTrack } from "@/game/racing/tracks";
 import type { GameState, RaceRecord } from "@/game/types";
 import { pitBox } from "../racing/track-paint";
@@ -36,6 +37,8 @@ export interface RaceCarView {
   steer: number;
   alpha: number;
   odo: number;
+  /** The player's car as it was built (rims, brakes, wing, carbon...). */
+  build?: import("../three/car-models").BuildLook;
 }
 
 /**
@@ -112,7 +115,7 @@ export class RaceReplay {
 export function drawRaceCar(p: Painter, v: RaceCarView, ox: number, oy: number, scale = 1) {
   const c = p.ctx;
   if (v.alpha < 1) c.globalAlpha = Math.max(0, v.alpha);
-  drawModel(p, v.x + ox, v.y + oy, 0, v.model, v.color, scale, { yaw: v.yaw, brake: v.braking, steer: v.steer, odo: v.odo, paint: true, lights: p.night > 0.35 });
+  drawModel(p, v.x + ox, v.y + oy, 0, v.model, v.color, scale, { yaw: v.yaw, brake: v.braking, steer: v.steer, odo: v.odo, paint: true, lights: p.night > 0.35, build: v.build });
   c.globalAlpha = 1;
 }
 
@@ -138,7 +141,9 @@ export class RaceLayer {
     if (R.live) {
       if (this.replay?.rec.id !== R.live.id) this.replay = new RaceReplay(R.live);
       const { views } = this.replay.frame(clock - R.live.startT);
-      views.forEach(push);
+      const mine = raceCar(s, R.live.car);
+      const build = mine ? lookOf(s, mine) : undefined;
+      views.forEach((v) => push(v.id === "player" ? { ...v, build } : v));
       return out;
     }
     // the podium after a race
@@ -161,11 +166,12 @@ export class RaceLayer {
       return out;
     }
     // practice: the team's cars lapping on their own
-    R.cars.slice(0, 3).forEach((rc, i) => {
+    // (only the cars at the paddock: the others are at the factory, in a showroom or on a transporter)
+    R.cars.filter(atTrack).slice(0, 3).forEach((rc, i) => {
       const look = liveryOf(s, rc);
       const sp = distanceAt(HOME, ((t * 0.55 + i * 23) % HOME.lapT) + HOME.lapT * 3) - HOME.length * 3;
       const q = pointAt(HOME, sp, i * 0.12 - 0.12);
-      push({ id: `p${rc.id}`, x: q.x, y: q.y, yaw: q.yaw, model: CAR_MODEL_FOR[rc.car], color: look.color || CAR_BY_ID[rc.car].color, braking: false, steer: Math.abs(q.k) > 0.25 ? -Math.sign(q.k) : 0, alpha: 1, odo: sp });
+      push({ id: `p${rc.id}`, x: q.x, y: q.y, yaw: q.yaw, model: CAR_MODEL_FOR[rc.car], color: look.color || CAR_BY_ID[rc.car].color, braking: false, steer: Math.abs(q.k) > 0.25 ? -Math.sign(q.k) : 0, alpha: 1, odo: sp, build: lookOf(s, rc) });
     });
     return out;
   }
