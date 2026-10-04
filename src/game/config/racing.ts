@@ -254,8 +254,10 @@ export const SPECIAL_EVENTS: SpecialEventConfig[] = [
 
 // ───────────────────────────── development ─────────────────────────────
 
-export type RaceUpgrade = "engine" | "brakes" | "suspension" | "tires" | "aero" | "weight" | "transmission" | "cooling";
-export const RACE_UPGRADES: RaceUpgrade[] = ["engine", "brakes", "suspension", "tires", "aero", "weight", "transmission", "cooling"];
+export type RaceUpgrade = "engine" | "turbo" | "ecu" | "brakes" | "suspension" | "tires" | "aero" | "weight" | "transmission" | "cooling";
+export const RACE_UPGRADES: RaceUpgrade[] = ["engine", "turbo", "ecu", "brakes", "suspension", "tires", "aero", "weight", "transmission", "cooling"];
+/** The development the event rivals are built with (turbo and ECU tuning are the player's own edge). */
+export const REF_UPGRADES: RaceUpgrade[] = ["engine", "brakes", "suspension", "tires", "aero", "weight", "transmission", "cooling"];
 
 export interface RaceUpgradeConfig {
   id: RaceUpgrade;
@@ -271,9 +273,21 @@ export interface RaceUpgradeConfig {
 /** Each development level costs this many times the previous. */
 export const UPGRADE_GROWTH = 1.9;
 export const MAX_UPGRADE = 5;
+/** Fitting a level in the garage takes this many seconds × the level; the car can't race meanwhile. */
+export const UPGRADE_INSTALL_SEC = 20;
 
+// ───────────────────────────── weather ─────────────────────────────
+
+/** The forecast changes every this many seconds of racing time. */
+export const WEATHER_BLOCK_SEC = 600;
+export const RAIN_CHANCE = 0.3;
+/** In the rain a car loses up to this share of its pace, less the more grip (handling + braking) it has. */
+export const RAIN = { pace: 0.14, rivalGrip: 60, incidents: 1.6 };
 export const RACE_UPGRADE_CONFIG: Record<RaceUpgrade, RaceUpgradeConfig> = {
-  engine: { id: "engine", emoji: "⚙️", cost: 0.6, part: "engine", effect: { hp: 0.09 } },
+  // more power stresses the engine: reliability pays for it (cooling buys it back)
+  engine: { id: "engine", emoji: "⚙️", cost: 0.6, part: "engine", effect: { hp: 0.09, reliability: -1 } },
+  turbo: { id: "turbo", emoji: "🌀", cost: 0.55, part: "engine", effect: { hp: 0.08, accel: 1, reliability: -3 } },
+  ecu: { id: "ecu", emoji: "💾", cost: 0.35, part: "electronics", effect: { hp: 0.03, accel: 2, reliability: -1 } },
   brakes: { id: "brakes", emoji: "🛑", cost: 0.35, part: "tires", effect: { braking: 6 } },
   suspension: { id: "suspension", emoji: "🔩", cost: 0.45, part: "suspension", effect: { handling: 5, braking: 1 } },
   tires: { id: "tires", emoji: "🛞", cost: 0.4, part: "tires", effect: { handling: 4, braking: 3 } },

@@ -32,6 +32,11 @@ import { DRIVETRAIN_GRADE,
   RACE_TIME_SCALE,
   RACE_UPGRADES,
   RACE_UPGRADE_CONFIG,
+  RAIN,
+  RAIN_CHANCE,
+  REF_UPGRADES,
+  UPGRADE_INSTALL_SEC,
+  WEATHER_BLOCK_SEC,
   RACE_WEIGHTS,
   RACING_DISTRICT,
   RATING_SOFTEN,
@@ -325,7 +330,7 @@ export function referenceRating(ev: RaceEventConfig, type: RaceType = ev.type): 
   const grades: Partial<Record<ComponentId, number>> = {};
   for (const c of recipeOf(cfg)) grades[c] = ev.ref.grade;
   const ds = designStats(cfg, { name: "", engine: 0, interior: 0, rims: 0, paint: 0, color: "" }, ev.ref.grade);
-  const ups = Object.fromEntries(RACE_UPGRADES.map((u) => [u, ev.ref.upgrades])) as RaceCarState["upgrades"];
+  const ups = Object.fromEntries(REF_UPGRADES.map((u) => [u, ev.ref.upgrades])) as RaceCarState["upgrades"];
   return rating(statsOf(ev.ref.car, grades, ds, ups), type === "championship" ? "circuit" : type);
 }
 
@@ -369,6 +374,7 @@ export type EventLock =
   | { kind: "class"; classes: RaceClass[] }
   | { kind: "noCar" }
   | { kind: "away" }
+  | { kind: "fitting"; seconds: number }
   | { kind: "busy" }
   | { kind: "championship"; event: string }
   | { kind: "cooldown"; seconds: number }
@@ -390,6 +396,7 @@ export function eventLock(s: GameState, ev: RaceEventConfig, rc: RaceCarState | 
   if (s.racing.rep < ev.minRep) return { kind: "rep", need: ev.minRep };
   if (!rc) return { kind: "noCar" };
   if (!atTrack(rc)) return { kind: "away" };
+  if (rc.install) return { kind: "fitting", seconds: rc.install.left };
   if (!ev.classes.includes(classOf(rc.car))) return { kind: "class", classes: ev.classes };
   if (s.racing.live) return { kind: "busy" };
   // one championship at a time
@@ -403,7 +410,7 @@ export function eventLock(s: GameState, ev: RaceEventConfig, rc: RaceCarState | 
 
 /** The hardest event this car may enter now (what automatic racing picks). */
 export function bestEventFor(s: GameState, rc: RaceCarState): RaceEventConfig | null {
-  if (!atTrack(rc)) return null;
+  if (!atTrack(rc) || rc.install) return null;
   let best: RaceEventConfig | null = null;
   for (const ev of RACE_EVENTS) {
     if (ev.type === "championship") continue;
@@ -509,9 +516,13 @@ export function runRace(s: GameState, setup: RaceSetup, rc: RaceCarState, startT
   const st = carStats(rc);
   const look = liveryOf(s, rc);
   const rivals = rivalsFor(s, setup.event, setup.type, seed);
+  // rain: every car loses pace, the ones with grip (tyres, suspension, brakes) lose less
+  const wet = weatherAt(s, startT).wet;
+  const mine = wet ? wetPace(st) : 1;
+  const theirs = wet ? 1 - RAIN.pace * (1 - RAIN.rivalGrip / 100) : 1;
   const field: Omit<RaceEntrant, "grid" | "laps" | "total">[] = [
-    { id: "player", team: null, driver: "", model: rc.car, color: look.color, accent: look.accent, rating: rating(st, type) },
-    ...rivals.map((x) => ({ id: x.id, team: x.team.id, driver: x.driver, model: x.model, color: x.team.color, accent: x.team.accent, rating: x.rating })),
+    { id: "player", team: null, driver: "", model: rc.car, color: look.color, accent: look.accent, rating: rating(st, type) * mine },
+    ...rivals.map((x) => ({ id: x.id, team: x.team.id, driver: x.driver, model: x.model, color: x.team.color, accent: x.team.accent, rating: x.rating * theirs })),
   ];
   // the grid: the player starts from the back of the field the first time, then by rating (a qualifying run)
   const quali = field.map((e) => ({ e, q: e.rating * (1 + gauss(r) * 0.01) })).sort((a, b) => b.q - a.q);
@@ -522,7 +533,7 @@ export function runRace(s: GameState, setup: RaceSetup, rc: RaceCarState, startT
     for (let l = 0; l < setup.laps; l++) laps.push(base * (1 + gauss(r) * RACE_NOISE.lap) * (l === 0 ? 1.04 : 1));
     // mistakes: rarer the more reliable the car
     const rel = e.id === "player" ? st.reliability : 70 + (e.rating / 10) * 0.2;
-    if (r() < INCIDENT.chance * (1 - rel / 100)) {
+    if (r() < INCIDENT.chance * (1 - rel / 100) * (wet ? RAIN.incidents : 1)) {
       const lap = Math.floor(r() * setup.laps);
       laps[lap] += INCIDENT.minLoss + r() * (INCIDENT.maxLoss - INCIDENT.minLoss);
     }
@@ -530,7 +541,7 @@ export function runRace(s: GameState, setup: RaceSetup, rc: RaceCarState, startT
     return { ...e, grid, laps, total: start + laps.reduce((a, b) => a + b, 0) };
   });
   const order = [...entrants].sort((a, b) => a.total - b.total).map((e) => e.id);
-  return { id, event: setup.event.id, special: setup.special?.id, track: setup.track, type: setup.type, laps: setup.laps, startT, car: rc.id, entrants, order, round: setup.round };
+  return { id, event: setup.event.id, special: setup.special?.id, track: setup.track, type: setup.type, laps: setup.laps, startT, car: rc.id, entrants, order, round: setup.round, ...(wet ? { wet } : {}) };
 }
 
 /** Pays the entry fee and starts the event's pause; returns the fee. */
@@ -547,6 +558,16 @@ function signUp(s: GameState, ev: RaceEventConfig, specialMult = 1): number {
 export function raceDuration(rec: RaceRecord): number {
   return RACE_COUNTDOWN + Math.max(...rec.entrants.map((e) => e.total)) / RACE_TIME_SCALE;
 }
+
+/** Rain or shine at the circuits now (the forecast holds for WEATHER_BLOCK_SEC of racing time). */
+export function weatherAt(s: GameState, clock = s.racing.clock): { wet: boolean; left: number } {
+  const block = Math.floor(Math.max(0, clock) / WEATHER_BLOCK_SEC);
+  const wet = rng((block * 2246822519 + s.createdAt) >>> 0)() < RAIN_CHANCE;
+  return { wet, left: (block + 1) * WEATHER_BLOCK_SEC - Math.max(0, clock) };
+}
+
+/** Grip in the wet: tyres, suspension and brakes keep a car's pace (0–1, share kept). */
+export const wetPace = (st: Pick<RaceStats, "handling" | "braking">) => 1 - RAIN.pace * (1 - (st.handling + st.braking) / 200);
 
 /** Enters the selected car in a race; it starts on the map and in the viewer right away. */
 export function enterRace(s: GameState, eventId: string, specialId?: string, carId = s.racing.selected): RaceRecord | null {
@@ -747,9 +768,25 @@ function takeParts(s: GameState, c: ComponentId, n: number): boolean {
  * Develops a car: costs money and components from the player's own plants
  * (🔧 racing parts won at races can be used instead of the components).
  */
+/** Seconds to fit a development level. */
+export const installTime = (_s: GameState, lvl: number) => UPGRADE_INSTALL_SEC * lvl;
+
+/** The garage works on the cars: a fitted level counts from now on. */
+export function garageTick(s: GameState, dt: number) {
+  for (const rc of s.racing.cars) {
+    const job = rc.install;
+    if (!job) continue;
+    job.left -= dt;
+    if (job.left <= 0) {
+      rc.upgrades[job.u] = Math.min(MAX_UPGRADE, level(rc, job.u) + 1);
+      delete rc.install;
+    }
+  }
+}
+
 export function upgradeRaceCar(s: GameState, id: number, u: RaceUpgrade, useRacingParts = false): boolean {
   const rc = raceCar(s, id);
-  if (!rc || s.racing.live?.car === id || rc.location === "transit") return false;
+  if (!rc || s.racing.live?.car === id || rc.location === "transit" || rc.install) return false;
   const cost = raceUpgradeCost(s, rc, u);
   if (!cost || s.cash < cost.money) return false;
   if (useRacingParts) {
@@ -757,7 +794,9 @@ export function upgradeRaceCar(s: GameState, id: number, u: RaceUpgrade, useRaci
     s.racing.parts -= cost.racingParts;
   } else if (!takeParts(s, cost.part, cost.parts)) return false;
   s.cash -= cost.money;
-  rc.upgrades[u] = level(rc, u) + 1;
+  // the mechanics fit it: the car is in the garage until the level is in
+  const total = installTime(s, level(rc, u) + 1);
+  rc.install = { u, left: total, total };
   s.run.upgradesBought += 1;
   s.lifetime.upgradesBought += 1;
   return true;
@@ -798,7 +837,8 @@ function autoRepair(s: GameState, rc: RaceCarState) {
 
 function autoCar(s: GameState) {
   const sel = raceCar(s, s.racing.selected);
-  return sel && atTrack(sel) ? sel : (s.racing.cars.find(atTrack) ?? sel ?? s.racing.cars[0] ?? null);
+  const ready = (c: RaceCarState) => atTrack(c) && !c.install;
+  return sel && ready(sel) ? sel : (s.racing.cars.find(ready) ?? sel ?? s.racing.cars[0] ?? null);
 }
 
 /**
@@ -807,6 +847,7 @@ function autoCar(s: GameState) {
  */
 export function racingTick(s: GameState, dt: number): RaceRecord | null {
   const R = s.racing;
+  garageTick(s, dt);
   if (!R.unlocked) return null;
   R.clock += dt;
   while (R.arrivals.length) receiveRaceCar(s, R.arrivals.shift()!);
@@ -837,6 +878,7 @@ export function racingTick(s: GameState, dt: number): RaceRecord | null {
 /** Automatic races while away: run and settled at once. */
 export function offlineRacing(s: GameState, seconds: number): OfflineRacing | null {
   const R = s.racing;
+  if (seconds > 0) garageTick(s, seconds);
   if (!R.unlocked || seconds <= 0) return null;
   // a race still running when the player left finishes first
   if (R.live) {
@@ -958,6 +1000,7 @@ export function migrateRacing(raw: unknown): RacingState {
         ...(num(c.bestLap, 0) > 0 ? { bestLap: num(c.bestLap) } : {}),
         history: Array.isArray(c.history) ? c.history.filter(isObj).filter((h) => typeof h.event === "string").map((h) => ({ event: h.event as string, pos: Math.max(0, Math.floor(num(h.pos))) })).slice(-12) : [],
         ...(isObj(c.test) ? { test: c.test as unknown as RaceCarState["test"] } : {}),
+        ...(isObj(c.install) && RACE_UPGRADES.includes(c.install.u as RaceUpgrade) ? { install: { u: c.install.u as RaceUpgrade, left: Math.max(0, num(c.install.left)), total: Math.max(1, num(c.install.total, 1)) } } : {}),
       });
     }
   R.nextCar = Math.max(R.nextCar, ...R.cars.map((c) => c.id + 1));

@@ -24,7 +24,11 @@ import {
   classOf,
   condition,
   atTrack,
+  carStats,
   eventLock,
+  installTime,
+  weatherAt,
+  wetPace,
   expectedHourly,
   garageLevel,
   garageUpgradeCost,
@@ -168,6 +172,7 @@ function Races() {
   return (
     <div className="space-y-2">
       {(!car || !atTrack(car)) && <NoCarHint />}
+      <Forecast />
       {specials.length > 0 && (
         <>
           <div className="px-1 text-[11px] font-bold uppercase tracking-wider text-fuchsia-300/80">✨ {t("racing.specials")}</div>
@@ -190,6 +195,22 @@ function Races() {
 const eventOf = (id: string) => RACE_EVENTS.find((e) => e.id === id)!;
 /** Special events on today (by the device clock). */
 const specialsNow = () => activeSpecials(new Date().getTime());
+
+/** The weather at the circuits: rain takes pace, less from a car with grip. */
+function Forecast() {
+  const state = useGame((g) => g.state);
+  const { t } = useT();
+  const w = weatherAt(state);
+  const car = raceCar(state, state.racing.selected);
+  const label = t(w.wet ? "racing.weather.wet" : "racing.weather.dry");
+  const left = `${Math.floor(w.left / 60)}:${String(Math.floor(w.left % 60)).padStart(2, "0")}`;
+  return (
+    <div className={cn("rounded-2xl p-3 text-[11px] ring-1", w.wet ? "bg-sky-500/10 text-sky-100 ring-sky-400/30" : "bg-white/[0.03] text-white/60 ring-white/[0.07]")}>
+      {t("racing.weather.hint", { w: label, time: left })}
+      {w.wet && car && <div className="mt-1 font-bold">{t("racing.weather.pace", { p: formatPercent(wetPace(carStats(car))) })}</div>}
+    </div>
+  );
+}
 
 function NoCarHint() {
   const state = useGame((g) => g.state);
@@ -479,14 +500,24 @@ function Development() {
   return (
     <div className="space-y-2">
       <StatBars state={state} id={car.id} type="circuit" />
-      <p className="px-1 text-[11px] text-white/50">{t("racing.devHint", { max })}</p>
+      {car.install && (
+        <div className="rounded-2xl bg-amber-500/10 p-3 text-xs text-amber-100 ring-1 ring-amber-400/30">
+          {t("racing.fitting", { u: t(`race.up.${car.install.u}` as MessageKey), time: `${Math.ceil(car.install.left)}s` })}
+          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10">
+            <div className="h-full rounded-full bg-amber-300" style={{ width: `${Math.round((1 - car.install.left / car.install.total) * 100)}%` }} />
+          </div>
+        </div>
+      )}
+      <p className="px-1 text-[11px] text-white/50">
+        {t("racing.devHint", { max })} {t("racing.relCost")}
+      </p>
       {RACE_UPGRADES.map((u) => {
         const cfg = RACE_UPGRADE_CONFIG[u];
         const lvl = car.upgrades[u] ?? 0;
         const cost = raceUpgradeCost(state, car, u);
         const have = cost ? partsInStock(state, cost.part) : 0;
         const effect = Object.entries(cfg.effect)
-          .map(([k, v]) => (k === "hp" ? `+${formatPercent(v)} HP` : k === "weight" ? `${formatPercent(v)} kg` : `+${v} ${t(`race.stat.${k}` as MessageKey)}`))
+          .map(([k, v]) => (k === "hp" ? `+${formatPercent(v)} HP` : k === "weight" ? `${formatPercent(v)} kg` : `${v > 0 ? "+" : ""}${v} ${t(`race.stat.${k}` as MessageKey)}`))
           .join(" · ");
         return (
           <div key={u} className="rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.08]">
@@ -500,11 +531,14 @@ function Development() {
                 ))}
               </div>
             </div>
-            <div className="text-[11px] text-emerald-200/80">{effect} / {t("racing.perLevel")}</div>
+            <div className="text-[11px] text-emerald-200/80">
+              {effect} / {t("racing.perLevel")}
+              {cost && <span className="text-white/40"> · ⏱ {t("racing.installTime", { time: `${installTime(state, lvl + 1)}s` })}</span>}
+            </div>
             {cost ? (
               <div className="mt-2 grid grid-cols-2 gap-1.5">
                 <button
-                  disabled={state.cash < cost.money || have < cost.parts || state.racing.live?.car === car.id}
+                  disabled={state.cash < cost.money || have < cost.parts || state.racing.live?.car === car.id || !!car.install}
                   onClick={() => upgradeRaceCar(car.id, u)}
                   className="rounded-xl bg-gold px-2 py-2 text-[11px] font-black text-black disabled:bg-white/10 disabled:text-white/40"
                 >
@@ -514,7 +548,7 @@ function Development() {
                   </div>
                 </button>
                 <button
-                  disabled={state.cash < cost.money || state.racing.parts < cost.racingParts || state.racing.live?.car === car.id}
+                  disabled={state.cash < cost.money || state.racing.parts < cost.racingParts || state.racing.live?.car === car.id || !!car.install}
                   onClick={() => upgradeRaceCar(car.id, u, true)}
                   className="rounded-xl bg-white/10 px-2 py-2 text-[11px] font-black ring-1 ring-white/15 disabled:opacity-40"
                 >
