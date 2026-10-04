@@ -1,4 +1,6 @@
-import { EVENTS, EVENT_BLOCK_MS, EVENT_LENGTH_MS, EVENT_OFFSET_MS, type MarketEvent } from "../config/events";
+import { CAR_BY_ID } from "../config/cars";
+import { EVENTS, EVENT_BLOCK_MS, EVENT_LENGTH_MS, EVENT_OFFSET_MS, type EventMetric, type MarketEvent } from "../config/events";
+import type { CarId, GameState } from "../types";
 
 export interface EventWindow {
   event: MarketEvent;
@@ -29,7 +31,7 @@ function shuffled(r: number): number[] {
 }
 
 /**
- * Events come in shuffled rounds of all six. A round never opens with the
+ * Events come in shuffled rounds of all of them. A round never opens with the
  * event that closed the previous one (the swap only touches the first two
  * slots, so a round's last event never depends on the round before it).
  */
@@ -61,4 +63,86 @@ export function nextEvent(now: number): EventWindow {
   const block = Math.floor(now / EVENT_BLOCK_MS);
   const w = windowOf(block);
   return now < w.start ? w : windowOf(block + 1);
+}
+
+// ───────────────────────────── objectives ─────────────────────────────
+
+const builtWhere = (s: GameState, ok: (car: CarId) => boolean) =>
+  (Object.entries(s.lifetime.carsByType) as [CarId, number][]).reduce((a, [c, n]) => a + (CAR_BY_ID[c] && ok(c) ? n || 0 : 0), 0);
+
+/** Lifetime counters the objectives are measured on. */
+export function eventMetric(s: GameState, m: EventMetric): number {
+  switch (m) {
+    case "carsBuilt":
+      return builtWhere(s, () => true);
+    case "carsSold":
+      return s.lifetime.carsSold;
+    case "upgrades":
+      return s.lifetime.upgradesBought + s.lifetime.levelsBought;
+    case "premiumBuilt":
+      return builtWhere(s, (c) => CAR_BY_ID[c].tier >= 3);
+    case "research":
+      return s.research.length;
+    case "exported":
+      return s.export?.sold ?? 0;
+    case "raceWins":
+      return s.racing.stats.wins;
+    case "topBuilt":
+      return builtWhere(s, (c) => CAR_BY_ID[c].tier >= 8);
+  }
+}
+
+/** Can the company take part in this objective at all? (No racing objective without a racing team...) */
+export function eventGoalOpen(s: GameState, m: EventMetric): boolean {
+  switch (m) {
+    case "raceWins":
+      return s.racing.unlocked && s.racing.cars.length > 0;
+    case "exported":
+      return (s.export?.open.length ?? 0) > 0;
+    case "premiumBuilt":
+      return builtWhere(s, (c) => CAR_BY_ID[c].tier >= 3) > 0;
+    case "topBuilt":
+      return builtWhere(s, (c) => CAR_BY_ID[c].tier >= 8) > 0;
+    default:
+      return s.chain.firstCar;
+  }
+}
+
+/** Starts counting when a new event begins (call every tick with the clock). */
+export function eventGoalTick(s: GameState, now: number) {
+  const w = activeEvent(now);
+  if (!w || s.eventGoal.start === w.start) return;
+  s.eventGoal = { start: w.start, base: eventMetric(s, w.event.goal.metric), claimed: false };
+}
+
+export interface EventGoalStatus {
+  window: EventWindow;
+  progress: number;
+  target: number;
+  done: boolean;
+  claimed: boolean;
+  open: boolean;
+}
+
+export function eventGoal(s: GameState, now: number): EventGoalStatus | null {
+  const w = activeEvent(now);
+  if (!w) return null;
+  const g = w.event.goal;
+  const counting = s.eventGoal.start === w.start;
+  const progress = counting ? Math.max(0, eventMetric(s, g.metric) - s.eventGoal.base) : 0;
+  return { window: w, progress: Math.min(progress, g.target), target: g.target, done: progress >= g.target, claimed: counting && s.eventGoal.claimed, open: eventGoalOpen(s, g.metric) };
+}
+
+/** Collects the objective's reward: steady income for a few minutes, and racing parts. */
+export function claimEventGoal(s: GameState, now: number): number | null {
+  const st = eventGoal(s, now);
+  if (!st || !st.done || st.claimed) return null;
+  const g = st.window.event.goal;
+  const cash = Math.max(1_000, Math.max(0, s.chain.steady ?? s.chain.rate) * g.incomeSeconds);
+  s.cash += cash;
+  s.run.moneyEarned += cash;
+  s.lifetime.moneyEarned += cash;
+  if (g.parts) s.racing.parts += g.parts;
+  s.eventGoal.claimed = true;
+  return cash;
 }

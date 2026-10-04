@@ -24,6 +24,7 @@ import { STRUCTURE_BY_ID } from "@/game/config/city";
 import { PLANT_LEVELS } from "@/game/config/chain";
 import { snapshot, unlockedCarIds, type EconomySnapshot } from "@/game/engine/economy";
 import { activeEvent } from "@/game/engine/events";
+import * as Ev from "@/game/engine/events";
 import { collectOffline, settleOffline } from "@/game/engine/offline";
 import { prestige as doPrestige } from "@/game/engine/prestige";
 import { checkAchievements, claimDaily, claimMilestone, recordHistory, refreshDaily } from "@/game/engine/progress";
@@ -137,6 +138,7 @@ interface GameStore {
   sendCar: (id: number, to: Ch.CarDestination, price?: number) => boolean;
   setShowroomPrice: (id: number, price: number) => boolean;
   startCampaign: () => boolean;
+  claimEventGoal: () => void;
   setBrand: (patch: Parameters<typeof Br.setBrand>[1]) => boolean;
   cancelRaceOrder: (car: CarId) => boolean;
   selectRaceCar: (id: number) => void;
@@ -393,6 +395,11 @@ export const useGame = create<GameStore>((set, get) => {
     sendCar: (id, to, price) => act((s) => Ch.sendCar(s, id, to, price)),
     setShowroomPrice: (id, price) => act((s) => Sh.setPrice(s, id, price)),
     startCampaign: () => act((s) => Sh.startCampaign(s)),
+    claimEventGoal: () => {
+      let cash: number | null = null;
+      act((s) => (cash = Ev.claimEventGoal(s, s.lastActiveAt)) !== null);
+      if (cash !== null) uiEvents.emit({ type: "toast", tone: "gold", icon: "🎯", title: tr("eventGoal.claimed", { money: formatMoney(cash) }) });
+    },
     setBrand: (patch) => act((s) => Br.setBrand(s, patch)),
     cancelRaceOrder: (car) => act((s) => Rc.cancelOrder(s, car)),
     selectRaceCar: (id) =>

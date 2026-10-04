@@ -25,6 +25,7 @@ import {
   condition,
   atTrack,
   carStats,
+  contractStatus,
   eventLock,
   installTime,
   weatherAt,
@@ -47,7 +48,7 @@ import {
 } from "@/game/engine/racing";
 import { carEta, carTrip } from "@/game/engine/chain";
 import { raceClock } from "@/game/racing/tracks";
-import { formatMoney, formatNumber, formatPercent } from "@/game/format";
+import { formatDuration, formatMoney, formatNumber, formatPercent } from "@/game/format";
 import type { GameState } from "@/game/types";
 import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
@@ -575,6 +576,7 @@ function Development() {
 function Team() {
   const state = useGame((g) => g.state);
   const { signSponsor, setAutoRacing, setAutoRepair } = useGame.getState();
+  const contract = contractStatus(state);
   const { t } = useT();
   const R = state.racing;
   const lv = garageLevel(state);
@@ -606,7 +608,8 @@ function Team() {
 
       {/* sponsors */}
       <div className="rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.08]">
-        <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-white/55">🤝 {t("racing.sponsors")}</div>
+        <div className="mb-1 text-[11px] font-bold uppercase tracking-wider text-white/55">🤝 {t("racing.sponsors")}</div>
+        <p className="mb-2 text-[10px] text-white/45">{t("sponsorContract.note")}</p>
         <div className="space-y-1.5">
           {SPONSORS.map((sp) => {
             const locked = R.rep < sp.minRep;
@@ -618,7 +621,26 @@ function Team() {
                 </div>
                 <div className="min-w-0 flex-1 text-[11px]">
                   <div className="font-black">{sp.name}</div>
-                  <div className="text-white/55">{t("racing.sponsorTerms", { race: formatMoney(sp.perRace), sign: formatMoney(sp.signing) })}</div>
+                  <div className="text-white/55">
+                    {t("racing.sponsorTerms", { race: formatMoney(sp.perRace), sign: R.signed.includes(sp.id) ? "—" : formatMoney(sp.signing) })}
+                  </div>
+                  <div className="text-white/45">
+                    📜 {t(`sponsorContract.goal.${sp.contract.goal}`, { n: sp.contract.target, h: sp.contract.hours })} → {formatMoney(sp.contract.bonus)}
+                  </div>
+                  {active && contract && (
+                    <div className="mt-1">
+                      <div className="flex justify-between font-bold text-emerald-200">
+                        <span>
+                          {contract.progress}/{contract.target}
+                        </span>
+                        <span>{t("sponsorContract.left", { time: formatDuration(contract.left) })}</span>
+                      </div>
+                      <div className="mt-0.5 h-1 overflow-hidden rounded-full bg-white/10">
+                        <div className="h-full rounded-full bg-emerald-400" style={{ width: `${(contract.progress / contract.target) * 100}%` }} />
+                      </div>
+                      {(R.contract?.met ?? 0) > 0 && <div className="text-white/45">{t("sponsorContract.met", { n: R.contract!.met })}</div>}
+                    </div>
+                  )}
                 </div>
                 {active ? (
                   <span className="text-[10px] font-bold text-emerald-300">✓ {t("racing.signed")}</span>

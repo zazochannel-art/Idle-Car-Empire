@@ -62,6 +62,7 @@ import { DRIVETRAIN_GRADE,
   type RaceStat,
   type RaceType,
   type RaceUpgrade,
+  type SponsorConfig,
   type SpecialEventConfig,
   type Trophy,
   type WearPart,
@@ -103,6 +104,8 @@ export function createRacing(): RacingState {
     parts: 0,
     skins: ["factory"],
     sponsor: null,
+    contract: null,
+    signed: [],
     live: null,
     last: null,
     championship: null,
@@ -829,13 +832,48 @@ export function setSkin(s: GameState, id: number, skin: string): boolean {
 export function signSponsor(s: GameState, id: string | null): boolean {
   if (id === null) {
     s.racing.sponsor = null;
+    s.racing.contract = null;
     return true;
   }
   const sp = SPONSOR_BY_ID[id];
   if (!sp || s.racing.rep < sp.minRep || s.racing.sponsor === id) return false;
   s.racing.sponsor = id;
-  earn(s, sp.signing);
+  // the signing fee comes once per sponsor (switching back and forth pays nothing more)
+  if (!s.racing.signed.includes(id)) {
+    s.racing.signed.push(id);
+    earn(s, sp.signing);
+  }
+  s.racing.contract = { base: contractCount(s, sp), until: s.racing.clock + sp.contract.hours * 3600, met: 0 };
   return true;
+}
+
+const contractCount = (s: GameState, sp: SponsorConfig) => (sp.contract.goal === "wins" ? s.racing.stats.wins : s.racing.stats.podiums);
+
+/** The sponsor's contract: how far along it is. */
+export function contractStatus(s: GameState): { progress: number; target: number; left: number; bonus: number; goal: "podiums" | "wins" } | null {
+  const sp = s.racing.sponsor ? SPONSOR_BY_ID[s.racing.sponsor] : null;
+  const c = s.racing.contract;
+  if (!sp || !c) return null;
+  return { progress: Math.max(0, contractCount(s, sp) - c.base), target: sp.contract.target, left: Math.max(0, c.until - s.racing.clock), bonus: sp.contract.bonus, goal: sp.contract.goal };
+}
+
+/** Pays a met contract and renews it; a sponsor whose contract ran out unmet leaves. */
+export function contractTick(s: GameState): "met" | "lost" | null {
+  const st = contractStatus(s);
+  const c = s.racing.contract;
+  if (!st || !c) return null;
+  if (st.progress >= st.target) {
+    earn(s, st.bonus);
+    const sp = SPONSOR_BY_ID[s.racing.sponsor!];
+    s.racing.contract = { base: contractCount(s, sp), until: s.racing.clock + sp.contract.hours * 3600, met: c.met + 1 };
+    return "met";
+  }
+  if (st.left <= 0) {
+    s.racing.sponsor = null;
+    s.racing.contract = null;
+    return "lost";
+  }
+  return null;
 }
 
 // ───────────────────────────── automatic racing ─────────────────────────────
@@ -875,6 +913,7 @@ export function racingTick(s: GameState, dt: number): RaceRecord | null {
     R.last = R.live;
     R.live = null;
   }
+  contractTick(s);
   const every = garageLevel(s).autoEvery;
   if (R.auto.on && every !== null && !R.live && R.clock >= R.auto.next) {
     R.auto.next = R.clock + every * 60;
@@ -928,6 +967,7 @@ export function offlineRacing(s: GameState, seconds: number): OfflineRacing | nu
     if (rw.position <= 2) out.podiums += 1;
     out.prize += rw.prize + rw.sponsor;
     out.rep += rw.rep;
+    contractTick(s);
   }
   R.clock = Math.max(R.clock, end);
   return out.races ? out : null;
@@ -980,6 +1020,7 @@ export function migrateRacing(raw: unknown): RacingState {
   if (isObj(raw.trophies)) for (const k of ["bronze", "silver", "gold"] as Trophy[]) R.trophies[k] = Math.max(0, Math.floor(num(raw.trophies[k])));
   if (Array.isArray(raw.skins)) R.skins = [...new Set(["factory", ...raw.skins.filter((x): x is string => typeof x === "string")])];
   R.sponsor = typeof raw.sponsor === "string" && SPONSOR_BY_ID[raw.sponsor] ? raw.sponsor : null;
+  R.signed = Array.isArray(raw.signed) ? [...new Set(raw.signed.filter((x): x is string => typeof x === "string" && !!SPONSOR_BY_ID[x]))] : R.sponsor ? [R.sponsor] : [];
   if (Array.isArray(raw.orders)) R.orders = raw.orders.filter(isCar);
   if (Array.isArray(raw.arrivals)) R.arrivals = raw.arrivals.filter(isCar);
   if (isObj(raw.wins)) for (const [k, v] of Object.entries(raw.wins)) R.wins[k] = Math.max(0, Math.floor(num(v)));
@@ -1025,6 +1066,14 @@ export function migrateRacing(raw: unknown): RacingState {
       });
     }
   R.nextCar = Math.max(R.nextCar, ...R.cars.map((c) => c.id + 1));
+  // the sponsor's contract (older saves: a fresh one from now)
+  const sp = R.sponsor ? SPONSOR_BY_ID[R.sponsor] : null;
+  const c = isObj(raw.contract) ? raw.contract : null;
+  R.contract = sp
+    ? c
+      ? { base: Math.max(0, num(c.base)), until: Math.max(0, num(c.until)), met: Math.max(0, Math.floor(num(c.met))) }
+      : { base: sp.contract.goal === "wins" ? R.stats.wins : R.stats.podiums, until: R.clock + sp.contract.hours * 3600, met: 0 }
+    : null;
   const sel = num(raw.selected, -1);
   R.selected = R.cars.some((c) => c.id === sel) ? sel : (R.cars[0]?.id ?? null);
   if (isObj(raw.championship) && typeof raw.championship.event === "string" && RACE_EVENT_BY_ID[raw.championship.event]) {
