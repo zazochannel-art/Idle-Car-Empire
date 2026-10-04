@@ -36,6 +36,7 @@ export interface BuildCtx {
   industrial: typeof import("./industrial-models");
   buildings: typeof import("./building-models");
   homes: typeof import("./home-models");
+  interior: typeof import("./interior-models");
 }
 
 interface Job {
@@ -165,6 +166,7 @@ class SpriteFactory {
       const industrial = await import("./industrial-models");
       const buildings = await import("./building-models");
       const homes = await import("./home-models");
+      const interior = await import("./interior-models");
       const canvas = document.createElement("canvas");
       const renderer = new T.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true, powerPreference: "low-power" });
       renderer.setPixelRatio(1);
@@ -234,7 +236,7 @@ class SpriteFactory {
       const kit = models.materialKit(T);
       // shared materials survive; everything a build creates is disposed after rendering
       this.keep = new Set(Object.values(kit).filter((m): m is THREE_NS.Material => m instanceof T.Material));
-      this.ctx = { kit, models, industrial, buildings, homes };
+      this.ctx = { kit, models, industrial, buildings, homes, interior };
       this.kick();
     } catch {
       this.failed = true;

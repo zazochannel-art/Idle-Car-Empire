@@ -20,6 +20,7 @@ import { useUi } from "@/store/ui-store";
 import { MapEngine } from "./map-engine";
 import { Showcase } from "./showcase";
 import { sprites3d } from "../three/sprites";
+import { HAS_INTERIOR } from "../plant/interior/factory-interior";
 import { setLiveryOverrides } from "../three/livery";
 import { Minimap } from "./minimap";
 import { plantName } from "../panels/plant-panel";
@@ -84,6 +85,24 @@ function shipViews(s: GameState): ShipView[] {
   return out;
 }
 
+/** Plants you can walk into: tapping them on the map zooms into their interior. */
+function hasInterior(plotId: string) {
+  const b = useGame.getState().state.city.buildings[plotId];
+  return !!b?.plant && HAS_INTERIOR.has(b.type);
+}
+
+/** Where the camera was before walking into a factory (to zoom back out on exit). */
+const returnView: { current: { x: number; y: number; zoom: number } | null } = { current: null };
+
+/** Map → factory: the camera dives onto the building, then the interior opens. */
+function enterFactory(engine: MapEngine, plotId: string) {
+  const ui = useUi.getState();
+  ui.closeAll();
+  returnView.current = { x: engine.cam.x, y: engine.cam.y, zoom: engine.cam.zoom };
+  engine.focusPlot(plotId, { x: 0, y: 0 }, engine.cam.maxZoom, 0.55);
+  setTimeout(() => useUi.getState().openFloor(plotId), 480);
+}
+
 export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffset: { x: number; y: number } }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -106,6 +125,7 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
       if (!target) ui.closeAll();
       else if (target.kind === "zone") ui.selectZone(target.id);
       else if (target.kind === "vehicle") ui.setShowcase(target.v);
+      else if (hasInterior(target.id)) enterFactory(engine, target.id);
       else ui.selectPlot(target.id);
     });
     engine.money = (v) => formatMoney(v);
@@ -151,6 +171,19 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
       engineRef.current = null;
     };
   }, []);
+
+  // back from a factory interior: zoom out to where the player was
+  useEffect(
+    () =>
+      useUi.subscribe((u, prev) => {
+        const e = engineRef.current;
+        if (!e || !prev.floor || u.floor) return;
+        const back = returnView.current;
+        returnView.current = null;
+        if (back) e.cam.flyTo(back.x, back.y, back.zoom, 0.7);
+      }),
+    [],
+  );
 
   // the camera glides after the vehicle in the showroom
   useEffect(() => {
