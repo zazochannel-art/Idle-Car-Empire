@@ -39,6 +39,7 @@ import * as Mk from "@/game/engine/market";
 import * as Lv from "@/game/engine/live";
 import * as Cl from "@/game/engine/classics";
 import * as Ex from "@/game/engine/expansion";
+import * as Dn from "@/game/engine/car-dna";
 import { ENGINEER_BY_ID, type EngineerId, type ExportMarketId, type FleetProduct, type PayLevel, type ProtoFocus } from "@/game/config/expansion";
 import { HOT_CLASS, RECALL } from "@/game/config/market";
 import { claimUnlock, openPlantTypes } from "@/game/engine/unlocks";
@@ -130,6 +131,7 @@ interface GameStore {
   buyStarUpgrade: (id: StarUpgradeId) => boolean;
   unlockRacing: () => boolean;
   orderRaceCar: (car: CarId) => boolean;
+  runTest: (id: number) => void;
   cancelRaceOrder: (car: CarId) => boolean;
   selectRaceCar: (id: number) => void;
   enterRace: (event: string, special?: string) => boolean;
@@ -378,6 +380,10 @@ export const useGame = create<GameStore>((set, get) => {
     buyLogistics: (id) => act((s) => L.buyLogistics(s, id, get().snap.gm.costMult)),
     unlockRacing: () => act((s) => Rc.unlockRacing(s)),
     orderRaceCar: (car) => act((s) => Rc.orderRaceCar(s, car)),
+    runTest: (id) => {
+      const r = act((s) => Dn.runTest(s, id));
+      if (r) uiEvents.emit({ type: "toast", tone: "success", icon: "⏱️", title: tr("test.done", { t: r.zeroTo100.toFixed(1), v: r.topSpeed }) });
+    },
     cancelRaceOrder: (car) => act((s) => Rc.cancelOrder(s, car)),
     selectRaceCar: (id) =>
       act((s) => {

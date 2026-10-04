@@ -1,6 +1,7 @@
 "use client";
 
 import { PrototypeLab } from "./expansion-cards";
+import { MyCars } from "./my-cars";
 import { DEALER_FEE, SALES_TAX } from "@/game/config/economy";
 import { Lock, Palette } from "lucide-react";
 import { useState } from "react";
@@ -34,16 +35,28 @@ export function CarsView() {
   const { t } = useT();
   const unlocked = unlockedCarIds(state, snap.gm);
   const [open, setOpen] = useState<string | null>(null);
+  const [tab, setTab] = useState<"mine" | "models" | "dev">("mine");
 
   return (
     <div className="space-y-4">
       <ViewHeader icon="🚗" title={t("cars.title")} subtitle={t("cars.subtitle", { n: unlocked.size, total: CARS.length })} />
-      <PrototypeLab />
-      <div className="grid gap-3 @sm:grid-cols-2 @3xl:grid-cols-3">
-        {CARS.map((car) => (
-          <ModelCard key={car.id} car={car} unlocked={unlocked.has(car.id)} open={open === car.id} onToggle={() => setOpen(open === car.id ? null : car.id)} />
+      <div className="grid grid-cols-3 gap-1 rounded-2xl bg-white/[0.04] p-1 ring-1 ring-white/[0.07]">
+        {(["mine", "models", "dev"] as const).map((k) => (
+          <button key={k} onClick={() => setTab(k)} className={cn("rounded-xl py-2 text-[11px] font-black uppercase tracking-wide", tab === k ? "bg-gold text-black" : "text-white/60")}>
+            {t(`cars.tab.${k}` as MessageKey)}
+            {k === "mine" && state.racing.cars.length > 0 && <span className="ml-1 opacity-70">{state.racing.cars.length}</span>}
+          </button>
         ))}
       </div>
+      {tab === "mine" && <MyCars />}
+      {tab === "dev" && <PrototypeLab />}
+      {tab === "models" && (
+        <div className="grid gap-3 @sm:grid-cols-2 @3xl:grid-cols-3">
+          {CARS.map((car) => (
+            <ModelCard key={car.id} car={car} unlocked={unlocked.has(car.id)} open={open === car.id} onToggle={() => setOpen(open === car.id ? null : car.id)} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -28,6 +28,7 @@ import * as Rc from "../src/game/engine/racing";
 import * as Rt from "../src/game/engine/retention";
 import { carBaseValue } from "../src/game/engine/chain";
 import { snapshot } from "../src/game/engine/economy";
+import * as Dn from "../src/game/engine/car-dna";
 import * as U from "../src/game/engine/unlocks";
 import * as Mk from "../src/game/engine/market";
 import * as Lv from "../src/game/engine/live";
@@ -158,6 +159,8 @@ const actions: [string, () => unknown][] = [
   ["sponsor", () => Rc.signSponsor(s, rnd() < 0.1 ? null : pick(SPONSORS).id)],
   ["auto", () => Rc.setAutoRacing(s, rnd() < 0.7)],
   ["select", () => s.racing.cars.length && (s.racing.selected = pick(s.racing.cars).id)],
+  ["keepCar", () => Rc.orderRaceCar(s, pick(CARS).id)],
+  ["testTrack", () => s.racing.cars.length && Dn.runTest(s, pick(s.racing.cars).id)],
   ["autoUpgrade", () => plantPlots().length && (s.city.buildings[pick(plantPlots())].plant!.auto = rnd() < 0.5)],
   ["claimUnlock", () => U.claimUnlock(s, rnd() < 0.5 ? "car" : "plant", rnd() < 0.5 ? pick(CARS).id : pick(PLANTS).id)],
   ["restockLow", () => restockLow(s, snapshot(s))],
