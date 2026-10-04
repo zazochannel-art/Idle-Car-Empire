@@ -2,6 +2,7 @@ import { OFFLINE } from "../config/prestige";
 import type { GameState, OfflineReport } from "../types";
 import { simulateChain } from "./chain";
 import { offlineRacing } from "./racing";
+import { showroomTick } from "./showroom";
 import { snapshot } from "./economy";
 import { credit } from "./tick";
 import { book, LEDGER_KEYS, settleLedger } from "./materials";
@@ -27,6 +28,8 @@ export function computeOffline(s: GameState, now: number): OfflineReport {
   const r = simulateChain(s, capped, snap.chain, (amount) => credit(s, amount));
   // the racing team keeps racing (automatic racing only)
   const racing = offlineRacing(s, capped);
+  // buyers kept walking into the showroom
+  showroomTick(s, capped);
   if (racing) settleLedger(s, capped);
   // Hold the net earnings back for the COLLECT button (they already count as earned).
   const net = s.cash - cash;

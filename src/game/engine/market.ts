@@ -2,6 +2,7 @@
 import { defectMult, hypeDemand } from "./expansion";
 import { CAR_BY_ID, type CarClass } from "../config/cars";
 import { MATERIAL_IDS, type MaterialId } from "../config/economy";
+import { CAMPAIGN } from "../config/showroom";
 import { HOT_CLASS, MATERIAL_SWING, QUALITY_MODES, RECALL, REP_DRIFT_PER_MIN, REP_PRICE_PER_POINT, TREND_CLASSES, TREND_SEC } from "../config/market";
 import type { CarId, GameState, PlantData, QualityMode, QualityState } from "../types";
 
@@ -69,9 +70,12 @@ export function carPriceMult(s: GameState, car: CarId | undefined): number {
   return hot * repPriceMult(s);
 }
 
-/** How much faster customers come for a car (the class in fashion). */
+/** A marketing campaign is running (config/showroom.ts). */
+export const campaignOn = (s: GameState) => s.market.t < (s.showroom?.campaignUntil ?? 0);
+
+/** How much faster customers come for a car (the class in fashion, a hyped prototype, a marketing campaign). */
 export function carDemandMult(s: GameState, car: CarId | undefined): number {
-  return (car && CAR_BY_ID[car].class === trendOf(s).hot ? HOT_CLASS.demand : 1) * hypeDemand(s, car);
+  return (car && CAR_BY_ID[car].class === trendOf(s).hot ? HOT_CLASS.demand : 1) * hypeDemand(s, car) * (campaignOn(s) ? CAMPAIGN.demand : 1);
 }
 
 const clampRep = (r: number) => Math.max(0, Math.min(100, r));

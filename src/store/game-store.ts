@@ -40,6 +40,7 @@ import * as Lv from "@/game/engine/live";
 import * as Cl from "@/game/engine/classics";
 import * as Ex from "@/game/engine/expansion";
 import * as Dn from "@/game/engine/car-dna";
+import * as Sh from "@/game/engine/showroom";
 import { ENGINEER_BY_ID, type EngineerId, type ExportMarketId, type FleetProduct, type PayLevel, type ProtoFocus } from "@/game/config/expansion";
 import { HOT_CLASS, RECALL } from "@/game/config/market";
 import { claimUnlock, openPlantTypes } from "@/game/engine/unlocks";
@@ -132,7 +133,9 @@ interface GameStore {
   unlockRacing: () => boolean;
   orderRaceCar: (car: CarId) => boolean;
   runTest: (id: number) => void;
-  sendCar: (id: number, to: Ch.CarDestination) => boolean;
+  sendCar: (id: number, to: Ch.CarDestination, price?: number) => boolean;
+  setShowroomPrice: (id: number, price: number) => boolean;
+  startCampaign: () => boolean;
   cancelRaceOrder: (car: CarId) => boolean;
   selectRaceCar: (id: number) => void;
   enterRace: (event: string, special?: string) => boolean;
@@ -385,7 +388,9 @@ export const useGame = create<GameStore>((set, get) => {
       const r = act((s) => Dn.runTest(s, id));
       if (r) uiEvents.emit({ type: "toast", tone: "success", icon: "⏱️", title: tr("test.done", { t: r.zeroTo100.toFixed(1), v: r.topSpeed }) });
     },
-    sendCar: (id, to) => act((s) => Ch.sendCar(s, id, to)),
+    sendCar: (id, to, price) => act((s) => Ch.sendCar(s, id, to, price)),
+    setShowroomPrice: (id, price) => act((s) => Sh.setPrice(s, id, price)),
+    startCampaign: () => act((s) => Sh.startCampaign(s)),
     cancelRaceOrder: (car) => act((s) => Rc.cancelOrder(s, car)),
     selectRaceCar: (id) =>
       act((s) => {

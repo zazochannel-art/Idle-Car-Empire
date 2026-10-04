@@ -67,6 +67,7 @@ import { DRIVETRAIN_GRADE,
   type WearPart,
 } from "../config/racing";
 import { ZONE_BY_ID } from "../config/city";
+import { DEALER_BY_ID } from "../config/dealerships";
 import { carListPrice } from "./costs";
 import { designStats } from "./design";
 import { book } from "./materials";
@@ -74,6 +75,7 @@ import type {
   CarId,
   ChampionshipState,
   ComponentId,
+  DealerId,
   GameState,
   OfflineRacing,
   RaceCarState,
@@ -247,7 +249,7 @@ export function retireRaceCar(s: GameState, id: number): number {
 const TRACK_KM = 4.2;
 
 /** A car at the paddock (not at the factory lot, nor on a transporter) can race. */
-export const atTrack = (rc: RaceCarState) => rc.location !== "factory" && rc.location !== "transit";
+export const atTrack = (rc: RaceCarState) => rc.location === undefined || rc.location === "racing";
 
 export const raceCar = (s: GameState, id: number | null) => s.racing.cars.find((c) => c.id === id) ?? null;
 export const condition = (rc: RaceCarState) => WEAR_PARTS.reduce((a, p) => a + rc.wear[p], 0) / WEAR_PARTS.length;
@@ -993,7 +995,10 @@ export function migrateRacing(raw: unknown): RacingState {
         races: Math.max(0, num(c.races)),
         wins: Math.max(0, num(c.wins)),
         built: num(c.built, 0),
-        location: c.location === "factory" || c.location === "transit" ? c.location : "racing",
+        location: c.location === "factory" || c.location === "transit" || c.location === "showroom" ? c.location : "racing",
+        ...(isObj(c.listing) && typeof c.listing.dealer === "string" && c.listing.dealer in DEALER_BY_ID && num(c.listing.price) > 0
+          ? { listing: { price: num(c.listing.price), dealer: c.listing.dealer as DealerId, since: Math.max(0, num(c.listing.since)) } }
+          : {}),
         ...(typeof c.home === "string" ? { home: c.home } : {}),
         mileage: Math.max(0, num(c.mileage)),
         podiums: Math.max(0, num(c.podiums)),

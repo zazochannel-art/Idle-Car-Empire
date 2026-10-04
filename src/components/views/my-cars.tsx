@@ -6,9 +6,12 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CARS, CAR_BY_ID } from "@/game/config/cars";
 import { carDNA, testCar, testFee, type TestReport } from "@/game/engine/car-dna";
-import { carEta, carTrip } from "@/game/engine/chain";
+import { DEALER_BY_ID } from "@/game/config/dealerships";
+import { carEta, carTrip, showroomFor } from "@/game/engine/chain";
+import { campaignOn } from "@/game/engine/market";
+import { campaignCost, expectedSale, fairPrice } from "@/game/engine/showroom";
 import { MY_CARS_LOT, atTrack, condition, fleetCap, orderableCars, racingFleet } from "@/game/engine/racing";
-import { formatMoney, formatNumber } from "@/game/format";
+import { formatMoney, formatNumber, formatPercent } from "@/game/format";
 import type { RaceCarState } from "@/game/types";
 import { useContent } from "@/i18n/content";
 import { useT } from "@/i18n/use-t";
@@ -29,6 +32,7 @@ export function MyCars() {
   return (
     <div className="space-y-3">
       <KeepCar />
+      <Campaign />
       {cars.length === 0 && <p className="rounded-2xl bg-white/[0.03] p-4 text-center text-sm text-white/50 ring-1 ring-white/[0.06]">{t("mycars.empty")}</p>}
       {cars.map((rc) => (
         <CarCard key={rc.id} rc={rc} open={open === rc.id} onToggle={() => setOpen(open === rc.id ? null : rc.id)} />
@@ -85,7 +89,15 @@ function CarCard({ rc, open, onToggle }: { rc: RaceCarState; open: boolean; onTo
   const losses = rc.races - rc.wins;
   const fee = testFee(rc);
   const where =
-    state.racing.live?.car === rc.id ? t("mycars.loc.racing") : rc.location === "factory" ? t("mycars.loc.factory") : rc.location === "transit" ? t("mycars.loc.transit") : t("mycars.loc.paddock");
+    state.racing.live?.car === rc.id
+      ? t("mycars.loc.racing")
+      : rc.location === "factory"
+        ? t("mycars.loc.factory")
+        : rc.location === "transit"
+          ? t("mycars.loc.transit")
+          : rc.location === "showroom"
+            ? t("mycars.loc.showroom")
+            : t("mycars.loc.paddock");
   const eta = rc.location === "transit" ? carEta(state, rc.id) : null;
   const toPaddock = carTrip(state, rc, "racing");
   const toLot = carTrip(state, rc, "factory");
@@ -163,7 +175,7 @@ function CarCard({ rc, open, onToggle }: { rc: RaceCarState; open: boolean; onTo
           {/* on the road: the car travels on its own transporter, visible on the map */}
           {eta && (
             <p className="rounded-lg bg-amber-400/10 px-2 py-1.5 text-[11px] text-amber-200 ring-1 ring-amber-300/20">
-              {t("mycars.eta", { to: t(eta.to === "racing" ? "mycars.loc.paddock" : "mycars.loc.factory"), time: `${Math.ceil(eta.left)}s` })}
+              {t("mycars.eta", { to: t(eta.to === "racing" ? "mycars.loc.paddock" : eta.to === "showroom" ? "mycars.loc.showroom" : "mycars.loc.factory"), time: `${Math.ceil(eta.left)}s` })}
             </p>
           )}
           {state.racing.unlocked && rc.location === "factory" && <p className="text-[11px] text-white/45">{t("mycars.awayHint")}</p>}
@@ -179,6 +191,7 @@ function CarCard({ rc, open, onToggle }: { rc: RaceCarState; open: boolean; onTo
               </Button>
             )}
           </div>
+          <Showroom rc={rc} />
           {state.racing.unlocked && atTrack(rc) && (
             <Button
               size="sm"
@@ -193,6 +206,76 @@ function CarCard({ rc, open, onToggle }: { rc: RaceCarState; open: boolean; onTo
             </Button>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+const clock = (sec: number) => (sec >= 3600 ? `${Math.floor(sec / 3600)}h ${Math.round((sec % 3600) / 60)}m` : `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}`);
+
+/** SHOWROOM: the player's price against what the car is worth; a transporter takes it to the dealer. */
+function Showroom({ rc }: { rc: RaceCarState }) {
+  const state = useGame((g) => g.state);
+  const { sendCar, setShowroomPrice } = useGame.getState();
+  const [pct, setPct] = useState(1.1);
+  const { t, lang } = useT();
+  const n = useContent(lang);
+  const fair = fairPrice(state, rc);
+  const dealer = rc.listing?.dealer ?? showroomFor(state, rc);
+  const trip = carTrip(state, rc, "showroom");
+  const price = rc.listing?.price ?? fair * pct;
+  if (!dealer) return <p className="text-[11px] text-white/40">🏬 {t("showroom.noDealer")}</p>;
+  return (
+    <div className="rounded-xl bg-gradient-to-br from-emerald-500/10 to-transparent p-2.5 ring-1 ring-emerald-400/25">
+      <div className="mb-1 flex items-center justify-between text-[11px]">
+        <span className="font-bold uppercase tracking-wider text-emerald-200">🏬 {t("showroom.title")}</span>
+        <span className="text-white/55">{t("showroom.fair", { money: formatMoney(fair) })}</span>
+      </div>
+      {rc.listing && <div className="text-[11px] text-white/60">{t("showroom.listed", { dealer: n.dealer(DEALER_BY_ID[dealer]) })}</div>}
+      <div className="mt-1 text-xs font-bold">{t("showroom.price", { money: formatMoney(price), pct: formatPercent(price / fair) })}</div>
+      <div className="text-[11px] text-white/50">{t("showroom.eta", { time: clock(expectedSale(state, rc, price)) })}</div>
+      <div className="mt-2 flex gap-1.5">
+        {[0.8, 0.95, 1.1, 1.3, 1.6].map((k) => (
+          <button
+            key={k}
+            onClick={() => (rc.listing ? setShowroomPrice(rc.id, fair * k) : setPct(k))}
+            className={cn("flex-1 rounded-lg px-1 py-1 text-[11px] font-bold ring-1", Math.abs(price / fair - k) < 0.01 ? "bg-emerald-400/25 ring-emerald-300/50" : "bg-white/[0.05] ring-white/10")}
+          >
+            {formatPercent(k)}
+          </button>
+        ))}
+      </div>
+      {!rc.listing && trip && (
+        <Button size="sm" variant="gold" className="mt-2 w-full" disabled={state.cash < trip.fee} onClick={() => sendCar(rc.id, "showroom", fair * pct)}>
+          {t("mycars.send.showroom", { fee: formatMoney(trip.fee) })}
+        </Button>
+      )}
+      <p className="mt-1 text-[10px] text-white/40">{t("showroom.hint")}</p>
+    </div>
+  );
+}
+
+/** A marketing campaign: every dealer gets customers faster, the showroom more buyers. */
+function Campaign() {
+  const state = useGame((g) => g.state);
+  const start = useGame((g) => g.startCampaign);
+  const { t } = useT();
+  if (!state.chain.firstCar) return null;
+  const on = campaignOn(state);
+  const cost = campaignCost(state);
+  return (
+    <div className="flex items-center gap-3 rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.07]">
+      <div className="min-w-0 flex-1">
+        <div className="text-[11px] font-bold uppercase tracking-wider text-white/55">📣 {t("campaign.title")}</div>
+        <div className="text-[11px] text-white/50">{t("campaign.desc")}</div>
+        {state.showroom.sold > 0 && <div className="text-[10px] text-white/40">{t("showroom.stats", { n: state.showroom.sold, money: formatMoney(state.showroom.revenue) })}</div>}
+      </div>
+      {on ? (
+        <span className="shrink-0 text-[11px] font-bold text-emerald-300">{t("campaign.on", { time: clock(state.showroom.campaignUntil - state.market.t) })}</span>
+      ) : (
+        <Button size="sm" variant="gold" disabled={state.cash < cost} onClick={() => start()}>
+          {t("campaign.run", { money: formatMoney(cost) })}
+        </Button>
       )}
     </div>
   );

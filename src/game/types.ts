@@ -468,6 +468,8 @@ export interface GameState {
   logistics: LogisticsState;
   /** The materials market: its clock (price drift) and lifetime units bought (supplier tiers). */
   market: { t: number; bought: number };
+  /** Showroom sales of the collection and the marketing campaign (market clock). */
+  showroom: { campaignUntil: number; campaigns: number; sold: number; revenue: number };
   research: string[];
   achievements: string[];
   missions: {
@@ -530,7 +532,9 @@ export interface RaceCarState {
   /** My Cars: when it left the line (ms), where it is, its record and its last test. */
   built?: number;
   /** At the factory lot, at the paddock, or on a car transporter between them. */
-  location?: "factory" | "racing" | "transit";
+  location?: "factory" | "racing" | "transit" | "showroom";
+  /** For sale in a company showroom: the asking price, the dealer, seconds on display. */
+  listing?: { price: number; dealer: DealerId; since: number };
   /** The assembly plant whose lot it calls home (plot id). */
   home?: string;
   mileage?: number;

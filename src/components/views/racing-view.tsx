@@ -381,7 +381,9 @@ function Garage() {
               return (
                 <div key={c.id} className="flex items-center justify-between gap-2">
                   <span className="truncate">
-                    {CAR_BY_ID[c.car].emoji} {state.designs[c.car].name} — {eta ? t("mycars.eta", { to: t("mycars.loc.paddock"), time: `${Math.ceil(eta.left)}s` }) : t("mycars.loc.factory")}
+                    {CAR_BY_ID[c.car].emoji} {state.designs[c.car].name} — {eta
+                      ? t("mycars.eta", { to: t(eta.to === "racing" ? "mycars.loc.paddock" : eta.to === "showroom" ? "mycars.loc.showroom" : "mycars.loc.factory"), time: `${Math.ceil(eta.left)}s` })
+                      : t(c.location === "showroom" ? "mycars.loc.showroom" : "mycars.loc.factory")}
                   </span>
                   {trip && (
                     <button disabled={state.cash < trip.fee} onClick={() => sendCar(c.id, "racing")} className="shrink-0 rounded-lg bg-gold/20 px-2 py-1 text-[11px] font-bold text-gold ring-1 ring-gold/40 disabled:opacity-40">
