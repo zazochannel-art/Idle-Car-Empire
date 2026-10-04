@@ -8,7 +8,7 @@ import { CAR_BY_ID, type CarConfig } from "../config/cars";
 import { RACE_UPGRADES } from "../config/racing";
 import type { CarId, ComponentId, GameState, RaceCarState } from "../types";
 import { carStdCost, assemblyTime } from "./costs";
-import { recipe } from "./chain";
+import { bestGrade, recipe, supplied, suppliedGrade } from "./chain";
 import { carStats, rating, statsOf, type RaceStats } from "./racing";
 
 /** Names of the parts by grade (1–5). */
@@ -217,4 +217,38 @@ export function runTest(s: GameState, id: number): TestReport | null {
   const report = testCar(rc);
   rc.test = report;
   return report;
+}
+
+// ───────────────────────────── the look of the build ─────────────────────────────
+
+/** What a car looks like from the parts it got (3D model and assembly line). */
+export interface BuildLookData {
+  color: string;
+  rims: "silver" | "black" | "dark" | "chrome";
+  rimScale: number;
+  engine: number;
+  brakes: number;
+}
+
+const RIM_STYLES = ["silver", "silver", "dark", "chrome"] as const;
+
+/** From the grades of a car's parts and its Design studio options. */
+export function buildLookFrom(grades: Partial<Record<ComponentId, number>>, design: { rims?: number; color?: string } | undefined): BuildLookData {
+  const rimsLvl = design?.rims ?? 0;
+  const wheels = Math.max(1, grades.wheels ?? 1);
+  return {
+    color: design?.color ?? "",
+    rims: rimsLvl >= 3 || wheels >= 5 ? "black" : RIM_STYLES[Math.min(3, rimsLvl)],
+    rimScale: 1 + 0.04 * (wheels - 1) + 0.02 * rimsLvl,
+    engine: Math.max(1, grades.engine ?? 1),
+    brakes: Math.max(1, grades.brakes ?? 1),
+  };
+}
+
+/** The car an assembly line builds right now: the grades its parts come in today. */
+export function lineBuildLook(s: GameState, car: CarId): BuildLookData {
+  const cfg = CAR_BY_ID[car];
+  const grades: Partial<Record<ComponentId, number>> = {};
+  for (const c of recipe(cfg)) grades[c] = supplied(s, c) ? suppliedGrade(c, cfg) : Math.max(1, bestGrade(s, c));
+  return buildLookFrom(grades, s.designs[car]);
 }

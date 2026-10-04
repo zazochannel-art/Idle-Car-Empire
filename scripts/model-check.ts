@@ -42,7 +42,13 @@ async function main() {
   const models = Object.keys(cars.CAR_SPECS) as cars.BodyModel[];
   for (const model of models)
     for (const st of [-1, 0, 1, 2, 2.5, 3, 4, 5, 6, 7, 8, 9])
-      for (const spin of [0, 1.3]) tryBuild(`car ${model} st${st}`, () => cars.buildCar(T, kit, { model, color: "#c0392b", finish: "metallic", steer: 0.3, spin, stage: { station: st } }));
+      for (const spin of [0, 1.3]) {
+        tryBuild(`car ${model} st${st}`, () => cars.buildCar(T, kit, { model, color: "#c0392b", finish: "metallic", steer: 0.3, spin, stage: { station: st } }));
+        for (const g of [1, 3, 5])
+          tryBuild(`car ${model} st${st} build${g}`, () =>
+            cars.buildCar(T, kit, { model, color: "#c0392b", spin, stage: { station: st }, build: { color: "#1b46b8", rims: g === 5 ? "black" : "chrome", rimScale: 1 + 0.04 * (g - 1), engine: g, brakes: g } }),
+          );
+      }
   for (const kind of ["van", "truck", "semi", "trailer"] as const)
     for (const empty of [true, false]) tryBuild(`truck ${kind}`, () => cars.buildTruck(T, kit, { kind, cargo: "#888888", empty }));
   for (let n = 0; n <= 8; n++) tryBuild(`carrier ${n}`, () => cars.buildCarrier(T, kit, models.slice(0, n).map((model) => ({ model, color: "#fff" }))));
