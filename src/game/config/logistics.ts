@@ -14,7 +14,7 @@ export interface LogisticsConfig {
 }
 
 export const LOGISTICS: LogisticsConfig[] = [
-  { id: "speed", emoji: "🛣️", step: 0.1, max: 10, cost: 2_000, growth: 2.2 }, // +10% truck speed
+  { id: "speed", emoji: "🛣️", step: 0.1, max: 10, cost: 2_000, growth: 2.2 }, // +10% delivery rate (bigger loads, faster docks)
   { id: "capacity", emoji: "📦", step: 0.15, max: 10, cost: 5_000, growth: 2.3 }, // +15% per trip
   { id: "loading", emoji: "🏗️", step: 0.1, max: 7, cost: 3_000, growth: 2.2 }, // −10% dock and waiting time
   { id: "warehouse", emoji: "🏬", step: 0.2, max: 10, cost: 4_000, growth: 2.3 }, // +20% storage

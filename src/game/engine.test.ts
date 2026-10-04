@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CAR_BY_ID } from "./config/cars";
-import { MAX_WAIT, PLANT_BY_ID } from "./config/chain";
+import { MAX_WAIT, PLANT_BY_ID, VEHICLE_CAPACITY } from "./config/chain";
 import { MANAGER_BY_ID } from "./config/managers";
 import { PRESTIGE } from "./config/prestige";
 import { DEPOT, MARKET, STARTER_PLOT, WORLD_MAP } from "./city/layout";
@@ -251,7 +251,7 @@ describe("manager categories", () => {
 });
 
 describe("logistics center", () => {
-  it("upgrades and transport tiers speed up every truck and add trucks, storage and prices", () => {
+  it("upgrades and transport tiers raise the delivery rate and add trucks, storage and prices", () => {
     const s = createInitialState(T0);
     s.cash = 1e15;
     const before = snapshot(s).chain.plants[STARTER_PLOT];
@@ -261,7 +261,12 @@ describe("logistics center", () => {
     expect(L.buyLogistics(s, "fleet")).toBe(true);
     expect(L.buyLogistics(s, "loading")).toBe(true);
     const after = snapshot(s).chain.plants[STARTER_PLOT];
-    expect(after.pace).toBeCloseTo(before.pace / 1.1);
+    // every vehicle drives the same road speed; the delivery rate (+10%) and
+    // Bigger loads (+15%) fill each truck more, Loading (−10%) shortens the docks
+    expect(after.pace).toBeCloseTo(before.pace);
+    expect(before.capacity).toBe(VEHICLE_CAPACITY[before.vehicle]);
+    expect(after.capacity).toBe(Math.round(VEHICLE_CAPACITY[before.vehicle] * 1.15 * 1.1));
+    expect(after.load).toBeCloseTo(0.9 / 1.1);
     expect(after.trucks).toBe(before.trucks + 1);
     expect(after.outCap).toBeCloseTo(before.outCap * 1.2);
     expect(after.dock).toBeCloseTo(0.9);

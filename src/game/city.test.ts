@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FACILITY_BY_ID, ZONES } from "./config/city";
-import { DEPOT, MARKET, STARTER_PLOT, WORLD, WORLD_MAP, segmentOpen } from "./city/layout";
+import { DEPOT, DRIVEWAY, MARKET, STARTER_PLOT, WORLD, WORLD_MAP, roadRoute, segmentOpen } from "./city/layout";
 import type { GameState } from "./types";
 import * as C from "./engine/city";
 import { snapshot } from "./engine/economy";
@@ -172,5 +172,27 @@ describe("zones and plots", () => {
     expect(junk.city.buildings[GAR].level).toBe(10);
     expect(junk.city.buildings[GAR].garage?.facilities).toHaveLength(0);
     expect(Object.keys(junk.city.buildings)).toEqual([GAR]);
+  });
+});
+
+describe("road routes", () => {
+  it("leave toward the destination and agree both ways", () => {
+    const plots = WORLD_MAP.plots.filter((p) => p.kind === "plot").slice(0, 40);
+    for (const a of plots.slice(0, 8))
+      for (const b of plots.slice(8)) {
+        const r = roadRoute(a.entry, b.entry);
+        const back = roadRoute(b.entry, a.entry);
+        expect(r.length).toBeCloseTo(back.length, 6);
+        // never shorter than the straight grid distance plus both driveways
+        expect(r.length).toBeGreaterThanOrEqual(Math.abs(a.entry.x - b.entry.x) + Math.abs(a.entry.y - b.entry.y) + 2 * DRIVEWAY - 1e-9);
+      }
+  });
+
+  it("drives straight along a shared road segment", () => {
+    const a = { x: 2.5, y: 7.5, line: 1, i0: 0, i1: 1, inward: 1 as const };
+    const b = { x: 5.5, y: 7.5, line: 1, i0: 0, i1: 1, inward: -1 as const };
+    const r = roadRoute(a, b);
+    expect(r.from).toBeNull();
+    expect(r.length).toBeCloseTo(3 + 2 * DRIVEWAY, 6);
   });
 });
