@@ -3,6 +3,7 @@ import { migrateRacing } from "../engine/racing";
 import { migrateQuality } from "../engine/market";
 import { migrateLive } from "../engine/live";
 import { migrateClassics } from "../engine/classics";
+import { migrateExpansion } from "../engine/expansion";
 import { migrateCity, unlockOwnedZones } from "../engine/city";
 import { applyStartPerks } from "../engine/prestige";
 import { createInitialState, SAVE_VERSION } from "../engine/state";
@@ -68,6 +69,7 @@ export function migrate(raw: unknown, now: number): GameState {
   state.quality = migrateQuality(raw.quality);
   migrateLive(raw, state);
   state.classics = migrateClassics(raw.classics);
+  migrateExpansion(raw, state);
   state.unlocks = state.unlocks.filter((u) => typeof u === "string");
   // a missing or future start date would skew rivals, contracts and stats
   if (!(state.createdAt > 0 && state.createdAt <= now)) state.createdAt = Math.min(now, state.lastActiveAt > 0 ? state.lastActiveAt : now);

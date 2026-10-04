@@ -2,6 +2,7 @@
 
 // Market dynamics in the UI: quality mode and car routing on a plant, the
 // market news card, and the company's reputation.
+import { EXPORT_BY_ID } from "@/game/config/expansion";
 import { DEALER_BY_ID } from "@/game/config/dealerships";
 import { MATERIAL_BY_ID } from "@/game/config/economy";
 import { HOT_CLASS, MATERIAL_SWING, QUALITY_MODES, QUALITY_MODE_IDS, RECALL } from "@/game/config/market";
@@ -58,10 +59,12 @@ export function CarRoutePicker({ id }: { id: string }) {
   if (!p) return null;
   const cur: CarRoute = p.carRoute ?? "price";
   const owned = (Object.keys(dealers) as DealerId[]).filter((d) => dealers[d].owned);
+  const exportOpen = useGame.getState().state.export.open;
   const opts: { id: CarRoute; label: string }[] = [
     { id: "price", label: `💰 ${t("route.price")}` },
     { id: "fast", label: `⏱️ ${t("route.fast")}` },
     ...owned.map((d) => ({ id: d as CarRoute, label: `${DEALER_BY_ID[d].emoji} ${n.dealer(DEALER_BY_ID[d])}` })),
+    ...exportOpen.map((m) => ({ id: `export:${m}` as CarRoute, label: `${EXPORT_BY_ID[m].emoji} ${t(`export.market.${m}` as MessageKey)}` })),
   ];
   return (
     <Box title={t("route.title")}>
@@ -72,7 +75,7 @@ export function CarRoutePicker({ id }: { id: string }) {
           </button>
         ))}
       </div>
-      <p className="mt-2 text-[11px] text-white/55">{cur === "price" ? t("route.priceDesc") : cur === "fast" ? t("route.fastDesc") : t("route.dealerDesc")}</p>
+      <p className="mt-2 text-[11px] text-white/55">{cur === "price" ? t("route.priceDesc") : cur === "fast" ? t("route.fastDesc") : cur.startsWith("export:") ? t("route.exportDesc") : t("route.dealerDesc")}</p>
     </Box>
   );
 }

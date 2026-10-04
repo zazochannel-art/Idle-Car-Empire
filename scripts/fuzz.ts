@@ -32,6 +32,7 @@ import * as U from "../src/game/engine/unlocks";
 import * as Mk from "../src/game/engine/market";
 import * as Lv from "../src/game/engine/live";
 import * as Cl from "../src/game/engine/classics";
+import * as Ex from "../src/game/engine/expansion";
 import { CLASSICS } from "../src/game/config/classics";
 import { restockLow } from "../src/game/engine/insights";
 import { nextGoals } from "../src/game/engine/insights";
@@ -68,6 +69,7 @@ const actions: [string, () => unknown][] = [
   ["rich", () => (s.cash += 10 ** (3 + Math.floor(rnd() * 7)))],
   ["zone", () => C.unlockZone(s, pick(ZONES).id)],
   ["build", () => C.buildStructure(s, pick(plots()), pick([...STRUCTURES.map((x) => x.id), ...PLANTS.map((x) => x.id)]))],
+  ["buildSpecial", () => C.buildStructure(s, pick(plots()), pick(["museum", "fleetPlant", "exportTerminal", "garage"] as const))],
   ["upgradeBuilding", () => built().length && C.upgradeBuilding(s, pick(built()))],
   ["plantLevel", () => plantPlots().length && Ch.upgradePlantLevel(s, pick(plantPlots()), snapshot(s).gm)],
   ["plantSpeed", () => plantPlots().length && Ch.upgradePlantSpeed(s, pick(plantPlots()), snapshot(s).gm)],
@@ -174,6 +176,16 @@ const actions: [string, () => unknown][] = [
   ["showClaim", () => Lv.claimShow(s)],
   ["classic", () => Cl.restoreClassic(s, pick(CLASSICS).id, now)],
   ["classicTick", () => Cl.classicsTick(s, now)],
+  ["proto", () => {
+    const car = pick(CARS);
+    const base = carBaseValue(s, car, snapshot(s).gm);
+    const r = rnd();
+    return r < 0.25 ? Ex.startPrototype(s, car.id, pick(["performance", "comfort", "style", "efficiency"] as const), now, base) : r < 0.5 ? Ex.windTunnel(s, Math.floor(rnd() * 3), now, base) : r < 0.75 ? Ex.trackTest(s, now, base) : Ex.launchProto(s, Math.floor(rnd() * 3), now, base);
+  }],
+  ["market", () => Ex.openMarket(s, pick(["europe", "northAmerica", "asia", "middleEast"] as const))],
+  ["exportRoute", () => plantPlots().length && Ch.setCarRoute(s, pick(plantPlots()), pick(["export:europe", "export:asia"] as const))],
+  ["fleet", () => (rnd() < 0.3 ? Ex.setFleetProduct(s, pick(["van", "truck", "bus"] as const)) : rnd() < 0.5 ? Ex.fleetOrderTick(s, now) : Ex.acceptFleetOrder(s, now) || Ex.finishFleetOrder(s, now))],
+  ["engineers", () => (rnd() < 0.4 ? Ex.engineersTick(s, now, 1) : rnd() < 0.5 ? Ex.hireEngineer(s) : rnd() < 0.5 ? Ex.counterOffer(s) : s.engineers.hired.length && Ex.setEngineerPay(s, pick(s.engineers.hired).id, pick(["low", "fair", "generous"] as const)))],
 ];
 
 for (let step = 0; step < steps; step++) {

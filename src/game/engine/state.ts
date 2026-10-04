@@ -9,6 +9,7 @@ import { createLogistics } from "./logistics";
 import { createRacing } from "./racing";
 import { createSeason, createShow, createVip } from "./live";
 import { createClassics } from "./classics";
+import { createEngineers, createExport, createFleet, createProto } from "./expansion";
 import type { CarDesign, CarId, ComponentId, DealerId, DealerState, GameState, ManagerId, ManagerState, Stats } from "../types";
 
 /** v3: the supply-chain economy (older saves start a new company). */
@@ -92,6 +93,10 @@ export function createInitialState(now: number): GameState {
     pendingOffline: null,
     unlocks: [],
     classics: createClassics(),
+    proto: createProto(),
+    export: createExport(),
+    fleet: createFleet(),
+    engineers: createEngineers(),
     vip: createVip(),
     season: createSeason(),
     show: createShow(),

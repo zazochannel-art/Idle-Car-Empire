@@ -510,6 +510,27 @@ function structure(p: Painter, plot: Plot, b: BuildingState, t: number, seed: nu
       p.box(px - 0.05, Y + 1.5, 0.12, 0.62, 5, 2, "#f8fafc");
       break;
     }
+    case "fleetPlant": {
+      // a long assembly hall, then a yard of finished vans, trucks and a yellow bus
+      p.quad(X, Y, W, D, p.col("#9ca3af"));
+      p.shadow(X + 0.15, Y + 0.15, 2.1, 1.0, 26);
+      p.box(X + 0.15, Y + 0.15, 2.1, 1.0, 0, 26, "#e2e8f0", "#ca8a04");
+      p.windows(X + 0.15, Y + 0.15, 2.1, 1.0, 0, 26, 4, "#fde68a", 0.8);
+      doors(p, X + 0.15, Y + 1.15, 2.1, 2, 14, true, t);
+      p.onLeft(X + 0.15, Y + 1.15, 0, 0, 2.1, 20, 26, p.col("#ca8a04"));
+      p.textLeft("FLEET", X + 1.2, Y + 1.15, 23, 6, "#fff");
+      // the yard
+      p.quad(X + 0.1, Y + 1.45, W - 0.2, D - 1.55, p.col("#6b7280"));
+      drawTruck(p, X + 0.45, Y + 1.85, 0, "#f8fafc", 0.85, false, { kind: "van" });
+      drawTruck(p, X + 1.0, Y + 1.85, 0, "#2563eb", 0.95, false, { kind: "truck" });
+      // a bus: long yellow box with a band of windows
+      p.shadow(X + 1.45, Y + 1.65, 0.9, 0.36, 14);
+      p.box(X + 1.45, Y + 1.65, 0.9, 0.36, 1, 13, "#facc15", "#fde047");
+      p.onLeft(X + 1.45, Y + 2.01, 1, 0.04, 0.86, 7, 11, p.col("#1e293b"));
+      p.onRight(X + 2.35, Y + 1.65, 1, 0.04, 0.32, 7, 11, p.col("#334155"));
+      for (const dx of [0.15, 0.75]) cyl(p, X + 1.45 + dx, Y + 2.02, 0, 3, 2, "#111827");
+      break;
+    }
     case "museum": {
       // a classical hall: steps, a colonnade, a pediment and banners; the classics on the forecourt
       p.quad(X, Y, W, D, p.col("#d6d3d1"));

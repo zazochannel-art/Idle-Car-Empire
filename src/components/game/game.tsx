@@ -47,6 +47,7 @@ import { OfflineDialog, PrestigeOverlay, SettingsDialog, Toasts } from "./overla
 import { FirstCarOverlay } from "./first-car";
 import { UnlockCard } from "./unlock-card";
 import { RecallDialog } from "./recall-dialog";
+import { PoachDialog } from "../views/expansion-cards";
 import { PlantFloor } from "../plant/plant-floor";
 import { FactoryInterior, HAS_INTERIOR } from "../plant/interior/factory-interior";
 
@@ -176,6 +177,7 @@ function Shell() {
       <FirstCarOverlay />
       <UnlockCard />
       <RecallDialog />
+      <PoachDialog />
 
       <Toasts />
       <FeedbackBridge />

@@ -1,5 +1,6 @@
 "use client";
 
+import { FleetPanel } from "./expansion-cards";
 import { MILESTONES } from "@/game/config/missions";
 import { dailyProgress, metric, openMilestones } from "@/game/engine/progress";
 import { formatDuration } from "@/game/format";
@@ -47,6 +48,7 @@ export function MissionsView() {
         <ShowCard />
         <SeasonCard />
         <ClassicsPanel />
+        <FleetPanel />
       </section>
 
       <section className="space-y-2">

@@ -1,4 +1,5 @@
 import { EMPIRE_PERKS, PRESTIGE } from "../config/prestige";
+import { createExport, createFleet } from "./expansion";
 import type { GameState } from "../types";
 import { STARTER_PLOT, WORLD_MAP } from "../city/layout";
 import { createChain, newPlant } from "./chain";
@@ -61,6 +62,10 @@ export function prestigeReset(s: GameState, now: number) {
   s.runStartedAt = now;
   s.pendingOffline = null;
   s.unlocks = [];
+  // a new region: new ports and a new division (the engineers and launched models stay)
+  s.export = createExport();
+  s.fleet = createFleet();
+  s.proto.active = null;
   for (const m of Object.values(s.managers)) m.assignedTo = null;
 
   applyStartPerks(s);

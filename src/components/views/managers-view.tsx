@@ -1,5 +1,6 @@
 "use client";
 
+import { EngineersCard } from "./expansion-cards";
 import { Lock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -32,6 +33,7 @@ export function ManagersView() {
         title={t("nav.managers")}
         subtitle={t("managers.subtitle", { n: hired, total: MANAGERS.length })}
       />
+      <EngineersCard />
       <div className="grid gap-3 @xl:grid-cols-2">
         {MANAGERS.map((m) => {
           const st = state.managers[m.id];
