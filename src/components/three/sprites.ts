@@ -114,7 +114,9 @@ class SpriteFactory {
   private listeners = new Set<() => void>();
   /** Total bytes of cached sprites, to stay within memory. */
   private bytes = 0;
-  private order: string[] = [];
+  /** Use counter: each sprite remembers when it was last drawn (least recently used goes first). */
+  private uses = 0;
+  private lastUse = new Map<string, number>();
   private static MAX_BYTES = 96 * 1024 * 1024;
 
   get ready() {
@@ -132,14 +134,20 @@ class SpriteFactory {
    */
   /** A sprite only if it is already made (never queues one). */
   peek(key: string, k: number, shadow = true): Sprite | null {
-    return this.cache.get(`${key}|${k}|${shadow ? 1 : 0}`) ?? null;
+    const full = `${key}|${k}|${shadow ? 1 : 0}`;
+    const hit = this.cache.get(full) ?? null;
+    if (hit) this.lastUse.set(full, ++this.uses);
+    return hit;
   }
 
   get(key: string, size: SpriteSize, k: number, build: Build, shadow = true): Sprite | null {
     if (this.failed || typeof document === "undefined") return null;
     const full = `${key}|${k}|${shadow ? 1 : 0}`;
     const hit = this.cache.get(full);
-    if (hit) return hit;
+    if (hit) {
+      this.lastUse.set(full, ++this.uses);
+      return hit;
+    }
     if (hit === null) return null; // queued
     this.cache.set(full, null);
     this.queue.push({ key: full, size, k, shadow, build });
@@ -308,13 +316,23 @@ class SpriteFactory {
     out.getContext("2d")!.drawImage(r.domElement, 0, 0);
     this.cache.set(job.key, { img: out, size: job.size, k: job.k });
     this.bytes += W * H * 4;
-    this.order.push(job.key);
-    // forget the oldest sprites when over budget (they are re-made on demand)
-    while (this.bytes > SpriteFactory.MAX_BYTES && this.order.length > 1) {
-      const old = this.order.shift()!;
-      const s = this.cache.get(old);
-      if (s) this.bytes -= s.img.width * s.img.height * 4;
-      this.cache.delete(old);
+    this.lastUse.set(job.key, ++this.uses);
+    if (this.bytes > SpriteFactory.MAX_BYTES) this.evict(job.key);
+  }
+
+  /**
+   * Over budget: forget the sprites drawn least recently (down to 85% of the
+   * budget, so this runs rarely). Sprites on screen keep being used and stay;
+   * the rest are re-made on demand.
+   */
+  private evict(keep: string) {
+    const made = [...this.cache.entries()].filter((e): e is [string, Sprite] => e[1] !== null && e[0] !== keep);
+    made.sort((a, b) => (this.lastUse.get(a[0]) ?? 0) - (this.lastUse.get(b[0]) ?? 0));
+    for (const [k, sp] of made) {
+      if (this.bytes <= SpriteFactory.MAX_BYTES * 0.85) break;
+      this.bytes -= sp.img.width * sp.img.height * 4;
+      this.cache.delete(k);
+      this.lastUse.delete(k);
     }
   }
 }

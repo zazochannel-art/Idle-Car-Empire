@@ -13,6 +13,8 @@ import { Painter, rand, sx, sy } from "./iso";
 import { billboard, flagPole, lightPole, tireStack } from "./props";
 import type { Drawable } from "./scene";
 import { drawModel, CAR_COLORS, CAR_MODEL_FOR } from "./vehicles";
+import { atTrack, carWorth, liveryOf } from "@/game/engine/racing";
+import { carLook as lookOf } from "@/game/engine/car-dna";
 
 export const HOME = trackOf("small");
 /** The home circuit's frame on the map. */
@@ -170,8 +172,9 @@ function showroom(p: Painter, s: GameState, t: number) {
   const x = PAD.x + 0.4;
   const y = PAD.y + 3;
   p.box(x, y, 1.7, 1.5, 0, 1, "#e5e7eb", "#f8fafc");
-  const rc = s.racing.cars[0];
-  if (rc) drawModel(p, x + 0.85, y + 0.75, 0, CAR_MODEL_FOR[rc.car], "#f5c451", 1.1, { yaw: t * 0.5, lift: 1 });
+  // the best car at the paddock, in its livery and as it was built
+  const rc = s.racing.cars.filter(atTrack).sort((a, b) => carWorth(b) - carWorth(a))[0];
+  if (rc) drawModel(p, x + 0.85, y + 0.75, 0, CAR_MODEL_FOR[rc.car], liveryOf(s, rc).color, 1.1, { yaw: t * 0.5, lift: 1, paint: true, build: lookOf(s, rc) });
   const c = p.ctx;
   c.globalAlpha = 0.28;
   p.box(x, y, 1.7, 1.5, 1, 14, "#7dd3fc", "#bae6fd", false);

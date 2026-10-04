@@ -52,7 +52,7 @@ Regula de lucru: **extindem ce există, nu creăm sisteme paralele.**
 | **9. Evenimente + sponsori** ✅ | Fiecare eveniment de piață are un obiectiv numărat de la începutul lui (Factory Week: mașini construite, Car Show: vândute, Race Weekend: victorii, Electric Week: hypercar/electrice, export, cercetare, upgrade-uri) cu recompensă în venit + piese; obiectivele neaccesibile (fără echipă de curse, fără export) apar închise; sponsorii au contracte (podiumuri/victorii în 2 h de curse) cu bonus și reînnoire, iar ratarea îl face să plece; prima de semnare se plătește o singură dată (repară exploit-ul semnare/anulare). Bonus: după prestige, mașinile de pe drum sau din showroom revin la fabrică | `events.ts`, `config/events.ts`, `racing.ts`, `prestige.ts` |
 | **10. Economie** ✅ | Goal-bot cu jucător „full” (toate sistemele), ceas real (evenimente), sesiuni 1 h joc / 7 h offline, rapoarte la 15 min → 7 zile; recalibrare: campania costă din vânzările de mașini (nu și din piese), rivalii cresc până la +36%, furnizorul acoperă o fabrică de transmisie/roți/frâne care nu livrează (repară blocarea asamblării după prestige) | `scripts/goal-bot.ts`, `showroom.ts`, `config/racing.ts`, `chain.ts` |
 | **11. UI** ✅ | Bara din stânga: Hartă + 4 piloni (Imperiu: fabrici, garaje, logistică, cercetare, personal, expansiune · Mașini: colecție, modele, laborator, brand · Curse · Afaceri: dealeri, economie, misiuni, statistici, realizări); fiecare ecran arată frații din pilonul lui ca tab-uri; un pilon se redeschide pe ultimul ecran văzut; nicio intrare veche pierdută | `game.tsx`, `ui-store.ts` |
-| **12. Grafică + performanță** | Mașini 3D mai detaliate, LOD, cache de sprite-uri | `three/*` |
+| **12. Grafică + performanță** ✅ | Tehnologiile R&D se văd pe mașină (tunelul aerodinamic → eleron mai mare, panourile din carbon → capotă din carbon), pe linia de asamblare și pe circuit; mașinile tale de curse și cea din showroom-ul paddock-ului sunt desenate cu piesele lor reale și livreaua brandului; doar mașinile ajunse la paddock fac tururi; cache-ul de sprite-uri scoate acum ce s-a folosit cel mai demult (LRU, cu 15% rezervă), nu ce s-a creat primul; timp pe cadru neschimbat (≈7 ms desktop, ≈5 ms telefon) | `car-models.ts`, `sprites.ts`, `race-layer.ts`, `racing-district.ts` |
 
 ## 4. Principii
 
@@ -79,3 +79,30 @@ Ce a arătat și ce s-a reparat:
 - **Campania de marketing** costa din tot venitul (inclusiv piese) și golea casa; acum costă 300 s din media vânzărilor de mașini ale rundei.
 - **Cursele** deveniseră prea ușoare pe termen lung (96% victorii): rivalii unui eveniment cresc acum până la +36% (30 de victorii).
 - Contribuția sistemelor noi la 10 h (fără cercetare/prestige): sponsori + obiective de eveniment + campanii ≈ +25% venit; cercetarea rămâne cel mai mare multiplicator.
+
+## 6. Verificarea finală (specificația, secțiunea 36)
+
+| Cerință | Stare | Unde se vede / cum e verificat |
+|---|---|---|
+| Proiectul existent extins, nu rescris; niciun sistem paralel | ✅ | Fiecare fază extinde un sistem existent: `statsOf` (o singură fizică), `shipments` (transportul colecției), `carPriceMult` (brand), `RESEARCH` (tech), `EVENTS` / `SPONSORS` (obiective, contracte), `RaceCarState` (My Cars) |
+| Mașina e centrul jocului (Car DNA) | ✅ | `engine/car-dna.ts`: DNA din piesele reale (gradele fabricilor), design, upgrade-uri, R&D; aceeași mașină în DNA, pista de teste, curse, showroom |
+| Fabrici noi (transmisie, roți, frâne) legate de asamblare | ✅ | Faza 2; furnizor până la construire și ca rezervă când fabrica nu livrează (faza 10) |
+| Producție vizuală | ✅ | Linia de asamblare desenează mașina reală (culoare, jante, motor, frâne, eleron, carbon) |
+| Transport vizibil | ✅ | Transportoare pe hartă: fabrică ↔ paddock ↔ showroom |
+| Test Track | ✅ | 0–100, 0–200, viteză maximă, frânare, viraj, tur, fiabilitate, din DNA |
+| Racing cu aceeași mașină produsă | ✅ | Comandă de pe linie → colecție → paddock; cursa folosește `carStats(rc)` |
+| Racing Garage (cost, timp, performanță, fiabilitate) | ✅ | Montaj în timp, turbo/ECU, fiabilitatea scade cu puterea, vreme |
+| My Cars cu istoric | ✅ | Locație, kilometraj, curse, victorii, podiumuri, cel mai bun tur, ultimele 12 curse, raport de test |
+| Dealership cu preț și marketing | ✅ | Showroom cu prețul jucătorului, cerere elastică, campanie de marketing |
+| Brand (≠ reputația de racing) | ✅ | Identitate + atribute câștigate; imaginea sportivă separată de calitate |
+| R&D cu piese reale | ✅ | 7 tehnologii care intră fizic în mașinile noi |
+| Evenimente cu obiective + contracte cu sponsori | ✅ | 8 evenimente cu obiective, contracte cu bonus/pierdere |
+| Raport offline | ✅ | Existent, extins: showroom, garaj, contracte avansează offline |
+| Economie 15 min → 7 zile | ✅ | §5; goal-bot `full` / `sessions` |
+| UI pe 4 piloni | ✅ | Bara din stânga: Imperiu / Mașini / Curse / Afaceri + tab-uri |
+| Performanța browserului | ✅ | ≈7 ms/cadru desktop, ≈5 ms telefon; cache LRU de sprite-uri |
+| **Sistemele legate real între ele** | ✅ | Test cap-coadă `the whole loop` (src/game/car-dna.test.ts): fabrică → DNA → pistă → transport → cursă → brand → showroom → bani în registru |
+
+Ce rămâne în afara acestor 12 faze (propuneri):
+- Botul de bază (doar obiectivele „What's next”) are un platou după ~10 h pentru că obiectivele nu sugerează cercetarea și expansiunea; un obiectiv „cercetează X” / „expansiune globală” ar ajuta jucătorii noi.
+- După fiecare expansiune globală, vânzarea de piese domină câteva ore până se reface lanțul de mașini; prețul pieselor la piață poate fi recalibrat separat.
