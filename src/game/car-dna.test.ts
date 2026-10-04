@@ -10,6 +10,8 @@ import * as R from "./engine/racing";
 import * as Sh from "./engine/showroom";
 import { carDemandMult, carPriceMult } from "./engine/market";
 import * as Br from "./engine/brand";
+import * as Ev from "./engine/events";
+import { prestigeReset } from "./engine/prestige";
 import { createInitialState } from "./engine/state";
 import { tick } from "./engine/tick";
 import { migrate } from "./save/serialize";
@@ -382,5 +384,76 @@ describe("R&D technologies", () => {
       expect(node.effects).toContainEqual({ kind: "tech", tech: t });
       expect(Object.keys(CAR_TECH[t].effect).length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("events with objectives and sponsor contracts", () => {
+  const H = 3_600_000;
+  it("an event counts its objective from the moment it starts and pays once", () => {
+    const s = createInitialState(T0);
+    s.chain.firstCar = true;
+    s.chain.steady = 100;
+    const t = [...Array(40)].map((_, b) => b * 3 * H + H + 1).find((x) => Ev.activeEvent(x)!.event.id === "rushOrders")!;
+    s.lifetime.carsByType.city = 50; // built before the event: doesn't count
+    Ev.eventGoalTick(s, t);
+    expect(Ev.eventGoal(s, t)).toMatchObject({ progress: 0, target: 25, done: false, open: true });
+    expect(Ev.claimEventGoal(s, t)).toBeNull();
+    s.lifetime.carsByType.city += 25;
+    expect(Ev.eventGoal(s, t)!.done).toBe(true);
+    const cash = s.cash;
+    expect(Ev.claimEventGoal(s, t)).toBeCloseTo(100 * 600);
+    expect(s.cash).toBeCloseTo(cash + 60_000);
+    expect(Ev.claimEventGoal(s, t)).toBeNull(); // once
+    // the next event starts counting afresh
+    const later = t + 3 * H;
+    Ev.eventGoalTick(s, later);
+    expect(Ev.eventGoal(s, later)!.claimed).toBe(false);
+  });
+
+  it("a racing objective isn't open without a racing team", () => {
+    const s = createInitialState(T0);
+    expect(Ev.eventGoalOpen(s, "raceWins")).toBe(false);
+    s.racing.unlocked = true;
+    car(s);
+    expect(Ev.eventGoalOpen(s, "raceWins")).toBe(true);
+  });
+
+  it("sponsor contract: the signing fee once, a bonus and renewal when met, the sponsor leaves when missed", () => {
+    const s = createInitialState(T0);
+    s.racing.unlocked = true;
+    s.racing.rep = 1000;
+    const cash0 = s.cash;
+    expect(R.signSponsor(s, "boltCola")).toBe(true);
+    expect(s.cash).toBe(cash0 + 10_000);
+    R.signSponsor(s, null);
+    expect(R.signSponsor(s, "boltCola")).toBe(true);
+    expect(s.cash).toBe(cash0 + 10_000); // no second signing fee
+    expect(R.contractStatus(s)).toMatchObject({ progress: 0, target: 3, goal: "podiums" });
+    s.racing.stats.podiums += 3;
+    const before = s.cash;
+    expect(R.contractTick(s)).toBe("met");
+    expect(s.cash).toBe(before + 15_000);
+    expect(s.racing.contract).toMatchObject({ met: 1 });
+    expect(R.contractStatus(s)!.progress).toBe(0);
+    s.racing.clock += 2 * 3600 + 1;
+    expect(R.contractTick(s)).toBe("lost");
+    expect(s.racing.sponsor).toBeNull();
+    // a save keeps the contract
+    R.signSponsor(s, "boltCola");
+    const back = migrate(JSON.parse(JSON.stringify(s)), T0);
+    expect(back.racing.contract).toEqual(s.racing.contract);
+    expect(back.racing.signed).toEqual(["boltCola"]);
+  });
+
+  it("a reset of the empire brings cars on the road or on display back to the lot", () => {
+    const s = createInitialState(T0);
+    const a = car(s);
+    const b = car(s);
+    a.location = "transit";
+    b.location = "showroom";
+    b.listing = { price: 1, dealer: "local", since: 0 };
+    prestigeReset(s, T0);
+    expect([a.location, b.location]).toEqual(["factory", "factory"]);
+    expect(b.listing).toBeUndefined();
   });
 });

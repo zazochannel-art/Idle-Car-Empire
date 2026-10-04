@@ -8,7 +8,7 @@ import { useContent } from "@/i18n/content";
 import { useT } from "@/i18n/use-t";
 import { useGame } from "@/store/game-store";
 import { MissionRow } from "../game/goals";
-import { EventCard } from "../game/event-chip";
+import { EventCard, EventGoalCard } from "../game/event-chip";
 import { ContractCard } from "./contract-card";
 import { ClassicsPanel, SeasonCard, ShowCard, VipCard } from "./live-cards";
 import { SectionTitle, ViewHeader } from "./section-title";
@@ -32,6 +32,7 @@ export function MissionsView() {
     <div className="space-y-5">
       <ViewHeader icon="📋" title={t("nav.missions")} subtitle={t("missions.subtitle")} />
       <EventCard />
+      <EventGoalCard />
 
       <section className="space-y-2">
         <SectionTitle title={t("contract.title")} subtitle={t("contract.subtitle", { n: state.contracts.done })} />

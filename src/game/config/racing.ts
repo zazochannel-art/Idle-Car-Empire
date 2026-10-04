@@ -363,14 +363,16 @@ export interface SponsorConfig {
   perRace: number;
   /** Paid once when signing (and nothing back when leaving). */
   signing: number;
+  /** The contract: reach the target within the hours of racing time for the bonus (and a renewal); miss it and the sponsor leaves. */
+  contract: { goal: "podiums" | "wins"; target: number; hours: number; bonus: number };
 }
 
 export const SPONSORS: SponsorConfig[] = [
-  { id: "boltCola", name: "Bolt Cola", logo: "🥤", color: "#dc2626", minRep: 100, perRace: 5_000, signing: 10_000 },
-  { id: "turboTech", name: "TurboTech Oil", logo: "🛢️", color: "#f59e0b", minRep: 600, perRace: 15_000, signing: 40_000 },
-  { id: "nimbusTel", name: "Nimbus Telecom", logo: "📡", color: "#2563eb", minRep: 2_500, perRace: 50_000, signing: 150_000 },
-  { id: "aurumBank", name: "Aurum Bank", logo: "🏦", color: "#ca8a04", minRep: 8_000, perRace: 200_000, signing: 600_000 },
-  { id: "orbitAir", name: "Orbit Airways", logo: "✈️", color: "#0ea5e9", minRep: 20_000, perRace: 1_000_000, signing: 3_000_000 },
+  { id: "boltCola", name: "Bolt Cola", logo: "🥤", color: "#dc2626", minRep: 100, perRace: 5_000, signing: 10_000, contract: { goal: "podiums", target: 3, hours: 2, bonus: 15_000 } },
+  { id: "turboTech", name: "TurboTech Oil", logo: "🛢️", color: "#f59e0b", minRep: 600, perRace: 15_000, signing: 40_000, contract: { goal: "podiums", target: 5, hours: 2, bonus: 60_000 } },
+  { id: "nimbusTel", name: "Nimbus Telecom", logo: "📡", color: "#2563eb", minRep: 2_500, perRace: 50_000, signing: 150_000, contract: { goal: "wins", target: 4, hours: 2, bonus: 220_000 } },
+  { id: "aurumBank", name: "Aurum Bank", logo: "🏦", color: "#ca8a04", minRep: 8_000, perRace: 200_000, signing: 600_000, contract: { goal: "wins", target: 6, hours: 2, bonus: 900_000 } },
+  { id: "orbitAir", name: "Orbit Airways", logo: "✈️", color: "#0ea5e9", minRep: 20_000, perRace: 1_000_000, signing: 3_000_000, contract: { goal: "wins", target: 8, hours: 2, bonus: 4_500_000 } },
 ];
 export const SPONSOR_BY_ID = Object.fromEntries(SPONSORS.map((s) => [s.id, s])) as Record<string, SponsorConfig>;
 

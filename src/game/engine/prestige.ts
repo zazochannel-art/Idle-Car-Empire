@@ -58,6 +58,12 @@ export function prestigeReset(s: GameState, now: number) {
   // the racing team stays (cars, reputation, trophies); what was on its way from the old plants is gone
   s.racing.orders = [];
   s.racing.arrivals = [];
+  // the old transporters and showrooms are gone: cars on the road or on display are back at the lot
+  for (const rc of s.racing.cars) {
+    if (rc.location === "transit" || rc.location === "showroom") rc.location = "factory";
+    delete rc.listing;
+    delete rc.home;
+  }
   s.run = createStats();
   s.runStartedAt = now;
   s.pendingOffline = null;

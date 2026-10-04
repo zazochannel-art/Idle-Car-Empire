@@ -470,6 +470,8 @@ export interface GameState {
   logistics: LogisticsState;
   /** The materials market: its clock (price drift) and lifetime units bought (supplier tiers). */
   market: { t: number; bought: number };
+  /** The running event's objective: counted from `base` since the event that started at `start` (ms). */
+  eventGoal: { start: number; base: number; claimed: boolean };
   /** The brand: identity chosen by the player (its attributes are earned, see engine/brand.ts). */
   brand: BrandState;
   /** Showroom sales of the collection and the marketing campaign (market clock). */
@@ -635,6 +637,10 @@ export interface RacingState {
   parts: number;
   skins: string[];
   sponsor: string | null;
+  /** The sponsor's contract: progress counted from `base`, due by `until` (racing clock); `met` rounds done. */
+  contract: { base: number; until: number; met: number } | null;
+  /** Sponsors that already paid their signing fee (once each). */
+  signed: string[];
   live: RaceRecord | null;
   last: RaceRecord | null;
   championship: ChampionshipState | null;
