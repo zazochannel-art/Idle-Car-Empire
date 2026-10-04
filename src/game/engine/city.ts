@@ -1,6 +1,7 @@
 // The Empire Map economy: zones, plot buildings and garages with their
 // interior facilities. Garages earn by servicing cars at their workstations;
 // support facilities and nearby buildings make them faster or pricier.
+import { museumTickets } from "./classics";
 import {
   FACILITY_BY_ID,
   FACILITY_GROWTH,
@@ -320,7 +321,8 @@ export function citySnapshot(s: GameState, incomeMult: number): CitySnapshot {
     } else {
       const cfg = STRUCTURE_BY_ID[b.type];
       if (!cfg?.income) continue;
-      const inc = cfg.income * scaleOf(id) * b.level * incomeMult;
+      // the museum sells tickets for the classic cars on show
+      const inc = (cfg.income * b.level + (b.type === "museum" ? museumTickets(s, b.level) : 0)) * scaleOf(id) * incomeMult;
       structureIncome[id] = inc;
       incomePerSec += inc;
     }

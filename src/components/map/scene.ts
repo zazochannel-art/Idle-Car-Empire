@@ -1,6 +1,7 @@
 // Builds the list of things to draw on the Empire Map from the game state:
 // one drawable per plot/cell, depth-sorted by the renderer. Ground (zones,
 // roads, sidewalks) is drawn separately and first.
+import { CLASSIC_BY_ID } from "@/game/config/classics";
 import { racingScene } from "./racing-district";
 import { SPEC_BY_ID, STRUCTURE_BY_ID, ZONES, ZONE_BY_ID } from "@/game/config/city";
 import { DEALER_BY_ID } from "@/game/config/dealerships";
@@ -373,7 +374,7 @@ function dealerLot(p: Painter, plot: Plot, owned: boolean, t: number, seed: numb
 }
 
 
-function structure(p: Painter, plot: Plot, b: BuildingState, t: number, seed: number) {
+function structure(p: Painter, plot: Plot, b: BuildingState, t: number, seed: number, classics: string[] = []) {
   const X = plot.x + M;
   const Y = plot.y + M;
   const W = plot.w - 2 * M;
@@ -507,6 +508,40 @@ function structure(p: Painter, plot: Plot, b: BuildingState, t: number, seed: nu
       const px = X + 0.4 + ((t * 0.12) % 1) * 1.8;
       p.box(px - 0.35, Y + 1.75, 0.7, 0.12, 4, 4, "#f8fafc");
       p.box(px - 0.05, Y + 1.5, 0.12, 0.62, 5, 2, "#f8fafc");
+      break;
+    }
+    case "museum": {
+      // a classical hall: steps, a colonnade, a pediment and banners; the classics on the forecourt
+      p.quad(X, Y, W, D, p.col("#d6d3d1"));
+      p.quad(X + 0.15, Y + 1.55, W - 0.3, D - 1.7, p.col("#e7e5e4"));
+      p.shadow(X + 0.2, Y + 0.2, 2.0, 1.25, 30);
+      p.box(X + 0.15, Y + 0.15, 2.1, 1.35, 0, 4, "#e7e5e4");
+      p.box(X + 0.25, Y + 0.25, 1.9, 1.1, 4, 22, "#f5f0e6", "#e7dfcf");
+      // columns along the front
+      for (let i = 0; i < 6; i++) p.box(X + 0.3 + i * 0.34, Y + 1.3, 0.09, 0.09, 4, 20, "#fafaf9", "#fafaf9", false);
+      p.box(X + 0.22, Y + 1.25, 1.96, 0.2, 24, 4, "#e7dfcf", "#b45309");
+      // pediment
+      const c = p.ctx;
+      c.fillStyle = p.col("#f5f0e6");
+      c.beginPath();
+      c.moveTo(sx(X + 0.22, Y + 1.45), sy(X + 0.22, Y + 1.45, 28));
+      c.lineTo(sx(X + 2.18, Y + 1.45), sy(X + 2.18, Y + 1.45, 28));
+      c.lineTo(sx(X + 1.2, Y + 1.45), sy(X + 1.2, Y + 1.45, 40));
+      c.closePath();
+      c.fill();
+      c.strokeStyle = p.col("#b45309");
+      c.lineWidth = 1;
+      c.stroke();
+      p.textLeft("MUSEUM", X + 1.2, Y + 1.45, 26, 6, "#78350f");
+      // banners
+      const flags = ["#c3141b", "#1b46b8", "#f3c014"];
+      for (let i = 0; i < 3; i++) {
+        p.box(X + 0.1 + i * 1.05, Y + 1.9, 0.03, 0.03, 0, 22, "#94a3b8", undefined, false);
+        p.onLeft(X + 0.11 + i * 1.05, Y + 1.93, 0, 0, 0.18 + Math.sin(t * 2 + i) * 0.02, 14, 21, p.col(flags[i]));
+      }
+      // the classics on show
+      const show = classics.length ? classics : [];
+      show.slice(0, 4).forEach((id, i) => drawCar(p, X + 0.45 + i * 0.5, Y + 2.05, 0, CLASSIC_BY_ID[id]?.color ?? "#b3b9c0"));
       break;
     }
     default:
@@ -1432,7 +1467,7 @@ export function buildScene(state: GameState, snap: EconomySnapshot, names: Scene
           sig: `${b.type}:${b.level}`,
           announce: `${names.structure(b.type)} · ${names.level(b.level)}`,
           draw: (p, info) => {
-            structure(p, plot, b, info.t, seed);
+            structure(p, plot, b, info.t, seed, b.type === "museum" ? live().classics.owned : undefined);
             if (info.selected === plot.id) p.quadStroke(plot.x + 0.2, plot.y + 0.2, plot.w - 0.4, plot.d - 0.4, "#fbbf24", 2.5);
           },
           label: (p, info) => {

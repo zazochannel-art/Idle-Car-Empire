@@ -30,6 +30,9 @@ import { carBaseValue } from "../src/game/engine/chain";
 import { snapshot } from "../src/game/engine/economy";
 import * as U from "../src/game/engine/unlocks";
 import * as Mk from "../src/game/engine/market";
+import * as Lv from "../src/game/engine/live";
+import * as Cl from "../src/game/engine/classics";
+import { CLASSICS } from "../src/game/config/classics";
 import { restockLow } from "../src/game/engine/insights";
 import { nextGoals } from "../src/game/engine/insights";
 import { collectOffline, settleOffline } from "../src/game/engine/offline";
@@ -160,6 +163,17 @@ const actions: [string, () => unknown][] = [
   ["carRoute", () => plantPlots().length && Ch.setCarRoute(s, pick(plantPlots()), pick(["price", "fast", ...DEALERS.map((d) => d.id)] as const))],
   ["recall", () => (rnd() < 0.5 ? Mk.payRecall(s, rnd() * 1e5) : Mk.ignoreRecall(s, rnd()))],
   ["defects", () => Mk.onCarBuilt(s, pick(CARS).id, rnd() * 3, "fast")],
+  ["vipTick", () => Lv.vipTick(s, now, snapshot(s))],
+  ["vipAccept", () => Lv.acceptVip(s, now)],
+  ["vipDecline", () => Lv.declineVip(s, now)],
+  ["vipBuild", () => s.vip.active && Lv.vipBuilt(s, s.vip.active.car, 1 + Math.floor(rnd() * 3), "premium")],
+  ["vipClaim", () => Lv.claimVip(s, now)],
+  ["season", () => (Lv.addSeasonPoints(s, Math.floor(rnd() * 8), pick(RACE_EVENTS).id), Lv.seasonTick(s, now))],
+  ["seasonClaim", () => Lv.claimSeason(s)],
+  ["show", () => Lv.enterShow(s, pick(CARS).id, now, new Set(CARS.map((c) => c.id)))],
+  ["showClaim", () => Lv.claimShow(s)],
+  ["classic", () => Cl.restoreClassic(s, pick(CLASSICS).id, now)],
+  ["classicTick", () => Cl.classicsTick(s, now)],
 ];
 
 for (let step = 0; step < steps; step++) {

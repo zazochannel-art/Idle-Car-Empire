@@ -78,6 +78,7 @@ import type {
 } from "../types";
 import { QUALITY_MODES } from "../config/market";
 import { carDemandMult, carPriceMult, defectRate, onCarBuilt, qualityOf, qualityTick } from "./market";
+import { vipBuilt } from "./live";
 import { designStats } from "./design";
 import { logisticsMods } from "./logistics";
 import { starMods } from "./imperium";
@@ -684,6 +685,7 @@ export function chainTick(
           events?.push({ type: "carBuilt", plot: id, car: st.car.id, first });
           const partModes = recipe(st.car).flatMap((c) => plantsOf(s).filter(([, o]) => o.type === MAKER[c]).map(([, o]) => qualityOf(o.plant)));
           for (let k = 0; k < n; k++) onCarBuilt(s, st.car.id, defectRate(s, p, partModes), qualityOf(p));
+          vipBuilt(s, st.car.id, n, qualityOf(p));
         }
         p.made += n;
         out.rp += n * st.rp;

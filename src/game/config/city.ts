@@ -40,7 +40,7 @@ export const ZONES: ZoneConfig[] = [
   },
   {
     id: "downtown", stage: 3, letter: "D", cost: 150_000, scale: 2.5, ground: "#7fae6e", accent: "#22d3ee",
-    builds: ["garage", "carWash", "parking", "serviceCenter", "researchCenter"],
+    builds: ["garage", "carWash", "parking", "serviceCenter", "researchCenter", "museum"],
     mix: "....ooooaasst",
   },
   {
@@ -50,7 +50,7 @@ export const ZONES: ZoneConfig[] = [
   },
   {
     id: "luxury", stage: 5, letter: "L", cost: 2_500_000, scale: 7, ground: "#5fbf74", accent: "#facc15",
-    builds: ["garage", "serviceCenter", "carWash", "parking", "hq"],
+    builds: ["garage", "serviceCenter", "carWash", "parking", "hq", "museum"],
     mix: "....hhhttta",
   },
   {
@@ -164,6 +164,7 @@ export const STRUCTURES: StructureConfig[] = [
   { id: "researchCenter", emoji: "🔬", cost: 150_000, levelGrowth: 4, maxLevel: 10, rp: 0.05, color: "#f8fafc", roof: "#06b6d4" },
   { id: "exportTerminal", emoji: "🚢", cost: 1_500_000, levelGrowth: 4, maxLevel: 10, markup: 0.02, color: "#cbd5e1", roof: "#0f766e" },
   { id: "hq", emoji: "🏢", cost: 3_000_000, levelGrowth: 4, maxLevel: 10, income2: 0.02, color: "#bfdbfe", roof: "#1e3a8a" },
+  { id: "museum", emoji: "🏛️", cost: 300_000, levelGrowth: 3, maxLevel: 10, income: 1, color: "#f5f0e6", roof: "#b45309" },
   { id: "airport", emoji: "✈️", cost: 8_000_000, levelGrowth: 4, maxLevel: 10, markup: 0.04, color: "#e2e8f0", roof: "#475569" },
   // supply-chain plants (their economy lives in config/chain.ts)
   ...PLANTS.map((p) => ({ id: p.id, emoji: p.emoji, cost: p.cost, levelGrowth: 1, maxLevel: 8, color: p.color, roof: p.roof })),

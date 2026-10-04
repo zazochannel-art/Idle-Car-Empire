@@ -1,5 +1,6 @@
 "use client";
 
+import { ClassicsPanel } from "../views/live-cards";
 import { ArrowRight, Lock, LogIn, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -185,6 +186,7 @@ function StructurePanel({ id }: { id: string }) {
         {income !== undefined && <div className="mt-1 text-base font-bold text-white">{formatMoney(income)}{t("unit.perSec")}</div>}
       </div>
       <CostButton className="w-full" size="lg" cost={cost} label={t("plot.upgrade")} maxedLabel={t("plot.maxed")} onBuy={() => upgradeBuilding(id)} />
+      {b.type === "museum" && <ClassicsPanel />}
     </div>
   );
 }

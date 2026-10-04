@@ -4,6 +4,7 @@
 // trophies. Races are decided here, deterministically, lap by lap; the map
 // and the race viewer only replay the lap times. Prizes go back into the
 // empire; better plants make faster cars. All numbers: config/racing.ts.
+import { addSeasonPoints } from "./live";
 import { CAR_BY_ID, CARS, type CarConfig } from "../config/cars";
 import { MAKER } from "../config/chain";
 import {
@@ -595,6 +596,7 @@ export function settleRace(s: GameState, rec: RaceRecord, seed = rec.id): RaceRe
   }
 
   if (champ) champRound(s, rec, ev, reward, mult);
+  addSeasonPoints(s, pos, ev.id);
   rec.result = reward;
   return reward;
 }
