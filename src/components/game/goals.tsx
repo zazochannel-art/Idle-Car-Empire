@@ -101,9 +101,9 @@ export function runGoal(g: Goal, ready: boolean) {
       ui.selectPlot(g.plot);
       break;
     case "materials": {
-      // one tap buys what is missing for the next 10 units
+      // one tap restocks this plant and every other one running low
       const st = game.snap.chain.plants[g.plot];
-      if (ready && st) game.buyPlan(g.plot, restockPlan(game.state, g.plot, st.need, RESTOCK_UNITS));
+      if (ready && st && !game.restockLow()) game.buyPlan(g.plot, restockPlan(game.state, g.plot, st.need, RESTOCK_UNITS));
       ui.selectPlot(g.plot);
       break;
     }

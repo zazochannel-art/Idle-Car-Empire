@@ -60,6 +60,7 @@ export function prestigeReset(s: GameState, now: number) {
   s.run = createStats();
   s.runStartedAt = now;
   s.pendingOffline = null;
+  s.unlocks = [];
   for (const m of Object.values(s.managers)) m.assignedTo = null;
 
   applyStartPerks(s);

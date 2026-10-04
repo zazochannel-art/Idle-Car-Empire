@@ -450,6 +450,8 @@ export interface GameState {
   chain: ChainState;
   racing: RacingState;
   pendingOffline: OfflineReport | null;
+  /** Unlock bonuses already claimed this run ("car:sedan", "plant:engineFactory"). */
+  unlocks: string[];
   settings: { buyAmount: BuyAmount; lang: Lang; lowGraphics: boolean; sound: boolean; haptics: boolean };
   createdAt: number;
   runStartedAt: number;

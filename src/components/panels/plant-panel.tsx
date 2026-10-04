@@ -5,14 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { CARS, CAR_BY_ID } from "@/game/config/cars";
-import { AUTOMATION, BASE_MAX_LEVEL, CHASSIS_BONUS, COMPONENTS, COMPONENT_BY_ID, GRADES, PLANT_BY_ID, PLANT_LEVELS, PLANT_TRUCKS, SPEED } from "@/game/config/chain";
+import { AUTOMATION, BASE_MAX_LEVEL, CHASSIS_BONUS, COMPONENTS, COMPONENT_BY_ID, GRADES, MAKER, PLANT_BY_ID, PLANT_LEVELS, PLANT_TRUCKS, SPEED } from "@/game/config/chain";
 import { DEALER_BY_ID, DEALER_SPECIALTY } from "@/game/config/dealerships";
 import { MANAGERS } from "@/game/config/managers";
 import { DEPOT, MARKET, plotOf } from "@/game/city/layout";
 import { MATERIALS } from "@/game/config/economy";
 import { marketPrice, usedMaterials } from "@/game/engine/materials";
 import { REGIONS } from "@/game/config/regions";
-import { AUTO_UPGRADE_FROM, plantNetValue, plantProfitPerMin, plantUnitCost, automationCost, bestGrade, carLock, carValue, componentValue, dealerStats, trucksOf, gradeCost, levelCost, plantNumber, plantsOf, recipe, speedCost } from "@/game/engine/chain";
+import { AUTO_UPGRADE_FROM, plantNetValue, plantProfitPerMin, plantUnitCost, automationCost, bestGrade, carLock, carValue, componentValue, dealerStats, trucksOf, gradeCost, levelCost, plantNumber, plantsOf, recipe, speedCost, supplied, supplierPrice } from "@/game/engine/chain";
 import { isManagerUnlocked } from "@/game/engine/actions";
 import { dealerUpgradeCost, managerUpgradeCost } from "@/game/engine/economy";
 import { dealerRequirement } from "@/game/engine/insights";
@@ -148,6 +148,15 @@ export function PlantPanel({ id }: { id: string }) {
             ))}
           <StockBar label={`📦 ${itemName(st.combine ? "chassis" : item, t)}`} value={p.out} cap={st.outCap} color="#38bdf8" />
         </div>
+        {!cfg.item &&
+          st.car &&
+          recipe(st.car)
+            .filter((c) => supplied(state, c))
+            .map((c) => (
+              <p key={c} className="mt-2 rounded-lg bg-sky-400/10 px-2 py-1.5 text-[11px] text-sky-200 ring-1 ring-sky-400/25">
+                🚚 {t("supplier.note", { item: itemName(c, t), price: formatMoney(supplierPrice(c)), plant: t(`structure.${PLANT_BY_ID[MAKER[c]].id}` as MessageKey) })}
+              </p>
+            ))}
       </div>
 
       {/* transport */}

@@ -3,7 +3,7 @@
 // in the player's language. Never mutate state.
 import { racingCost } from "./racing";
 import { LOW_STOCK_UNITS, MATERIAL_BY_ID, RESERVE_UNITS, RESTOCK_UNITS, WAREHOUSE_MINUTES, type MaterialId } from "../config/economy";
-import { plantMaterials, restockPlan, stockTotal, supplierOf, unitsInStock, warehouseCap, warehouseCost } from "./materials";
+import { buyPlan, plantMaterials, restockPlan, stockTotal, supplierOf, unitsInStock, warehouseCap, warehouseCost } from "./materials";
 import { CARS } from "../config/cars";
 import { MAKER, PLANTS, PLANT_BY_ID } from "../config/chain";
 import { DEALERS } from "../config/dealerships";
@@ -56,6 +56,26 @@ export function dealerRequirement(s: GameState, id: DealerId): Requirement | nul
   if (!canOpenDealers(s)) return { kind: "firstCar" };
   const plot = dealerPlot(id);
   return plot && !isPlotUnlocked(s, plot) ? { kind: "zone", zone: plot.zone } : null;
+}
+
+/**
+ * One tap for every plant running low (fewest units first, while the cash
+ * lasts), so the materials goal doesn't come back plant after plant.
+ * Returns how many plants were restocked.
+ */
+export function restockLow(s: GameState, snap: EconomySnapshot): number {
+  const low: { id: string; n: number; need: MaterialStock }[] = [];
+  for (const [id, b] of plantsOf(s)) {
+    const st = snap.chain.plants[id];
+    if (!st || !Object.keys(st.need).length) continue;
+    if (s.chain.shipments.some((sh) => !sh.back && sh.to === id && sh.materials)) continue;
+    const n = unitsInStock(b.plant, st.need).n;
+    if (n < LOW_STOCK_UNITS || b.plant.status === "noRaw") low.push({ id, n, need: st.need });
+  }
+  low.sort((a, b) => a.n - b.n);
+  let done = 0;
+  for (const l of low) if (buyPlan(s, l.id, restockPlan(s, l.id, l.need, RESTOCK_UNITS))) done++;
+  return done;
 }
 
 /** A free plot in an unlocked district, if there is one. */
@@ -213,6 +233,9 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
   }
   const plantGoal = goals.find((g) => g.kind === "plant");
   if (best && best.cost <= s.cash && best.cost + reserve > s.cash) best = null;
+  // before the first car, everything goes towards the next plant of the chain (no detours)
+  const firstCarFocus = !s.chain.firstCar && !!plantGoal;
+  if (firstCarFocus) best = null;
   // the next plant is "far" when it takes more than ~10 minutes of income to save up for it
   const far = !plantGoal || ("cost" in plantGoal && plantGoal.cost - s.cash > Math.max(s.cash * 2, snap.incomePerSec * 600));
   if (best && best.cost <= s.cash && far) {
@@ -242,7 +265,7 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
   }
 
   const nextManager = MANAGERS.find((m) => !s.managers[m.id].hired && isManagerUnlocked(s, m.id));
-  if (nextManager) goals.push({ kind: "manager", icon: nextManager.avatar, cost: nextManager.cost, manager: nextManager.id });
+  if (nextManager && !firstCarFocus) goals.push({ kind: "manager", icon: nextManager.avatar, cost: nextManager.cost, manager: nextManager.id });
 
   if (canPrestige(s)) {
     const points = pendingPoints(s);

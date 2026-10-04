@@ -8,6 +8,7 @@ import { CARS, CAR_BY_ID, CAR_MODEL, type CarConfig } from "../config/cars";
 import {
   AUTOMATION,
   BASE_RECIPE,
+  SUPPLIER_MARKUP,
   CHASSIS_BONUS,
   CARRIER_CAPACITY,
   COMPONENT_BY_ID,
@@ -150,7 +151,9 @@ export function plantLock(s: GameState, type: PlantType): PlantLock {
 }
 
 export function plantBuildCost(s: GameState, type: PlantType): number {
-  return PLANT_BY_ID[type].cost * Math.pow(PLANT_COPY_COST, plantCount(s, type)) * regionCostMult(s.prestigeCount);
+  const cfg = PLANT_BY_ID[type];
+  const n = plantCount(s, type);
+  return (n === 0 && cfg.firstCost ? cfg.firstCost : cfg.cost * Math.pow(PLANT_COPY_COST, n)) * regionCostMult(s.prestigeCount);
 }
 
 const base = (b: BuildingState) => PLANT_BY_ID[b.type as PlantType].cost;
@@ -197,6 +200,16 @@ export function recipe(car: CarConfig): ComponentId[] {
   return [...BASE_RECIPE, ...car.extras];
 }
 
+/** A base part the company doesn't make yet: an outside supplier delivers it to the assembly line. */
+export function supplied(s: GameState, c: ComponentId): boolean {
+  return BASE_RECIPE.includes(c) && !hasPlant(s, MAKER[c]);
+}
+
+/** What the supplier charges for one unit (grade 1). */
+export function supplierPrice(c: ComponentId): number {
+  return componentStdCost(c, 1) * SUPPLIER_MARKUP;
+}
+
 /** Best grade available for a component across all plants that make it. */
 export function bestGrade(s: GameState, c: ComponentId): number {
   let g = 0;
@@ -215,8 +228,8 @@ export function carLock(s: GameState, car: CarConfig, gm: GlobalMods): CarLock {
   if (car.requiresResearch && !gm.unlockedCars.has(car.id)) return { kind: "research", research: car.requiresResearch };
   if (!hasPlant(s, "assemblyPlant")) return { kind: "plant", plant: "assemblyPlant" };
   // missing plants first (the bigger step), then grades
-  for (const c of recipe(car)) if (bestGrade(s, c) === 0) return { kind: "plant", plant: MAKER[c] };
-  for (const c of recipe(car)) if (bestGrade(s, c) < car.grade) return { kind: "grade", plant: MAKER[c], grade: car.grade };
+  for (const c of recipe(car)) if (bestGrade(s, c) === 0 && !(supplied(s, c) && car.grade <= 1)) return { kind: "plant", plant: MAKER[c] };
+  for (const c of recipe(car)) if (bestGrade(s, c) < car.grade && !(supplied(s, c) && car.grade <= 1)) return { kind: "grade", plant: MAKER[c], grade: car.grade };
   return null;
 }
 
@@ -255,7 +268,7 @@ export function componentValue(c: ComponentId, grade: number, gm: GlobalMods, ex
 
 /** The player's model on this platform, with quality from the parts actually made. */
 export function modelStats(s: GameState, car: CarConfig) {
-  const grades = recipe(car).map((c) => bestGrade(s, c));
+  const grades = recipe(car).map((c) => (supplied(s, c) ? 1 : bestGrade(s, c)));
   const grade = grades.length ? Math.max(car.grade, grades.reduce((a, b) => a + b, 0) / grades.length) : car.grade;
   return designStats(car, s.designs[car.id], grade);
 }
@@ -556,6 +569,20 @@ export function chainTick(
 
     // 1. materials: restock automatically when the plant is set to (Wholesale supplier and up)
     if (cfg.item && p.autoBuy) autoRestock(s, id, st.unitsPerSec);
+
+    // 1b. parts the company doesn't make yet come from the supplier
+    if (!cfg.item && st.car)
+      for (const c of recipe(st.car)) {
+        if (!supplied(s, c)) continue;
+        // only what the next car needs, on account when cash is short (the car pays it back)
+        const n = Math.floor(st.lines - (p.inputs[c] ?? 0));
+        if (n <= 0) continue;
+        const price = supplierPrice(c);
+        payOrOwe(s, n * price);
+        out.spent += n * price;
+        book(s, "materials", n * price);
+        p.inputs[c] = (p.inputs[c] ?? 0) + n;
+      }
 
     // 2. production
     const canMake = () => {

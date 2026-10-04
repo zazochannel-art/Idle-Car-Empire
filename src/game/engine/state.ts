@@ -88,6 +88,7 @@ export function createInitialState(now: number): GameState {
     chain: createChain(),
     racing: createRacing(),
     pendingOffline: null,
+    unlocks: [],
     settings: { buyAmount: 1, lang: "en", lowGraphics: false, sound: true, haptics: true },
     createdAt: now,
     runStartedAt: now,

@@ -8,7 +8,7 @@ import { buyPlan, restockPlan } from "../src/game/engine/materials";
 import { createInitialState } from "../src/game/engine/state";
 import { tick } from "../src/game/engine/tick";
 import { buyDealer, hireManager, upgradeDealer } from "../src/game/engine/actions";
-import { freePlot, nextGoals } from "../src/game/engine/insights";
+import { freePlot, nextGoals, restockLow } from "../src/game/engine/insights";
 import { formatMoney } from "../src/game/format";
 import { checkInvariants } from "./invariants";
 import * as Rc from "../src/game/engine/racing";
@@ -67,7 +67,11 @@ for (let t = 0; t < hours * 3600; t++) {
   if (t % 5 === 0) snap = snapshot(s);
   const before = s.cash;
   const owedBefore = s.chain.owed;
+  const hadCar = s.chain.firstCar;
+  const hadAsm = Ch.hasPlant(s, "assemblyPlant");
   tick(s, 1, snap);
+  if (!hadAsm && Ch.hasPlant(s, "assemblyPlant")) console.log(`>> assembly plant at ${fmtT(t)}`);
+  if (!hadCar && s.chain.firstCar) console.log(`>> first car at ${fmtT(t)}`);
   if (owedBefore > 0 && s.chain.owed === 0 && s.cash > before + 40 && s.cash < 1000) rescues++;
   maxOwed = Math.max(maxOwed, s.chain.owed);
   if (t % 600 === 0 && t > 0) {
@@ -102,7 +106,7 @@ for (let t = 0; t < hours * 3600; t++) {
     switch (g.kind) {
       case "plant": { const p = freePlot(s); acted = !!p && buildStructure(s, p, g.plant); break; }
       case "upgrade": case "shortage": if ("what" in g && g.what) acted = g.what === "speed" ? Ch.upgradePlantSpeed(s, g.plot, gm) : Ch.upgradePlantLevel(s, g.plot, gm); break;
-      case "materials": { const st = snap.chain.plants[g.plot]; if (st) acted = buyPlan(s, g.plot, restockPlan(s, g.plot, st.need, RESTOCK_UNITS)); break; }
+      case "materials": { const st = snap.chain.plants[g.plot]; acted = restockLow(s, snap) > 0 || (!!st && buyPlan(s, g.plot, restockPlan(s, g.plot, st.need, RESTOCK_UNITS))); break; }
       case "dealer": acted = buyDealer(s, g.dealer); break;
       case "dealerFull": acted = g.open ? buyDealer(s, g.dealer) : upgradeDealer(s, g.dealer); break;
       case "car": if (g.plot && g.cost !== undefined) acted = Ch.upgradeGrade(s, g.plot, gm); break;
