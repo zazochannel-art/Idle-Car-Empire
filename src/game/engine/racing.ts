@@ -439,6 +439,8 @@ const gauss = (r: () => number) => Math.sqrt(-2 * Math.log(Math.max(1e-9, r())))
 /** Colours a race car runs in: its livery, or the model's own paint. */
 export function liveryOf(s: GameState, rc: RaceCarState): { color: string; accent: string } {
   const sk = SKINS[rc.skin] ?? SKINS.factory;
+  // the factory livery wears the brand's colours
+  if (rc.skin === "factory" || !SKINS[rc.skin]) return { color: s.designs[rc.car]?.color || (s.brand?.name ? s.brand.color : "") || CAR_BY_ID[rc.car].color, accent: s.brand?.accent && s.brand.name ? s.brand.accent : sk.accent };
   return { color: sk.color || s.designs[rc.car]?.color || CAR_BY_ID[rc.car].color, accent: sk.accent };
 }
 
