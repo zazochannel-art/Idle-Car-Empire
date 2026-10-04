@@ -159,6 +159,8 @@ export function lockText(t: (k: MessageKey, v?: Record<string, string | number>)
       return t("racing.lock.class", { c: lock.classes.join("/") });
     case "noCar":
       return t("racing.lock.noCar");
+    case "away":
+      return t("racing.lock.away");
     case "busy":
       return t("racing.lock.busy");
     case "championship":

@@ -241,6 +241,9 @@ export function retireRaceCar(s: GameState, id: number): number {
 /** Kilometres a lap adds to a car's odometer. */
 const TRACK_KM = 4.2;
 
+/** A car at the paddock (not at the factory lot, nor on a transporter) can race. */
+export const atTrack = (rc: RaceCarState) => rc.location !== "factory" && rc.location !== "transit";
+
 export const raceCar = (s: GameState, id: number | null) => s.racing.cars.find((c) => c.id === id) ?? null;
 export const condition = (rc: RaceCarState) => WEAR_PARTS.reduce((a, p) => a + rc.wear[p], 0) / WEAR_PARTS.length;
 const level = (rc: { upgrades: RaceCarState["upgrades"] }, u: RaceUpgrade) => rc.upgrades[u] ?? 0;
@@ -365,6 +368,7 @@ export type EventLock =
   | { kind: "rep"; need: number }
   | { kind: "class"; classes: RaceClass[] }
   | { kind: "noCar" }
+  | { kind: "away" }
   | { kind: "busy" }
   | { kind: "championship"; event: string }
   | { kind: "cooldown"; seconds: number }
@@ -385,6 +389,7 @@ export function cooldownLeft(s: GameState, id: string): number {
 export function eventLock(s: GameState, ev: RaceEventConfig, rc: RaceCarState | null): EventLock {
   if (s.racing.rep < ev.minRep) return { kind: "rep", need: ev.minRep };
   if (!rc) return { kind: "noCar" };
+  if (!atTrack(rc)) return { kind: "away" };
   if (!ev.classes.includes(classOf(rc.car))) return { kind: "class", classes: ev.classes };
   if (s.racing.live) return { kind: "busy" };
   // one championship at a time
@@ -398,6 +403,7 @@ export function eventLock(s: GameState, ev: RaceEventConfig, rc: RaceCarState | 
 
 /** The hardest event this car may enter now (what automatic racing picks). */
 export function bestEventFor(s: GameState, rc: RaceCarState): RaceEventConfig | null {
+  if (!atTrack(rc)) return null;
   let best: RaceEventConfig | null = null;
   for (const ev of RACE_EVENTS) {
     if (ev.type === "championship") continue;
@@ -680,7 +686,7 @@ export function repairCost(s: GameState, rc: RaceCarState): number {
 
 export function repairCar(s: GameState, id: number): boolean {
   const rc = raceCar(s, id);
-  if (!rc || s.racing.live?.car === id) return false;
+  if (!rc || s.racing.live?.car === id || rc.location === "transit") return false;
   const cost = repairCost(s, rc);
   if (cost <= 0 || s.cash < cost) return false;
   s.cash -= cost;
@@ -743,7 +749,7 @@ function takeParts(s: GameState, c: ComponentId, n: number): boolean {
  */
 export function upgradeRaceCar(s: GameState, id: number, u: RaceUpgrade, useRacingParts = false): boolean {
   const rc = raceCar(s, id);
-  if (!rc || s.racing.live?.car === id) return false;
+  if (!rc || s.racing.live?.car === id || rc.location === "transit") return false;
   const cost = raceUpgradeCost(s, rc, u);
   if (!cost || s.cash < cost.money) return false;
   if (useRacingParts) {
@@ -791,7 +797,8 @@ function autoRepair(s: GameState, rc: RaceCarState) {
 }
 
 function autoCar(s: GameState) {
-  return raceCar(s, s.racing.selected) ?? s.racing.cars[0] ?? null;
+  const sel = raceCar(s, s.racing.selected);
+  return sel && atTrack(sel) ? sel : (s.racing.cars.find(atTrack) ?? sel ?? s.racing.cars[0] ?? null);
 }
 
 /**
@@ -944,7 +951,8 @@ export function migrateRacing(raw: unknown): RacingState {
         races: Math.max(0, num(c.races)),
         wins: Math.max(0, num(c.wins)),
         built: num(c.built, 0),
-        location: c.location === "factory" ? "factory" : "racing",
+        location: c.location === "factory" || c.location === "transit" ? c.location : "racing",
+        ...(typeof c.home === "string" ? { home: c.home } : {}),
         mileage: Math.max(0, num(c.mileage)),
         podiums: Math.max(0, num(c.podiums)),
         ...(num(c.bestLap, 0) > 0 ? { bestLap: num(c.bestLap) } : {}),

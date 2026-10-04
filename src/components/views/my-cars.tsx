@@ -6,7 +6,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CARS, CAR_BY_ID } from "@/game/config/cars";
 import { carDNA, testCar, testFee, type TestReport } from "@/game/engine/car-dna";
-import { MY_CARS_LOT, condition, fleetCap, orderableCars, racingFleet } from "@/game/engine/racing";
+import { carEta, carTrip } from "@/game/engine/chain";
+import { MY_CARS_LOT, atTrack, condition, fleetCap, orderableCars, racingFleet } from "@/game/engine/racing";
 import { formatMoney, formatNumber } from "@/game/format";
 import type { RaceCarState } from "@/game/types";
 import { useContent } from "@/i18n/content";
@@ -75,7 +76,7 @@ function KeepCar() {
 
 function CarCard({ rc, open, onToggle }: { rc: RaceCarState; open: boolean; onToggle: () => void }) {
   const state = useGame((g) => g.state);
-  const { runTest, selectRaceCar } = useGame.getState();
+  const { runTest, selectRaceCar, sendCar } = useGame.getState();
   const setView = useUi((u) => u.setView);
   const { t, lang } = useT();
   const n = useContent(lang);
@@ -83,7 +84,11 @@ function CarCard({ rc, open, onToggle }: { rc: RaceCarState; open: boolean; onTo
   const dna = carDNA(state, rc);
   const losses = rc.races - rc.wins;
   const fee = testFee(rc);
-  const where = state.racing.live?.car === rc.id ? t("mycars.loc.racing") : rc.location === "factory" ? t("mycars.loc.factory") : t("mycars.loc.paddock");
+  const where =
+    state.racing.live?.car === rc.id ? t("mycars.loc.racing") : rc.location === "factory" ? t("mycars.loc.factory") : rc.location === "transit" ? t("mycars.loc.transit") : t("mycars.loc.paddock");
+  const eta = rc.location === "transit" ? carEta(state, rc.id) : null;
+  const toPaddock = carTrip(state, rc, "racing");
+  const toLot = carTrip(state, rc, "factory");
   return (
     <div className="glass overflow-hidden rounded-2xl ring-1 ring-white/[0.07]">
       <button onClick={onToggle} className="flex w-full items-center gap-3 p-3 text-left">
@@ -149,13 +154,32 @@ function CarCard({ rc, open, onToggle }: { rc: RaceCarState; open: boolean; onTo
           <div className="rounded-xl bg-gradient-to-br from-sky-500/10 to-transparent p-2.5 ring-1 ring-sky-400/25">
             <div className="mb-1 flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-sky-200">⏱️ {t("test.title")}</span>
-              <Button size="sm" variant="gold" disabled={state.cash < fee || state.racing.live?.car === rc.id} onClick={() => runTest(rc.id)}>
+              <Button size="sm" variant="gold" disabled={state.cash < fee || state.racing.live?.car === rc.id || rc.location === "transit"} onClick={() => runTest(rc.id)}>
                 {t("test.run", { fee: formatMoney(fee) })}
               </Button>
             </div>
             {rc.test ? <Report r={rc.test} now={testCar(rc)} /> : <p className="text-[11px] text-white/45">{t("test.none")}</p>}
           </div>
-          {state.racing.unlocked && (
+          {/* on the road: the car travels on its own transporter, visible on the map */}
+          {eta && (
+            <p className="rounded-lg bg-amber-400/10 px-2 py-1.5 text-[11px] text-amber-200 ring-1 ring-amber-300/20">
+              {t("mycars.eta", { to: t(eta.to === "racing" ? "mycars.loc.paddock" : "mycars.loc.factory"), time: `${Math.ceil(eta.left)}s` })}
+            </p>
+          )}
+          {state.racing.unlocked && rc.location === "factory" && <p className="text-[11px] text-white/45">{t("mycars.awayHint")}</p>}
+          <div className="flex gap-2">
+            {toPaddock && (
+              <Button size="sm" variant="gold" className="flex-1" disabled={state.cash < toPaddock.fee} onClick={() => sendCar(rc.id, "racing")}>
+                {t("mycars.send.racing", { fee: formatMoney(toPaddock.fee) })}
+              </Button>
+            )}
+            {toLot && (
+              <Button size="sm" variant="secondary" className="flex-1" disabled={state.cash < toLot.fee} onClick={() => sendCar(rc.id, "factory")}>
+                {t("mycars.send.factory", { fee: formatMoney(toLot.fee) })}
+              </Button>
+            )}
+          </div>
+          {state.racing.unlocked && atTrack(rc) && (
             <Button
               size="sm"
               variant="secondary"

@@ -23,6 +23,7 @@ import {
   carRating,
   classOf,
   condition,
+  atTrack,
   eventLock,
   expectedHourly,
   garageLevel,
@@ -40,6 +41,7 @@ import {
   repTier,
   standings,
 } from "@/game/engine/racing";
+import { carEta, carTrip } from "@/game/engine/chain";
 import { raceClock } from "@/game/racing/tracks";
 import { formatMoney, formatNumber, formatPercent } from "@/game/format";
 import type { GameState } from "@/game/types";
@@ -165,7 +167,7 @@ function Races() {
   const car = raceCar(state, state.racing.selected);
   return (
     <div className="space-y-2">
-      {!car && <NoCarHint />}
+      {(!car || !atTrack(car)) && <NoCarHint />}
       {specials.length > 0 && (
         <>
           <div className="px-1 text-[11px] font-bold uppercase tracking-wider text-fuchsia-300/80">✨ {t("racing.specials")}</div>
@@ -190,8 +192,26 @@ const eventOf = (id: string) => RACE_EVENTS.find((e) => e.id === id)!;
 const specialsNow = () => activeSpecials(new Date().getTime());
 
 function NoCarHint() {
+  const state = useGame((g) => g.state);
+  const sendCar = useGame((g) => g.sendCar);
   const { t } = useT();
-  return <div className="rounded-2xl bg-amber-500/10 p-3 text-xs text-amber-100 ring-1 ring-amber-400/30">🚛 {t("racing.noCarHint")}</div>;
+  const cars = state.racing.cars;
+  // the company has cars, just not at the paddock: a transporter brings one over
+  const away = cars.length > 0 && !cars.some(atTrack);
+  const rc = away ? (cars.find((c) => c.location !== "transit") ?? null) : null;
+  const trip = rc && carTrip(state, rc, "racing");
+  const eta = away && !rc ? carEta(state, cars[0].id) : null;
+  if (!away) return <div className="rounded-2xl bg-amber-500/10 p-3 text-xs text-amber-100 ring-1 ring-amber-400/30">🚛 {t("racing.noCarHint")}</div>;
+  return (
+    <div className="flex items-center gap-2 rounded-2xl bg-amber-500/10 p-3 text-xs text-amber-100 ring-1 ring-amber-400/30">
+      <span className="flex-1">{eta ? t("mycars.eta", { to: t("mycars.loc.paddock"), time: `${Math.ceil(eta.left)}s` }) : t("mycars.awayHint")}</span>
+      {rc && trip && (
+        <button disabled={state.cash < trip.fee} onClick={() => sendCar(rc.id, "racing")} className="shrink-0 rounded-lg bg-gold/20 px-2 py-1 text-[11px] font-bold text-gold ring-1 ring-gold/40 disabled:opacity-40">
+          {t("mycars.send.racing", { fee: formatMoney(trip.fee) })}
+        </button>
+      )}
+    </div>
+  );
 }
 
 function EventCard({ ev, special }: { ev: RaceEventConfig; special?: string }) {
@@ -292,7 +312,7 @@ function ChampionshipCard() {
 
 function Garage() {
   const state = useGame((g) => g.state);
-  const { upgradeRacingGarage, orderRaceCar, cancelRaceOrder } = useGame.getState();
+  const { upgradeRacingGarage, orderRaceCar, cancelRaceOrder, sendCar } = useGame.getState();
   const { t } = useT();
   const R = state.racing;
   const lv = garageLevel(state);
@@ -325,9 +345,33 @@ function Garage() {
         )}
       </div>
 
-      {R.cars.map((c) => (
+      {R.cars.filter(atTrack).map((c) => (
         <RaceCarCard key={c.id} id={c.id} />
       ))}
+
+      {/* cars of the collection away from the paddock: a transporter brings them over */}
+      {R.cars.some((c) => !atTrack(c)) && (
+        <div className="space-y-1.5 rounded-2xl bg-white/[0.04] p-3 text-xs ring-1 ring-white/[0.07]">
+          {R.cars
+            .filter((c) => !atTrack(c))
+            .map((c) => {
+              const trip = carTrip(state, c, "racing");
+              const eta = carEta(state, c.id);
+              return (
+                <div key={c.id} className="flex items-center justify-between gap-2">
+                  <span className="truncate">
+                    {CAR_BY_ID[c.car].emoji} {state.designs[c.car].name} — {eta ? t("mycars.eta", { to: t("mycars.loc.paddock"), time: `${Math.ceil(eta.left)}s` }) : t("mycars.loc.factory")}
+                  </span>
+                  {trip && (
+                    <button disabled={state.cash < trip.fee} onClick={() => sendCar(c.id, "racing")} className="shrink-0 rounded-lg bg-gold/20 px-2 py-1 text-[11px] font-bold text-gold ring-1 ring-gold/40 disabled:opacity-40">
+                      {t("mycars.send.racing", { fee: formatMoney(trip.fee) })}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+        </div>
+      )}
 
       {/* cars on their way and sending a new one */}
       {(R.orders.length > 0 || R.arrivals.length > 0) && (

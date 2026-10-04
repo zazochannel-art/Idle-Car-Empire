@@ -161,6 +161,7 @@ const actions: [string, () => unknown][] = [
   ["select", () => s.racing.cars.length && (s.racing.selected = pick(s.racing.cars).id)],
   ["keepCar", () => Rc.orderRaceCar(s, pick(CARS).id)],
   ["testTrack", () => s.racing.cars.length && Dn.runTest(s, pick(s.racing.cars).id)],
+  ["sendCar", () => s.racing.cars.length && Ch.sendCar(s, pick(s.racing.cars).id, rnd() < 0.5 ? "racing" : "factory")],
   ["autoUpgrade", () => plantPlots().length && (s.city.buildings[pick(plantPlots())].plant!.auto = rnd() < 0.5)],
   ["claimUnlock", () => U.claimUnlock(s, rnd() < 0.5 ? "car" : "plant", rnd() < 0.5 ? pick(CARS).id : pick(PLANTS).id)],
   ["restockLow", () => restockLow(s, snapshot(s))],
