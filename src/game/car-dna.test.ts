@@ -457,3 +457,22 @@ describe("events with objectives and sponsor contracts", () => {
     expect(b.listing).toBeUndefined();
   });
 });
+
+describe("the supplier as a backup", () => {
+  it("a drivetrain plant that delivers nothing doesn't stall the assembly line", () => {
+    const s = createInitialState(T0);
+    s.cash = 1e6;
+    s.chain.firstCar = true;
+    const free = WORLD_MAP.plots.filter((x) => x.kind === "plot" && x.zone === "town" && !x.big && !s.city.buildings[x.id]).map((x) => x.id);
+    for (const [i, t] of (["bodyWorks", "engineFactory", "tireFactory", "assemblyPlant", "interiorFactory", "suspensionFactory", "brakeFactory"] as const).entries())
+      s.city.buildings[free[i]] = { type: t, level: 1, plant: Ch.newPlant() };
+    const asm = s.city.buildings[free[3]].plant!;
+    const brakes = s.city.buildings[free[6]].plant!;
+    brakes.status = "noRaw";
+    // the line builds Sedans; the brake plant has nothing to give
+    asm.car = "sedan";
+    expect(Ch.supplied(s, "brakes")).toBe(false); // the company has a brake plant
+    for (let i = 0; i < 20; i++) tick(s, 0.5);
+    expect(asm.inputs.brakes ?? 0).toBeGreaterThan(0);
+  });
+});

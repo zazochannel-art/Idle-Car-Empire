@@ -220,6 +220,17 @@ export function suppliedGrade(c: ComponentId, car: CarConfig): number {
   return SUPPLIED_PARTS.includes(c) ? car.grade : 1;
 }
 
+/**
+ * A drivetrain part the company makes, but its own plants deliver nothing
+ * (out of materials, stopped): rather than stalling the line for hours, the
+ * outside supplier steps in at its price until the company's parts flow again.
+ */
+function backupSupply(s: GameState, plot: string, c: ComponentId, p: PlantData): boolean {
+  if (!SUPPLIED_PARTS.includes(c) || (p.inputs[c] ?? 0) >= 1) return false;
+  if (s.chain.shipments.some((sh) => !sh.back && sh.to === plot && sh.item === c)) return false;
+  return plantsOf(s).every(([, b]) => b.type !== MAKER[c] || (b.plant.out < 1 && b.plant.status !== "ok"));
+}
+
 /** Whether the supplier covers this part for this model. */
 const supplierCovers = (s: GameState, c: ComponentId, car: CarConfig) => supplied(s, c) && suppliedGrade(c, car) >= car.grade;
 
@@ -669,7 +680,7 @@ export function chainTick(
     // 1b. parts the company doesn't make yet come from the supplier
     if (!cfg.item && st.car)
       for (const c of recipe(st.car)) {
-        if (!supplied(s, c)) continue;
+        if (!supplied(s, c) && !backupSupply(s, id, c, p)) continue;
         // only what the next car needs, on account when cash is short (the car pays it back)
         const n = Math.floor(st.lines - (p.inputs[c] ?? 0));
         if (n <= 0) continue;

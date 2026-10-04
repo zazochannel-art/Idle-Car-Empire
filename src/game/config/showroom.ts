@@ -19,7 +19,7 @@ export const CAMPAIGN = {
   /** Dealer customers come this much faster, showroom buyers this much more often. */
   demand: 1.5,
   showroom: 2,
-  /** It costs this many seconds of steady income (at least `min`). */
-  costSec: 240,
+  /** It costs this many seconds of the run's average car sales (at least `min`): it only helps cars. */
+  costSec: 300,
   min: 5_000,
 };
