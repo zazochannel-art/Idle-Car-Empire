@@ -38,6 +38,8 @@ import { uiEvents } from "./events";
 import * as Mk from "@/game/engine/market";
 import * as Lv from "@/game/engine/live";
 import * as Cl from "@/game/engine/classics";
+import * as Ex from "@/game/engine/expansion";
+import { ENGINEER_BY_ID, type EngineerId, type ExportMarketId, type FleetProduct, type PayLevel, type ProtoFocus } from "@/game/config/expansion";
 import { HOT_CLASS, RECALL } from "@/game/config/market";
 import { claimUnlock, openPlantTypes } from "@/game/engine/unlocks";
 import { restockLow } from "@/game/engine/insights";
@@ -107,6 +109,19 @@ interface GameStore {
   claimShow: () => void;
   claimSeason: () => void;
   restoreClassic: (id: string) => void;
+  startPrototype: (car: CarId, focus: ProtoFocus) => void;
+  windTunnel: (effort: number) => void;
+  trackTest: () => void;
+  launchProto: (campaign: number) => void;
+  openMarket: (id: ExportMarketId) => void;
+  setFleetProduct: (p: FleetProduct) => void;
+  acceptFleetOrder: () => void;
+  declineFleetOrder: () => void;
+  finishFleetOrder: () => void;
+  hireEngineer: () => void;
+  setEngineerPay: (id: EngineerId, pay: PayLevel) => void;
+  letGoEngineer: (id: EngineerId) => void;
+  counterOffer: () => void;
   declineContract: () => void;
   claimContract: () => void;
   collectOffline: () => void;
@@ -234,6 +249,14 @@ export const useGame = create<GameStore>((set, get) => {
       uiEvents.emit({ type: "toast", tone: "gold", icon: "🏆", title: tr("season.over", { rank: next.season.last.rank + 1 }) });
     const restored = Cl.classicsTick(next, now);
     if (restored) uiEvents.emit({ type: "toast", tone: "gold", icon: "🏛️", title: tr("classics.done", { name: tr(`classic.${restored}` as MessageKey) }), body: tr("classics.doneBody") });
+    const eng = Ex.engineersTick(next, now, dt);
+    if (eng === "candidate") uiEvents.emit({ type: "toast", tone: "info", icon: "👩‍🔬", title: tr("eng.candidateToast", { name: ENGINEER_BY_ID[next.engineers.candidate!.id].name }) });
+    else if (eng === "lost") uiEvents.emit({ type: "toast", tone: "warn", icon: "🕵️", title: tr("eng.lostToast") });
+    const fo = Ex.fleetOrderTick(next, now);
+    if (fo === "offer") uiEvents.emit({ type: "toast", tone: "info", icon: "🚌", title: tr("fleet.offerToast") });
+    else if (fo === "failed") uiEvents.emit({ type: "toast", tone: "warn", icon: "⌛", title: tr("fleet.failed") });
+    const pa = state.proto.active;
+    if (pa && state.lastActiveAt < pa.until && now >= pa.until) uiEvents.emit({ type: "toast", tone: "success", icon: "🧪", title: tr("proto.stageDone") });
     const trend = Mk.trendOf(next);
     if (trend.hot && trend.block !== Mk.trendOf(state).block) {
       uiEvents.emit({ type: "toast", tone: "info", icon: "📰", title: tr("news.toast"), body: tr("news.hot", { cls: tr(`class.${trend.hot}` as MessageKey), price: formatPercent(HOT_CLASS.price), demand: formatPercent(HOT_CLASS.demand - 1) }) });
@@ -416,6 +439,48 @@ export const useGame = create<GameStore>((set, get) => {
     setSpecialization: (plot, spec) => act((s) => C.setSpecialization(s, plot, spec)),
     claimDaily: (id) => {
       act((s) => claimDaily(s, id));
+    },
+    startPrototype: (car, focus) => {
+      act((s) => Ex.startPrototype(s, car, focus, Date.now(), Ch.carBaseValue(s, CAR_BY_ID[car], get().snap.gm)));
+    },
+    windTunnel: (effort) => {
+      act((s) => s.proto.active !== null && Ex.windTunnel(s, effort, Date.now(), Ch.carBaseValue(s, CAR_BY_ID[s.proto.active.car], get().snap.gm)));
+    },
+    trackTest: () => {
+      act((s) => s.proto.active !== null && Ex.trackTest(s, Date.now(), Ch.carBaseValue(s, CAR_BY_ID[s.proto.active.car], get().snap.gm)));
+    },
+    launchProto: (campaign) => {
+      const car = get().state.proto.active?.car;
+      const score = act((s) => (s.proto.active ? Ex.launchProto(s, campaign, Date.now(), Ch.carBaseValue(s, CAR_BY_ID[s.proto.active.car], get().snap.gm)) : null));
+      if (score !== null && car) uiEvents.emit({ type: "toast", tone: "gold", icon: "🚀", title: tr("proto.launchedToast", { name: get().state.designs[car].name, n: Math.round(score) }), body: tr("proto.launchedBody") });
+    },
+    openMarket: (id) => {
+      if (act((s) => Ex.openMarket(s, id))) uiEvents.emit({ type: "toast", tone: "gold", icon: "🚢", title: tr("export.opened", { name: tr(`export.market.${id}` as MessageKey) }) });
+    },
+    setFleetProduct: (p) => {
+      act((s) => Ex.setFleetProduct(s, p));
+    },
+    acceptFleetOrder: () => {
+      act((s) => Ex.acceptFleetOrder(s, Date.now()));
+    },
+    declineFleetOrder: () => {
+      act((s) => Ex.declineFleetOrder(s, Date.now()));
+    },
+    finishFleetOrder: () => {
+      if (act((s) => Ex.finishFleetOrder(s, Date.now()))) uiEvents.emit({ type: "toast", tone: "gold", icon: "🚌", title: tr("fleet.doneToast") });
+    },
+    hireEngineer: () => {
+      const id = get().state.engineers.candidate?.id;
+      if (act((s) => Ex.hireEngineer(s)) && id) uiEvents.emit({ type: "toast", tone: "success", icon: ENGINEER_BY_ID[id].emoji, title: tr("eng.hired", { name: ENGINEER_BY_ID[id].name }) });
+    },
+    setEngineerPay: (id, pay) => {
+      act((s) => Ex.setEngineerPay(s, id, pay));
+    },
+    letGoEngineer: (id) => {
+      act((s) => Ex.letGo(s, id));
+    },
+    counterOffer: () => {
+      act((s) => Ex.counterOffer(s));
     },
     acceptVip: () => {
       act((s) => Lv.acceptVip(s, Date.now()));

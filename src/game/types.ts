@@ -203,6 +203,7 @@ export type StructureType =
   | "hq"
   | "airport"
   | "museum"
+  | "fleetPlant"
   | PlantType;
 
 /** Things built inside a garage, on its tile grid. */
@@ -318,7 +319,7 @@ export interface PlantData {
 
 export type QualityMode = "fast" | "balanced" | "premium";
 /** "fast" = the dealer that will sell it soonest, or one dealer first. */
-export type CarRoute = "price" | "fast" | DealerId;
+export type CarRoute = "price" | "fast" | DealerId | `export:${import("./config/expansion").ExportMarketId}`;
 
 /** Build quality, the company's reputation and product recalls. */
 export interface QualityState {
@@ -365,6 +366,8 @@ export interface Shipment {
   models?: CarId[];
   /** A materials delivery from the depot: what it carries. */
   materials?: MaterialStock;
+  /** Cars for export: the market their ship sails to. */
+  market?: import("./config/expansion").ExportMarketId;
 }
 
 export interface DealerStock {
@@ -478,6 +481,10 @@ export interface GameState {
   season: import("./engine/live").SeasonState;
   show: import("./engine/live").ShowState;
   classics: import("./engine/classics").ClassicsState;
+  proto: import("./engine/expansion").ProtoState;
+  export: import("./engine/expansion").ExportState;
+  fleet: import("./engine/expansion").FleetState;
+  engineers: import("./engine/expansion").EngineersState;
   /** Unlock bonuses already claimed this run ("car:sedan", "plant:engineFactory"). */
   unlocks: string[];
   settings: { buyAmount: BuyAmount; lang: Lang; lowGraphics: boolean; sound: boolean; haptics: boolean };

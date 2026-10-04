@@ -35,7 +35,7 @@ export const ZONES: ZoneConfig[] = [
   },
   {
     id: "industrial", stage: 2, letter: "I", cost: 25_000, scale: 1.5, ground: "#94a06f", accent: "#38bdf8",
-    builds: ["garage", "partsFactory", "warehouse", "logistics", "truckDepot", "parking"],
+    builds: ["garage", "partsFactory", "warehouse", "logistics", "truckDepot", "parking", "fleetPlant"],
     mix: "....iiiit",
   },
   {
@@ -45,7 +45,7 @@ export const ZONES: ZoneConfig[] = [
   },
   {
     id: "automotive", stage: 4, letter: "A", cost: 600_000, scale: 4, ground: "#8fa77a", accent: "#818cf8",
-    builds: ["garage", "partsFactory", "researchCenter", "logistics", "warehouse"],
+    builds: ["garage", "partsFactory", "researchCenter", "logistics", "warehouse", "fleetPlant"],
     mix: "....iiisot",
   },
   {
@@ -164,6 +164,7 @@ export const STRUCTURES: StructureConfig[] = [
   { id: "researchCenter", emoji: "🔬", cost: 150_000, levelGrowth: 4, maxLevel: 10, rp: 0.05, color: "#f8fafc", roof: "#06b6d4" },
   { id: "exportTerminal", emoji: "🚢", cost: 1_500_000, levelGrowth: 4, maxLevel: 10, markup: 0.02, color: "#cbd5e1", roof: "#0f766e" },
   { id: "hq", emoji: "🏢", cost: 3_000_000, levelGrowth: 4, maxLevel: 10, income2: 0.02, color: "#bfdbfe", roof: "#1e3a8a" },
+  { id: "fleetPlant", emoji: "🚌", cost: 800_000, levelGrowth: 3, maxLevel: 10, color: "#e2e8f0", roof: "#ca8a04" },
   { id: "museum", emoji: "🏛️", cost: 300_000, levelGrowth: 3, maxLevel: 10, income: 1, color: "#f5f0e6", roof: "#b45309" },
   { id: "airport", emoji: "✈️", cost: 8_000_000, levelGrowth: 4, maxLevel: 10, markup: 0.04, color: "#e2e8f0", roof: "#475569" },
   // supply-chain plants (their economy lives in config/chain.ts)

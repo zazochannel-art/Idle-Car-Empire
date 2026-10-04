@@ -1,5 +1,6 @@
 "use client";
 
+import { PrototypeLab } from "./expansion-cards";
 import { DEALER_FEE, SALES_TAX } from "@/game/config/economy";
 import { Lock, Palette } from "lucide-react";
 import { useState } from "react";
@@ -37,6 +38,7 @@ export function CarsView() {
   return (
     <div className="space-y-4">
       <ViewHeader icon="🚗" title={t("cars.title")} subtitle={t("cars.subtitle", { n: unlocked.size, total: CARS.length })} />
+      <PrototypeLab />
       <div className="grid gap-3 @sm:grid-cols-2 @3xl:grid-cols-3">
         {CARS.map((car) => (
           <ModelCard key={car.id} car={car} unlocked={unlocked.has(car.id)} open={open === car.id} onToggle={() => setOpen(open === car.id ? null : car.id)} />

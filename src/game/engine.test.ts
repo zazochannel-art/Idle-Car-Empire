@@ -18,6 +18,7 @@ import * as U from "./engine/unlocks";
 import * as Mk from "./engine/market";
 import * as Lv from "./engine/live";
 import * as Cl from "./engine/classics";
+import * as Ex from "./engine/expansion";
 import { RACE_EVENTS } from "./config/racing";
 import { TREND_SEC } from "./config/market";
 import { restockLow } from "./engine/insights";
@@ -418,6 +419,101 @@ describe("VIP orders, racing season, Auto Show, classics", () => {
     s.classics.owned = ["arrow55"];
     expect(migrate(JSON.parse(JSON.stringify(s)), T0).classics.owned).toEqual(["arrow55"]);
     void m;
+  });
+});
+
+describe("prototypes, export, truck & bus division, star engineers", () => {
+  it("a prototype goes concept → tunnel → track → launch, and the model is worth more", () => {
+    const { s } = fullChain();
+    s.cash = 1e9;
+    const gm = snapshot(s).gm;
+    const base = Ch.carBaseValue(s, CAR_BY_ID.city, gm);
+    const v0 = Ch.carValue(s, CAR_BY_ID.city, gm);
+    expect(Ex.startPrototype(s, "city", "efficiency", T0, base)).toBe(true);
+    expect(s.proto.active!.score).toBe(30); // what economy buyers want
+    expect(Ex.windTunnel(s, 1, T0 + 60_000, base)).toBe(false); // the concept isn't done
+    expect(Ex.windTunnel(s, 1, T0 + 3 * 60_000, base)).toBe(true);
+    expect(Ex.trackTest(s, T0 + 11 * 60_000, base)).toBe(true);
+    const score = Ex.launchProto(s, 2, T0 + 16 * 60_000, base)!;
+    expect(score).toBeGreaterThan(55);
+    expect(s.proto.done.city).toBe(score);
+    // like every bonus, it widens the margin (never the cost)
+    expect(Ch.carValue(s, CAR_BY_ID.city, gm)).toBeGreaterThan(v0);
+    expect(Ex.protoValueMult(s, "city")).toBeCloseTo(1 + (0.25 * score) / 100);
+    expect(Mk.carDemandMult(s, "city")).toBeGreaterThanOrEqual(1.8);
+    // once per model
+    expect(Ex.startPrototype(s, "city", "style", T0, base)).toBe(false);
+    expect(migrate(JSON.parse(JSON.stringify(s)), T0).proto.done.city).toBe(score);
+  });
+
+  it("export: cars go to the port, sail, and sell abroad", () => {
+    const { s, assembly } = fullChain();
+    s.cash = 1e9;
+    expect(Ex.openMarket(s, "europe")).toBe(false); // no port yet
+    s.city.zones.push("supercar");
+    const port = WORLD_MAP.plots.find((p) => p.zone === "supercar" && p.kind === "plot" && !p.big)!.id;
+    expect(C.buildStructure(s, port, "exportTerminal")).toBe(true);
+    expect(Ex.portPlot(s)).toBe(port);
+    expect(Ex.openMarket(s, "europe")).toBe(true);
+    expect(Ch.setCarRoute(s, assembly, "export:europe")).toBe(true);
+    const sold = s.export.sold;
+    run(s, 1500);
+    expect(s.chain.shipments.some((sh) => sh.market === "europe") || s.export.ships.length > 0 || s.export.sold > sold).toBe(true);
+    run(s, 900);
+    expect(s.export.sold).toBeGreaterThan(sold);
+    expect(Ex.exportMult("europe", "city")).toBeCloseTo(1.35);
+    expect(Ex.exportMult("europe", "supercar")).toBeCloseTo(0.9);
+    expect(migrate(JSON.parse(JSON.stringify(s)), T0).export.open).toEqual(["europe"]);
+  });
+
+  it("the truck & bus division builds and sells, and fleet orders pay a bonus", () => {
+    const s = createInitialState(T0);
+    s.cash = 1e8;
+    s.city.zones.push("industrial");
+    const plot = WORLD_MAP.plots.find((p) => p.zone === "industrial" && p.kind === "plot" && !p.big)!.id;
+    expect(C.buildStructure(s, plot, "fleetPlant")).toBe(true);
+    const u = Ex.fleetUnit("van");
+    expect(u.price).toBeGreaterThan(u.cost);
+    const cash = s.cash;
+    Ex.fleetTick(s, 400);
+    expect(s.fleet.built).toBe(10);
+    expect(s.cash).toBeCloseTo(cash + 10 * (u.price - u.cost));
+    expect(Ex.fleetOrderTick(s, T0)).toBeNull();
+    expect(Ex.fleetOrderTick(s, T0 + 6 * 60_000)).toBe("offer");
+    expect(Ex.acceptFleetOrder(s, T0 + 6 * 60_000)).toBe(true);
+    const o = s.fleet.order!;
+    Ex.fleetTick(s, (o.n + 1) * 200);
+    expect(o.made).toBe(o.n);
+    expect(Ex.finishFleetOrder(s, T0 + 7 * 60_000)).toBe(true);
+    expect(s.fleet.done).toBe(1);
+  });
+
+  it("star engineers: hired with a perk, poached when underpaid", () => {
+    const s = createInitialState(T0);
+    s.chain.firstCar = true;
+    s.cash = 1e8;
+    expect(Ex.engineersTick(s, T0, 1)).toBe("candidate");
+    const id = s.engineers.candidate!.id;
+    expect(Ex.hireEngineer(s)).toBe(true);
+    expect(s.engineers.hired).toEqual([{ id, pay: "fair" }]);
+    // Kenji speeds up every plant
+    s.engineers.hired = [{ id: "kenji", pay: "fair" }];
+    const sp = snapshot(s).gm.speed;
+    s.engineers.hired = [];
+    expect(snapshot(s).gm.speed).toBeCloseTo(sp / 1.1);
+    // a poaching attempt: match it, or they leave
+    s.engineers.hired = [{ id: "kenji", pay: "low" }];
+    s.engineers.poach = { id: "kenji", team: "Nova", cost: 1000, until: T0 + 1000 };
+    expect(Ex.counterOffer(s)).toBe(true);
+    expect(s.engineers.hired[0].pay).toBe("fair");
+    s.engineers.poach = { id: "kenji", team: "Nova", cost: 1000, until: T0 + 1000 };
+    expect(Ex.engineersTick(s, T0 + 2000, 1)).toBe("lost");
+    expect(s.engineers.hired).toEqual([]);
+    expect(s.engineers.lost).toBe(1);
+    // Mei: fewer defects
+    s.engineers.hired = [{ id: "mei", pay: "generous" }];
+    expect(Mk.defectRate(s, s.city.buildings[STARTER_PLOT].plant!, [])).toBeCloseTo(0.01 * 0.4);
+    expect(migrate(JSON.parse(JSON.stringify(s)), T0).engineers.hired).toEqual([{ id: "mei", pay: "generous" }]);
   });
 });
 

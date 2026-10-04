@@ -1,4 +1,5 @@
 import { ACHIEVEMENT_INCOME_BONUS } from "../config/achievements";
+import { ENGINEER_BY_ID } from "../config/expansion";
 import { CARS, CAR_MODEL } from "../config/cars";
 import { MANAGERS, type ManagerConfig } from "../config/managers";
 import { EMPIRE_PERKS, OFFLINE, PRESTIGE } from "../config/prestige";
@@ -168,6 +169,9 @@ export function computeGlobalMods(s: GameState): GlobalMods {
         break;
     }
   }
+
+  // Star engineers on the payroll.
+  for (const e of s.engineers?.hired ?? []) ENGINEER_BY_ID[e.id]?.effects.forEach((x) => applyEffect(m, x));
 
   // Buildings on the Empire Map.
   const city = cityEffects(s);

@@ -79,6 +79,8 @@ import type {
 import { QUALITY_MODES } from "../config/market";
 import { carDemandMult, carPriceMult, defectRate, onCarBuilt, qualityOf, qualityTick } from "./market";
 import { vipBuilt } from "./live";
+import { dockCars, exportTick, fleetTick, isExportRoute, portPlot, protoValueMult } from "./expansion";
+import type { ExportMarketId } from "../config/expansion";
 import { designStats } from "./design";
 import { logisticsMods } from "./logistics";
 import { starMods } from "./imperium";
@@ -252,7 +254,7 @@ export function carPartsValue(car: CarConfig): number {
 
 /** Sale value of one car before dealer markup (bonuses widen its margin). */
 export function carValue(s: GameState, car: CarConfig, gm: GlobalMods, extra = 1): number {
-  return carListPrice(car, recipe(car), carMarginMult(s, car, gm) * modelStats(s, car).valueMult * extra);
+  return carListPrice(car, recipe(car), carMarginMult(s, car, gm) * modelStats(s, car).valueMult * protoValueMult(s, car.id) * extra);
 }
 
 /** Sale value before the Design studio options (what R&D prices are based on). */
@@ -501,7 +503,7 @@ export interface ChainTickOut {
 }
 
 /** Where a finished load from this plant should go now, or null to wait. */
-function destination(s: GameState, snap: ChainSnapshot, id: string, b: BuildingState & { plant: PlantData }): { to: string; room: number } | null {
+function destination(s: GameState, snap: ChainSnapshot, id: string, b: BuildingState & { plant: PlantData }): { to: string; room: number; market?: ExportMarketId } | null {
   const cfg = PLANT_BY_ID[b.type as PlantType];
   // motorized chassis are sold at the market
   if (snap.plants[id]?.combine) return { to: MARKET, room: Infinity };
@@ -510,6 +512,12 @@ function destination(s: GameState, snap: ChainSnapshot, id: string, b: BuildingS
     // the one that will sell it soonest, or a chosen dealer first; always one with room
     const car = snap.plants[id]?.car?.id;
     const route = b.plant.carRoute ?? "price";
+    // overseas: to the port, while the market is open
+    if (isExportRoute(route)) {
+      const port = portPlot(s);
+      const market = route.slice(7) as ExportMarketId;
+      if (port && s.export.open.includes(market)) return { to: port, room: Infinity, market };
+    }
     let best: { to: string; room: number; score: number } | null = null;
     for (const d of Object.values(snap.dealers)) {
       if (!d) continue;
@@ -724,7 +732,7 @@ export function chainTick(
             book(s, "logistics", fee);
             const value = (p.outValue / p.out) * qty;
             const models = cfg.item ? undefined : (Array.from({ length: qty }, () => st.car?.id ?? "city") as CarId[]);
-            ship(s, { from: id, to: dest.to, item: cfg.item ? (st.combine ? "chassis" : cfg.item) : "car", qty, value, dur: legTime(id, dest.to, st.pace, st.load), vehicle: st.vehicle, models });
+            ship(s, { from: id, to: dest.to, item: cfg.item ? (st.combine ? "chassis" : cfg.item) : "car", qty, value, dur: legTime(id, dest.to, st.pace, st.load), vehicle: st.vehicle, models, ...(dest.market ? { market: dest.market } : {}) });
             p.out -= qty;
             p.outValue -= value;
             p.wait = 0;
@@ -757,6 +765,10 @@ export function chainTick(
     keep.push(sh);
   }
   s.chain.shipments = keep;
+
+  // 4b. ships to the export markets, and the truck & bus division's line
+  out.earned += exportTick(s, dt);
+  out.earned += fleetTick(s, dt, offline ? snap.plants[Object.keys(snap.plants)[0]]?.offline ?? 0.5 : 1);
 
   // 5. customers at the dealerships
   for (const d of Object.values(snap.dealers)) {
@@ -879,6 +891,11 @@ function arrive(s: GameState, sh: Shipment, snap: ChainSnapshot, earn: (n: numbe
     stock.cars += sh.qty;
     stock.value += sh.value;
     stock.models.push(...(sh.models ?? []));
+    return 0;
+  }
+  if (sh.item === "car" && sh.market) {
+    // at the port: onto the next ship to that market
+    dockCars(s, sh.market, sh.models ?? [], sh.value);
     return 0;
   }
   if (sh.to === RACING) {
@@ -1079,7 +1096,7 @@ export function migratePlant(type: PlantType, raw: unknown): PlantData {
   if (typeof raw.missing === "string" && raw.missing in COMPONENT_BY_ID) p.missing = raw.missing as ComponentId;
   p.car = typeof raw.car === "string" && raw.car in CAR_BY_ID ? (raw.car as CarId) : null;
   if (raw.mode === "fast" || raw.mode === "premium") p.mode = raw.mode;
-  if (raw.carRoute === "fast" || (typeof raw.carRoute === "string" && raw.carRoute in DEALER_BY_ID)) p.carRoute = raw.carRoute as CarRoute;
+  if (raw.carRoute === "fast" || (typeof raw.carRoute === "string" && (raw.carRoute in DEALER_BY_ID || isExportRoute(raw.carRoute)))) p.carRoute = raw.carRoute as CarRoute;
   if (isObj(raw.inputs)) for (const c of Object.keys(COMPONENT_BY_ID) as ComponentId[]) if (raw.inputs[c] !== undefined) p.inputs[c] = num(raw.inputs[c]);
   return p;
 }

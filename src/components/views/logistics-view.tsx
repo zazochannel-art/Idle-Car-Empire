@@ -1,5 +1,6 @@
 "use client";
 
+import { ExportCard } from "./expansion-cards";
 import { Badge } from "@/components/ui/badge";
 import { LOGISTICS, TRANSPORT_TIERS } from "@/game/config/logistics";
 import { logisticsCost, logisticsMods, nextTier } from "@/game/engine/logistics";
@@ -34,6 +35,7 @@ export function LogisticsView() {
           <Metric label={t("logistics.capacity")} value={`×${lm.capacity.toFixed(2)}`} gold />
         </div>
       </ViewHeader>
+      <ExportCard />
 
       {/* transport ladder */}
       <div className="rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.07]">

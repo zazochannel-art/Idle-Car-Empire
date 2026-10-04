@@ -1,5 +1,6 @@
 "use client";
 
+import { FleetPanel } from "../views/expansion-cards";
 import { ClassicsPanel } from "../views/live-cards";
 import { ArrowRight, Lock, LogIn, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -187,6 +188,7 @@ function StructurePanel({ id }: { id: string }) {
       </div>
       <CostButton className="w-full" size="lg" cost={cost} label={t("plot.upgrade")} maxedLabel={t("plot.maxed")} onBuy={() => upgradeBuilding(id)} />
       {b.type === "museum" && <ClassicsPanel />}
+      {b.type === "fleetPlant" && <FleetPanel />}
     </div>
   );
 }
