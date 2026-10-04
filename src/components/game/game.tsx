@@ -43,6 +43,7 @@ import { Hud } from "./hud";
 import { OfflineDialog, PrestigeOverlay, SettingsDialog, Toasts } from "./overlays";
 import { FirstCarOverlay } from "./first-car";
 import { PlantFloor } from "../plant/plant-floor";
+import { FactoryInterior, HAS_INTERIOR } from "../plant/interior/factory-interior";
 
 type Icon = React.ComponentType<{ className?: string }>;
 
@@ -164,7 +165,9 @@ function Shell() {
       </Sheet>
 
       <AnimatePresence>{garage && <GarageView key={garage} plotId={garage} />}</AnimatePresence>
-      <AnimatePresence>{floor && <PlantFloor key={floor} plotId={floor} />}</AnimatePresence>
+      <AnimatePresence>
+        {floor && (HAS_INTERIOR.has(useGame.getState().state.city.buildings[floor]?.type ?? "") ? <FactoryInterior key={floor} plotId={floor} /> : <PlantFloor key={floor} plotId={floor} />)}
+      </AnimatePresence>
       <FirstCarOverlay />
 
       <Toasts />
