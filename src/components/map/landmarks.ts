@@ -51,6 +51,9 @@ export function landmarkGround(p: Painter, lm: Landmark, t: number) {
     case "port": {
       // quay along the sea side, bollards and the berth markings
       if (L.i === 0) {
+        // the dock basin dredged out of the shore, where the ships moor
+        p.quad(x - 6.2, y - 0.5, 5.8, 7, p.col("#1f74ad"));
+        p.line(x - 6.2, y - 0.5, x - 6.2, y + 6.5, p.col("#7dd3fc"), 1, 0, [6, 6]);
         p.quad(x - 0.5, y - 0.5, 0.6, 7, p.col("#6b7280"));
         for (let k = 0; k < 6; k++) p.quad(x - 0.3, y + k + 0.4, 0.18, 0.18, p.col("#facc15"));
       }
@@ -116,9 +119,24 @@ export function landmarkGround(p: Painter, lm: Landmark, t: number) {
         p.quad(x - 0.5, y + 2.3, 7, 1.4, p.col(ASPHALT));
         if (L.i === L.w - 1) for (let k = 0; k < 5; k++) p.quad(x + 4 + k * 0.4, y + 2.35, 0.2, 1.3, k % 2 ? "#ef4444" : "#f8fafc");
         p.line(x - 0.5, y + 3, x + 6.5, y + 3, p.col("#f8fafc", -0.2), 1, 0, [8, 8]);
-      } else {
+      } else if (L.i === 0) {
         p.ellipse(x + 3, y + 3, 0, 2.4, p.col(ASPHALT), 0.5);
         p.ellipse(x + 3, y + 3, 0, 1.6, p.col(GROUND.testFacility), 0.5);
+      } else {
+        // terraced hill with the hairpin road
+        for (let k = 0; k < 3; k++) p.quad(x + 0.2 + k * 0.5, y + 0.2 + k * 0.5, 5.6 - k, 5.6 - k, p.col("#6f7b5e", -0.05 * k));
+        const c = p.ctx;
+        c.beginPath();
+        HILLCLIMB.forEach(([u, v], i) => (i ? c.lineTo(sx(x + u, y + v), sy(x + u, y + v)) : c.moveTo(sx(x + u, y + v), sy(x + u, y + v))));
+        c.lineJoin = "round";
+        c.strokeStyle = p.col(ASPHALT);
+        c.lineWidth = 9;
+        c.stroke();
+        c.strokeStyle = p.col("#f8fafc", -0.2);
+        c.lineWidth = 0.8;
+        c.setLineDash([4, 5]);
+        c.stroke();
+        c.setLineDash([]);
       }
       break;
     }
@@ -163,6 +181,63 @@ function tower(p: Painter, x: number, y: number, w: number, d: number, h: number
   p.box(x, y, w, d, 0, h, glass, "#e2e8f0");
   p.windows(x, y, w, d, 0, h, Math.max(3, Math.floor(h / 14)), "#0f172a", p.night > 0.3 ? 0.6 : 0);
   if (rand(seed, 9) > 0.5) p.box(x + w * 0.3, y + d * 0.3, w * 0.4, d * 0.4, h, 14, "#94a3b8");
+  if (h > 250) {
+    // aircraft-warning mast on the tallest towers
+    p.box(x + w / 2 - 0.05, y + d / 2 - 0.05, 0.1, 0.1, h, 40, "#cbd5e1");
+    if (Math.sin(p.t * 3 + seed * 5) > 0) p.light(sx(x + w / 2, y + d / 2), sy(x + w / 2, y + d / 2, h + 40), 5, "#ef4444", 0.5 + p.night * 0.5);
+  }
+}
+
+/** The hill climb's hairpins, in block tiles. */
+const HILLCLIMB: [number, number][] = [[0.6, 5.4], [5.2, 5.4], [5.2, 4.1], [1.2, 4.1], [1.2, 2.8], [4.8, 2.8], [4.8, 1.6], [1.8, 1.6], [1.8, 0.6], [4.2, 0.6]];
+
+/** A container ship along the quay (bow north), its deck stacked with boxes. */
+function ship(p: Painter, x: number, y: number, seed: number, t: number) {
+  const bob = Math.sin(t * 0.8 + seed * 4) * 0.8;
+  p.ctx.save();
+  p.ctx.translate(0, bob);
+  p.box(x, y + 0.6, 2.4, 4.6, 0, 9, "#7f1d1d", "#9ca3af");
+  p.box(x + 0.4, y, 1.6, 0.8, 0, 9, "#7f1d1d");
+  for (let j = 0; j < 4; j++)
+    for (let i = 0; i < 2; i++) {
+      const h = 1 + Math.floor(rand(seed + i, j) * 2);
+      for (let k = 0; k < h; k++) p.box(x + 0.2 + i * 1, y + 1 + j * 0.9, 0.9, 0.8, 9 + k * 7, 7, CONTAINER[Math.floor(rand(seed * 5 + i + k, j) * CONTAINER.length)]);
+    }
+  // bridge at the stern, its funnel smoking
+  p.box(x + 0.4, y + 4.6, 1.6, 0.5, 9, 18, "#f8fafc", "#e5e7eb");
+  p.box(x + 1, y + 5, 0.4, 0.3, 27, 8, "#1f2937");
+  if (p.night > 0.3) p.light(sx(x + 1.2, y + 4.6), sy(x + 1.2, y + 4.6, 22), 8, "#fde68a", 0.6);
+  p.ctx.restore();
+}
+
+/** Red-and-white lighthouse; the beam sweeps at night. */
+function lighthouse(p: Painter, x: number, y: number, t: number) {
+  for (let k = 0; k < 5; k++) p.box(x, y, 0.55, 0.55, k * 12, 12, k % 2 ? "#f8fafc" : "#dc2626");
+  p.box(x - 0.1, y - 0.1, 0.75, 0.75, 60, 6, "#fde68a", "#1f2937");
+  if (p.night > 0.2) {
+    const c = p.ctx;
+    const X = sx(x + 0.27, y + 0.27);
+    const Y = sy(x + 0.27, y + 0.27, 63);
+    const a = t * 1.2;
+    const g = c.createRadialGradient(X, Y, 0, X, Y, 160);
+    g.addColorStop(0, "rgba(254,240,138,0.45)");
+    g.addColorStop(1, "rgba(254,240,138,0)");
+    c.fillStyle = g;
+    c.beginPath();
+    c.moveTo(X, Y);
+    c.arc(X, Y, 160, a - 0.12, a + 0.12);
+    c.closePath();
+    c.fill();
+  }
+}
+
+/** A sponsor hoarding on two legs. */
+function sponsor(p: Painter, x: number, y: number, seed: number, text: string) {
+  const col = ["#e11d48", "#2563eb", "#f59e0b", "#16a34a"][Math.floor(rand(seed, 3) * 4)];
+  p.box(x, y, 0.08, 0.08, 0, 10, "#475569");
+  p.box(x + 1.2, y, 0.08, 0.08, 0, 10, "#475569");
+  p.box(x - 0.1, y, 1.5, 0.12, 10, 8, col);
+  p.textLeft(text, x + 0.1, y + 0.12, 12, 6, "#ffffff");
 }
 
 function plane(p: Painter, x: number, y: number, z: number, color = "#f8fafc") {
@@ -187,6 +262,11 @@ function landmarkBuildings(p: Painter, lm: Landmark, t: number) {
   const L = local(lm);
   switch (lm.kind) {
     case "port": {
+      if (L.i === 0) {
+        // a container ship moored along the quay, and the lighthouse on the north pier
+        if (L.j < L.d - 1) ship(p, x - 5, y + 0.4, seed, t);
+        if (L.j === 0) lighthouse(p, x - 0.2, y - 0.2, t);
+      }
       containers(p, x + 1.2, y + 0.4, 3, 6, seed * 100);
       if (L.i === 0) crane(p, x + 0.2, y + 1 + (L.j % 2) * 2.4, t, seed);
       else {
@@ -307,9 +387,22 @@ function landmarkBuildings(p: Painter, lm: Landmark, t: number) {
         p.windows(x + 0.6, y + 4.3, 2.2, 1.3, 0, 22, 2, "#0f172a");
         p.box(x + 3.4, y + 4.6, 0.4, 0.4, 0, 54, "#334155");
         p.box(x + 3.2, y + 4.4, 0.8, 0.8, 54, 8, "#38bdf8");
-      } else if (L.j > 0) {
+      } else if (L.j > 0 && L.i === 0) {
         // slalom cones on the pad
         for (let k = 0; k < 6; k++) p.box(x + 1 + k * 0.8, y + 3 + Math.sin(k) * 0.3, 0.12, 0.12, 0, 4, "#f97316");
+      } else if (L.j > 0) {
+        // the hill climb: a car working up the hairpins, marshal flags at the bends
+        const path = HILLCLIMB.map(([u, v]) => [x + u, y + v] as const);
+        const f = (t * 0.08 + seed) % 1;
+        const i = Math.floor(f * (path.length - 1));
+        const k = f * (path.length - 1) - i;
+        const [ax, ay] = path[i];
+        const [bx, by] = path[i + 1];
+        const cx = ax + (bx - ax) * k;
+        const cy = ay + (by - ay) * k;
+        const along = Math.abs(bx - ax) > Math.abs(by - ay);
+        p.box(cx - (along ? 0.35 : 0.18), cy - (along ? 0.18 : 0.35), along ? 0.7 : 0.36, along ? 0.36 : 0.7, 0, 6, "#22d3ee");
+        for (const [u, v] of HILLCLIMB.slice(1, -1)) p.box(x + u, y + v - 0.5, 0.06, 0.06, 0, 10, "#f8fafc");
       }
       if (L.j === 0) {
         // a car on the straight, back and forth
@@ -324,10 +417,35 @@ function landmarkBuildings(p: Painter, lm: Landmark, t: number) {
         p.box(x + 0.5, y + 0.5, 1, 4.5, 0, 26, "#cbd5e1", "#94a3b8");
         for (let k = 0; k < 9; k++) p.person(x + 0.9, y + 0.8 + k * 0.48, ["#ef4444", "#3b82f6", "#facc15", "#22c55e"][k % 4], t * 2 + k);
         p.box(x + 4, y + 0.6, 1.6, 1.6, 0, 40, "#1e293b", "#f5c451");
+      } else if (L.i === 0 || L.i === L.w - 1) {
+        // drag strip: the start tree, sponsor boards and a dragster down the quarter mile
+        p.box(x + 1.7, y + 0.4, 0.15, 0.15, 0, 22, "#334155");
+        const lit = Math.floor((t * 2 + seed) % 4);
+        for (let k = 0; k < 3; k++) p.box(x + 1.62, y + 0.32, 0.3, 0.3, 8 + k * 4, 3, k < lit ? (k === 2 ? "#22c55e" : "#facc15") : "#1f2937");
+        sponsor(p, x + 4.4, y + 1, seed, "SPEED");
+        sponsor(p, x + 4.4, y + 4, seed + 1, "OIL");
+        const run = (t * 0.25 + seed) % 1;
+        if (run < 0.7) p.box(x + 2.75, y - 0.5 + (run / 0.7) * 7, 0.45, 0.9, 0, 6, L.i === 0 ? "#ef4444" : "#facc15");
+      } else if (L.j === 1) {
+        // media centre with its dishes, the VIP lounge and sponsor boards
+        p.shadow(x + 0.5, y + 0.5, 2.4, 2, 40);
+        p.box(x + 0.5, y + 0.5, 2.4, 2, 0, 34, "#1e293b", "#334155");
+        p.windows(x + 0.5, y + 0.5, 2.4, 2, 0, 34, 3, "#38bdf8", p.night > 0.3 ? 0.8 : 0.2);
+        for (let k = 0; k < 2; k++) p.ellipse(x + 1.1 + k * 1.1, y + 1.4, 40, 0.35, "#e2e8f0", 0.4);
+        p.shadow(x + 3.4, y + 0.6, 2.2, 1.8, 24);
+        p.box(x + 3.4, y + 0.6, 2.2, 1.8, 0, 20, "#a5d8ff", "#f5c451");
+        p.box(x + 3.3, y + 0.5, 2.4, 2, 20, 1.2, "#f5c451");
+        p.tag("VIP", x + 4.5, y + 1.5, 26, { bg: "#f5c451", fg: "#111827", size: 7 });
+        sponsor(p, x + 0.8, y + 4.6, seed, "TYRES");
+        sponsor(p, x + 3.6, y + 4.6, seed + 2, "FUEL");
       } else {
-        // a drift car circling the pad
+        // a drift car circling the pad under the sponsor arch
         const a = t * 1.3 + seed * 5;
         p.box(x + 3 + Math.cos(a) * 1.8, y + 3 + Math.sin(a) * 1.8, 0.6, 0.35, 0, 7, "#a855f7");
+        p.ellipse(x + 3 + Math.cos(a - 0.4) * 1.8, y + 3 + Math.sin(a - 0.4) * 1.8, 2, 0.5, "rgba(226,232,240,0.45)", 1);
+        p.box(x + 0.4, y + 0.3, 0.15, 0.15, 0, 26, "#e11d48");
+        p.box(x + 5.4, y + 0.3, 0.15, 0.15, 0, 26, "#e11d48");
+        p.box(x + 0.4, y + 0.3, 5.15, 0.15, 26, 4, "#e11d48");
       }
       break;
     }
@@ -336,7 +454,7 @@ function landmarkBuildings(p: Painter, lm: Landmark, t: number) {
 
 const HEIGHT: Record<LandmarkKind, number> = {
   testFacility: 70,
-  port: 110,
+  port: 120,
   railyard: 30,
   raw: 160,
   suburbs: 50,
@@ -352,7 +470,8 @@ export function landmarkDrawables() {
   return WORLD_MAP.landmarks.map((lm) => ({
     depth: lm.x + 3 + lm.y + 3,
     zone: lm.territory as string,
-    bbox: bbox(lm.x - 2, lm.y - 1, 9, 8, HEIGHT[lm.kind]),
+    // the port's ships lie off the quay, in the sea
+    bbox: lm.kind === "port" ? bbox(lm.x - 6, lm.y - 1, 13, 8, HEIGHT.port) : bbox(lm.x - 2, lm.y - 1, 9, 8, HEIGHT[lm.kind]),
     draw: (p: Painter, info: { t: number }) => landmarkBuildings(p, lm, info.t),
   }));
 }
