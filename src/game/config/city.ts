@@ -80,7 +80,7 @@ export const ZONES: ZoneConfig[] = [
  * unlocked as the empire grows; landmarks, no plots): K test facility, P port,
  * Y rail yard, Q raw-material basin, U suburbs, V premium boulevard, O city
  * skyline, X cargo airport, C automotive campus, R racing (paddock and
- * circuit), Z racing annex (drag strip, drift, stands). Lower-case k p q u z
+ * circuit), Z racing annex (drag strip, drift, stands). Lower-case k p q u v z
  * are their access roads (country and mountain roads). A river runs down
  * node column RIVER_LINE, crossed by bridges.
  *
@@ -94,14 +94,14 @@ export const WORLD_BLOCKS = [
   "mmmmmmmffffffaffhahfafaf",
   "mmmmmmffhfffhffhhfahflla",
   "mmmmmafhfhallfhhhhaahlla",
-  "mmmmKKfhfffllffafOOOOaff",
-  "mmmfKKkkhffffhahhOOOOaaa",
-  "wmfffffkfffffffahOOOOfaa",
-  "wfffffakkahfhfhaaOOOOaha",
-  "wfaaaaahfTTTIICCCOaaaffw",
-  "wwhaahppTTTTIIICCVVffaaw",
-  "wwPPfppaaTDDILLCCVVffffw",
-  "wwPPYYhaDDDDALLLhVVhahfw",
+  "mmmmKKfhfffllffaffOOOOff",
+  "mmmfKKkkhmmmfhahhaOOOOaa",
+  "wmfffffkfmmffffahaOOOOaa",
+  "wfffffakkahfhfhaaaOOOOha",
+  "wfaaaaahfTTTIICCCavaaffw",
+  "wwhaahppTTTTIIICCvVVfaaw",
+  "wwPPfppaaTDDILLCCfVVfffw",
+  "wwPPYYhaDDDDALLLhaVVahfw",
   "wwPPYYawDDAAAALwwhhXXXXw",
   "wwaffffwwMAASSSwwafXXXXw",
   "wwhfffawMMMASSShwafXXXXw",
@@ -181,7 +181,7 @@ export const TERRITORIES: TerritoryConfig[] = [
   { id: "campus", emoji: "🏢", letters: "C", cost: 0, zone: "automotive", effects: [] },
   { id: "racing", emoji: "🏁", letters: "RZz", cost: 0, effects: [] },
   { id: "mountain", emoji: "🏔️", letters: "Kk", cost: 8_000_000, rep: 800, effects: [{ kind: "rp", mult: 1.1 }] },
-  { id: "boulevard", emoji: "💎", letters: "VO", cost: 40_000_000, zone: "luxury", effects: [{ kind: "markup", add: 0.03 }] },
+  { id: "boulevard", emoji: "💎", letters: "VOv", cost: 40_000_000, zone: "luxury", effects: [{ kind: "markup", add: 0.03 }] },
   { id: "port", emoji: "⚓", letters: "PYp", cost: 100_000_000, rep: 5_000, effects: [{ kind: "delivery", mult: 1.15 }] },
   { id: "airport", emoji: "✈️", letters: "X", cost: 500_000_000, rep: 20_000, ep: 25, zone: "global", effects: [{ kind: "income", mult: 1.1 }] },
 ];

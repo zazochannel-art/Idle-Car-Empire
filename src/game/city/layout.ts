@@ -95,7 +95,7 @@ const DECOR: Record<string, DecorKind> = { h: "house", a: "apartment", o: "offic
 const SCENERY: Record<string, SceneryKind | "sea" | "lake"> = { w: "sea", l: "lake", f: "forest", a: "farm", h: "hills", m: "mountains" };
 const LANDMARK: Record<string, LandmarkKind | "racing" | "road"> = {
   K: "testFacility", P: "port", Y: "railyard", Q: "raw", U: "suburbs", V: "boulevard", O: "skyline", X: "airport", C: "campus", R: "racing", Z: "racingAnnex",
-  k: "road", p: "road", q: "road", u: "road", z: "road",
+  k: "road", p: "road", q: "road", u: "road", v: "road", z: "road",
 };
 /** Landmarks whose blocks hold one big thing (a runway, a circuit, test roads): no streets between their blocks. */
 const SOLID: ReadonlySet<BlockKind> = new Set<BlockKind>(["testFacility", "airport", "racing", "racingAnnex"]);

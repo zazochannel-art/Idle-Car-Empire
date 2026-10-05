@@ -13,6 +13,8 @@ import { landmarkDrawables, landmarkGround } from "./landmarks";
 /** Landmark block by its index (by × BLOCKS + bx), for the ground pass. */
 const LANDMARKS_AT = new Map(WORLD_MAP.landmarks.map((l) => [l.by * BLOCKS + l.bx, l]));
 import { coastline } from "./terrain";
+import { drawNetworkGround, networkDrawables } from "./highway";
+import { corridors } from "@/game/city/network";
 import type { EconomySnapshot } from "@/game/engine/economy";
 import type { BuildingState, CarId, GameState, StructureType, ZoneId } from "@/game/types";
 import { drawDepot, drawMarket, drawPlant, plantBadge } from "./plants";
@@ -1205,6 +1207,9 @@ export function drawGround(p: Painter, unlocked: ReadonlySet<string>, view: [num
       }
     }
   p.dim = false;
+
+  // the motorway at grade and the railway
+  drawNetworkGround(p, unlocked, view);
   c.globalAlpha = 1;
 }
 
@@ -1282,8 +1287,26 @@ function mountain(p: Painter, x: number, y: number, w: number, d: number, h: num
   }
 }
 
+/** Motorway and railway corridors: no trees, farmyards or hills on them. */
+const CORRIDORS = corridors();
+const inCorridor = (x: number, y: number) => CORRIDORS.some((r) => x > r[0] && x < r[2] && y > r[1] && y < r[3]);
+const overlapsCorridor = (x0: number, y0: number, x1: number, y1: number) => CORRIDORS.some((r) => x1 > r[0] && x0 < r[2] && y1 > r[1] && y0 < r[3]);
+
 function scenery(p: Painter, sc: Scenery) {
   const { x, y, seed } = sc;
+  const cut = sc.kind !== "mountains" && overlapsCorridor(x, y, x + 6, y + 6);
+  if (cut) {
+    // the way cuts through: keep a few trees on the verges
+    for (let i = 0; i < 14; i++) {
+      const tx = x - 0.2 + rand(seed * 13, i) * 6.4;
+      const ty = y - 0.2 + rand(seed * 7, i + 40) * 6.4;
+      if (inCorridor(tx, ty) || overlapsCorridor(tx - 0.6, ty - 0.6, tx + 0.6, ty + 0.6)) continue;
+      if (sc.kind === "farm" && rand(seed, i) > 0.3) continue;
+      if (rand(seed, i) > 0.5) p.pine(tx, ty, 0.95);
+      else p.tree(tx, ty, 0.9, rand(seed, i + 2));
+    }
+    return;
+  }
   if (sc.kind === "forest") {
     const n = 22;
     const pts: [number, number, number][] = [];
@@ -1386,6 +1409,9 @@ export function buildScene(state: GameState, snap: EconomySnapshot, names: Scene
 
   // the territories' landmarks: port, airport, mines, suburbs, skyline...
   out.push(...landmarkDrawables());
+
+  // motorway viaducts, tunnel portals, gantries and lamps; level crossings
+  out.push(...networkDrawables());
 
   // the Racing District draws itself
   out.push(...racingScene(live, { locked: names.racing, title: names.racing }));
