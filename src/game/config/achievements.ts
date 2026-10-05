@@ -38,7 +38,7 @@ export const ACHIEVEMENTS: AchievementConfig[] = [
   { id: "tycoon", name: "Tycoon", description: "Earn $1B.", icon: "🎩", condition: { type: "metric", metric: "moneyEarned", target: 1e9 }, reward: { incomeSeconds: 900 } },
   { id: "mass_production", name: "Mass Production", description: "Produce 1,000 complete cars.", icon: "📦", condition: { type: "metric", metric: "carsProduced", target: 1_000 }, reward: { rp: 2_000 } },
   { id: "sports_debut", name: "Sports Debut", description: "Build your first sports car.", icon: "🏎️", condition: { type: "carType", car: "sports", target: 1 }, reward: { rp: 300 } },
-  { id: "luxury_debut", name: "First Class", description: "Build your first luxury sedan.", icon: "🚖", condition: { type: "carType", car: "luxury", target: 1 }, reward: { rp: 1_000 } },
+  { id: "luxury_debut", name: "First Class", description: "Build your first luxury coupe.", icon: "🥂", condition: { type: "carType", car: "luxury", target: 1 }, reward: { rp: 1_000 } },
   { id: "supercar_maker", name: "Supercar Manufacturer", description: "Build your first supercar.", icon: "🏁", condition: { type: "carType", car: "supercar", target: 1 }, reward: { rp: 5_000 } },
   { id: "money_printer", name: "Money Printer", description: "Reach $10K profit per second.", icon: "📈", condition: { type: "income", target: 1e4 }, reward: { incomeSeconds: 300 } },
   { id: "hypercar_first", name: "Hypercar Maker", description: "Build your first hypercar.", icon: "💎", condition: { type: "carType", car: "hypercar", target: 1 }, reward: { rp: 20_000 } },
