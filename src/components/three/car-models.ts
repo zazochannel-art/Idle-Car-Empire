@@ -315,7 +315,8 @@ const HERO_FILES: Partial<Record<BodyModel, HeroFile>> = {
   suv: { url: PACK, pick: "SUV Body", facing: "-x" },
   luxury: { url: PACK, pick: "Coupe Body" },
   supercar: { url: PACK, pick: "Sport body", facing: "-x" },
-  hypercar: { url: PACK, pick: "Sport body", facing: "-x" },
+  // "1985 DeLorean DMC-12 Time Machine BTTF" by Ddiaz Design, CC BY-NC-SA 4.0 — stainless steel as built; a Design colour paints the body only
+  hypercar: { url: "models/hypercar-dmc12.glb", hide: /BadgeA/, ownPaint: true, paint: /1985Paint_Material1$/ },
   // "2010 Citroën DS Survolt" by Ddiaz Design, CC BY-NC-SA 4.0 — black body, the accents take the paint
   electric: { url: "models/electric-survolt.glb", hide: /licenseplate/i, paint: /^CarPaint_Color$/ },
   // street traffic
