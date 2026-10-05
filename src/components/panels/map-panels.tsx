@@ -21,6 +21,8 @@ import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { CostButton } from "../game/cost-button";
 import { DealerPanel, DepotPanel, MarketPanel, PlantPanel, plantFlow, plantName } from "./plant-panel";
+import { LandPanel, SitePanel, WorksBanner, landName } from "./land-panel";
+import { plotStatus } from "@/game/engine/construction";
 
 type T = (k: MessageKey, v?: Vars) => string;
 
@@ -54,7 +56,9 @@ export function plotTitle(id: string, t: T, n: ReturnType<typeof useContent>, s:
     return { title: n.dealer(d), icon: d.emoji };
   }
   const b = s.city.buildings[id];
-  if (!b) return { title: t("map.emptyPlot"), icon: "🏗️" };
+  const site = s.city.sites[id];
+  if (site) return { title: t("site.title", { name: t(`structure.${site.type}`) }), icon: "🏗️" };
+  if (!b) return { title: plot.use ? landName(id, t) : t("map.emptyPlot"), icon: plot.use ? STRUCTURE_BY_ID[plot.use].emoji : "🏗️" };
   if (b.type === "garage") return { title: t("garage.title", { no: lv2(b.garage?.no ?? 1) }), icon: SPEC_BY_ID[b.garage?.spec ?? "repair"].emoji };
   if (b.plant) return { title: plantName(s, id, t), icon: STRUCTURE_BY_ID[b.type].emoji };
   return { title: t(`structure.${b.type}`), icon: STRUCTURE_BY_ID[b.type].emoji };
@@ -63,11 +67,13 @@ export function plotTitle(id: string, t: T, n: ReturnType<typeof useContent>, s:
 export function PlotPanel({ id }: { id: string }) {
   const plot = plotOf(id);
   const b = useGame((g) => g.state.city.buildings[id]);
+  const site = useGame((g) => !!g.state.city.sites[id]);
   if (!plot) return null;
   if (plot.kind === "market") return <MarketPanel />;
   if (plot.kind === "depot") return <DepotPanel />;
   if (plot.kind === "dealer") return <DealerPanel id={plot.dealer!} />;
-  if (!b) return <BuildMenu id={id} />;
+  if (site) return <SitePanel id={id} />;
+  if (!b) return plot.use ? <LandPanel id={id} /> : <BuildMenu id={id} />;
   if (b.type === "garage") return <GarageSummary id={id} />;
   if (b.plant) return <PlantPanel id={id} />;
   return <StructurePanel id={id} />;
@@ -145,6 +151,7 @@ function GarageSummary({ id }: { id: string }) {
   const spec = SPEC_BY_ID[b.garage.spec];
   return (
     <div className="space-y-3 pb-2">
+      <WorksBanner id={id} />
       <div className="flex flex-wrap items-center gap-1.5">
         <Badge variant="gold">{t("common.lv", { level: b.level })}</Badge>
         <Badge style={{ color: spec.color }} variant="muted">
@@ -161,7 +168,7 @@ function GarageSummary({ id }: { id: string }) {
       <Button size="lg" variant="gold" className="w-full" onClick={() => enterGarage(id)}>
         <LogIn /> {t("map.enter")}
       </Button>
-      <CostButton className="w-full" cost={cost} label={t("garage.upgradeTo", { level: b.level + 1 })} maxedLabel={t("garage.maxLevel")} onBuy={() => upgradeBuilding(id)} />
+      <CostButton className="w-full" cost={cost} label={t("garage.upgradeTo", { level: b.level + 1 })} maxedLabel={b.works ? t("works.inProgress") : t("garage.maxLevel")} onBuy={() => upgradeBuilding(id)} />
     </div>
   );
 }
@@ -177,6 +184,7 @@ function StructurePanel({ id }: { id: string }) {
   const cfg = STRUCTURE_BY_ID[b.type];
   return (
     <div className="space-y-3 pb-2">
+      <WorksBanner id={id} />
       <div className="flex flex-wrap items-center gap-1.5">
         <Badge variant="gold">{t("common.lv", { level: b.level })}</Badge>
         <Badge variant="muted">📍 {t(`zone.${plot.zone}`)}</Badge>
@@ -186,7 +194,7 @@ function StructurePanel({ id }: { id: string }) {
         {structureEffect(cfg, ZONE_BY_ID[plot.zone].scale, t)}
         {income !== undefined && <div className="mt-1 text-base font-bold text-white">{formatMoney(income)}{t("unit.perSec")}</div>}
       </div>
-      <CostButton className="w-full" size="lg" cost={cost} label={t("plot.upgrade")} maxedLabel={t("plot.maxed")} onBuy={() => upgradeBuilding(id)} />
+      <CostButton className="w-full" size="lg" cost={cost} label={t("plot.upgrade")} maxedLabel={b.works ? t("works.inProgress") : t("plot.maxed")} onBuy={() => upgradeBuilding(id)} />
       {b.type === "museum" && <ClassicsPanel />}
       {b.type === "fleetPlant" && <FleetPanel />}
     </div>
@@ -333,6 +341,7 @@ export function BuildPanel() {
       <p className="px-1 text-xs text-white/50">{t("build.subtitle")}</p>
       {ZONES.filter((z) => state.city.zones.includes(z.id)).map((z) => {
         const free = WORLD_MAP.plots.filter((p) => p.zone === z.id && p.kind === "plot" && !state.city.buildings[p.id]);
+        const sites = free.filter((p) => state.city.sites[p.id]).length;
         return (
           <div key={z.id} className="flex items-center gap-3 rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.07]">
             <div className="flex size-11 shrink-0 items-center justify-center rounded-xl text-xs font-black ring-1 ring-white/10" style={{ background: `${z.ground}55` }}>
@@ -340,13 +349,32 @@ export function BuildPanel() {
             </div>
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-bold">{t(`zone.${z.id}`)}</div>
-              <div className="text-[11px] text-white/50">{free.length ? t("build.free", { n: free.length }) : t("build.none")}</div>
-              <div className="mt-0.5 flex gap-1 text-sm">
-                {z.builds.map((b) => (
-                  <span key={b} title={t(`structure.${b}`)}>
-                    {STRUCTURE_BY_ID[b].emoji}
-                  </span>
-                ))}
+              <div className="text-[11px] text-white/50">
+                {free.length ? t("build.free", { n: free.length - sites }) : t("build.none")}
+                {sites > 0 && ` · 🏗️ ${sites}`}
+              </div>
+              {/* each free plot and what it is zoned for, coloured by status */}
+              <div className="mt-1 flex flex-wrap gap-1">
+                {free.map((p) => {
+                  const st = plotStatus(state, p.id);
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      title={landName(p.id, t)}
+                      onClick={() => selectPlot(p.id)}
+                      className={cn(
+                        "flex size-7 items-center justify-center rounded-lg text-sm ring-1",
+                        st === "available" && "bg-emerald-500/15 ring-emerald-400/40",
+                        st === "owned" && "bg-sky-500/15 ring-sky-400/40",
+                        st === "construction" && "bg-amber-500/15 ring-amber-400/40",
+                        st === "locked" && "bg-white/[0.03] opacity-50 ring-white/10",
+                      )}
+                    >
+                      {p.use ? STRUCTURE_BY_ID[p.use].emoji : "▫️"}
+                    </button>
+                  );
+                })}
               </div>
             </div>
             <Button size="sm" variant={free.length ? "default" : "locked"} disabled={!free.length} onClick={() => free[0] && selectPlot(free[0].id)}>

@@ -5,6 +5,7 @@ import { offlineRacing } from "./racing";
 import { showroomTick } from "./showroom";
 import { snapshot } from "./economy";
 import { credit } from "./tick";
+import { constructionTick } from "./construction";
 import { book, LEDGER_KEYS, settleLedger } from "./materials";
 
 /**
@@ -20,6 +21,12 @@ export function computeOffline(s: GameState, now: number): OfflineReport {
   const capped = Math.min(seconds, snap.gm.offlineCapHours * 3600);
   const report: OfflineReport = { seconds, cappedSeconds: capped, cars: 0, components: 0, deliveries: 0, money: 0, rp: 0, carsByType: {} };
   if (capped <= 0) return report;
+  // construction never stops: sites and upgrades advance for the whole absence
+  // (what they finish starts working when the player is back)
+  const before0 = new Set(Object.keys(s.city.sites));
+  const finished = constructionTick(s, seconds);
+  const built = finished.filter((id) => before0.has(id));
+  if (built.length) report.built = built;
 
   const cash = s.cash;
   const byType = { ...s.lifetime.carsByType };
@@ -80,7 +87,7 @@ export function applyOffline(s: GameState, report: OfflineReport) {
 export function settleOffline(s: GameState, now: number): OfflineReport | null {
   const report = computeOffline(s, now);
   s.lastActiveAt = now;
-  if (report.money <= 0 && report.cars <= 0 && !report.components && !report.serviced) return null;
+  if (report.money <= 0 && report.cars <= 0 && !report.components && !report.serviced && !report.built?.length) return null;
   if (report.seconds < OFFLINE.minReportSeconds) {
     applyOffline(s, report);
     return null;
@@ -98,6 +105,7 @@ export function settleOffline(s: GameState, now: number): OfflineReport | null {
     p.rp += report.rp;
     p.carsSold = (p.carsSold ?? 0) + (report.carsSold ?? 0);
     p.materialsUsed = (p.materialsUsed ?? 0) + (report.materialsUsed ?? 0);
+    if (report.built?.length) p.built = [...(p.built ?? []), ...report.built];
     if (report.racing) {
       const a = (p.racing ??= { races: 0, wins: 0, podiums: 0, prize: 0, rep: 0, repairs: 0 });
       for (const k of ["races", "wins", "podiums", "prize", "rep", "repairs"] as const) a[k] += report.racing[k];

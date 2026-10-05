@@ -1,6 +1,8 @@
 // Runs the Empire Map: owns the canvas, camera, scene and traffic, renders
 // every animation frame and turns taps into selections. React only feeds it
 // state and listens to its callbacks.
+import { networkTraffic } from "./highway";
+import type { PlotStatus } from "@/game/engine/construction";
 import { LEGACY_OFFSET } from "@/game/config/city";
 import { ROAD_STEP as STEP_TILES, territoryCenterTile } from "@/game/city/layout";
 import type { TerritoryId } from "@/game/config/city";
@@ -64,7 +66,8 @@ export class MapEngine {
   /** Day, evening, night or the automatic cycle. */
   timeMode: TimeMode = "auto";
   /** BUILD mode: plots to highlight and how (green / yellow / red). */
-  buildInfo: Map<string, "green" | "yellow" | "red"> | null = null;
+  /** BUILD mode: every building plot coloured by its status. */
+  buildInfo: Map<string, PlotStatus> | null = null;
   /** A building being previewed on a plot before it is bought. */
   preview: { plot: string; type: StructureType } | null = null;
   private sigs = new Map<string, string>();
@@ -120,7 +123,8 @@ export class MapEngine {
       if (!d.pickId || !d.sig) continue;
       const old = this.sigs.get(d.pickId);
       if (!first && old !== undefined && old !== d.sig && d.sig !== "lot") {
-        const upgrade = old !== "lot" && old.split(":")[0] === d.sig.split(":")[0];
+        // a finished site only loses its scaffolding: animate it like an upgrade
+        const upgrade = old !== "lot" && (old.startsWith("site:") || old.split(":")[0] === d.sig.split(":")[0]);
         this.anims.set(d.pickId, { start: this.t, upgrade, announce: d.announce });
       }
       this.sigs.set(d.pickId, d.sig);
@@ -451,7 +455,7 @@ export class MapEngine {
     const inView = (b: [number, number, number, number]) => b[2] >= view[0] && b[0] <= view[2] && b[3] >= view[1] && b[1] <= view[3];
 
     // merge static scene with moving traffic, both sorted by depth
-    const moving = [...this.traffic.drawables(), ...(this.race?.drawables(this.t) ?? [])].sort((a, b) => a.depth - b.depth);
+    const moving = [...this.traffic.drawables(), ...networkTraffic(this.t, this.unlocked, this.traffic.density, this.cam.zoom), ...(this.race?.drawables(this.t) ?? [])].sort((a, b) => a.depth - b.depth);
     let mi = 0;
     const visible: Drawable[] = [];
     const drawMoving = (upTo: number) => {
@@ -487,16 +491,23 @@ export class MapEngine {
 
     // BUILD mode: dim the city, light up the plots by availability
     if (this.buildInfo) {
-      ctx.fillStyle = "rgba(2,6,23,0.42)";
+      // subtle: a light veil, then each plot tinted by its status
+      ctx.fillStyle = "rgba(2,6,23,0.3)";
       ctx.fillRect(view[0] - 10, view[1] - 10, view[2] - view[0] + 20, view[3] - view[1] + 20);
-      const pulse = 0.5 + 0.2 * Math.sin(this.t * 3);
-      const fills = { green: `rgba(34,197,94,${pulse * 0.6})`, yellow: `rgba(250,204,21,${pulse * 0.5})`, red: "rgba(239,68,68,0.28)" };
-      const lines = { green: "#4ade80", yellow: "#facc15", red: "#f87171" };
+      const pulse = 0.5 + 0.15 * Math.sin(this.t * 2.5);
+      const fills: Record<PlotStatus, string> = {
+        available: `rgba(74,222,128,${pulse * 0.45})`,
+        owned: "rgba(56,189,248,0.3)",
+        construction: "rgba(250,204,21,0.28)",
+        operational: "rgba(255,255,255,0.06)",
+        locked: "rgba(100,116,139,0.22)",
+      };
+      const lines: Record<PlotStatus, string> = { available: "#86efac", owned: "#7dd3fc", construction: "#fde047", operational: "rgba(255,255,255,0.35)", locked: "rgba(148,163,184,0.5)" };
       for (const [id, st] of this.buildInfo) {
         const pl = WORLD_MAP.plotById[id];
         if (!pl) continue;
         p.quad(pl.x + 0.3, pl.y + 0.3, pl.w - 0.6, pl.d - 0.6, fills[st]);
-        p.quadStroke(pl.x + 0.3, pl.y + 0.3, pl.w - 0.6, pl.d - 0.6, lines[st], 2);
+        p.quadStroke(pl.x + 0.3, pl.y + 0.3, pl.w - 0.6, pl.d - 0.6, lines[st], st === "operational" ? 1 : 1.6, st === "locked" ? [5, 5] : undefined);
       }
     }
     drawFog(p, this.unlocked, this.t);

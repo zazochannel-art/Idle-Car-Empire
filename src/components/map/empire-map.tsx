@@ -12,7 +12,9 @@ import { DEALER_BY_ID } from "@/game/config/dealerships";
 import { BLOCKS, RACING, WORLD_MAP, dealerPlot, plotOf } from "@/game/city/layout";
 import { racingBlocker, racingCost } from "@/game/engine/racing";
 import { RaceLayer } from "./race-layer";
-import { structureCost, zoneBlocker } from "@/game/engine/city";
+import { zoneBlocker } from "@/game/engine/city";
+import { plotStatus, type PlotStatus } from "@/game/engine/construction";
+import * as Ch from "@/game/engine/chain";
 import type { EconomySnapshot } from "@/game/engine/economy";
 import { formatMoney } from "@/game/format";
 import type { GameState, ZoneId } from "@/game/types";
@@ -39,7 +41,9 @@ function sceneKey(s: GameState, snap: EconomySnapshot) {
     .map(([id, x]) => `${id}:${x.type}:${x.level}:${x.garage?.spec ?? ""}:${x.garage?.workers ?? ""}:${x.garage?.facilities.length ?? ""}:${(snap.city.garages[id]?.incomePerSec ?? 0) > 0 ? 1 : 0}:${snap.chain.plants[id]?.car?.id ?? ""}`)
     .join("|");
   const d = Object.values(s.dealers).map((x) => `${x.owned ? 1 : 0}${x.level}`).join(",");
-  return `${s.city.zones.join()}#${b}#${d}`;
+  // land bought, building sites and upgrades under way
+  const w = Object.entries(s.city.buildings).filter(([, x]) => x.works).map(([id]) => id).join(",");
+  return `${s.city.zones.join()}#${b}#${d}#${s.city.land.length}#${Object.keys(s.city.sites).join(",")}#${w}`;
 }
 
 function trafficWorld(s: GameState, snap: EconomySnapshot): TrafficWorld {
@@ -253,8 +257,8 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
     if (engineRef.current) engineRef.current.preview = preview;
   }, [preview]);
 
-  // BUILD mode: colour every free plot by whether it can be built on now
-  const buildKey = view === "build" ? `${state.city.zones.join()}|${Object.keys(state.city.buildings).length}|${Math.floor(Math.log10(state.cash + 1) * 4)}` : "";
+  // BUILD mode: every plot coloured by its status (available, owned, building, operational, locked)
+  const buildKey = view === "build" ? `${state.city.zones.join()}|${Object.keys(state.city.buildings).length}|${state.city.land.length}|${Object.keys(state.city.sites).length}|${Ch.plantsOf(state).map(([, b]) => b.type).join()}` : "";
   useEffect(() => {
     const e = engineRef.current;
     if (!e) return;
@@ -263,16 +267,8 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
       return;
     }
     const s = useGame.getState().state;
-    const info = new Map<string, "green" | "yellow" | "red">();
-    for (const p of WORLD_MAP.plots) {
-      if (p.kind !== "plot" || s.city.buildings[p.id]) continue;
-      if (!s.city.zones.includes(p.zone)) {
-        info.set(p.id, "red");
-        continue;
-      }
-      const cheapest = Math.min(...buildableIn(p.zone, p.big).map((type) => structureCost(s, p.id, type)));
-      info.set(p.id, s.cash >= cheapest ? "green" : "yellow");
-    }
+    const info = new Map<string, PlotStatus>();
+    for (const p of WORLD_MAP.plots) if (p.kind === "plot") info.set(p.id, plotStatus(s, p.id));
     e.buildInfo = info;
   }, [view, buildKey]);
 

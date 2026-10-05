@@ -26,7 +26,8 @@ import {
   buildableIn,
 } from "../config/city";
 import { PLANT_MAX_LEVEL, isPlantType } from "../config/chain";
-import { migratePlant, newPlant, plantBuildCost, plantLock, starterStock } from "./chain";
+import { migratePlant, newPlant, plantBuildCost, starterStock } from "./chain";
+import { buyAndBuild, startWorks } from "./construction";
 import { STARTER_PLOT, plotOf, WORLD_MAP, type Plot } from "../city/layout";
 import type {
   BuildingState,
@@ -50,7 +51,7 @@ export function newGarage(no: number): BuildingState {
 export function createCity(): CityState {
   // the first few car bodies' worth of material is already in the warehouse
   const plant = { ...newPlant(), stock: starterStock("bodyWorks", 1, 3) };
-  return { zones: ["town"], territories: [], buildings: { [STARTER_PLOT]: { type: "bodyWorks", level: 1, plant } }, nextUid: 1, nextGarageNo: 1, carsServiced: 0 };
+  return { zones: ["town"], territories: [], buildings: { [STARTER_PLOT]: { type: "bodyWorks", level: 1, plant } }, land: [STARTER_PLOT], sites: {}, nextUid: 1, nextGarageNo: 1, carsServiced: 0 };
 }
 
 export const isZoneUnlocked = (s: GameState, zone: ZoneId) => s.city.zones.includes(zone);
@@ -108,7 +109,7 @@ export function structureCost(s: GameState, plotId: string, type: StructureType)
 /** Next level of a plot building, or null at max. Garages have their own table. */
 export function buildingUpgradeCost(s: GameState, plotId: string): number | null {
   const b = s.city.buildings[plotId];
-  if (!b || b.plant) return null;
+  if (!b || b.plant || b.works) return null;
   const scale = scaleOf(plotId);
   if (b.type === "garage") {
     if (b.level >= GARAGE_MAX_LEVEL) return null;
@@ -387,7 +388,7 @@ export function unlockZone(s: GameState, zone: ZoneId): boolean {
 
 export function canBuildOn(s: GameState, plotId: string): boolean {
   const plot = plotOf(plotId);
-  return !!plot && plot.kind === "plot" && isZoneUnlocked(s, plot.zone) && !s.city.buildings[plotId];
+  return !!plot && plot.kind === "plot" && isZoneUnlocked(s, plot.zone) && !s.city.buildings[plotId] && !s.city.sites[plotId];
 }
 
 /** Support buildings are one per district; garages are unlimited. */
@@ -395,29 +396,20 @@ export function builtInZone(s: GameState, zone: ZoneId, type: StructureType): bo
   return Object.entries(s.city.buildings).some(([id, b]) => b.type === type && plotOf(id)?.zone === zone);
 }
 
+/**
+ * Builds `type` on a plot zoned for it: buys the land if needed and starts
+ * the construction (engine/construction.ts). The building appears when the
+ * construction is finished, never at once.
+ */
 export function buildStructure(s: GameState, plotId: string, type: StructureType): boolean {
   const plot = plotOf(plotId);
-  if (!plot || !canBuildOn(s, plotId) || !buildableIn(plot.zone, plot.big).includes(type)) return false;
-  if (isPlantType(type)) {
-    if (plantLock(s, type) || !spend(s, structureCost(s, plotId, type))) return false;
-    s.city.buildings[plotId] = { type, level: 1, plant: newPlant() };
-    return true;
-  }
-  if (type !== "garage" && builtInZone(s, plot.zone, type)) return false;
-  if (!spend(s, structureCost(s, plotId, type))) return false;
-  if (type === "garage") {
-    s.city.buildings[plotId] = newGarage(s.city.nextGarageNo++);
-  } else {
-    s.city.buildings[plotId] = { type, level: 1 };
-  }
-  return true;
+  if (!plot || plot.use !== type || !canBuildOn(s, plotId) || !buildableIn(plot.zone, plot.big).includes(type)) return false;
+  return buyAndBuild(s, plotId);
 }
 
+/** A new level is built onto the building (it keeps working meanwhile). */
 export function upgradeBuilding(s: GameState, plotId: string): boolean {
-  const b = s.city.buildings[plotId];
-  if (!b || !spend(s, buildingUpgradeCost(s, plotId))) return false;
-  b.level += 1;
-  return true;
+  return startWorks(s, plotId, buildingUpgradeCost(s, plotId));
 }
 
 export function placeFacility(s: GameState, plotId: string, type: FacilityType, x: number, y: number, rot: 0 | 1): boolean {
@@ -531,6 +523,29 @@ export function migrateCity(raw: unknown): CityState {
     city.nextUid = Math.max(int(raw.nextUid, 1, 1e9, 1), maxUid + 1);
     city.nextGarageNo = Math.max(int(raw.nextGarageNo, 1, 9999, 1), maxNo + 1);
   }
+  // works in progress on existing buildings
+  if (isObj(raw.buildings))
+    for (const [id, b] of Object.entries(city.buildings)) {
+      const w = (raw.buildings as Record<string, unknown>)[id];
+      const works = isObj(w) && isObj(w.works) ? w.works : null;
+      if (!works) continue;
+      const dur = num(works.dur);
+      if (dur > 0) b.works = { to: Math.max(b.level + 1, int(works.to, 1, 999, b.level + 1)), t: Math.min(dur, num(works.t)), dur, cost: num(works.cost) };
+    }
+  // land: every built plot is owned (older saves had no land); then the bought plots
+  city.land = Object.keys(city.buildings);
+  if (Array.isArray(raw.land))
+    for (const id of raw.land) if (typeof id === "string" && plotOf(id)?.kind === "plot" && !city.land.includes(id)) city.land.push(id);
+  city.sites = {};
+  if (isObj(raw.sites))
+    for (const [id, st] of Object.entries(raw.sites)) {
+      const plot = plotOf(id);
+      if (!isObj(st) || !plot || plot.kind !== "plot" || city.buildings[id] || typeof st.type !== "string" || !(st.type in STRUCTURE_BY_ID)) continue;
+      const dur = num(st.dur);
+      if (!(dur > 0)) continue;
+      city.sites[id] = { type: st.type as StructureType, t: Math.min(dur, num(st.t)), dur, cost: num(st.cost) };
+      if (!city.land.includes(id)) city.land.push(id);
+    }
   city.carsServiced = num(raw.carsServiced);
   return city;
 }
@@ -538,7 +553,7 @@ export function migrateCity(raw: unknown): CityState {
 /** Open the zones that hold what the player owns (perks, imported saves). */
 export function unlockOwnedZones(s: GameState) {
   for (const p of WORLD_MAP.plots) {
-    const owned = (p.dealer && s.dealers[p.dealer].owned) || !!s.city.buildings[p.id];
+    const owned = (p.dealer && s.dealers[p.dealer].owned) || !!s.city.buildings[p.id] || !!s.city.sites[p.id];
     if (owned) ensureZonesUpTo(s, p.zone);
   }
 }

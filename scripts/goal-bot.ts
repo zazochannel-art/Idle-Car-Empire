@@ -11,7 +11,7 @@ import { buyPlan, restockPlan } from "../src/game/engine/materials";
 import { createInitialState } from "../src/game/engine/state";
 import { tick } from "../src/game/engine/tick";
 import { buyDealer, hireManager, upgradeDealer } from "../src/game/engine/actions";
-import { freePlot, nextGoals, restockLow } from "../src/game/engine/insights";
+import { nextGoals, restockLow } from "../src/game/engine/insights";
 import { formatMoney } from "../src/game/format";
 import { checkInvariants } from "./invariants";
 import * as Rc from "../src/game/engine/racing";
@@ -159,12 +159,12 @@ for (let t = 0; t < hours * 3600; t++) {
   }
   let acted = false;
   // a focused player: the top goal, or the second one while the first only needs waiting
-  for (const g of goals.filter((g, i) => i === 0 || goals[0].kind === "made" || ("cost" in goals[0] && (goals[0].cost ?? 0) > s.cash && g.kind !== "upgrade"))) {
+  for (const g of goals.filter((g, i) => i === 0 || goals[0].kind === "made" || goals[0].kind === "site" || ("cost" in goals[0] && (goals[0].cost ?? 0) > s.cash && g.kind !== "upgrade"))) {
     const cost = ("cost" in g && g.cost !== undefined ? g.cost : 0) + (g.kind === "plant" ? g.reserve : 0);
     if (cost > s.cash) continue;
     const gm = snap.gm;
     switch (g.kind) {
-      case "plant": { const p = freePlot(s); acted = !!p && buildStructure(s, p, g.plant); break; }
+      case "plant": acted = buildStructure(s, g.plot, g.plant); break;
       case "upgrade": case "shortage": if ("what" in g && g.what) acted = g.what === "speed" ? Ch.upgradePlantSpeed(s, g.plot, gm) : Ch.upgradePlantLevel(s, g.plot, gm); break;
       case "materials": { const st = snap.chain.plants[g.plot]; acted = restockLow(s, snap) > 0 || (!!st && buyPlan(s, g.plot, restockPlan(s, g.plot, st.need, RESTOCK_UNITS))); break; }
       case "dealer": acted = buyDealer(s, g.dealer); break;

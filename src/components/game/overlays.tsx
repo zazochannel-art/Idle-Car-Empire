@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { formatDuration, formatHours, formatMoney, formatNumber } from "@/game/format";
 import { REGIONS, regionIndex } from "@/game/config/regions";
+import { STRUCTURE_BY_ID } from "@/game/config/city";
 import { transferLink } from "@/game/save/transfer";
 import { LANGS } from "@/i18n";
 import { useContent } from "@/i18n/content";
@@ -20,6 +21,7 @@ import { LedgerTable } from "../views/ledger-table";
 /** "Welcome Back!" — shown while an offline report is waiting to be collected. */
 export function OfflineDialog() {
   const report = useGame((g) => g.state.pendingOffline);
+  const buildings = useGame((g) => g.state.city.buildings);
   const collect = useGame((g) => g.collectOffline);
   const { t } = useT();
   const offlineCap = useGame((g) => g.snap.gm.offlineCapHours);
@@ -60,6 +62,19 @@ export function OfflineDialog() {
             <div className="mt-1 text-lg font-bold tabular-nums">{formatNumber(report.deliveries ?? 0)}</div>
           </div>
         </div>
+        {!!report.built?.length && (
+          <div className="mt-2 rounded-2xl bg-gold/[0.07] p-3 text-left text-xs ring-1 ring-gold/30">
+            <div className="mb-1 text-[11px] font-bold uppercase tracking-wider text-gold/80">🏗️ {t("offline.built")}</div>
+            {report.built.map((id) => {
+              const b = buildings[id];
+              return b ? (
+                <div key={id} className="font-semibold">
+                  {STRUCTURE_BY_ID[b.type].emoji} {t(`structure.${b.type}`)} — {t("land.status.operational")}
+                </div>
+              ) : null;
+            })}
+          </div>
+        )}
         {report.ledger && (
           <div className="mt-2 text-left">
             <div className="mb-1 flex justify-between text-[11px] uppercase tracking-wider text-white/45">
@@ -127,6 +142,7 @@ interface Toast {
   title: string;
   body?: string;
   icon?: string;
+  action?: { label: string; plot: string };
 }
 let toastId = 0;
 
@@ -138,9 +154,9 @@ export function Toasts() {
     () =>
       uiEvents.on((e: UiEvent) => {
         if (e.type !== "toast") return;
-        const t = { id: ++toastId, tone: e.tone, title: e.title, body: e.body, icon: e.icon };
+        const t = { id: ++toastId, tone: e.tone, title: e.title, body: e.body, icon: e.icon, action: e.action };
         setToasts((list) => [...list.slice(-3), t]);
-        setTimeout(() => setToasts((list) => list.filter((x) => x.id !== t.id)), 3800);
+        setTimeout(() => setToasts((list) => list.filter((x) => x.id !== t.id)), e.action ? 7000 : 3800);
       }),
     [],
   );
@@ -164,10 +180,22 @@ export function Toasts() {
             )}
           >
             {t.icon && <span className="text-2xl">{t.icon}</span>}
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className={cn("text-sm font-semibold", t.tone === "gold" && "text-gold")}>{t.title}</div>
               {t.body && <div className="truncate text-xs text-white/55">{t.body}</div>}
             </div>
+            {t.action && (
+              <button
+                type="button"
+                className="shrink-0 rounded-xl bg-gold/90 px-3 py-1.5 text-xs font-bold text-black hover:bg-gold"
+                onClick={() => {
+                  useUi.getState().selectPlot(t.action!.plot);
+                  setToasts((list) => list.filter((x) => x.id !== t.id));
+                }}
+              >
+                {t.action.label}
+              </button>
+            )}
           </motion.div>
         ))}
       </AnimatePresence>

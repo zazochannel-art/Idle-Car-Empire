@@ -20,6 +20,7 @@ import * as D from "@/game/engine/design";
 import * as L from "@/game/engine/logistics";
 import type { LogisticsUpgrade } from "@/game/config/logistics";
 import * as C from "@/game/engine/city";
+import * as Co from "@/game/engine/construction";
 import { STRUCTURE_BY_ID } from "@/game/config/city";
 import { PLANT_LEVELS } from "@/game/config/chain";
 import { snapshot, unlockedCarIds, type EconomySnapshot } from "@/game/engine/economy";
@@ -30,7 +31,7 @@ import { prestige as doPrestige } from "@/game/engine/prestige";
 import { checkAchievements, claimDaily, claimMilestone, recordHistory, refreshDaily } from "@/game/engine/progress";
 import { cloneState, createInitialState } from "@/game/engine/state";
 import { tick as engineTick } from "@/game/engine/tick";
-import { formatMoney, formatPercent } from "@/game/format";
+import { formatDuration, formatMoney, formatPercent } from "@/game/format";
 import { decodeSave, encodeSave, SaveManager } from "@/game/save";
 import type { BuyAmount, CarId, CarRoute, DealerId, FacilityType, GameState, Lang, ManagerId, QualityMode, Specialization, StructureType, ZoneId } from "@/game/types";
 import { applyLanguage, detectLanguage, translate, type MessageKey, type Vars } from "@/i18n";
@@ -96,6 +97,9 @@ interface GameStore {
   research: (id: string) => boolean;
   unlockZone: (id: ZoneId) => boolean;
   buildStructure: (plot: string, type: StructureType) => boolean;
+  buyLand: (plot: string) => boolean;
+  startConstruction: (plot: string) => boolean;
+  speedUp: (plot: string) => boolean;
   upgradeBuilding: (plot: string) => boolean;
   placeFacility: (plot: string, type: FacilityType, x: number, y: number, rot: 0 | 1) => boolean;
   moveFacility: (plot: string, uid: number, x: number, y: number, rot: 0 | 1) => boolean;
@@ -238,6 +242,17 @@ export const useGame = create<GameStore>((set, get) => {
     for (const e of events) {
       if (e.type === "sale") uiEvents.emit(e);
       else if (e.type === "carBuilt" && e.first) uiEvents.emit({ type: "firstCar", plot: e.plot, car: e.car });
+      else if (e.type === "built") {
+        const name = tr(`structure.${e.structure}`);
+        uiEvents.emit({
+          type: "toast",
+          tone: "gold",
+          icon: e.upgrade ? "⬆️" : STRUCTURE_BY_ID[e.structure].emoji,
+          title: e.upgrade ? tr("toast.upgradeDone", { name, level: e.level }) : tr("toast.constructionDone", { name }),
+          body: e.upgrade ? tr("toast.upgradeDoneBody") : tr("toast.constructionDoneBody"),
+          action: { label: tr("toast.open"), plot: e.plot },
+        });
+      }
       else if (e.type === "raceFinished") {
         const rec = next.racing.last;
         const rw = rec?.result;
@@ -456,9 +471,32 @@ export const useGame = create<GameStore>((set, get) => {
     buildStructure: (plot, type) => {
       const ok = act((s) => C.buildStructure(s, plot, type));
       if (ok) {
-        uiEvents.emit({ type: "toast", tone: "success", icon: STRUCTURE_BY_ID[type].emoji, title: tr("toast.built", { name: tr(`structure.${type}`) }), body: tr(`structureDesc.${type}`) });
+        const site = get().state.city.sites[plot];
+        uiEvents.emit({ type: "toast", tone: "info", icon: "🏗️", title: tr("toast.constructionStarted", { name: tr(`structure.${type}`) }), body: tr("toast.constructionBody", { time: formatDuration(site?.dur ?? 0) }) });
         persist(true);
       }
+      return ok;
+    },
+    buyLand: (plot) => {
+      const ok = act((s) => Co.buyLand(s, plot));
+      if (ok) {
+        uiEvents.emit({ type: "toast", tone: "success", icon: "📜", title: tr("toast.landBought") });
+        persist(true);
+      }
+      return ok;
+    },
+    startConstruction: (plot) => {
+      const ok = act((s) => Co.startConstruction(s, plot));
+      if (ok) {
+        const site = get().state.city.sites[plot];
+        if (site) uiEvents.emit({ type: "toast", tone: "info", icon: "🏗️", title: tr("toast.constructionStarted", { name: tr(`structure.${site.type}`) }), body: tr("toast.constructionBody", { time: formatDuration(site.dur) }) });
+        persist(true);
+      }
+      return ok;
+    },
+    speedUp: (plot) => {
+      const ok = act((s) => Co.speedUp(s, plot));
+      if (ok) persist(true);
       return ok;
     },
     upgradeBuilding: (plot) => act((s) => C.upgradeBuilding(s, plot)),

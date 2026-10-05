@@ -1,6 +1,7 @@
 // Read-only helpers that explain the game to the player: what to aim for next
 // and why something is locked. They return data, not text — the UI words it
 // in the player's language. Never mutate state.
+import { constructionCost, freePlotFor, landCost, ownsLand, progressOf, remainingOf } from "./construction";
 import { atTrack, racingCost } from "./racing";
 import { nextTerritory, territoryLock } from "./territory";
 import type { TerritoryId } from "../config/city";
@@ -12,7 +13,7 @@ import { DEALERS } from "../config/dealerships";
 import { MANAGERS } from "../config/managers";
 import { ZONE_BY_ID } from "../config/city";
 import { WORLD_MAP, dealerPlot } from "../city/layout";
-import type { CarId, ComponentId, DealerId, GameState, ManagerId, MaterialStock, PlantType, ZoneId } from "../types";
+import type { CarId, ComponentId, DealerId, GameState, ManagerId, MaterialStock, PlantType, StructureType, ZoneId } from "../types";
 import { canOpenDealers, isManagerUnlocked } from "./actions";
 import { bestGrade, carLock, carTrip, gradeCost, hasPlant, levelCost, plantBuildCost, plantLock, plantsOf, speedCost } from "./chain";
 import { isPlotUnlocked, nextZone, zoneBlocker } from "./city";
@@ -30,7 +31,9 @@ export type Requirement =
   | { kind: "unavailable" };
 
 export type Goal =
-  | { kind: "plant"; icon: string; cost: number; plant: PlantType; /** Cash to keep for materials after building. */ reserve: number }
+  | { kind: "plant"; icon: string; cost: number; plant: PlantType; plot: string; /** Cash to keep for materials after building. */ reserve: number }
+  /** The next plant is going up: how far it is and how long it still takes. */
+  | { kind: "site"; icon: string; plot: string; type: StructureType; progress: number; left: number }
   | { kind: "upgrade"; icon: string; cost: number; plot: string; what: "speed" | "level" }
   /** cost/what: the cheapest upgrade on the maker plot, bought by tapping the goal. */
   | { kind: "shortage"; icon: string; plot: string; component: ComponentId; cost?: number; what?: "speed" | "level" }
@@ -84,7 +87,7 @@ export function restockLow(s: GameState, snap: EconomySnapshot): number {
 
 /** A free plot in an unlocked district, if there is one. */
 export function freePlot(s: GameState): string | null {
-  const p = WORLD_MAP.plots.find((pl) => pl.kind === "plot" && isPlotUnlocked(s, pl) && !s.city.buildings[pl.id]);
+  const p = WORLD_MAP.plots.find((pl) => pl.kind === "plot" && isPlotUnlocked(s, pl) && !s.city.buildings[pl.id] && !s.city.sites[pl.id]);
   return p?.id ?? null;
 }
 
@@ -194,10 +197,15 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
   }
 
   // The next plant in the chain.
-  const next = PLANTS.find((p) => !hasPlant(s, p.id) && plantLock(s, p.id) === null);
+  // (a plant whose site is going up already counts: the next one can start alongside it)
+  const building = (t: PlantType) => Object.entries(s.city.sites).find(([, st]) => st.type === t)?.[0];
+  const next = PLANTS.find((p) => !hasPlant(s, p.id) && !building(p.id) && plantLock(s, p.id) === null);
   if (next) {
-    if (freePlot(s)) goals.push({ kind: "plant", icon: next.emoji, cost: plantBuildCost(s, next.id), plant: next.id, reserve: workingCapital(s, snap) });
-    else {
+    const plot = freePlotFor(s, next.id);
+    if (plot) {
+      const land = ownsLand(s, plot) ? 0 : landCost(s, plot);
+      goals.push({ kind: "plant", icon: next.emoji, cost: land + constructionCost(s, plot), plant: next.id, plot, reserve: workingCapital(s, snap) });
+    } else {
       const z = nextZone(s);
       if (z && !zoneBlocker(s, z.id)) goals.push({ kind: "zone", icon: "🗺️", cost: ZONE_BY_ID[z.id].cost, zone: z.id });
     }
@@ -292,6 +300,12 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
     // worth it now (growth stalled or a big jump) → first; otherwise a quiet option
     if (stalled || gain >= 0.5) goals.unshift(g);
     else goals.splice(Math.min(goals.length, max - 1), 0, g);
+  }
+  // a plant going up: shown once nothing more urgent needs doing (it only needs waiting)
+  const firstSite = PLANTS.map((p) => (hasPlant(s, p.id) ? undefined : building(p.id))).find(Boolean);
+  if (firstSite) {
+    const st = s.city.sites[firstSite];
+    goals.push({ kind: "site", icon: "🏗️", plot: firstSite, type: st.type, progress: progressOf(s, firstSite) ?? 0, left: remainingOf(s, firstSite) });
   }
   return goals.slice(0, max);
 }

@@ -14,6 +14,16 @@ export function checkInvariants(s: GameState): string[] {
   walk(s, "s");
   if (s.cash < -1e-6) out.push(`cash ${s.cash}`);
   if (s.chain.owed < -1e-6) out.push(`owed ${s.chain.owed}`);
+  // land and construction: a plot is a site or a building, never both; both stand on owned land
+  for (const [id, st] of Object.entries(s.city.sites)) {
+    if (s.city.buildings[id]) out.push(`${id} is a site and a building`);
+    if (!s.city.land.includes(id)) out.push(`${id} site without land`);
+    if (!(st.dur > 0) || st.t < 0 || st.t > st.dur) out.push(`${id} site time ${st.t}/${st.dur}`);
+  }
+  for (const [id, b] of Object.entries(s.city.buildings)) {
+    if (!s.city.land.includes(id)) out.push(`${id} building without land`);
+    if (b.works && (b.works.to <= b.level || b.works.t > b.works.dur)) out.push(`${id} works ${b.works.to}@${b.level}`);
+  }
   for (const [id, b] of Object.entries(s.city.buildings)) {
     const p = b.plant;
     if (!p) continue;

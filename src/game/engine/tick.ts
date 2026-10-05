@@ -1,6 +1,7 @@
 import type { GameEvent, GameState } from "../types";
 import { chainTick } from "./chain";
 import { cityTick } from "./city";
+import { constructionTick } from "./construction";
 import { snapshot, type EconomySnapshot } from "./economy";
 import { book } from "./materials";
 import { racingTick } from "./racing";
@@ -34,6 +35,9 @@ export function tick(s: GameState, dt: number, snap?: EconomySnapshot): GameEven
     credit(s, amount);
     book(s, "services", amount);
   });
+
+  // building sites and upgrades in progress
+  constructionTick(s, dt, events);
 
   const race = racingTick(s, dt);
   if (race) events.push({ type: "raceFinished", race: race.id });

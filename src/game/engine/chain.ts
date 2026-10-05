@@ -3,6 +3,7 @@
 // raw material from the Materials Depot, components to the Parts Market or
 // to a Car Assembly Plant, finished cars to dealerships. Money only comes in
 // when a load is sold at the market or a customer buys a car.
+import { startWorks } from "./construction";
 import { receiveRaceCar } from "./racing";
 import { regionCostMult } from "../config/regions";
 import { CARS, CAR_BY_ID, CAR_MODEL, type CarConfig } from "../config/cars";
@@ -153,7 +154,9 @@ export type PlantLock =
 /** What must happen before a plant type can be built (null = ready). */
 export function plantLock(s: GameState, type: PlantType): PlantLock {
   const cfg = PLANT_BY_ID[type];
-  if (cfg.requires && !hasPlant(s, cfg.requires)) return { kind: "plant", plant: cfg.requires };
+  // the plant before it in the chain must be built or at least going up (sites can run side by side)
+  if (cfg.requires && !hasPlant(s, cfg.requires) && !Object.values(s.city.sites).some((st) => st.type === cfg.requires))
+    return { kind: "plant", plant: cfg.requires };
   if (cfg.unlockMade && s.lifetime.parts[cfg.unlockMade.item] < cfg.unlockMade.n)
     return { kind: "made", item: cfg.unlockMade.item, n: cfg.unlockMade.n, have: Math.floor(s.lifetime.parts[cfg.unlockMade.item]) };
   if (cfg.research && !s.research.includes(cfg.research)) return { kind: "research", research: cfg.research };
@@ -170,7 +173,7 @@ const base = (b: BuildingState) => PLANT_BY_ID[b.type as PlantType].cost;
 
 /** Price of the next level: the plant's cost × level.base × level.growth^(level-1) (config/economy.ts). */
 export function levelCost(b: BuildingState, gm: GlobalMods): number | null {
-  if (b.level >= Math.min(PLANT_MAX_LEVEL, gm.maxPlantLevel)) return null;
+  if (b.works || b.level >= Math.min(PLANT_MAX_LEVEL, gm.maxPlantLevel)) return null;
   const u = UPGRADE_SCALING.level;
   return base(b) * u.base * Math.pow(u.growth, b.level - 1) * gm.costMult;
 }
@@ -1067,10 +1070,10 @@ function countUpgrade(s: GameState, levels = false) {
   }
 }
 
+/** A new level is built onto the plant (it keeps producing at its level meanwhile). */
 export function upgradePlantLevel(s: GameState, plotId: string, gm: GlobalMods): boolean {
   const b = plantAt(s, plotId);
-  if (!b || !spend(s, levelCost(b, gm))) return false;
-  b.level += 1;
+  if (!b || !startWorks(s, plotId, levelCost(b, gm))) return false;
   countUpgrade(s, true);
   return true;
 }

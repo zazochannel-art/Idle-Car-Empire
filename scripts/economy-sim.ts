@@ -5,7 +5,8 @@ import { PLANTS } from "../src/game/config/chain";
 import { ZONES } from "../src/game/config/city";
 import { WORLD_MAP } from "../src/game/city/layout";
 import * as Ch from "../src/game/engine/chain";
-import { buildStructure, canBuildOn, unlockZone } from "../src/game/engine/city";
+import { buildStructure, unlockZone } from "../src/game/engine/city";
+import { freePlotFor } from "../src/game/engine/construction";
 import { snapshot } from "../src/game/engine/economy";
 import { buyMaterial, maxOrder, shortfall, stockTotal, warehouseCap } from "../src/game/engine/materials";
 import { createInitialState } from "../src/game/engine/state";
@@ -14,7 +15,7 @@ import { upgradeDealer } from "../src/game/engine/actions";
 import { dealerUpgradeCost } from "../src/game/engine/economy";
 import { formatMoney } from "../src/game/format";
 import type { MaterialId } from "../src/game/config/economy";
-import type { PlantType } from "../src/game/types";
+import type { PlantType, StructureType } from "../src/game/types";
 
 const hours = Number(process.argv[2] ?? 8);
 const s = createInitialState(0);
@@ -30,7 +31,7 @@ const fmtT = (t: number) => `${Math.floor(t / 3600)}h${String(Math.floor((t % 36
 
 const order: PlantType[] = PLANTS.map((p) => p.id).filter((id) => id !== "batteryFactory");
 let snap = snapshot(s);
-const freePlot = () => WORLD_MAP.plots.find((p) => p.kind === "plot" && canBuildOn(s, p.id) && !p.big)?.id;
+const freePlot = (type: StructureType) => freePlotFor(s, type) ?? undefined;
 let lastIncome = 0;
 let prev = { ...s.chain.ledger.run };
 for (let t = 0; t < hours * 3600; t++) {
@@ -55,12 +56,12 @@ for (let t = 0; t < hours * 3600; t++) {
   // build the next plant in the chain when affordable
   for (const type of order) {
     if (Ch.hasPlant(s, type)) continue;
-    if (Ch.plantLock(s, type)) break;
-    let plot = freePlot();
+    if (Ch.plantLock(s, type) || Object.values(s.city.sites).some((st) => st.type === type)) break;
+    let plot = freePlot(type);
     if (!plot) {
       const z = ZONES.find((z) => !s.city.zones.includes(z.id));
       if (z && s.cash > z.cost * 1.2) unlockZone(s, z.id);
-      plot = freePlot();
+      plot = freePlot(type);
     }
     const cost = Ch.plantBuildCost(s, type);
     if (plot && s.cash > cost * 1.15 && buildStructure(s, plot, type)) mark(`built ${type}`, t, formatMoney(cost));

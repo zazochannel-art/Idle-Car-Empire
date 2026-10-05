@@ -6,6 +6,7 @@ import LEGACY_PLOTS from "./legacy-plots.json";
 import { computeGlobalMods } from "./engine/modifiers";
 import type { GameState } from "./types";
 import * as C from "./engine/city";
+import * as Co from "./engine/construction";
 import { snapshot } from "./engine/economy";
 import { computeOffline } from "./engine/offline";
 import { prestige } from "./engine/prestige";
@@ -17,12 +18,16 @@ import { decodeSave, encodeSave, migrate } from "./save/serialize";
 // outside every season (seasons add income) and outside market events
 const T0 = Date.UTC(2026, 2, 1, 12);
 
-/** Garages are a side business now: build one on the first free town plot. */
-const GAR = WORLD_MAP.plots.find((p) => p.zone === "town" && p.kind === "plot" && !p.starter && !p.big)!.id;
+/** Lets every construction and upgrade in progress finish. */
+const finish = (s: GameState) => Co.constructionTick(s, 1e9);
+
+/** Garages are a side business now: build one on the first town plot zoned for a garage. */
+const GAR = Co.plotsFor("garage")[0];
 function withGarage(cash = 0): GameState {
   const s = createInitialState(T0);
-  s.cash = 500 + cash;
+  s.cash = Co.landCost(s, GAR) + Co.constructionCost(s, GAR) + cash;
   expect(C.buildStructure(s, GAR, "garage")).toBe(true);
+  finish(s);
   return s;
 }
 
@@ -149,7 +154,7 @@ describe("territories", () => {
 describe("garages", () => {
   it("the first garage of a district is cheap and starts empty", () => {
     const s = withGarage();
-    expect(s.cash).toBe(0);
+    expect(s.cash).toBeCloseTo(0);
     const g = s.city.buildings[GAR];
     expect(g.garage?.no).toBe(1);
     expect(g.garage?.facilities).toHaveLength(0);
@@ -181,6 +186,7 @@ describe("garages", () => {
     expect(C.placementProblem(1, g, "serviceBay", 0, 4, 0)).toBe("cap"); // one bay at level 1
     expect(C.placeFacility(s, GAR, "paintBooth", 0, 4, 0)).toBe(false); // level 2+
     expect(C.upgradeBuilding(s, GAR)).toBe(true);
+    finish(s);
     expect(C.gridSize(2)).toEqual([10, 10]);
     expect(C.placeFacility(s, GAR, "serviceBay", 0, 4, 0)).toBe(true);
     expect(C.placeFacility(s, GAR, "paintBooth", 5, 4, 0)).toBe(true);
@@ -190,7 +196,10 @@ describe("garages", () => {
 
   it("workers, power and specialization shape income", () => {
     const s = withGarage(1e12);
-    for (let i = 0; i < 4; i++) C.upgradeBuilding(s, GAR);
+    for (let i = 0; i < 4; i++) {
+      C.upgradeBuilding(s, GAR);
+      finish(s);
+    }
     const b = s.city.buildings[GAR];
     expect(b.level).toBe(5);
     C.placeFacility(s, GAR, "serviceBay", 0, 0, 0);
@@ -224,17 +233,18 @@ describe("zones and plots", () => {
   it("builds structures on plots and applies their bonuses", () => {
     const s = createInitialState(T0);
     s.cash = 1e12;
-    const plot = WORLD_MAP.plots.find((p) => p.zone === "town" && p.kind === "plot" && !p.starter && !p.big)!;
+    const plot = WORLD_MAP.plotById[Co.plotsFor("carWash")[0]];
     expect(C.buildStructure(s, plot.id, "partsFactory")).toBe(false); // not offered in town
+    expect(C.buildStructure(s, plot.id, "parking")).toBe(false); // the plot is zoned for a car wash
     expect(C.buildStructure(s, plot.id, "carWash")).toBe(true);
-    expect(C.buildStructure(s, plot.id, "parking")).toBe(false); // occupied
-    const other = WORLD_MAP.plots.filter((p) => p.zone === "town" && p.kind === "plot" && !p.starter)[3];
-    expect(C.buildStructure(s, other.id, "carWash")).toBe(false); // one car wash per district
+    expect(C.buildStructure(s, plot.id, "carWash")).toBe(false); // already being built
+    finish(s);
     expect(snapshot(s).city.structureIncome[plot.id]).toBeGreaterThan(0);
-    const second = WORLD_MAP.plots.find((p) => p.zone === "town" && p.kind === "plot" && !p.starter && p.id !== plot.id)!;
-    expect(C.structureCost(s, second.id, "garage")).toBe(500); // first garage in the zone
-    expect(C.buildStructure(s, second.id, "garage")).toBe(true);
-    expect(s.city.buildings[second.id].garage?.no).toBe(1);
+    const second = Co.plotsFor("garage")[0];
+    expect(C.structureCost(s, second, "garage")).toBe(500); // first garage in the zone
+    expect(C.buildStructure(s, second, "garage")).toBe(true);
+    finish(s);
+    expect(s.city.buildings[second].garage?.no).toBe(1);
   });
 
   it("garages work offline and Global Expansion resets the city", () => {

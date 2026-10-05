@@ -80,7 +80,7 @@ export const ZONES: ZoneConfig[] = [
  * unlocked as the empire grows; landmarks, no plots): K test facility, P port,
  * Y rail yard, Q raw-material basin, U suburbs, V premium boulevard, O city
  * skyline, X cargo airport, C automotive campus, R racing (paddock and
- * circuit), Z racing annex (drag strip, drift, stands). Lower-case k p q u z
+ * circuit), Z racing annex (drag strip, drift, stands). Lower-case k p q u v z
  * are their access roads (country and mountain roads). A river runs down
  * node column RIVER_LINE, crossed by bridges.
  *
@@ -94,14 +94,14 @@ export const WORLD_BLOCKS = [
   "mmmmmmmffffffaffhahfafaf",
   "mmmmmmffhfffhffhhfahflla",
   "mmmmmafhfhallfhhhhaahlla",
-  "mmmmKKfhfffllffafOOOOaff",
-  "mmmfKKkkhffffhahhOOOOaaa",
-  "wmfffffkfffffffahOOOOfaa",
-  "wfffffakkahfhfhaaOOOOaha",
-  "wfaaaaahfTTTIICCCOaaaffw",
-  "wwhaahppTTTTIIICCVVffaaw",
-  "wwPPfppaaTDDILLCCVVffffw",
-  "wwPPYYhaDDDDALLLhVVhahfw",
+  "mmmmKKfhfffllffaffOOOOff",
+  "mmmfKKkkhmmmfhahhaOOOOaa",
+  "wmfffffkfmmffffahaOOOOaa",
+  "wfffffakkahfhfhaaaOOOOha",
+  "wfaaaaahfTTTIICCCavaaffw",
+  "wwhaahppTTTTIIICCvVVfaaw",
+  "wwPPfppaaTDDILLCCfVVfffw",
+  "wwPPYYhaDDDDALLLhaVVahfw",
   "wwPPYYawDDAAAALwwhhXXXXw",
   "wwaffffwwMAASSSwwafXXXXw",
   "wwhfffawMMMASSShwafXXXXw",
@@ -181,7 +181,7 @@ export const TERRITORIES: TerritoryConfig[] = [
   { id: "campus", emoji: "🏢", letters: "C", cost: 0, zone: "automotive", effects: [] },
   { id: "racing", emoji: "🏁", letters: "RZz", cost: 0, effects: [] },
   { id: "mountain", emoji: "🏔️", letters: "Kk", cost: 8_000_000, rep: 800, effects: [{ kind: "rp", mult: 1.1 }] },
-  { id: "boulevard", emoji: "💎", letters: "VO", cost: 40_000_000, zone: "luxury", effects: [{ kind: "markup", add: 0.03 }] },
+  { id: "boulevard", emoji: "💎", letters: "VOv", cost: 40_000_000, zone: "luxury", effects: [{ kind: "markup", add: 0.03 }] },
   { id: "port", emoji: "⚓", letters: "PYp", cost: 100_000_000, rep: 5_000, effects: [{ kind: "delivery", mult: 1.15 }] },
   { id: "airport", emoji: "✈️", letters: "X", cost: 500_000_000, rep: 20_000, ep: 25, zone: "global", effects: [{ kind: "income", mult: 1.1 }] },
 ];
@@ -241,6 +241,75 @@ export const STRUCTURES: StructureConfig[] = [
 ];
 
 /** What a plot in a district can hold: any plant, plus the district's own buildings. */
+// ───────────────────────────── land plots ─────────────────────────────
+
+/**
+ * What each district's plots are zoned for: every plot takes one kind of
+ * building only (an Engine Factory plot, a Warehouse plot…), so the map has
+ * a real structure. The list is dealt out to the district's plots nearest
+ * first (town: nearest the starter works) and repeats if there are more
+ * plots than entries. `big` is for the whole-block lots.
+ */
+export const PLOT_USES: Record<ZoneId, { cells: StructureType[]; big: StructureType[] }> = {
+  town: {
+    cells: ["engineFactory", "assemblyPlant", "tireFactory", "interiorFactory", "suspensionFactory", "garage", "warehouse", "engineFactory", "carWash", "garage", "parking", "serviceCenter"],
+    big: ["assemblyPlant"],
+  },
+  industrial: {
+    cells: ["interiorFactory", "suspensionFactory", "truckDepot", "logistics", "transmissionFactory", "partsFactory", "fleetPlant", "warehouse"],
+    big: ["assemblyPlant", "glassFactory"],
+  },
+  downtown: {
+    cells: ["researchCenter", "garage", "wheelFactory", "museum", "brakeFactory", "carWash", "parking", "serviceCenter", "engineFactory", "garage", "tireFactory"],
+    big: ["paintFactory"],
+  },
+  automotive: {
+    cells: ["partsFactory", "researchCenter", "glassFactory", "logistics", "warehouse", "interiorFactory", "suspensionFactory", "fleetPlant", "transmissionFactory", "wheelFactory", "brakeFactory", "garage", "bodyWorks", "engineFactory", "tireFactory", "paintFactory", "assemblyPlant"],
+    big: ["electronicsFactory"],
+  },
+  luxury: {
+    cells: ["hq", "museum", "garage", "serviceCenter", "carWash", "parking", "glassFactory", "paintFactory", "interiorFactory"],
+    big: ["assemblyPlant"],
+  },
+  supercar: {
+    cells: ["researchCenter", "exportTerminal", "electronicsFactory", "warehouse", "garage", "paintFactory", "suspensionFactory", "transmissionFactory", "wheelFactory", "brakeFactory", "engineFactory", "glassFactory", "tireFactory"],
+    big: ["batteryFactory", "assemblyPlant"],
+  },
+  mega: {
+    cells: ["hq", "exportTerminal", "batteryFactory", "logistics", "truckDepot", "garage", "electronicsFactory", "engineFactory", "bodyWorks", "assemblyPlant"],
+    big: ["assemblyPlant"],
+  },
+  global: {
+    cells: ["airport", "hq", "exportTerminal", "batteryFactory", "garage", "electronicsFactory", "paintFactory", "glassFactory", "interiorFactory", "suspensionFactory", "assemblyPlant"],
+    big: ["batteryFactory"],
+  },
+};
+
+export type PlotSize = "small" | "medium" | "large" | "mega";
+
+/** Size class of a plot: town-centre cells are small, industrial cells medium, whole blocks large (mega in the last districts). */
+export function plotSizeOf(zone: ZoneId, big: boolean): PlotSize {
+  if (big) return zone === "mega" || zone === "global" ? "mega" : "large";
+  return zone === "town" || zone === "downtown" || zone === "luxury" ? "small" : "medium";
+}
+
+/** Share of a building's price paid for the land; the rest pays for the construction. */
+export const LAND_SHARE = 0.3;
+/** Land price by plot size (× the share above). */
+export const LAND_SIZE_MULT: Record<PlotSize, number> = { small: 0.8, medium: 1, large: 1.4, mega: 2.2 };
+/** Construction time by plot size. */
+export const BUILD_SIZE_MULT: Record<PlotSize, number> = { small: 1, medium: 1.25, large: 1.6, mega: 3 };
+/**
+ * Construction time of a new building from its price: 2 minutes for the
+ * cheapest, growing with the price (an Electronics Factory takes ~1 hour,
+ * a Battery Factory on a mega plot several), at most 8 hours.
+ */
+export const BUILD_TIME = { min: 120, base: 120, ref: 8_000, exp: 0.45, max: 8 * 3600 };
+/** Upgrading a building (a new level) is a smaller job: 15 s for cheap levels, up to 2 hours. */
+export const UPGRADE_TIME = { min: 15, base: 15, ref: 1_000, exp: 0.3, max: 2 * 3600 };
+/** Finishing a construction now costs this share of its price per remaining fraction. */
+export const SPEED_UP_SHARE = 0.6;
+
 export function buildableIn(zone: ZoneId, big = false): StructureType[] {
   const plants = PLANTS.map((p) => p.id);
   return big ? plants : [...plants, ...ZONE_BY_ID[zone].builds];
