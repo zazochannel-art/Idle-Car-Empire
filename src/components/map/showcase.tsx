@@ -151,7 +151,7 @@ function Turntable({ v }: { v: VehiclePick }) {
         const finish = (c: string) => (/^#(f8fafc|ffffff|111827|0f172a)$/i.test(c) ? "gloss" : "metallic") as "gloss" | "metallic";
         const obj =
           v.kind === "car"
-            ? models.buildCar(T, kit, { model: v.model, color: v.color, finish: finish(v.color), steer: 0, spin: 0, stage: { station: 8 } })
+            ? models.buildCar(T, { model: v.model, color: v.color, finish: finish(v.color), steer: 0, spin: 0, stage: { station: 8 } })
             : v.kind === "carrier"
               ? models.buildCarrier(
                   T,
