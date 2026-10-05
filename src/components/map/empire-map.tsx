@@ -73,8 +73,13 @@ function trafficWorld(s: GameState, snap: EconomySnapshot): TrafficWorld {
       const z = WORLD_MAP.blockZone[by][bx];
       if (z && unlocked.has(z)) busyBlocks.push([bx, by]);
     }
+  // people stroll in the bought town quarters too
+  for (const lm of WORLD_MAP.landmarks) if (WALKABLE.has(lm.kind) && unlocked.has(lm.territory)) busyBlocks.push([lm.bx, lm.by]);
   return { unlocked, garages, factories, dealers, suppliers, busyBlocks };
 }
+
+/** Landmarks with pavements full of people. */
+const WALKABLE = new Set(["boulevard", "skyline", "suburbs", "campus"]);
 
 const siteOf = (id: string): Site | null => {
   const plot = plotOf(id);
