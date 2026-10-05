@@ -1,7 +1,7 @@
 // Territories (config/city.ts TERRITORIES): the land around the districts,
 // bought as the empire grows. Each has a price and requirements (a district,
 // racing reputation, Empire Points) and an effect on the whole business.
-import { BUYABLE_TERRITORIES, LEGACY_OFFSET, TERRITORY_BY_ID, type TerritoryId } from "../config/city";
+import { BUYABLE_TERRITORIES, TERRITORY_BY_ID, type TerritoryId } from "../config/city";
 import type { GameState, ZoneId } from "../types";
 
 /** Everything open on the map: districts, bought territories, the campus with its district, racing once built. */
@@ -36,36 +36,4 @@ export function unlockTerritory(s: GameState, id: TerritoryId): boolean {
 /** The next territory to aim for: the cheapest one not open yet. */
 export function nextTerritory(s: GameState) {
   return BUYABLE_TERRITORIES.filter((t) => !isTerritoryOpen(s, t.id)).sort((a, b) => a.cost - b.cost)[0] ?? null;
-}
-
-// ───────────────────────────── saves from the first map ─────────────────────────────
-
-const shift = (id: string): string => {
-  const c = /^c:(\d+):(\d+)$/.exec(id);
-  if (c) return `c:${+c[1] + LEGACY_OFFSET * 2}:${+c[2] + LEGACY_OFFSET * 2}`;
-  const b = /^b:(\d+):(\d+)$/.exec(id);
-  if (b) return `b:${+b[1] + LEGACY_OFFSET}:${+b[2] + LEGACY_OFFSET}`;
-  return id;
-};
-
-/**
- * A save from the first map (10×10 blocks): that map is the middle of this
- * one, so every lot moves by the same offset and keeps its neighbours, roads
- * and distances. Rewrites the plot ids in the raw save before it is read.
- */
-export function remapLegacyPlots(raw: Record<string, unknown>) {
-  const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
-  const city = raw.city;
-  if (isObj(city) && isObj(city.buildings)) city.buildings = Object.fromEntries(Object.entries(city.buildings).map(([id, b]) => [shift(id), b]));
-  if (isObj(raw.managers))
-    for (const m of Object.values(raw.managers)) if (isObj(m) && typeof m.assignedTo === "string") m.assignedTo = shift(m.assignedTo);
-  const chain = raw.chain;
-  if (isObj(chain) && Array.isArray(chain.shipments))
-    for (const sh of chain.shipments)
-      if (isObj(sh)) {
-        if (typeof sh.from === "string") sh.from = shift(sh.from);
-        if (typeof sh.to === "string") sh.to = shift(sh.to);
-      }
-  const racing = raw.racing;
-  if (isObj(racing) && Array.isArray(racing.cars)) for (const c of racing.cars) if (isObj(c) && typeof c.home === "string") c.home = shift(c.home);
 }

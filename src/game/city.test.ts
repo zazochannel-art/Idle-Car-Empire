@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { FACILITY_BY_ID, LEGACY_OFFSET, SERVICE_FEE, TERRITORIES, ZONES } from "./config/city";
-import { DEPOT, DRIVEWAY, MARKET, RACING, RIVER, STARTER_PLOT, WORLD, WORLD_MAP, hasRoad, roadRoute, segmentOpen } from "./city/layout";
+import { FACILITY_BY_ID, SERVICE_FEE, TERRITORIES, ZONES } from "./config/city";
+import { DEPOT, DRIVEWAY, FAST_ROAD, MARKET, RACING, STARTER_PLOT, UNITS_PER_TILE, WORLD_MAP, along, roadOpen, roadRoute, routeLine } from "./city/layout";
 import * as T from "./engine/territory";
-import LEGACY_PLOTS from "./legacy-plots.json";
 import { computeGlobalMods } from "./engine/modifiers";
 import type { GameState } from "./types";
 import * as C from "./engine/city";
@@ -31,71 +30,91 @@ function withGarage(cash = 0): GameState {
   return s;
 }
 
+/** The four corners of a lot (map units). */
+function corners(p: { x: number; y: number; w: number; d: number; rot: number }) {
+  const c = Math.cos(p.rot);
+  const n = Math.sin(p.rot);
+  // local x runs along the road, local z toward it
+  return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => [p.x + (u * p.w) / 2 * c + (v * p.d) / 2 * n, p.y - (u * p.w) / 2 * n + (v * p.d) / 2 * c]);
+}
+
+/** Do two convex polygons overlap (separating axis test)? */
+function overlap(a: number[][], b: number[][]) {
+  for (const poly of [a, b])
+    for (let i = 0; i < poly.length; i++) {
+      const [x1, y1] = poly[i];
+      const [x2, y2] = poly[(i + 1) % poly.length];
+      const nx = y2 - y1;
+      const ny = x1 - x2;
+      const pa = a.map(([x, y]) => x * nx + y * ny);
+      const pb = b.map(([x, y]) => x * nx + y * ny);
+      if (Math.max(...pa) <= Math.min(...pb) + 1e-6 || Math.max(...pb) <= Math.min(...pa) + 1e-6) return false;
+    }
+  return true;
+}
+
 describe("world layout", () => {
   it("has the market, the depot, industrial lots and the starter works", () => {
-    expect(WORLD).toBe(24 * 7 + 1);
+    expect(WORLD_MAP.size[0]).toBeGreaterThan(300);
     expect(WORLD_MAP.plotById[MARKET].zone).toBe("town");
     expect(WORLD_MAP.plotById[DEPOT].zone).toBe("town");
-    expect(WORLD_MAP.plots.filter((p) => p.big)).toHaveLength(9);
+    expect(WORLD_MAP.plots.filter((p) => p.big).length).toBeGreaterThanOrEqual(8);
     expect(WORLD_MAP.plots.filter((p) => p.kind === "dealer")).toHaveLength(6);
     expect(WORLD_MAP.plotById[STARTER_PLOT].zone).toBe("town");
-    for (const z of ZONES) expect(WORLD_MAP.plots.filter((p) => p.zone === z.id && p.kind === "plot").length).toBeGreaterThanOrEqual(4);
+    expect(WORLD_MAP.plotById[STARTER_PLOT].use).toBe("bodyWorks");
+    for (const z of ZONES) expect(WORLD_MAP.plots.filter((p) => p.zone === z.id && p.kind === "plot").length).toBeGreaterThanOrEqual(6);
+    // ranks run through the districts in stage order
+    const ranked = WORLD_MAP.plots.filter((p) => p.kind === "plot").sort((a, b) => a.rank! - b.rank!);
+    const stage = (z: string) => ZONES.find((x) => x.id === z)!.stage;
+    for (let i = 1; i < ranked.length; i++) expect(stage(ranked[i].zone)).toBeGreaterThanOrEqual(stage(ranked[i - 1].zone));
   });
 
-  it("plots never overlap roads and every entry is on a road", () => {
+  it("lots never overlap and face their road, with the entry on it", () => {
+    const polys = WORLD_MAP.plots.map(corners);
+    for (let i = 0; i < polys.length; i++)
+      for (let j = i + 1; j < polys.length; j++) expect(overlap(polys[i], polys[j]), `${WORLD_MAP.plots[i].id} / ${WORLD_MAP.plots[j].id}`).toBe(false);
     for (const p of WORLD_MAP.plots) {
-      expect(p.x % 7).not.toBe(0);
-      expect((p.x + p.w) % 7).not.toBe(1);
-      expect(Math.floor(p.entry.y) % 7).toBe(0);
+      const road = WORLD_MAP.roads[p.entry.edge];
+      const at = along(road.pts, road.acc, p.entry.s);
+      expect(Math.hypot(at.x - p.entry.x, at.y - p.entry.y)).toBeLessThan(1e-6);
+      // the middle of the lot's front edge is a driveway away from the road's centre line
+      const fx = p.x + Math.sin(p.rot) * p.d / 2;
+      const fy = p.y + Math.cos(p.rot) * p.d / 2;
+      expect(Math.hypot(fx - p.entry.x, fy - p.entry.y), p.id).toBeLessThan(p.entry.drive + 0.6);
+      expect(p.entry.drive, p.id).toBeLessThan(2.5);
     }
   });
 
-  it("only roads next to unlocked zones carry traffic", () => {
-    const open = new Set(["town"] as const);
-    const o = LEGACY_OFFSET;
-    expect(segmentOpen("x", o + 0, o + 2, open)).toBe(true);
-    expect(segmentOpen("x", o + 2, o + 3, open)).toBe(true); // border with Downtown
-    expect(segmentOpen("x", o + 6, o + 5, open)).toBe(false); // Supercar Valley
-    expect(segmentOpen("x", 0, 0, open)).toBe(false); // mountains: no road
-    expect(segmentOpen("y", RIVER, o, open)).toBe(false); // the river
+  it("only roads through unlocked areas carry traffic", () => {
+    const open = new Set(["town"]);
+    const starter = WORLD_MAP.plotById[STARTER_PLOT];
+    expect(roadOpen(starter.entry.edge, open)).toBe(true);
+    const mega = WORLD_MAP.plots.find((p) => p.zone === "mega")!;
+    expect(roadOpen(mega.entry.edge, open)).toBe(false);
+    expect(roadOpen(mega.entry.edge, new Set(["mega"]))).toBe(true);
   });
 
-  it("every territory is reachable by road from the starter works, and has its landmarks", () => {
-    // flood the road graph from the starter plot's road
-    const start = WORLD_MAP.plotById[STARTER_PLOT].entry;
-    const seen = new Set<string>([`${start.i0},${start.line}`]);
-    const queue: [number, number][] = [[start.i0, start.line]];
+  it("every district and territory is reachable by road from the starter works", () => {
+    const start = WORLD_MAP.roads[WORLD_MAP.plotById[STARTER_PLOT].entry.edge];
+    const seen = new Set<number>([start.a, start.b]);
+    const queue = [start.a, start.b];
     while (queue.length) {
-      const [i, j] = queue.shift()!;
-      const next: [number, number, boolean][] = [
-        [i + 1, j, hasRoad("x", j, i)],
-        [i - 1, j, hasRoad("x", j, i - 1)],
-        [i, j + 1, hasRoad("y", i, j)],
-        [i, j - 1, hasRoad("y", i, j - 1)],
-      ];
-      for (const [a, b, ok] of next) if (ok && !seen.has(`${a},${b}`)) (seen.add(`${a},${b}`), queue.push([a, b]));
+      const n = queue.shift()!;
+      for (const r of WORLD_MAP.roads)
+        for (const [x, y] of [[r.a, r.b], [r.b, r.a]])
+          if (x === n && !seen.has(y)) (seen.add(y), queue.push(y));
     }
-    const reached = (bx: number, by: number) => [[bx, by], [bx + 1, by], [bx, by + 1], [bx + 1, by + 1]].some(([a, b]) => seen.has(`${a},${b}`));
-    for (const t of TERRITORIES) {
-      const blocks = WORLD_MAP.territoryBlocks[t.id];
-      expect(blocks.length, t.id).toBeGreaterThan(0);
-      expect(blocks.some(([bx, by]) => reached(bx, by)), t.id).toBe(true);
+    const reached = WORLD_MAP.roads.filter((r) => seen.has(r.a) && seen.has(r.b));
+    for (const id of [...ZONES.map((z) => z.id), ...TERRITORIES.map((t) => t.id)]) {
+      expect(reached.some((r) => r.areas.includes(id)), id).toBe(true);
+      expect(WORLD_MAP.areas[id], id).toBeTruthy();
     }
-    // the racing paddock's driveway is on a road
-    const pad = WORLD_MAP.plotById[RACING].entry;
-    expect(hasRoad("x", pad.line, pad.i0)).toBe(true);
-    // no street cuts the runway or the circuit
-    const [ax, ay] = WORLD_MAP.territoryBlocks.airport[0];
-    expect(hasRoad("y", ax + 1, ay)).toBe(false);
-    expect(WORLD_MAP.landmarks.some((l) => l.kind === "port")).toBe(true);
-  });
-
-  it("the map is about five times the first one, with room to breathe", () => {
-    expect((WORLD / 71) ** 2).toBeGreaterThan(4);
-    const kinds = WORLD_MAP.blocks.flat();
-    const share = (f: (k: string) => boolean) => kinds.filter(f).length / kinds.length;
-    expect(share((k) => k === "sea" || k === "lake")).toBeGreaterThan(0.12);
-    expect(share((k) => ["forest", "farm", "hills", "mountains"].includes(k))).toBeGreaterThan(0.25);
+    // every junction is on the network (the roundabout's centre is not a junction)
+    const used = new Set(WORLD_MAP.roads.flatMap((r) => [r.a, r.b]));
+    expect([...used].every((n) => seen.has(n))).toBe(true);
+    // the racing paddock stands on the circuit's own land
+    expect(WORLD_MAP.plotById[RACING].kind).toBe("racing");
+    expect(WORLD_MAP.circuit.length).toBeGreaterThan(20);
   });
 });
 
@@ -126,28 +145,20 @@ describe("territories", () => {
     expect(back.city.territories).toEqual(["raw"]);
   });
 
-  it("every lot of the first map is a lot of the new one, shifted to the middle", () => {
-    const shift = (id: string) => id.replace(/^c:(\d+):(\d+)$/, (_, x, y) => `c:${+x + LEGACY_OFFSET * 2}:${+y + LEGACY_OFFSET * 2}`).replace(/^b:(\d+):(\d+)$/, (_, x, y) => `b:${+x + LEGACY_OFFSET}:${+y + LEGACY_OFFSET}`);
-    for (const id of LEGACY_PLOTS) {
-      const p = WORLD_MAP.plotById[shift(id)];
-      expect(p, id).toBeTruthy();
-    }
-  });
-
-  it("a save from the first map keeps every building on the same lot of the middle of the new one", () => {
+  it("a save from the old grid map starts a new company and keeps its settings", () => {
     const s = createInitialState(T0);
     const raw = JSON.parse(JSON.stringify(s));
-    // what a first-map save looked like: the starter works at c:6:2, a big lot at b:6:0
-    delete raw.mapVersion;
-    raw.city.buildings = { "c:6:2": raw.city.buildings[STARTER_PLOT], "b:6:0": { type: "engineFactory", level: 2, plant: raw.city.buildings[STARTER_PLOT].plant } };
-    raw.managers.nina = { ...raw.managers.nina, hired: true, assignedTo: "c:6:2" };
+    raw.mapVersion = 2;
+    raw.cash = 123_456;
+    raw.settings.lang = "ro";
+    raw.city.buildings = { "c:20:16": raw.city.buildings[STARTER_PLOT], "b:13:7": { type: "engineFactory", level: 2 } };
     const back = migrate(raw, T0);
-    expect(Object.keys(back.city.buildings).sort()).toEqual([STARTER_PLOT, "b:13:7"].sort());
-    expect(back.city.buildings["b:13:7"].level).toBe(2);
-    expect(back.managers.nina.assignedTo).toBe(STARTER_PLOT);
-    expect(back.mapVersion).toBe(2);
-    // a current save is not shifted again
-    expect(Object.keys(migrate(JSON.parse(JSON.stringify(back)), T0).city.buildings).sort()).toEqual([STARTER_PLOT, "b:13:7"].sort());
+    expect(back.mapVersion).toBe(3);
+    expect(back.cash).toBe(createInitialState(T0).cash);
+    expect(back.settings.lang).toBe("ro");
+    expect(Object.keys(back.city.buildings)).toEqual([STARTER_PLOT]);
+    // a current save is read as it is
+    expect(migrate(JSON.parse(JSON.stringify(back)), T0).city.buildings).toEqual(back.city.buildings);
   });
 });
 
@@ -283,23 +294,35 @@ describe("zones and plots", () => {
 });
 
 describe("road routes", () => {
-  it("leave toward the destination and agree both ways", () => {
-    const plots = WORLD_MAP.plots.filter((p) => p.kind === "plot").slice(0, 40);
-    for (const a of plots.slice(0, 8))
-      for (const b of plots.slice(8)) {
+  it("are never shorter than the straight line, and follow the roads from entry to entry", () => {
+    const plots = WORLD_MAP.plots.filter((p) => p.kind === "plot");
+    for (const a of plots.slice(0, 10))
+      for (const b of plots.slice(10, 60)) {
         const r = roadRoute(a.entry, b.entry);
-        const back = roadRoute(b.entry, a.entry);
-        expect(r.length).toBeCloseTo(back.length, 6);
-        // never shorter than the straight grid distance plus both driveways
-        expect(r.length).toBeGreaterThanOrEqual(Math.abs(a.entry.x - b.entry.x) + Math.abs(a.entry.y - b.entry.y) + 2 * DRIVEWAY - 1e-9);
+        const straight = Math.hypot(a.entry.x - b.entry.x, a.entry.y - b.entry.y);
+        expect(r.length).toBeGreaterThanOrEqual((straight * FAST_ROAD) / UNITS_PER_TILE + 2 * DRIVEWAY - 1e-9);
+        const line = routeLine(a.entry, b.entry);
+        expect(Math.hypot(line[0][0] - a.entry.x, line[0][1] - a.entry.y)).toBeLessThan(1e-6);
+        expect(Math.hypot(line[line.length - 1][0] - b.entry.x, line[line.length - 1][1] - b.entry.y)).toBeLessThan(1e-6);
+        for (let i = 1; i < line.length; i++) expect(Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1])).toBeLessThan(2.5);
       }
   });
 
-  it("drives straight along a shared road segment", () => {
-    const a = { x: 2.5, y: 7.5, line: 1, i0: 0, i1: 1, inward: 1 as const };
-    const b = { x: 5.5, y: 7.5, line: 1, i0: 0, i1: 1, inward: -1 as const };
-    const r = roadRoute(a, b);
+  it("drives straight along a shared road section", () => {
+    const byEdge = new Map<number, typeof WORLD_MAP.plots>();
+    for (const p of WORLD_MAP.plots) byEdge.set(p.entry.edge, [...(byEdge.get(p.entry.edge) ?? []), p]);
+    const [a, b] = [...byEdge.values()].find((l) => l.length >= 2 && !WORLD_MAP.roads[l[0].entry.edge].oneway && !WORLD_MAP.roads[l[0].entry.edge].fast)!;
+    const r = roadRoute(a.entry, b.entry);
     expect(r.from).toBeNull();
-    expect(r.length).toBeCloseTo(3 + 2 * DRIVEWAY, 6);
+    expect(r.length).toBeCloseTo(Math.abs(a.entry.s - b.entry.s) / UNITS_PER_TILE + 2 * DRIVEWAY, 6);
+  });
+
+  it("keeps the first map's pace in town and takes longer to the regions over the bridges", () => {
+    const start = WORLD_MAP.plotById[STARTER_PLOT].entry;
+    expect(roadRoute(WORLD_MAP.plotById[DEPOT].entry, start).length).toBeLessThan(15);
+    expect(roadRoute(WORLD_MAP.plotById[MARKET].entry, start).length).toBeLessThan(20);
+    const far = WORLD_MAP.plots.filter((p) => p.zone === "supercar").map((p) => roadRoute(start, p.entry).length);
+    expect(Math.min(...far)).toBeGreaterThan(40);
+    expect(Math.max(...far)).toBeLessThan(120);
   });
 });

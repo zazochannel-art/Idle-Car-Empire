@@ -8,7 +8,6 @@ import { migrateExpansion } from "../engine/expansion";
 import { migrateCity, unlockOwnedZones } from "../engine/city";
 import { applyStartPerks } from "../engine/prestige";
 import { createInitialState, MAP_VERSION, SAVE_VERSION } from "../engine/state";
-import { remapLegacyPlots } from "../engine/territory";
 import type { GameState } from "../types";
 
 type Json = Record<string, unknown>;
@@ -52,12 +51,23 @@ function fromOldEconomy(raw: Json, now: number): GameState {
   return state;
 }
 
+/**
+ * Saves from an older world map (the isometric grid, map versions 1–2): the
+ * lots and roads they refer to are gone, so the company starts over on the
+ * island map. Only the settings (language, graphics, sound) are kept.
+ */
+function fromOldMap(raw: Json, now: number): GameState {
+  const state = createInitialState(now);
+  state.settings = mergeDefaults(state.settings, raw.settings);
+  return state;
+}
+
 export function migrate(raw: unknown, now: number): GameState {
   const fresh = createInitialState(now);
   if (!isObject(raw)) return fresh;
   if (typeof raw.version !== "number" || raw.version < SAVE_VERSION) return fromOldEconomy(raw, now);
-  // a save from the first (10×10) map: its lots move to the middle of this one
-  if (raw.mapVersion !== MAP_VERSION) remapLegacyPlots(raw);
+  // a save from an older world map: its lots don't exist on this one
+  if (raw.mapVersion !== MAP_VERSION) return fromOldMap(raw, now);
   const state = mergeDefaults(fresh, raw);
   state.mapVersion = MAP_VERSION;
   // Nullable fields have no typed default to merge against.
