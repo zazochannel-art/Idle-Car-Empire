@@ -2,7 +2,7 @@
 // the same isometric style as the map, at "room" scale.
 import { FACILITY_BY_ID } from "@/game/config/city";
 import type { FacilityType } from "@/game/types";
-import { Painter, rand, sx, sy } from "../map/iso";
+import { Painter, raceFont, rand, sx, sy } from "../map/iso";
 import { CAR_COLORS, drawModel, type CarModel, type Dir } from "../map/vehicles";
 
 export const WALL_H = 74;
@@ -381,7 +381,7 @@ export function drawFacility(p: Painter, f: FacilityDraw, t: number) {
     // an idle station shows a "needs a mechanic" marker
     p.circle(cx, cy, 34, 7, "rgba(245,158,11,0.95)");
     p.ctx.fillStyle = "#111";
-    p.ctx.font = "800 10px ui-sans-serif, system-ui, sans-serif";
+    p.ctx.font = raceFont(800, 11.5);
     p.ctx.textAlign = "center";
     p.ctx.textBaseline = "middle";
     p.ctx.fillText("!", sx(cx, cy), sy(cx, cy, 34) + 0.5);

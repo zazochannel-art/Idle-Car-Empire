@@ -18,12 +18,12 @@ const Progress = React.forwardRef<React.ElementRef<typeof ProgressPrimitive.Root
       <ProgressPrimitive.Root
         ref={ref}
         value={pct}
-        className={cn("relative h-2 w-full overflow-hidden rounded-full bg-white/[0.07]", className)}
+        className={cn("relative h-2 w-full overflow-hidden rounded-[4px] bg-[#1c1c1f] ring-1 ring-black/40", className)}
         {...props}
       >
         <ProgressPrimitive.Indicator
           className={cn(
-            "h-full rounded-full bg-gradient-to-r from-electric to-cyan-400",
+            "h-full rounded-[3px] bg-gradient-to-r from-go to-go",
             smooth && "transition-[width] duration-100 ease-linear",
             indicatorClassName,
           )}

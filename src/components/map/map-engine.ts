@@ -14,7 +14,7 @@ import { seasonAt } from "@/game/engine/season";
 import { ROAD_STEP, WORLD, WORLD_MAP, zoneOfBlock, type Plot } from "@/game/city/layout";
 import type { ZoneId } from "@/game/types";
 import { attachControls, Camera } from "./camera";
-import { Painter, sx, sy, toTile } from "./iso";
+import { Painter, raceFont, sx, sy, toTile } from "./iso";
 import { BUILD_ANIM, drawConstruction, drawFog, drawGround, drawPreview, hitBox, WORLD_BOUNDS, zoneCenter, type Drawable, type DrawInfo } from "./scene";
 import type { StructureType } from "@/game/types";
 import { applyLighting, skyAt, type TimeMode } from "./lighting";
@@ -521,7 +521,7 @@ export class MapEngine {
 
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.font = "800 13px ui-sans-serif, system-ui, sans-serif";
+    ctx.font = raceFont(900, 16);
     ctx.lineJoin = "round";
     for (const pop of this.pops) {
       pop.age += dt;
@@ -550,7 +550,7 @@ export class MapEngine {
       ctx.globalAlpha = k > 0.8 ? 1 - (k - 0.8) / 0.2 : 1;
       ctx.translate(px, py);
       ctx.scale(scale, scale);
-      ctx.font = "900 15px ui-sans-serif, system-ui, sans-serif";
+      ctx.font = raceFont(900, 17);
       const text = `★ ${b.text}`;
       const tw = ctx.measureText(text).width + 28;
       const g = ctx.createLinearGradient(0, -16, 0, 16);

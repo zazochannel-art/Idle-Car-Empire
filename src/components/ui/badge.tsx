@@ -2,14 +2,15 @@ import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-const badgeVariants = cva("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums", {
+// solid pills like the rarity labels of the garage cards
+const badgeVariants = cva("race-type inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[12px] leading-tight tabular-nums", {
   variants: {
     variant: {
-      default: "bg-electric/15 text-sky-300 ring-1 ring-electric/30",
-      gold: "bg-gold/15 text-gold ring-1 ring-gold/30",
-      muted: "bg-white/[0.06] text-white/60 ring-1 ring-white/10",
-      success: "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30",
-      danger: "bg-rose-500/15 text-rose-300 ring-1 ring-rose-500/30",
+      default: "bg-electric text-white",
+      gold: "bg-gold text-[#2a1d00]",
+      muted: "bg-[#4b4b50] text-white/75",
+      success: "bg-go text-white",
+      danger: "bg-stop text-white",
     },
   },
   defaultVariants: { variant: "default" },

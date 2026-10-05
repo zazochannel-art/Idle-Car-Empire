@@ -193,7 +193,7 @@ export class InteriorEngine {
     const W = this.canvas.width;
     const Hh = this.canvas.height;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = "#0b1220";
+    ctx.fillStyle = "#2b2b2e";
     ctx.fillRect(0, 0, W, Hh);
     if (!s || !L) return;
     const z = cam.zoom * this.dpr;

@@ -4,7 +4,7 @@ import { FACILITY_BY_ID } from "@/game/config/city";
 import { footprint, type StationStats } from "@/game/engine/city";
 import type { FacilityType, PlacedFacility } from "@/game/types";
 import { attachControls, Camera } from "../map/camera";
-import { Painter, sx, sy, toTile } from "../map/iso";
+import { Painter, raceFont, sx, sy, toTile } from "../map/iso";
 import { carColorFor, drawFacility, drawRoom, workerSpot, WALL_H, type FacilityDraw } from "./interior";
 
 export interface Ghost {
@@ -319,7 +319,7 @@ export class GarageEngine {
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.font = "800 14px ui-sans-serif, system-ui, sans-serif";
+    ctx.font = raceFont(800, 16);
     ctx.lineJoin = "round";
     for (const pop of this.pops) {
       pop.age += dt;

@@ -104,7 +104,7 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
   const picked = pick ? layout.lines[pick.line]?.stations.find((x) => x.def.id === pick.id) : undefined;
   return (
     <motion.div
-      className="fixed inset-0 z-40 bg-[#0b1220]"
+      className="fixed inset-0 z-40 bg-ink"
       initial={{ opacity: 0, scale: 1.12 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 1.12 }}
@@ -248,7 +248,7 @@ function StationCard({ plotId, id, people, robots, onClose }: { plotId: string; 
   }
 
   return (
-    <div className="rounded-2xl bg-[#0f172a]/92 p-3 shadow-2xl ring-1 ring-white/10 backdrop-blur">
+    <div className="rounded-2xl bg-[#2b2b2e]/95 p-3 shadow-[0_4px_0_0_rgba(0,0,0,0.35)]">
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-black">

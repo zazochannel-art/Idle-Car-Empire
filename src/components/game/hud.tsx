@@ -32,22 +32,22 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
   return (
     <header className="pointer-events-none absolute inset-x-0 top-0 z-30 pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       <div className="flex items-start gap-2 p-2 sm:p-3">
-        <div className="pointer-events-auto flex min-w-0 flex-1 flex-wrap items-center gap-1.5 rounded-2xl border border-white/10 bg-[#2a3388]/90 shadow-[0_4px_0_0_rgba(10,14,46,0.5)] p-1.5 shadow-[0_10px_40px_-12px_rgba(0,0,0,.9)] backdrop-blur-xl md:flex-nowrap md:gap-2 md:p-2">
+        <div className="pointer-events-auto flex min-w-0 flex-1 flex-wrap items-center gap-1.5 rounded-2xl hud-bar p-1.5 md:flex-nowrap md:gap-2 md:p-2">
           <div className="relative flex min-w-0 items-center gap-2 pl-1 pr-2">
             <CashFlash cash={cash} />
-            <span className="text-xl md:text-2xl">💰</span>
+            <CashBill />
             <div className="min-w-0">
-              <div className="hidden text-[9px] font-semibold uppercase tracking-[0.18em] text-white/40 md:block">{t("hud.cash")}</div>
-              <AnimatedNumber value={cash} format={money} className="block truncate text-lg font-black tabular-nums leading-tight text-gradient-gold md:text-2xl" />
+              <div className="hidden text-[9px] font-bold uppercase tracking-[0.14em] text-white/70 md:block">{t("hud.cash")}</div>
+              <AnimatedNumber value={cash} format={money} className="race-type block truncate text-[22px] tabular-nums leading-tight text-white not-italic [text-shadow:0_2px_0_rgba(0,0,0,0.25)] md:text-[26px]" />
             </div>
           </div>
-          <Pill icon={<TrendingUp className="size-3.5 text-emerald-400" />} label={t("hud.profit")} value={`${formatMoney(income)}${t("unit.perSec")}`} />
-          <Pill icon={<Car className="size-3.5 text-sky-400" />} label={carsRate > 0 ? t("hud.carsRate") : t("hud.partsRate")} value={`${formatNumber(carsRate > 0 ? carsRate : partsRate)}${t("unit.perMin")}`} />
+          <Pill icon={<TrendingUp className="size-4 stroke-[3] text-lime" />} label={t("hud.profit")} value={`${formatMoney(income)}${t("unit.perSec")}`} />
+          <Pill icon={<Car className="size-4 stroke-[2.5] text-white" />} label={carsRate > 0 ? t("hud.carsRate") : t("hud.partsRate")} value={`${formatNumber(carsRate > 0 ? carsRate : partsRate)}${t("unit.perMin")}`} />
           <div className="hidden sm:block">
             <Pill icon={<Factory className="size-3.5 text-cyan-300" />} label={t("hud.factories")} value={`${owned} · 🚚${trucks}`} />
           </div>
           <button onClick={() => setView("prestige")} className="text-left">
-            <Pill icon={<Globe2 className="size-3.5 text-gold" />} label={t("hud.prestige")} value={formatNumber(ep)} gold />
+            <Pill icon={<Globe2 className="size-4 stroke-[2.5] text-gold" />} label={t("hud.prestige")} value={formatNumber(ep)} gold />
           </button>
           <EventChip />
           {stars > 0 && (
@@ -61,7 +61,7 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
           <LanguageSwitch />
           <button
             onClick={onSettings}
-            className="flex size-10 items-center justify-center rounded-xl border border-white/10 bg-[#2a3388]/90 shadow-[0_4px_0_0_rgba(10,14,46,0.5)] text-white/60 backdrop-blur-xl transition hover:text-white"
+            className="flex size-10 items-center justify-center rounded-full bg-[#5b5b60]/85 text-white shadow-[0_3px_0_0_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:brightness-110"
             aria-label={t("settings.title")}
           >
             <Settings className="size-5" />
@@ -74,11 +74,11 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
 
 function Pill({ icon, label, value, gold }: { icon: React.ReactNode; label: string; value: React.ReactNode; gold?: boolean }) {
   return (
-    <div className="flex items-center gap-1.5 rounded-xl bg-white/[0.05] px-2 py-1 ring-1 ring-white/[0.06] md:px-2.5 md:py-1.5">
+    <div className="flex items-center gap-1.5 rounded-lg bg-black/20 px-2 py-1 md:px-2.5 md:py-1.5">
       {icon}
       <div className="leading-tight">
-        <div className="hidden text-[9px] font-medium uppercase tracking-wider text-white/40 xl:block">{label}</div>
-        <div className={`text-xs font-bold tabular-nums md:text-sm ${gold ? "text-gold" : "text-white"}`}>{value}</div>
+        <div className="hidden text-[9px] font-bold uppercase tracking-wider text-white/65 xl:block">{label}</div>
+        <div className={`race-type text-[15px] not-italic tabular-nums md:text-base ${gold ? "text-gold" : "text-white"}`}>{value}</div>
       </div>
     </div>
   );
@@ -93,7 +93,7 @@ function LanguageSwitch() {
     <div className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex h-10 items-center gap-1.5 rounded-xl border border-white/10 bg-[#2a3388]/90 shadow-[0_4px_0_0_rgba(10,14,46,0.5)] px-2.5 text-xs font-bold text-white/70 backdrop-blur-xl transition hover:text-white"
+        className="flex h-10 items-center gap-1.5 rounded-full bg-[#5b5b60]/85 px-3 text-xs font-bold text-white shadow-[0_3px_0_0_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:brightness-110"
         aria-label="Language"
         aria-expanded={open}
       >
@@ -118,6 +118,15 @@ function LanguageSwitch() {
         </div>
       )}
     </div>
+  );
+}
+
+/** The green banknote in front of the cash, as on the racing game's top bar. */
+function CashBill() {
+  return (
+    <span className="relative flex h-5 w-8 shrink-0 items-center justify-center rounded-[4px] bg-[#3fcf5a] shadow-[0_2px_0_0_#1d8a34] ring-2 ring-[#1d8a34] md:h-6 md:w-9" aria-hidden>
+      <span className="size-2.5 rounded-full bg-[#1d8a34] md:size-3" />
+    </span>
   );
 }
 
@@ -148,7 +157,7 @@ function TimeButton() {
   return (
     <button
       onClick={() => setTimeMode(TIME_MODES[(TIME_MODES.indexOf(mode) + 1) % TIME_MODES.length])}
-      className="flex size-10 items-center justify-center rounded-xl border border-white/10 bg-[#2a3388]/90 shadow-[0_4px_0_0_rgba(10,14,46,0.5)] text-amber-200/80 backdrop-blur-xl transition hover:text-amber-100"
+      className="flex size-10 items-center justify-center rounded-full bg-[#5b5b60]/85 text-gold shadow-[0_3px_0_0_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:brightness-110"
       aria-label={t(`time.${mode}`)}
       title={t(`time.${mode}`)}
     >

@@ -182,8 +182,8 @@ class SpriteFactory {
       renderer.setClearColor(0x000000, 0);
       renderer.outputColorSpace = T.SRGBColorSpace;
       renderer.toneMapping = T.NeutralToneMapping;
-      // bright and saturated: the toon look (see toToon below)
-      renderer.toneMappingExposure = 1.12;
+      // bright daylight over flat-shaded low-poly models (see lowPoly below)
+      renderer.toneMappingExposure = 1.05;
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = T.PCFSoftShadowMap;
 
@@ -193,7 +193,7 @@ class SpriteFactory {
       scene.environmentIntensity = 1.2;
 
       // the map's sun: from the upper left, shadows fall to the lower right
-      const sun = new T.DirectionalLight("#fff1d6", 2.7);
+      const sun = new T.DirectionalLight("#fff4e0", 3.1);
       sun.position.set(-3, 5, 2.2);
       sun.castShadow = true;
       sun.shadow.mapSize.set(1024, 1024);
@@ -207,9 +207,9 @@ class SpriteFactory {
       sc.near = 0.1;
       sc.far = 20;
       scene.add(sun);
-      scene.add(new T.HemisphereLight("#dff1ff", "#8a7f6a", 1.25));
+      scene.add(new T.HemisphereLight("#cfe6ff", "#7d8a5c", 1.0));
 
-      const ground = new T.Mesh(new T.PlaneGeometry(12, 12), new T.ShadowMaterial({ opacity: 0.26 }));
+      const ground = new T.Mesh(new T.PlaneGeometry(12, 12), new T.ShadowMaterial({ opacity: 0.32 }));
       ground.rotation.x = -Math.PI / 2;
       ground.receiveShadow = true;
       scene.add(ground);
@@ -236,13 +236,6 @@ class SpriteFactory {
       camera.position.set(Math.cos(el) * Math.SQRT1_2 * 40, Math.sin(el) * 40, Math.cos(el) * Math.SQRT1_2 * 40);
       camera.up.set(0, 1, 0);
       camera.lookAt(0, 0, 0);
-
-      // three flat tones: lit, shade, deep shade — the cartoon look of the whole game
-      const grad = new T.DataTexture(new Uint8Array([90, 90, 90, 255, 175, 175, 175, 255, 255, 255, 255, 255]), 3, 1, T.RGBAFormat);
-      grad.minFilter = T.NearestFilter;
-      grad.magFilter = T.NearestFilter;
-      grad.needsUpdate = true;
-      this.grad = grad;
 
       this.T = T;
       this.renderer = renderer;
@@ -283,42 +276,38 @@ class SpriteFactory {
     }
   }
 
-  /** Toon copies of the shared materials (made once, kept). */
-  private toons = new Map<THREE_NS.Material, THREE_NS.Material>();
-  private grad: THREE_NS.DataTexture | null = null;
+  /** Low-poly copies of the shared materials (made once, kept). */
+  private flats = new Map<THREE_NS.Material, THREE_NS.Material>();
 
   /**
-   * Cel shading: every lit material becomes a toon material with the same
-   * colour, texture, transparency and glow, shaded in three flat tones.
+   * The racing-game look: every lit material is shaded per face (round
+   * shapes show their facets), matte rather than glossy, a little more
+   * saturated. Glass stays dark and shiny; paint keeps a soft sheen.
    */
-  private toonify(obj: THREE_NS.Object3D) {
+  private lowPoly(obj: THREE_NS.Object3D) {
     const T = this.T!;
+    const hsl = { h: 0, s: 0, l: 0 };
     const conv = (mat: THREE_NS.Material): THREE_NS.Material => {
       if (!(mat instanceof T.MeshStandardMaterial)) return mat;
-      const shared = this.keep.has(mat) || !!mat.userData.keep;
-      const hit = this.toons.get(mat);
+      const hit = this.flats.get(mat);
       if (hit) return hit;
-      const toon = new T.MeshToonMaterial({
-        color: mat.color,
-        map: mat.map,
-        gradientMap: this.grad,
-        emissive: mat.emissive,
-        emissiveIntensity: mat.emissiveIntensity,
-        emissiveMap: mat.emissiveMap,
-        transparent: mat.transparent,
-        opacity: mat.opacity,
-        alphaTest: mat.alphaTest,
-        side: mat.side,
-        depthWrite: mat.depthWrite,
-        vertexColors: mat.vertexColors,
-      });
-      // shiny metal and glass keep a touch of their sheen as a lighter tone
-      if (mat.metalness > 0.7) toon.color = mat.color.clone().lerp(new T.Color("#ffffff"), 0.25);
+      const shared = this.keep.has(mat) || !!mat.userData.keep;
+      const flat = mat.clone();
+      flat.flatShading = true;
+      const glass = mat.transparent && mat.opacity < 0.95;
+      if (!glass) {
+        flat.roughness = Math.max(0.5, mat.roughness);
+        flat.metalness = Math.min(0.3, mat.metalness);
+        flat.envMapIntensity = 0.55;
+        flat.color.getHSL(hsl);
+        flat.color.setHSL(hsl.h, Math.min(1, hsl.s * 1.15), hsl.l);
+      }
+      flat.needsUpdate = true;
       if (shared) {
-        toon.userData.keep = true;
-        this.toons.set(mat, toon);
+        flat.userData.keep = true;
+        this.flats.set(mat, flat);
       } else mat.dispose();
-      return toon;
+      return flat;
     };
     obj.traverse((o) => {
       const m = o as THREE_NS.Mesh;
@@ -343,7 +332,7 @@ class SpriteFactory {
     cam.updateProjectionMatrix();
 
     const obj = job.build(T, this.ctx!);
-    this.toonify(obj);
+    this.lowPoly(obj);
     this.scene!.add(obj);
     this.ground!.visible = job.shadow;
     this.pad!.visible = job.shadow;
@@ -366,7 +355,7 @@ class SpriteFactory {
     const out = document.createElement("canvas");
     out.width = W;
     out.height = H;
-    outlined(out, r.domElement, job.k);
+    out.getContext("2d")!.drawImage(r.domElement, 0, 0);
     this.cache.set(job.key, { img: out, size: job.size, k: job.k });
     this.bytes += W * H * 4;
     this.lastUse.set(job.key, ++this.uses);
@@ -395,32 +384,4 @@ export const sprites3d = new SpriteFactory();
 /** Picks the sprite resolution for how big it will appear on screen. */
 export function tierFor(scale: number): number {
   return scale <= 1.4 ? 2 : scale <= 2.8 ? 4 : 6;
-}
-
-/**
- * Copies a rendered sprite with a dark cartoon outline round its silhouette
- * (the soft ground shadow is left without one: only solid pixels count).
- */
-function outlined(out: HTMLCanvasElement, src: HTMLCanvasElement, k: number) {
-  const W = out.width;
-  const H = out.height;
-  const g = out.getContext("2d")!;
-  const mask = document.createElement("canvas");
-  mask.width = W;
-  mask.height = H;
-  const mg = mask.getContext("2d", { willReadFrequently: true })!;
-  mg.drawImage(src, 0, 0);
-  const img = mg.getImageData(0, 0, W, H);
-  const d = img.data;
-  for (let i = 0; i < d.length; i += 4) {
-    const solid = d[i + 3] > 200;
-    d[i] = 24;
-    d[i + 1] = 28;
-    d[i + 2] = 52;
-    d[i + 3] = solid ? 235 : 0;
-  }
-  mg.putImageData(img, 0, 0);
-  const r = Math.max(1, Math.round(1.1 * k));
-  for (const [dx, dy] of [[r, 0], [-r, 0], [0, r], [0, -r], [r, r], [-r, r], [r, -r], [-r, -r]]) g.drawImage(mask, dx, dy);
-  g.drawImage(src, 0, 0);
 }

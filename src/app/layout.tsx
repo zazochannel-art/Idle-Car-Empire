@@ -1,13 +1,18 @@
 import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
-import { Nunito } from "next/font/google";
+import { Barlow_Condensed, Barlow_Semi_Condensed, Fira_Sans_Condensed, Fira_Sans_Extra_Condensed } from "next/font/google";
 import "./globals.css";
 
 const base = process.env.PAGES_BASE_PATH ?? "";
 
-// rounded, chunky letters: the friendly idle-game look (self-hosted at build time)
-const nunito = Nunito({ subsets: ["latin", "cyrillic"], weight: ["600", "700", "800", "900"], variable: "--font-nunito", display: "swap" });
+// racing-game lettering: narrow, heavy, slanted headings over a narrow body
+// face (self-hosted at build time). Barlow has no Cyrillic, so Fira's
+// condensed cuts fill in those letters for Russian.
+const display = Barlow_Condensed({ subsets: ["latin", "latin-ext"], weight: ["700", "800", "900"], style: ["normal", "italic"], variable: "--font-barlow-c", display: "swap" });
+const body = Barlow_Semi_Condensed({ subsets: ["latin", "latin-ext"], weight: ["500", "600", "700", "800"], variable: "--font-barlow-sc", display: "swap" });
+const displayCyr = Fira_Sans_Extra_Condensed({ subsets: ["cyrillic"], weight: ["700", "800", "900"], style: ["normal", "italic"], variable: "--font-fira-xc", display: "swap" });
+const bodyCyr = Fira_Sans_Condensed({ subsets: ["cyrillic"], weight: ["500", "600", "700", "800"], variable: "--font-fira-c", display: "swap" });
 
 export const metadata: Metadata = {
   title: "Idle Car Empire",
@@ -19,7 +24,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#141a3f",
+  themeColor: "#2b2b2e",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -27,7 +32,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable} ${nunito.variable} h-full antialiased`}>
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable} ${display.variable} ${body.variable} ${displayCyr.variable} ${bodyCyr.variable} h-full antialiased`}>
       <body className="min-h-full font-sans">{children}</body>
     </html>
   );
