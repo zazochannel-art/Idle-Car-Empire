@@ -1,0 +1,15 @@
+3D models used in Idle Car Empire
+=================================
+
+sports-1975.glb — the Sports Car platform
+  Original: "Porsche 911(930) Turbo 1975 | www.vecarz.com" by vecarz
+  https://sketchfab.com/heynic
+  https://sketchfab.com/3d-models/porsche-911930-turbo-1975-wwwvecarzcom-1b576d8b56e445fe8595e1b3fc07bcfe
+  Licence: CC BY-NC-SA 4.0 — https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+  Changes: geometry simplified and meshopt-compressed, textures resized to
+  512 px WebP (gltf-transform optimize). In the game the badges, stickers,
+  number plates and air freshener are hidden and the body paint is
+  recoloured. This adapted model is shared under the same licence
+  (CC BY-NC-SA 4.0). Non-commercial use only. Not affiliated with or
+  endorsed by Porsche AG; all trademarks belong to their owners.

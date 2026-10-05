@@ -318,6 +318,8 @@ export const en = {
   "settings.invalid": "That save code is not valid.",
   "settings.import": "Import save",
   "settings.erase": "Erase everything",
+  "settings.credits": "Credits",
+  "settings.creditsModel": "3D model of the Sports Car: “Porsche 911 (930) Turbo 1975” by vecarz (sketchfab.com/heynic), CC BY-NC-SA 4.0, adapted (simplified, badges removed, repainted). Not affiliated with Porsche.",
   "settings.reset": "Reset game",
 
   "toast.achievement": "Achievement: {name}",

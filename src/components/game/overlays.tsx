@@ -385,6 +385,15 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
             </Button>
           )}
         </div>
+        <div className="mt-3 border-t border-white/10 pt-3 text-[11px] leading-snug text-white/45">
+          <div className="mb-0.5 font-bold uppercase tracking-wider text-white/60">{t("settings.credits")}</div>
+          <p>
+            {t("settings.creditsModel")}{" "}
+            <a className="underline" href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noreferrer">
+              creativecommons.org/licenses/by-nc-sa/4.0
+            </a>
+          </p>
+        </div>
       </DialogContent>
     </Dialog>
   );

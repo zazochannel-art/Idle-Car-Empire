@@ -317,6 +317,8 @@ export const ro: Record<MessageKey, string> = {
   "settings.invalid": "Codul de salvare nu este valid.",
   "settings.import": "Importă salvarea",
   "settings.erase": "Șterge tot",
+  "settings.credits": "Credite",
+  "settings.creditsModel": "Modelul 3D al mașinii sport: „Porsche 911 (930) Turbo 1975” de vecarz (sketchfab.com/heynic), CC BY-NC-SA 4.0, adaptat (simplificat, fără embleme, revopsit). Fără legătură cu Porsche.",
   "settings.reset": "Resetează jocul",
 
   "toast.achievement": "Realizare: {name}",

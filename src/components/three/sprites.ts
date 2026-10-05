@@ -155,6 +155,17 @@ class SpriteFactory {
     return null;
   }
 
+  /** Drops cached sprites (they are made again when next drawn). */
+  forget(match: (key: string) => boolean) {
+    for (const [key, sp] of [...this.cache.entries()]) {
+      if (!match(key)) continue;
+      if (sp) this.bytes -= sp.img.width * sp.img.height * 4;
+      this.cache.delete(key);
+      this.lastUse.delete(key);
+    }
+    this.listeners.forEach((l) => l());
+  }
+
   private kick() {
     if (!this.T && !this.loading) {
       this.loading = true;
@@ -172,6 +183,8 @@ class SpriteFactory {
       const T = await import("three");
       const models = await import("./car-models");
       await models.loadShapes();
+      // ready-made models arrive a little later: redraw those cars once they do
+      void models.loadHeroes(T).then(() => this.forget((key) => /\bcar\|sports\|/.test(key)));
       const industrial = await import("./industrial-models");
       const buildings = await import("./building-models");
       const homes = await import("./home-models");
@@ -348,7 +361,7 @@ class SpriteFactory {
     obj.traverse((o) => {
       const m = o as THREE_NS.Mesh;
       if (!m.isMesh) return;
-      m.geometry.dispose();
+      if (!m.geometry.userData.keep) m.geometry.dispose();
       for (const mm of Array.isArray(m.material) ? m.material : [m.material]) if (!this.keep.has(mm) && !mm.userData.keep) mm.dispose();
     });
 

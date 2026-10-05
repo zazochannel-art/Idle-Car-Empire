@@ -337,6 +337,80 @@ function box(T: Three, w: number, h: number, d: number, mat: THREE_NS.Material, 
   return m;
 }
 
+/**
+ * Ready-made 3D models standing in for a procedural body (see glb-car.ts).
+ * Files live in public/models/; their licences and credits are in
+ * public/models/CREDITS.txt and on the Settings screen.
+ */
+const HERO_FILES: Partial<Record<BodyModel, { url: string; hide?: RegExp }>> = {
+  // "Porsche 911(930) Turbo 1975" by vecarz, CC BY-NC-SA 4.0 — badges and plates left out
+  sports: { url: "models/sports-1975.glb", hide: /sticker|plate|wunderbaum/i },
+};
+interface Hero {
+  car: THREE_NS.Group;
+  /** Names of the body-paint materials (repainted per car). */
+  paint: Set<string>;
+  /** One repainted copy of each paint material per colour. */
+  coats: Map<string, THREE_NS.Material>;
+}
+const HEROES: Partial<Record<BodyModel, Hero>> = {};
+let heroLoad: Promise<void> | null = null;
+
+/** Loads the ready-made models (once); bodies without one stay procedural. */
+export function loadHeroes(T: Three): Promise<void> {
+  heroLoad ??= (async () => {
+    const { loadGlbCar, paintMaterials } = await import("./glb-car");
+    const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+    await Promise.all(
+      (Object.entries(HERO_FILES) as [BodyModel, { url: string; hide?: RegExp }][]).map(async ([model, f]) => {
+        try {
+          const car = await loadGlbCar(T, `${base}/${f.url}`, { length: CAR_SPECS[model].L, hide: f.hide });
+          // shared by every copy: never disposed with a sprite
+          car.traverse((o) => {
+            const m = o as THREE_NS.Mesh;
+            if (!m.isMesh) return;
+            m.geometry.userData.keep = true;
+            for (const mm of Array.isArray(m.material) ? m.material : [m.material]) mm.userData.keep = true;
+          });
+          HEROES[model] = { car, paint: new Set(paintMaterials(T, car).map((m) => m.name)), coats: new Map() };
+        } catch {
+          // no file or no network: the procedural body stays
+        }
+      }),
+    );
+  })();
+  return heroLoad;
+}
+
+/** Whether a body is drawn from a ready-made model. */
+export const hasHero = (model: BodyModel) => !!HEROES[model];
+
+/** A copy of a ready-made model in the given paint (geometry and other materials shared). */
+function heroCopy(hero: Hero, color: string): THREE_NS.Group {
+  const car = hero.car.clone(true);
+  car.traverse((o) => {
+    const m = o as THREE_NS.Mesh;
+    if (!m.isMesh || Array.isArray(m.material) || !hero.paint.has(m.material.name)) return;
+    const key = `${m.material.name}|${color}`;
+    let coat = hero.coats.get(key);
+    if (!coat) {
+      coat = m.material.clone();
+      const c = coat as THREE_NS.MeshPhysicalMaterial;
+      c.color.set(color);
+      // a soft gloss: a mirror-like clearcoat shows the studio walls as grey streaks
+      c.envMapIntensity = 0.7;
+      if ("clearcoat" in c) {
+        c.clearcoat = Math.min(c.clearcoat, 0.35);
+        c.clearcoatRoughness = Math.max(c.clearcoatRoughness, 0.2);
+      }
+      coat.userData.keep = true;
+      hero.coats.set(key, coat);
+    }
+    m.material = coat;
+  });
+  return car;
+}
+
 let RoundedBox: typeof import("three/addons/geometries/RoundedBoxGeometry.js").RoundedBoxGeometry | null = null;
 /** Loads the rounded box geometry (call once before building). */
 export async function loadShapes() {
@@ -415,6 +489,9 @@ function wheel(T: Three, kit: MaterialKit, R: number, w: number, spokes: number,
 export function buildCar(T: Three, kit: MaterialKit, look: CarLook): THREE_NS.Group {
   const sp = CAR_SPECS[look.model];
   const st = look.stage?.station ?? 8;
+  // a finished car with a ready-made model: that model, in its paint
+  const hero = HEROES[look.model];
+  if (hero && st >= 8) return heroCopy(hero, look.build?.color || liveryOf(look.model).color);
   const painted = st >= 6;
   // every model leaves the line in its own factory colour
   const liv = liveryOf(look.model);
