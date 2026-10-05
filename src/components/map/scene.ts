@@ -15,6 +15,7 @@ const LANDMARKS_AT = new Map(WORLD_MAP.landmarks.map((l) => [l.by * BLOCKS + l.b
 import { coastline } from "./terrain";
 import { drawNetworkGround, networkDrawables } from "./highway";
 import { drawSite, drawWorks, siteTag } from "./sites";
+import { drawShell } from "./shells";
 import { plotStatus, type PlotStatus } from "@/game/engine/construction";
 import { corridors } from "@/game/city/network";
 import type { EconomySnapshot } from "@/game/engine/economy";
@@ -177,8 +178,13 @@ const M = 0.3;
 function emptyPlot(p: Painter, plot: Plot, info: DrawInfo, buildable: boolean, status: PlotStatus = "available") {
   const { x, y, w, d } = plot;
   const owned = status === "owned";
-  p.quad(x + M, y + M, w - 2 * M, d - 2 * M, p.col(owned ? "#a9bf8a" : "#b7c98f"));
-  p.quad(x + M + 0.15, y + M + 0.15, w - 2 * M - 0.3, d - 2 * M - 0.3, p.col(owned ? "#bccd9a" : "#c9d6a3"));
+  if (plot.use) {
+    // the bare bones of the building it is zoned for: every plot its own
+    drawShell(p, plot, plot.use, rand(plot.x, plot.y));
+  } else {
+    p.quad(x + M, y + M, w - 2 * M, d - 2 * M, p.col(owned ? "#a9bf8a" : "#b7c98f"));
+    p.quad(x + M + 0.15, y + M + 0.15, w - 2 * M - 0.3, d - 2 * M - 0.3, p.col(owned ? "#bccd9a" : "#c9d6a3"));
+  }
   const sel = info.selected === plot.id;
   const edge = sel ? "#fbbf24" : owned ? "rgba(125,211,252,0.95)" : buildable && status === "available" ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.35)";
   p.quadStroke(x + M + 0.1, y + M + 0.1, w - 2 * M - 0.2, d - 2 * M - 0.2, edge, sel ? 2.5 : 1.4, [6, 5]);
@@ -186,6 +192,12 @@ function emptyPlot(p: Painter, plot: Plot, info: DrawInfo, buildable: boolean, s
     // the owner's flag on bought land, waiting for the builders
     p.box(x + w - 0.6, y + d - 0.6, 0.05, 0.05, 0, 22, "#64748b");
     flag(p, sx(x + w - 0.58, y + d - 0.58), sy(x + w - 0.58, y + d - 0.58, 22), "#2563eb", info.t);
+  }
+  if (plot.use) {
+    // the board at the gate: green for sale, blue once bought, grey while locked
+    p.box(x + 0.5, y + d - 0.55, 0.05, 0.05, 0, 12, "#64748b");
+    p.box(x + 0.35, y + d - 0.58, 0.4, 0.06, 12, 7, owned ? "#2563eb" : status === "available" && buildable ? "#16a34a" : "#64748b");
+    return;
   }
   // corner foundation pegs
   for (const [a, b] of [[0.45, 0.45], [w - 0.45, 0.45], [0.45, d - 0.45], [w - 0.45, d - 0.45]]) p.box(x + a - 0.05, y + b - 0.05, 0.1, 0.1, 0, 4, "#a16207");
