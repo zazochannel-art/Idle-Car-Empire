@@ -1,8 +1,10 @@
 // The rally hatch: a short, wide hot hatchback in rally trim, modelled after
-// the reference photo — red body, black tail behind an orange band that
-// sweeps up over the rear quarter and the roof, gold multi-spoke wheels,
-// wide flares, four taped rally lamps in the bumper, a deep splitter and a
-// roof wing. Low-poly on purpose (flat-shaded facets, chunky bevels).
+// the reference photo. Smooth and rounded: the body and the glasshouse are
+// lofted from rounded cross-sections (no boxes), the wheel arches are round
+// openings with fat flares round them, and the livery is painted on with
+// curves — red, an orange swoosh sweeping up over the rear quarter onto the
+// roof, a black tail behind it, curved hood stripes and mud splashes. Gold
+// ten-spoke wheels, four X-taped rally lamps, a deep splitter, a roof wing.
 // Standalone: not wired into the game yet. Units are metres; +X is
 // forward, +Y up, +Z to the right; the wheels stand on y = 0.
 import type * as THREE_NS from "three";
@@ -10,90 +12,164 @@ import type * as THREE_NS from "three";
 type Three = typeof THREE_NS;
 
 const RED = "#d8261c";
-const BLACK = "#26262b";
+const BLACK = "#222226";
 const ORANGE = "#f39a1e";
 const GOLD = "#d9993a";
 
-/** Body and wheel layout. */
-const L = { R: 0.39, tw: 0.28, xf: 1.27, xr: -1.27, track: 0.8, W: 1.8, arch: 0.48 };
+/** Wheel layout. */
+const L = { R: 0.39, tw: 0.3, xf: 1.27, xr: -1.27, track: 0.8, arch: 0.47 };
+/** Glass starts above this height (the beltline). */
+const BELT = 1.02;
+
+/** Smooth curve through (x, value) points (Catmull-Rom), clamped at the ends. */
+function spline(pts: [number, number][]) {
+  return (x: number) => {
+    if (x <= pts[0][0]) return pts[0][1];
+    if (x >= pts[pts.length - 1][0]) return pts[pts.length - 1][1];
+    let i = 0;
+    while (x > pts[i + 1][0]) i++;
+    const p0 = pts[Math.max(0, i - 1)];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[Math.min(pts.length - 1, i + 2)];
+    const t = (x - p1[0]) / (p2[0] - p1[0]);
+    const m1 = ((p2[1] - p0[1]) / (p2[0] - p0[0] || 1)) * (p2[0] - p1[0]);
+    const m2 = ((p3[1] - p1[1]) / (p3[0] - p1[0] || 1)) * (p2[0] - p1[0]);
+    const t2 = t * t;
+    const t3 = t2 * t;
+    return (2 * t3 - 3 * t2 + 1) * p1[1] + (t3 - 2 * t2 + t) * m1 + (-2 * t3 + 3 * t2) * p2[1] + (t3 - t2) * m2;
+  };
+}
 
 /**
- * The paint: red, a black tail behind a slanted orange band (further back
- * the higher it goes, so it sweeps over the roof), a thin hood stripe and a
- * few white mud splashes on the flanks. Drawn per pixel from the model-space
- * position, so the band edges stay crisp on big faces.
+ * A closed rounded body lofted along x: at each station a superellipse
+ * cross-section between `bottom` and `top`, `half` wide, narrowing towards
+ * the top by `tuck` (tumblehome). Both ends are capped.
  */
-function liveryMaterial(T: Three) {
-  const m = new T.MeshStandardMaterial({ color: "#ffffff", roughness: 0.42, metalness: 0.08, flatShading: true });
+function loft(T: Three, x0: number, x1: number, n: number, bottom: (x: number) => number, top: (x: number) => number, half: (x: number) => number, shape: number, tuck = 0) {
+  const M = 36;
+  const pos: number[] = [];
+  const idx: number[] = [];
+  const e = 2 / shape;
+  for (let i = 0; i <= n; i++) {
+    // denser stations near the ends, where the shape turns fastest
+    const u = i / n;
+    const x = x0 + (x1 - x0) * (0.5 - 0.5 * Math.cos(u * Math.PI));
+    const b = bottom(x);
+    const t = Math.max(b + 0.01, top(x));
+    const yc = (b + t) / 2;
+    const H = (t - b) / 2;
+    const W = half(x);
+    for (let k = 0; k < M; k++) {
+      const a = (k / M) * Math.PI * 2;
+      const c = Math.cos(a);
+      const s = Math.sin(a);
+      const yy = Math.sign(s) * Math.pow(Math.abs(s), e);
+      const narrow = 1 - tuck * Math.max(0, yy);
+      pos.push(x, yc + H * yy, W * narrow * Math.sign(c) * Math.pow(Math.abs(c), e));
+    }
+  }
+  for (let i = 0; i < n; i++)
+    for (let k = 0; k < M; k++) {
+      const a = i * M + k;
+      const b = i * M + ((k + 1) % M);
+      idx.push(a, a + M, b, b, a + M, b + M);
+    }
+  // end caps: a fan from each end's centre
+  for (const [ring, flip] of [
+    [0, true],
+    [n, false],
+  ] as [number, boolean][]) {
+    const c = pos.length / 3;
+    let cy = 0;
+    for (let k = 0; k < M; k++) cy += pos[(ring * M + k) * 3 + 1];
+    pos.push(pos[ring * M * 3], cy / M, 0);
+    for (let k = 0; k < M; k++) {
+      const a = ring * M + k;
+      const b = ring * M + ((k + 1) % M);
+      if (flip) idx.push(c, b, a);
+      else idx.push(c, a, b);
+    }
+  }
+  const g = new T.BufferGeometry();
+  g.setAttribute("position", new T.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
+/**
+ * The paint, drawn per pixel from the model-space position and normal:
+ * the curved orange swoosh and the black tail, hood stripes, mud splashes,
+ * dark glass above the beltline, and round openings over the wheels (the
+ * inside of the body shows black through them, like a wheel well).
+ */
+function paintMaterial(T: Three) {
+  const m = new T.MeshStandardMaterial({ color: "#ffffff", roughness: 0.38, metalness: 0.1, side: T.DoubleSide });
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uRed = { value: new T.Color(RED) };
     sh.uniforms.uBlack = { value: new T.Color(BLACK) };
     sh.uniforms.uOrange = { value: new T.Color(ORANGE) };
     sh.vertexShader = sh.vertexShader
-      .replace("#include <common>", "#include <common>\nvarying vec3 vLiv;")
-      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvLiv = position;");
+      .replace("#include <common>", "#include <common>\nvarying vec3 vLiv;\nvarying vec3 vLivN;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvLiv = position;\nvLivN = normal;");
     sh.fragmentShader = sh.fragmentShader
       .replace(
         "#include <common>",
         `#include <common>
 varying vec3 vLiv;
+varying vec3 vLivN;
 uniform vec3 uRed; uniform vec3 uBlack; uniform vec3 uOrange;
-float splash(vec2 p, vec2 c, float r) { return step(length((p - c) * vec2(1.0, 1.6)), r); }`,
+float gGlass = 0.0;
+float blob(vec2 p, vec2 c, vec2 r) { return step(length((p - c) / r), 1.0); }`,
       )
       .replace(
         "vec4 diffuseColor = vec4( diffuse, opacity );",
-        `vec3 paint = uRed;
-float split = -0.6 - (vLiv.y - 0.35) * 0.58;
-if (vLiv.x < split + 0.24) paint = uOrange;
-if (vLiv.x < split + 0.07 && vLiv.x > split + 0.03) paint = uBlack;
-if (vLiv.x < split) paint = uBlack;
-// hood stripe: a thin orange line edged in black on each side of the bonnet
-float az = abs(vLiv.z);
-if (vLiv.y > 0.8 && vLiv.x > 0.45 && vLiv.x < 1.95 && vLiv.x > split + 0.3) {
-  if (az > 0.36 && az < 0.42) paint = uOrange;
-  if (az > 0.42 && az < 0.45) paint = uBlack;
+        `vec3 P = vLiv;
+vec3 N = normalize(vLivN);
+float az = abs(P.z);
+// wheel openings: round holes in the flanks and the floor over each wheel
+for (int w = 0; w < 2; w++) {
+  float wx = w == 0 ? ${L.xf.toFixed(3)} : ${L.xr.toFixed(3)};
+  if (length(vec2(P.x - wx, P.y - ${L.R.toFixed(3)})) < ${L.arch.toFixed(3)} && (az > 0.55 || P.y < 0.5)) discard;
+}
+vec3 paint = uRed;
+// the swoosh: a curve that leans further back the higher it climbs
+float h = clamp((P.y - 0.2) / 1.4, 0.0, 1.0);
+float split = -0.42 - 0.95 * pow(h, 1.7) + 0.12 * sin(h * 3.1416);
+if (P.x < split + 0.26) paint = uOrange;
+if (P.x < split + 0.1 && P.x > split + 0.06) paint = uBlack;
+if (P.x < split) paint = uBlack;
+// hood stripes: thin orange curves edged in black, opening out towards the nose
+if (P.y > 0.8 && P.y < ${BELT.toFixed(2)} + 0.02 && P.x > 0.55 && P.x > split + 0.4) {
+  float u = (P.x - 0.55) / 1.5;
+  float zc = 0.34 + 0.16 * u * u;
+  float d = az - zc;
+  if (d > 0.0 && d < 0.06) paint = uOrange;
+  if (d >= 0.06 && d < 0.09) paint = uBlack;
 }
 // white mud splashes low on the flanks
-if (az > 0.8) {
-  vec2 p = vLiv.xy;
-  float s = splash(p, vec2(1.72, 0.58), 0.07) + splash(p, vec2(1.6, 0.52), 0.045) + splash(p, vec2(1.84, 0.5), 0.035)
-          + splash(p, vec2(-0.2, 0.36), 0.05) + splash(p, vec2(-0.32, 0.4), 0.03) + splash(p, vec2(-1.85, 0.62), 0.05);
-  if (s > 0.5) paint = vec3(0.95);
+if (az > 0.7 && P.y < 0.85) {
+  vec2 p = P.xy;
+  float s = blob(p, vec2(1.8, 0.55), vec2(0.09, 0.06)) + blob(p, vec2(1.66, 0.5), vec2(0.05, 0.035)) + blob(p, vec2(1.9, 0.46), vec2(0.04, 0.03))
+          + blob(p, vec2(-0.25, 0.38), vec2(0.06, 0.04)) + blob(p, vec2(-0.4, 0.42), vec2(0.035, 0.025)) + blob(p, vec2(-1.86, 0.62), vec2(0.06, 0.04));
+  if (s > 0.5) paint = vec3(0.96);
 }
+// glass above the beltline: windscreen, side windows and the rear window,
+// framed by the painted pillars and roof
+if (P.y > ${BELT.toFixed(2)} + 0.05) {
+  float roofEdge = P.y > 1.51 ? 1.0 : 0.0;
+  bool front = N.x > 0.42 && az < 0.6;
+  bool rear = N.x < -0.45 && az < 0.58 && P.y < 1.47;
+  bool side = abs(N.z) > 0.5 && P.y < 1.5 && P.x < 0.86 - (P.y - 1.05) * 1.7 && P.x > -1.78 + (P.y - 1.05) * 0.75 && abs(P.x + 0.36) > 0.045;
+  if ((front || rear || side) && roofEdge < 0.5) { paint = vec3(0.07, 0.075, 0.09); gGlass = 1.0; }
+}
+if (!gl_FrontFacing) paint = vec3(0.05);
 vec4 diffuseColor = vec4( paint, opacity );`,
-      );
+      )
+      .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.08, gGlass);");
   };
-  // the patched shader differs from a plain standard material's
-  m.customProgramCacheKey = () => "rally-hatch-livery";
-  return m;
-}
-
-/** A side profile (x along the car, y up) extruded across the car, centred on z = 0. */
-function slab(T: Three, pts: [number, number][], width: number, mat: THREE_NS.Material, bevel = 0.05, arches = false) {
-  const s = new T.Shape();
-  s.moveTo(pts[0][0], pts[0][1]);
-  for (const [x, y] of pts.slice(1)) s.lineTo(x, y);
-  if (arches) {
-    // underside from the tail to the nose, cut round both wheels
-    const y0 = pts[0][1];
-    for (const x of [L.xr, L.xf]) {
-      s.lineTo(x - L.arch, y0);
-      s.lineTo(x - L.arch, L.R);
-      s.absarc(x, L.R, L.arch, Math.PI, 0, true);
-      s.lineTo(x + L.arch, y0);
-    }
-  }
-  s.closePath();
-  const depth = width - bevel * 2;
-  const g = new T.ExtrudeGeometry(s, { depth, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel * 0.8, bevelSegments: 2, curveSegments: 9 });
-  g.translate(0, 0, -depth / 2);
-  return new T.Mesh(g, mat);
-}
-
-function box(T: Three, w: number, h: number, d: number, mat: THREE_NS.Material, x: number, y: number, z: number, rz = 0, ry = 0) {
-  const m = new T.Mesh(new T.BoxGeometry(w, h, d), mat);
-  m.position.set(x, y, z);
-  m.rotation.set(0, ry, rz);
+  m.customProgramCacheKey = () => "rally-hatch-paint";
   return m;
 }
 
@@ -110,7 +186,6 @@ function lampTexture(T: Three) {
   g.fill();
   g.strokeStyle = "#1c1c20";
   g.lineWidth = 17;
-  g.lineCap = "butt";
   g.beginPath();
   g.moveTo(30, 30);
   g.lineTo(98, 98);
@@ -122,234 +197,201 @@ function lampTexture(T: Three) {
   return t;
 }
 
-/** Fat tyre and a gold rim with ten spokes, facing +z (flip for the left side). */
+/** A rounded fat tyre (lathed) and a gold ten-spoke rim, facing +z. */
 function wheel(T: Three, tyreM: THREE_NS.Material, rimM: THREE_NS.Material, hubM: THREE_NS.Material) {
   const w = new T.Group();
-  const tyre = new T.Mesh(new T.CylinderGeometry(L.R, L.R, L.tw, 16, 1), tyreM);
+  const R = L.R;
+  const h = L.tw / 2;
+  const pts: [number, number][] = [
+    [R * 0.66, -h],
+    [R - 0.07, -h],
+    [R - 0.02, -h + 0.03],
+    [R, -h + 0.08],
+    [R, h - 0.08],
+    [R - 0.02, h - 0.03],
+    [R - 0.07, h],
+    [R * 0.66, h],
+  ];
+  const tyre = new T.Mesh(new T.LatheGeometry(pts.map(([r, y]) => new T.Vector2(r, y)), 28), tyreM);
   tyre.rotation.x = Math.PI / 2;
   w.add(tyre);
-  // tread shoulders: a slightly smaller ring each side
-  for (const s of [-1, 1]) {
-    const sh = new T.Mesh(new T.CylinderGeometry(L.R * 0.93, L.R * 0.93, 0.03, 16, 1), tyreM);
-    sh.rotation.x = Math.PI / 2;
-    sh.position.z = (s * (L.tw + 0.03)) / 2;
-    w.add(sh);
-  }
-  const face = L.tw / 2 + 0.02;
-  const barrel = new T.Mesh(new T.CylinderGeometry(L.R * 0.68, L.R * 0.68, 0.03, 16, 1), hubM);
-  barrel.rotation.x = Math.PI / 2;
-  barrel.position.z = face - 0.01;
-  w.add(barrel);
-  const lip = new T.Mesh(new T.TorusGeometry(L.R * 0.68, 0.024, 4, 16), rimM);
+  const face = h - 0.02;
+  // dished barrel, then spokes and the centre cap
+  const dish = new T.Mesh(new T.CylinderGeometry(R * 0.66, R * 0.55, 0.06, 28, 1), hubM);
+  dish.rotation.x = Math.PI / 2;
+  dish.position.z = face - 0.04;
+  w.add(dish);
+  const lip = new T.Mesh(new T.TorusGeometry(R * 0.66, 0.022, 8, 28), rimM);
   lip.position.z = face;
   w.add(lip);
   for (let k = 0; k < 10; k++) {
-    const sp = new T.Mesh(new T.BoxGeometry(0.04, L.R * 0.62, 0.03), rimM);
+    const sp = new T.Mesh(new T.CapsuleGeometry(0.018, R * 0.5, 3, 6), rimM);
     const a = (k / 10) * Math.PI * 2;
-    sp.position.set(Math.sin(a) * L.R * 0.34, Math.cos(a) * L.R * 0.34, face);
+    sp.position.set(Math.sin(a) * R * 0.34, Math.cos(a) * R * 0.34, face - 0.01);
     sp.rotation.z = -a;
     w.add(sp);
   }
-  const hub = new T.Mesh(new T.CylinderGeometry(0.06, 0.07, 0.05, 8, 1), rimM);
+  const hub = new T.Mesh(new T.SphereGeometry(0.075, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), rimM);
   hub.rotation.x = Math.PI / 2;
-  hub.position.z = face + 0.01;
+  hub.position.z = face - 0.02;
   w.add(hub);
-  const nut = new T.Mesh(new T.CylinderGeometry(0.025, 0.025, 0.03, 6, 1), hubM);
-  nut.rotation.x = Math.PI / 2;
-  nut.position.z = face + 0.04;
-  w.add(nut);
   return w;
+}
+
+/** A rounded blob (a squashed sphere). */
+function blob(T: Three, mat: THREE_NS.Material, x: number, y: number, z: number, sx: number, sy: number, sz: number, ry = 0, rz = 0) {
+  const m = new T.Mesh(new T.SphereGeometry(1, 20, 12), mat);
+  m.position.set(x, y, z);
+  m.scale.set(sx, sy, sz);
+  m.rotation.set(0, ry, rz);
+  return m;
+}
+
+/** A slab with soft edges: an extruded rounded rectangle with a round bevel. */
+function rounded(T: Three, w: number, h: number, d: number, r: number, mat: THREE_NS.Material, x: number, y: number, z: number, rz = 0) {
+  const s = new T.Shape();
+  const W = w / 2;
+  const Hh = h / 2;
+  s.moveTo(-W + r, -Hh);
+  s.lineTo(W - r, -Hh);
+  s.quadraticCurveTo(W, -Hh, W, -Hh + r);
+  s.lineTo(W, Hh - r);
+  s.quadraticCurveTo(W, Hh, W - r, Hh);
+  s.lineTo(-W + r, Hh);
+  s.quadraticCurveTo(-W, Hh, -W, Hh - r);
+  s.lineTo(-W, -Hh + r);
+  s.quadraticCurveTo(-W, -Hh, -W + r, -Hh);
+  const depth = Math.max(0.001, d - 2 * r);
+  const g = new T.ExtrudeGeometry(s, { depth, bevelEnabled: true, bevelThickness: r, bevelSize: r * 0.9, bevelSegments: 3, curveSegments: 6 });
+  g.translate(0, 0, -depth / 2);
+  const m = new T.Mesh(g, mat);
+  m.position.set(x, y, z);
+  m.rotation.z = rz;
+  return m;
 }
 
 export function buildRallyHatch(T: Three): THREE_NS.Group {
   const car = new T.Group();
-  const paint = liveryMaterial(T);
-  const glass = new T.MeshStandardMaterial({ color: "#16181d", roughness: 0.12, metalness: 0.3, flatShading: true });
-  const trim = new T.MeshStandardMaterial({ color: "#1f1f23", roughness: 0.7, flatShading: true });
-  const carbon = new T.MeshStandardMaterial({ color: "#3a3b40", roughness: 0.55, flatShading: true });
-  const gold = new T.MeshStandardMaterial({ color: GOLD, roughness: 0.38, metalness: 0.35, flatShading: true });
-  const tyreM = new T.MeshStandardMaterial({ color: "#1b1b1e", roughness: 0.9, flatShading: true });
-  const head = new T.MeshStandardMaterial({ color: "#eef3f7", emissive: "#cfe4ff", emissiveIntensity: 0.25, roughness: 0.2, flatShading: true });
-  const tail = new T.MeshStandardMaterial({ color: "#c0141b", emissive: "#ff2a2a", emissiveIntensity: 0.35, roughness: 0.3, flatShading: true });
-  const chrome = new T.MeshStandardMaterial({ color: "#b8bcc4", roughness: 0.3, metalness: 0.8, flatShading: true });
-  const lampFace = new T.MeshStandardMaterial({ map: lampTexture(T), roughness: 0.35, flatShading: true });
+  const paint = paintMaterial(T);
+  const trim = new T.MeshStandardMaterial({ color: "#1d1d21", roughness: 0.6 });
+  const carbon = new T.MeshStandardMaterial({ color: "#36373c", roughness: 0.5 });
+  const gold = new T.MeshStandardMaterial({ color: GOLD, roughness: 0.32, metalness: 0.4 });
+  const tyreM = new T.MeshStandardMaterial({ color: "#1b1b1e", roughness: 0.85 });
+  const head = new T.MeshStandardMaterial({ color: "#2a2d33", roughness: 0.1, metalness: 0.4 });
+  const led = new T.MeshStandardMaterial({ color: "#ffffff", emissive: "#e8f2ff", emissiveIntensity: 0.6 });
+  const tail = new T.MeshStandardMaterial({ color: "#c0141b", emissive: "#ff2a2a", emissiveIntensity: 0.4, roughness: 0.25 });
+  const chrome = new T.MeshStandardMaterial({ color: "#c2c6cd", roughness: 0.25, metalness: 0.85 });
+  const lampFace = new T.MeshStandardMaterial({ map: lampTexture(T), roughness: 0.3 });
 
-  // ── lower body: bonnet, beltline and tail, cut round the wheels ──
-  // (the profile runs nose → tail along the top, then back underneath)
-  car.add(
-    slab(
-      T,
-      [
-        [1.98, 0.24],
-        [2.08, 0.46],
-        [2.06, 0.74],
-        [1.8, 0.84],
-        [1.0, 0.98],
-        [0.3, 1.02],
-        [-1.2, 1.03],
-        [-1.98, 1.0],
-        [-2.06, 0.5],
-        [-1.96, 0.24],
-      ],
-      L.W,
-      paint,
-      0.07,
-      true,
-    ),
-  );
+  // ── the body: a rounded tub from the nose to the tail ──
+  const bodyTop = spline([
+    [-2.06, 0.5],
+    [-2.0, 0.86],
+    [-1.86, 1.0],
+    [-1.2, 1.03],
+    [0.3, 1.03],
+    [1.0, 1.0],
+    [1.55, 0.9],
+    [1.9, 0.8],
+    [2.06, 0.66],
+    [2.13, 0.42],
+  ]);
+  const bodyBottom = spline([
+    [-2.06, 0.4],
+    [-1.95, 0.26],
+    [1.95, 0.24],
+    [2.13, 0.34],
+  ]);
+  // widest over the wheels (the flared arches), tucked in at the ends
+  const bodyHalf = spline([
+    [-2.06, 0.66],
+    [-1.92, 0.84],
+    [-1.27, 0.92],
+    [0, 0.86],
+    [1.27, 0.92],
+    [1.95, 0.84],
+    [2.13, 0.62],
+  ]);
+  car.add(new T.Mesh(loft(T, -2.06, 2.13, 64, bodyBottom, bodyTop, bodyHalf, 3.8, 0.05), paint));
 
-  // ── the cabin: dark glass all round, painted roof, pillars and rear quarters ──
-  const cabin = slab(
-    T,
-    [
-      [1.02, 0.94],
-      [0.08, 1.52],
-      [-1.38, 1.55],
-      [-1.86, 1.12],
-      [-1.86, 0.94],
-    ],
-    1.5,
-    glass,
-    0.05,
-  );
-  car.add(cabin);
-  // roof panel over the glass
-  car.add(
-    slab(
-      T,
-      [
-        [0.14, 1.52],
-        [-1.42, 1.56],
-        [-1.46, 1.63],
-        [0.06, 1.6],
-      ],
-      1.58,
-      paint,
-      0.04,
-    ),
-  );
-  // rear quarter and tailgate frame (black under the livery band)
-  car.add(
-    slab(
-      T,
-      [
-        [-1.02, 0.98],
-        [-1.2, 1.5],
-        [-1.42, 1.57],
-        [-1.9, 1.12],
-        [-1.9, 0.98],
-      ],
-      1.53,
-      paint,
-      0.04,
-    ),
-  );
-  // the rear window, set into the tailgate
-  car.add(
-    slab(
-      T,
-      [
-        [-1.5, 1.5],
-        [-1.86, 1.16],
-        [-1.9, 1.18],
-        [-1.55, 1.52],
-      ],
-      1.24,
-      glass,
-      0.02,
-    ),
-  );
-  // A- and B-pillars
-  const aLen = Math.hypot(1.02 - 0.08, 1.52 - 0.94);
-  const aAng = Math.atan2(1.52 - 0.94, 0.08 - 1.02);
-  for (const s of [-1, 1]) {
-    car.add(box(T, aLen, 0.08, 0.08, paint, (1.02 + 0.08) / 2, (0.94 + 1.52) / 2 + 0.02, s * 0.75, aAng));
-    car.add(box(T, 0.09, 0.52, 0.04, trim, -0.36, 1.27, s * 0.77, -0.04));
-    // a painted sill under the side windows
-    car.add(box(T, 2.7, 0.06, 0.06, paint, -0.42, 1.0, s * 0.76));
-  }
+  // ── the glasshouse: a rounded hood over the cabin, painted with glass ──
+  const cabTop = spline([
+    [-1.98, 0.96],
+    [-1.86, 1.2],
+    [-1.62, 1.47],
+    [-0.9, 1.6],
+    [0.0, 1.58],
+    [0.5, 1.4],
+    [0.95, 1.12],
+    [1.12, 0.96],
+  ]);
+  const cabHalf = spline([
+    [-1.98, 0.76],
+    [-1.7, 0.84],
+    [0.6, 0.84],
+    [1.12, 0.76],
+  ]);
+  car.add(new T.Mesh(loft(T, -1.98, 1.12, 56, () => 0.9, cabTop, cabHalf, 4.6, 0.13), paint));
 
-  // ── wide flares over the wheels ──
-  for (const x of [L.xf, L.xr]) {
+  // ── fat flares round the arches ──
+  for (const x of [L.xf, L.xr])
     for (const s of [-1, 1]) {
-      const ring = new T.Shape();
-      ring.absarc(0, 0, L.arch + 0.15, 0, Math.PI, false);
-      ring.lineTo(-L.arch - 0.02, 0);
-      ring.absarc(0, 0, L.arch + 0.02, Math.PI, 0, true);
-      ring.closePath();
-      const g = new T.ExtrudeGeometry(ring, { depth: 0.16, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.025, bevelSegments: 1, curveSegments: 8 });
-      g.translate(x, L.R, s > 0 ? L.W / 2 - 0.1 : -L.W / 2 - 0.06);
-      car.add(new T.Mesh(g, paint));
-      // black arch liner inside
-      const lg = new T.ExtrudeGeometry(
-        (() => {
-          const r = new T.Shape();
-          r.absarc(0, 0, L.arch + 0.02, 0, Math.PI, false);
-          r.lineTo(-L.arch + 0.04, 0);
-          r.absarc(0, 0, L.arch - 0.04, Math.PI, 0, true);
-          r.closePath();
-          return r;
-        })(),
-        { depth: 0.5, bevelEnabled: false, curveSegments: 8 },
-      );
-      lg.translate(x, L.R, s > 0 ? L.W / 2 - 0.5 : -L.W / 2);
-      car.add(new T.Mesh(lg, trim));
+      const f = new T.Mesh(new T.TorusGeometry(L.arch + 0.03, 0.075, 10, 24, Math.PI), paint);
+      f.position.set(x, L.R, s * (bodyHalf(x) - 0.06));
+      f.scale.set(1, 1, 1.6);
+      car.add(f);
     }
-    // side skirts between the arches
-  }
-  for (const s of [-1, 1]) car.add(box(T, L.xf - L.xr - 2 * L.arch - 0.1, 0.1, 0.08, carbon, (L.xf + L.xr) / 2, 0.26, s * (L.W / 2 + 0.02)));
+  // side skirts between the arches
+  for (const s of [-1, 1]) car.add(rounded(T, L.xf - L.xr - 2 * L.arch - 0.06, 0.08, 0.1, 0.03, carbon, (L.xf + L.xr) / 2, 0.27, s * 0.8));
 
-  // ── nose: intake, grille, splitter, lights, rally lamps ──
-  car.add(box(T, 0.12, 0.2, 1.3, trim, 2.06, 0.37, 0));
-  for (let k = -2; k <= 2; k++) car.add(box(T, 0.02, 0.18, 0.03, carbon, 2.13, 0.37, k * 0.24));
-  car.add(box(T, 0.06, 0.12, 0.42, trim, 2.08, 0.6, 0));
-  car.add(box(T, 0.02, 0.05, 0.08, chrome, 2.12, 0.61, 0));
-  // splitter: a deep blade with fins underneath
-  car.add(box(T, 0.42, 0.04, 1.84, carbon, 2.04, 0.2, 0));
-  for (const z of [-0.6, -0.2, 0.2, 0.6]) car.add(box(T, 0.36, 0.1, 0.03, carbon, 2.02, 0.26, z));
-  // headlights at the corners of the bonnet
+  // ── nose: intake, splitter, headlights, rally lamps ──
+  car.add(rounded(T, 0.1, 0.2, 1.24, 0.04, trim, 2.08, 0.38, 0));
+  car.add(rounded(T, 0.08, 0.1, 0.34, 0.04, trim, 2.09, 0.52, 0));
+  car.add(blob(T, chrome, 2.13, 0.53, 0, 0.012, 0.022, 0.05));
+  car.add(rounded(T, 0.44, 0.045, 1.8, 0.02, carbon, 2.06, 0.21, 0));
+  for (const z of [-0.6, -0.2, 0.2, 0.6]) car.add(rounded(T, 0.34, 0.1, 0.03, 0.012, carbon, 2.04, 0.27, z));
+  // oval headlights set into the corners of the bonnet
   for (const s of [-1, 1]) {
-    car.add(box(T, 0.16, 0.16, 0.46, trim, 1.98, 0.76, s * 0.56, -0.28));
-    car.add(box(T, 0.19, 0.1, 0.36, head, 2.0, 0.78, s * 0.56, -0.28));
+    car.add(blob(T, head, 1.97, bodyTop(1.97) - 0.05, s * 0.55, 0.13, 0.04, 0.22, 0, -0.45));
+    car.add(blob(T, led, 2.02, bodyTop(2.02) - 0.04, s * 0.57, 0.06, 0.012, 0.14, 0, -0.45));
   }
-  // four rally lamps along the bumper, taped with an X
-  for (const z of [-0.72, -0.48, 0.48, 0.72]) {
-    const housing = new T.Mesh(new T.CylinderGeometry(0.095, 0.1, 0.09, 12, 1), trim);
+  // four rally lamps along the top of the bumper, taped with an X
+  for (const z of [-0.74, -0.5, 0.5, 0.74]) {
+    const housing = new T.Mesh(new T.CylinderGeometry(0.095, 0.105, 0.1, 20, 1), trim);
     housing.rotation.z = -Math.PI / 2;
-    housing.position.set(2.13, 0.6, z);
+    housing.position.set(2.12, 0.6, z);
     car.add(housing);
-    const face = new T.Mesh(new T.CircleGeometry(0.085, 14), lampFace);
+    const face = new T.Mesh(new T.CircleGeometry(0.086, 24), lampFace);
     face.rotation.y = Math.PI / 2;
-    face.position.set(2.18, 0.6, z);
+    face.position.set(2.175, 0.6, z);
     car.add(face);
   }
 
-  // ── mirrors (gold caps) ──
+  // ── mirrors: gold rounded caps on short black arms ──
   for (const s of [-1, 1]) {
-    car.add(box(T, 0.06, 0.04, 0.12, trim, 0.9, 1.04, s * 0.82));
-    car.add(box(T, 0.17, 0.12, 0.13, gold, 0.87, 1.09, s * 0.93, 0, s * 0.2));
+    car.add(rounded(T, 0.08, 0.04, 0.12, 0.015, trim, 0.86, 1.06, s * 0.84));
+    car.add(rounded(T, 0.16, 0.11, 0.13, 0.04, gold, 0.84, 1.1, s * 0.93));
   }
 
-  // ── roof: vent scoop and a wing over the tailgate ──
-  car.add(box(T, 0.3, 0.06, 0.4, trim, -0.25, 1.64, 0, 0.08));
-  car.add(box(T, 0.06, 0.05, 0.36, carbon, -0.1, 1.65, 0));
-  car.add(box(T, 0.42, 0.04, 1.56, trim, -1.62, 1.72, 0, -0.12));
+  // ── roof: scoop and a wing over the tailgate ──
+  car.add(blob(T, trim, -0.3, 1.6, 0, 0.22, 0.035, 0.18));
+  car.add(rounded(T, 0.4, 0.04, 1.56, 0.018, trim, -1.68, 1.66, 0, -0.1));
   for (const s of [-1, 1]) {
-    car.add(box(T, 0.4, 0.16, 0.03, trim, -1.6, 1.68, s * 0.77, -0.12));
-    car.add(box(T, 0.08, 0.12, 0.05, trim, -1.45, 1.63, s * 0.4));
+    car.add(rounded(T, 0.38, 0.14, 0.03, 0.012, trim, -1.66, 1.63, s * 0.78, -0.1));
+    car.add(rounded(T, 0.1, 0.1, 0.04, 0.015, trim, -1.56, 1.58, s * 0.4));
   }
   // bonnet vents
-  for (const s of [-1, 1]) car.add(box(T, 0.26, 0.02, 0.18, trim, 1.42, 0.93, s * 0.17, -0.18));
+  for (const s of [-1, 1]) car.add(blob(T, trim, 1.4, 0.95, s * 0.16, 0.14, 0.02, 0.09, 0, -0.12));
 
-  // ── tail: lights, diffuser, twin exhausts ──
-  for (const s of [-1, 1]) car.add(box(T, 0.06, 0.14, 0.36, tail, -2.05, 0.86, s * 0.6));
-  car.add(box(T, 0.1, 0.06, 0.5, chrome, -2.08, 0.58, 0));
-  car.add(box(T, 0.3, 0.12, 1.5, carbon, -2.0, 0.26, 0));
-  for (let k = -3; k <= 3; k++) car.add(box(T, 0.26, 0.12, 0.025, trim, -2.04, 0.28, k * 0.2));
-  for (const z of [-0.45, -0.3]) {
-    const ex = new T.Mesh(new T.CylinderGeometry(0.05, 0.05, 0.2, 10, 1, true), chrome);
+  // ── tail: lights, plate recess, diffuser, twin exhausts ──
+  for (const s of [-1, 1]) car.add(blob(T, tail, -2.0, 0.86, s * 0.58, 0.05, 0.07, 0.18));
+  car.add(rounded(T, 0.06, 0.12, 0.42, 0.02, trim, -2.05, 0.6, 0));
+  car.add(rounded(T, 0.3, 0.12, 1.4, 0.03, carbon, -1.98, 0.28, 0));
+  for (let k = -3; k <= 3; k++) car.add(rounded(T, 0.24, 0.11, 0.025, 0.01, trim, -2.03, 0.29, k * 0.19));
+  for (const z of [-0.46, -0.3]) {
+    const ex = new T.Mesh(new T.CylinderGeometry(0.05, 0.05, 0.2, 16, 1, true), chrome);
     ex.rotation.z = Math.PI / 2;
-    ex.position.set(-2.1, 0.3, z);
+    ex.position.set(-2.1, 0.32, z);
     car.add(ex);
   }
 
@@ -364,18 +406,18 @@ export function buildRallyHatch(T: Three): THREE_NS.Group {
 
   car.traverse((o) => {
     const m = o as THREE_NS.Mesh;
-    if (m.isMesh) {
-      // the livery is drawn from model-space positions: bake painted parts in place
-      if (m.material === paint && m.parent === car) {
-        m.updateMatrix();
-        m.geometry.applyMatrix4(m.matrix);
-        m.position.set(0, 0, 0);
-        m.rotation.set(0, 0, 0);
-        m.scale.set(1, 1, 1);
-      }
-      m.castShadow = true;
-      m.receiveShadow = true;
+    if (!m.isMesh) return;
+    // the paint is drawn from model-space positions: bake painted parts in place
+    if (m.material === paint && m.parent === car) {
+      m.updateMatrix();
+      m.geometry.applyMatrix4(m.matrix);
+      m.geometry.computeVertexNormals();
+      m.position.set(0, 0, 0);
+      m.rotation.set(0, 0, 0);
+      m.scale.set(1, 1, 1);
     }
+    m.castShadow = true;
+    m.receiveShadow = true;
   });
   return car;
 }
