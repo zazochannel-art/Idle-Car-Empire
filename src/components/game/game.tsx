@@ -285,7 +285,7 @@ function LeftRail() {
     ...PILLARS.map((p) => ({ id: p.id, icon: p.icon, badge: p.id === "empire" ? badges.research : p.id === "business" ? badges.missions : 0 })),
   ];
   return (
-    <nav className="absolute left-[calc(env(safe-area-inset-left)+0.5rem)] top-[6.75rem] z-20 flex flex-col gap-1 rounded-2xl border border-white/10 bg-ink/75 p-1 backdrop-blur-xl md:left-[calc(env(safe-area-inset-left)+0.75rem)] md:top-[5.5rem]">
+    <nav className="absolute left-[calc(env(safe-area-inset-left)+0.5rem)] top-[6.75rem] z-20 flex flex-col gap-1 rounded-2xl border border-white/10 bg-[#2a3388]/90 shadow-[0_4px_0_0_rgba(10,14,46,0.5)] p-1 backdrop-blur-xl md:left-[calc(env(safe-area-inset-left)+0.75rem)] md:top-[5.5rem]">
       {items.map((r) => {
         const active = r.id === "map" ? nothing : current === r.id;
         const label = r.id === "map" ? t("map.nav.map") : t(`pillar.${r.id}`);
@@ -359,7 +359,7 @@ function BottomDock() {
   const { t } = useT();
   return (
     <nav className="absolute inset-x-0 bottom-0 z-30 flex justify-center px-[calc(env(safe-area-inset-left)+0.5rem)] pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
-      <div className="grid w-full max-w-xl grid-cols-5 gap-1 rounded-2xl border border-white/10 bg-ink/85 p-1.5 shadow-[0_-10px_40px_-12px_rgba(0,0,0,.9)] backdrop-blur-xl">
+      <div className="grid w-full max-w-xl grid-cols-5 gap-1 rounded-2xl border border-white/10 bg-[#26307e]/92 p-1.5 shadow-[0_-10px_40px_-12px_rgba(0,0,0,.9)] backdrop-blur-xl">
         {DOCK.map((d) => {
           const active = view === d.id;
           const badge = d.badge ? badges[d.badge] : 0;
@@ -402,7 +402,7 @@ function GoalTracker() {
         onClick={() => runGoal(goal, ready)}
         className={cn(
           "pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-2xl border p-2.5 text-left shadow-[0_10px_30px_-10px_rgba(0,0,0,.9)] backdrop-blur-xl transition hover:brightness-110",
-          ready ? "border-gold/40 bg-[#2a2210]/85" : "border-white/10 bg-ink/80",
+          ready ? "border-gold/40 bg-[#7a5208]/92" : "border-white/10 bg-[#26307e]/92",
         )}
       >
         <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/5 text-xl">{goal.icon}</span>

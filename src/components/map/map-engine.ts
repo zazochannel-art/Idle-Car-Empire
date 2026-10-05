@@ -419,8 +419,9 @@ export class MapEngine {
     const H = this.canvas.height;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     const bg = ctx.createLinearGradient(0, 0, 0, H);
-    bg.addColorStop(0, "#0f4f7a");
-    bg.addColorStop(1, "#0a3352");
+    // bright cartoon sea
+    bg.addColorStop(0, "#2aa7e0");
+    bg.addColorStop(1, "#1781c4");
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, H);
 
@@ -435,7 +436,7 @@ export class MapEngine {
     p.lights.length = 0;
 
     // sea shimmer around the island
-    ctx.strokeStyle = "rgba(125,211,252,0.12)";
+    ctx.strokeStyle = "rgba(255,255,255,0.22)";
     ctx.lineWidth = 2;
     const view = cam.view();
     for (let i = 0; i < (this.low ? 0 : 18); i++) {
