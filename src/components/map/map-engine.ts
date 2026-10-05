@@ -2,6 +2,7 @@
 // every animation frame and turns taps into selections. React only feeds it
 // state and listens to its callbacks.
 import { networkTraffic } from "./highway";
+import { sprites3d } from "../three/sprites";
 import type { PlotStatus } from "@/game/engine/construction";
 import { LEGACY_OFFSET } from "@/game/config/city";
 import { ROAD_STEP as STEP_TILES, territoryCenterTile } from "@/game/city/layout";
@@ -22,6 +23,24 @@ import { Traffic, type TrafficWorld, type VehiclePick } from "./traffic";
 import type { CarModel } from "./vehicles";
 
 export type MapTarget = { kind: "plot"; id: string } | { kind: "zone"; id: ZoneId } | { kind: "vehicle"; v: VehiclePick } | null;
+
+/** Below this zoom the still parts of the map are drawn from one cached picture. */
+const CACHE_ZOOM = 0.22;
+/** Largest side of that picture, px (keeps it within GPU texture limits). */
+const CACHE_MAX = 4096;
+/** The cached picture covers the whole region plus the sea round the coast. */
+const CACHE_TILES = { x0: -16, x1: WORLD + 16 };
+
+interface FarCache {
+  canvas: HTMLCanvasElement;
+  /** World px of its top-left corner, and world px → cache px. */
+  x0: number;
+  y0: number;
+  scale: number;
+  key: string;
+  lights: Painter["lights"];
+  built: number;
+}
 
 interface Pop {
   x: number;
@@ -71,6 +90,12 @@ export class MapEngine {
   /** A building being previewed on a plot before it is bought. */
   preview: { plot: string; type: StructureType } | null = null;
   private sigs = new Map<string, string>();
+  private far: FarCache | null = null;
+  /** Bumped by every new scene. */
+  private sceneGen = 0;
+  /** Bumped whenever new 3D sprites are ready (the cached picture may show placeholders). */
+  private spriteGen = 0;
+  private offSprites: () => void;
   private anims = new Map<string, { start: number; upgrade: boolean; announce?: string }>();
   private banners: { x: number; y: number; text: string; age: number }[] = [];
 
@@ -91,6 +116,7 @@ export class MapEngine {
     this.cam.x = sx(hx, hy);
     this.cam.y = sy(hx, hy);
     this.detach = attachControls(canvas, this.cam, { onTap: (x, y) => this.tap(x, y), onHover: (x, y) => this.hover(x, y) });
+    this.offSprites = sprites3d.onReady(() => this.spriteGen++);
     this.traffic.onArrive = (kind, site) => {
       if (kind === "carrier") this.burst(site.id, "🚗", "#93c5fd");
     };
@@ -130,6 +156,7 @@ export class MapEngine {
       this.sigs.set(d.pickId, d.sig);
     }
     this.scene = scene;
+    this.sceneGen++;
     this.unlocked = unlocked;
     this.traffic.setWorld(world);
   }
@@ -181,7 +208,9 @@ export class MapEngine {
   destroy() {
     this.stop();
     this.detach();
+    this.offSprites();
     this.ro.disconnect();
+    this.far = null;
   }
 
   // ───────────────────────── camera helpers ─────────────────────────
@@ -357,6 +386,50 @@ export class MapEngine {
     }
   }
 
+  /**
+   * The far view: the ground and every building drawn once into a picture of
+   * the whole region, redrawn only when the map, the unlocked areas, the time
+   * of day or the sprites change (sprites at most every 2 s while loading).
+   */
+  private farPicture(sky: { dark: number }): FarCache {
+    const night = Math.round(sky.dark * 8) / 8;
+    const sel = this.selected ?? "";
+    const base = `${this.sceneGen}|${[...this.unlocked].join()}|${this.racingOpen ? 1 : 0}|${night}|${sel}|${this.painter.season ?? ""}`;
+    const f = this.far;
+    const fresh = f && f.key.startsWith(base + "#") && (f.key === `${base}#${this.spriteGen}` || this.t - f.built < 2);
+    if (f && fresh && f.canvas) return f;
+    const { x0: a, x1: b } = CACHE_TILES;
+    const wx0 = sx(a, b);
+    const wx1 = sx(b, a);
+    const wy0 = sy(a, a) - 520;
+    const wy1 = sy(b, b) + 40;
+    const scale = Math.min(CACHE_ZOOM * Math.min(2, this.dpr) * 0.75, CACHE_MAX / (wx1 - wx0), CACHE_MAX / (wy1 - wy0));
+    const canvas = f?.canvas ?? document.createElement("canvas");
+    canvas.width = Math.ceil((wx1 - wx0) * scale);
+    canvas.height = Math.ceil((wy1 - wy0) * scale);
+    const ctx = canvas.getContext("2d")!;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.setTransform(scale, 0, 0, scale, -wx0 * scale, -wy0 * scale);
+    const p = new Painter(ctx);
+    p.season = this.painter.season;
+    p.t = this.t;
+    p.night = night;
+    p.zoom = scale;
+    p.dpr = 1;
+    const view: [number, number, number, number] = [wx0, wy0, wx1, wy1];
+    drawGround(p, this.unlocked, view, this.t);
+    drawRacingGround(p, this.racingOpen);
+    const info: DrawInfo = { zoom: scale, selected: this.selected, t: this.t };
+    for (const d of this.scene) {
+      p.dim = d.zone !== null && !this.unlocked.has(d.zone);
+      d.draw(p, info);
+    }
+    p.dim = false;
+    this.far = { canvas, x0: wx0, y0: wy0, scale, key: `${base}#${this.spriteGen}`, lights: p.lights, built: this.t };
+    return this.far;
+  }
+
   /** Drops render resolution step by step while frames stay slow (< ~45 FPS). */
   private adaptQuality(dt: number) {
     if (this.low || this.dpr <= 1 || document.hidden) return;
@@ -449,8 +522,16 @@ export class MapEngine {
     }
 
     this.drawShips();
-    drawGround(p, this.unlocked, view, this.t);
-    drawRacingGround(p, this.racingOpen);
+    // far away nothing on the ground needs redrawing each frame: use the cached picture
+    const farView = cam.zoom < CACHE_ZOOM && !this.buildInfo && !this.preview && this.anims.size === 0;
+    const far = farView ? this.farPicture(sky) : null;
+    if (far) {
+      ctx.drawImage(far.canvas, far.x0, far.y0, far.canvas.width / far.scale, far.canvas.height / far.scale);
+      for (const l of far.lights) p.lights.push(l);
+    } else {
+      drawGround(p, this.unlocked, view, this.t);
+      drawRacingGround(p, this.racingOpen);
+    }
 
     const info: DrawInfo = { zoom: cam.zoom, selected: this.selected, t: this.t };
     const inView = (b: [number, number, number, number]) => b[2] >= view[0] && b[0] <= view[2] && b[3] >= view[1] && b[1] <= view[3];
@@ -470,6 +551,11 @@ export class MapEngine {
       }
     };
     for (const d of this.scene) {
+      if (far) {
+        // already in the picture: only its label is still to draw
+        if (inView(d.bbox)) visible.push(d);
+        continue;
+      }
       drawMoving(d.depth);
       if (!inView(d.bbox)) continue;
       p.dim = d.zone !== null && !this.unlocked.has(d.zone);
