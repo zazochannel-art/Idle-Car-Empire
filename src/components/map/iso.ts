@@ -40,9 +40,13 @@ export function shade(hex: string, k: number): string {
   return k >= 0 ? mix(hex, "#ffffff", k) : mix(hex, "#000000", -k);
 }
 
-const FOG = "#1c2433";
+/** Locked areas fade towards a soft lilac-grey (bright toon style, not a dark veil). */
+const FOG = "#8d93b8";
 
 // ───────────────────────────── painter ─────────────────────────────
+
+/** Dark outlines round boxes: the toon style of the whole map. */
+const OUTLINES = true;
 
 export class Painter {
   ctx: CanvasRenderingContext2D;
@@ -82,7 +86,7 @@ export class Painter {
     let c = this.cache.get(key);
     if (!c) {
       c = k ? shade(hex, k) : hex;
-      if (this.dim) c = mix(mix(c, "#8a94a6", 0.45), FOG, 0.45);
+      if (this.dim) c = mix(mix(c, "#c3c8d8", 0.45), FOG, 0.35);
       this.cache.set(key, c);
     }
     return c;
@@ -190,6 +194,20 @@ export class Painter {
       c.moveTo(sx(x1, y1), sy(x1, y1, z + h));
       c.lineTo(sx(x1, y1), sy(x1, y1, z));
       c.strokeStyle = "rgba(255,255,255,0.18)";
+      c.lineWidth = 1;
+      c.stroke();
+    }
+    // the cartoon outline round the silhouette (like the 3D sprites')
+    if (OUTLINES && h > 1.5 && this.zoom > 0.45) {
+      c.beginPath();
+      c.moveTo(sx(x, y), sy(x, y, z + h));
+      c.lineTo(sx(x1, y), sy(x1, y, z + h));
+      c.lineTo(sx(x1, y), sy(x1, y, z));
+      c.lineTo(sx(x1, y1), sy(x1, y1, z));
+      c.lineTo(sx(x, y1), sy(x, y1, z));
+      c.lineTo(sx(x, y1), sy(x, y1, z + h));
+      c.closePath();
+      c.strokeStyle = this.dim ? "rgba(24,28,52,0.25)" : "rgba(24,28,52,0.6)";
       c.lineWidth = 1;
       c.stroke();
     }

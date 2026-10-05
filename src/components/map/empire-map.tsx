@@ -322,7 +322,7 @@ function ZoneCard({ id, full }: { id: ZoneId; full: boolean }) {
   return (
     <div data-zone={id} className="pointer-events-auto absolute left-0 top-0 will-change-transform" style={{ visibility: "hidden" }}>
       {full ? (
-        <div className="w-56 rounded-2xl border border-gold/40 bg-ink/85 p-3 text-center shadow-[0_20px_50px_-10px_rgba(0,0,0,.8)] backdrop-blur-md">
+        <div className="w-56 rounded-2xl border border-gold/40 bg-[#26307e]/92 p-3 text-center shadow-[0_20px_50px_-10px_rgba(0,0,0,.8)] backdrop-blur-md">
           <div className="mx-auto mb-1 flex size-9 items-center justify-center rounded-full bg-gold/15 ring-1 ring-gold/40">
             <Lock className="size-4 text-gold" />
           </div>
@@ -341,7 +341,7 @@ function ZoneCard({ id, full }: { id: ZoneId; full: boolean }) {
           {blocker && <div className="mt-1 text-[10px] text-amber-300/80">{t("map.requires", { name: t(`zone.${blocker}`) })}</div>}
         </div>
       ) : (
-        <button onClick={() => selectZone(id)} className="flex items-center gap-1.5 rounded-full border border-white/15 bg-ink/80 px-3 py-1.5 text-[11px] font-bold backdrop-blur-md">
+        <button onClick={() => selectZone(id)} className="flex items-center gap-1.5 rounded-full border border-white/15 bg-[#26307e]/92 px-3 py-1.5 text-[11px] font-bold backdrop-blur-md">
           <Lock className="size-3 text-white/60" />
           <span className="text-white/50">{t("map.stage", { n: z.stage })}</span>
           <span>{t(`zone.${id}`)}</span>
@@ -372,7 +372,7 @@ function TerritoryCard({ id }: { id: TerritoryId }) {
         onClick={() => !lock && unlock(id)}
         className={cn(
           "flex max-w-[15rem] flex-col items-center rounded-2xl border px-3 py-1.5 text-center backdrop-blur-md",
-          !lock ? "border-gold/50 bg-[#2a2210]/85 shadow-[0_0_20px_rgba(245,196,81,.35)]" : "border-white/15 bg-ink/80",
+          !lock ? "border-gold/50 bg-[#7a5208]/92 shadow-[0_0_20px_rgba(245,196,81,.35)]" : "border-white/15 bg-[#26307e]/92",
         )}
       >
         <span className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wide">
@@ -397,7 +397,7 @@ function RacingCard() {
   const can = blocker === null;
   return (
     <div data-zone="racing" className="pointer-events-auto absolute left-0 top-0 will-change-transform" style={{ visibility: "hidden" }}>
-      <div className="w-56 rounded-2xl border border-gold/40 bg-ink/85 p-3 text-center shadow-[0_20px_50px_-10px_rgba(0,0,0,.8)] backdrop-blur-md">
+      <div className="w-56 rounded-2xl border border-gold/40 bg-[#26307e]/92 p-3 text-center shadow-[0_20px_50px_-10px_rgba(0,0,0,.8)] backdrop-blur-md">
         <div className="text-2xl">🏁</div>
         <div className="text-sm font-black uppercase tracking-wide">{t("racing.district")}</div>
         <div className="mt-0.5 text-[11px] leading-snug text-white/55">{t("racing.districtDesc")}</div>

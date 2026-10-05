@@ -949,9 +949,9 @@ function port(p: Painter, X: number, Y: number, W: number, D: number, seed: numb
 
 // ───────────────────────────── ground ─────────────────────────────
 
-const ASPHALT = "#3d4450";
-const SIDEWALK = "#d3d9e0";
-const GRASS = "#69a955";
+const ASPHALT = "#565e6d";
+const SIDEWALK = "#eef1f5";
+const GRASS = "#7acd55";
 
 let grassPattern: CanvasPattern | null | undefined;
 /** A soft speckle texture laid over the grass so it doesn't look flat. */
@@ -965,7 +965,7 @@ function grassTexture(ctx: CanvasRenderingContext2D): CanvasPattern | null {
     const x = rand(i, 1) * 128;
     const y = rand(i, 2) * 128;
     const r = 0.8 + rand(i, 3) * 2.6;
-    g.fillStyle = rand(i, 4) > 0.5 ? "rgba(255,255,190,0.07)" : "rgba(10,40,10,0.08)";
+    g.fillStyle = rand(i, 4) > 0.5 ? "rgba(255,255,190,0.06)" : "rgba(10,60,10,0.04)";
     g.beginPath();
     g.ellipse(x, y, r * 1.6, r, 0, 0, Math.PI * 2);
     g.fill();
@@ -973,9 +973,13 @@ function grassTexture(ctx: CanvasRenderingContext2D): CanvasPattern | null {
   return (grassPattern = ctx.createPattern(cv, "repeat"));
 }
 
+/** Flat, clean surfaces (the toon style): no grime textures on roads and pavements. */
+const CLEAN = true;
 let asphaltPattern: CanvasPattern | null | undefined;
 /** Aggregate speckle, patched repairs and oil stains for the roads. */
 function asphaltTexture(ctx: CanvasRenderingContext2D): CanvasPattern | null {
+  // the clean cartoon look: flat roads, no grime
+  if (CLEAN) return null;
   if (asphaltPattern !== undefined) return asphaltPattern;
   if (typeof document === "undefined") return (asphaltPattern = null);
   const cv = document.createElement("canvas");
@@ -1009,6 +1013,7 @@ function asphaltTexture(ctx: CanvasRenderingContext2D): CanvasPattern | null {
 let paverPattern: CanvasPattern | null | undefined;
 /** Concrete paving slabs for the pavements. */
 function paverTexture(ctx: CanvasRenderingContext2D): CanvasPattern | null {
+  if (CLEAN) return null;
   if (paverPattern !== undefined) return paverPattern;
   if (typeof document === "undefined") return (paverPattern = null);
   const cv = document.createElement("canvas");
@@ -1050,10 +1055,10 @@ export function drawGround(p: Painter, unlocked: ReadonlySet<string>, view: [num
   // ── shore: shallow water, foam, sand, then the land
   c.lineJoin = "round";
   coastPath(c);
-  c.strokeStyle = "rgba(56,189,248,0.16)";
+  c.strokeStyle = "rgba(125,230,255,0.28)";
   c.lineWidth = 120;
   c.stroke();
-  c.strokeStyle = "rgba(125,211,252,0.22)";
+  c.strokeStyle = "rgba(170,240,255,0.35)";
   c.lineWidth = 60;
   c.stroke();
   c.setLineDash([18, 26]);
@@ -1063,7 +1068,7 @@ export function drawGround(p: Painter, unlocked: ReadonlySet<string>, view: [num
   c.stroke();
   c.setLineDash([]);
   c.lineDashOffset = 0;
-  c.strokeStyle = "#e4cf98";
+  c.strokeStyle = "#f6dfa0";
   c.lineWidth = 26;
   c.stroke();
   c.fillStyle = GRASS;
@@ -1103,7 +1108,7 @@ export function drawGround(p: Painter, unlocked: ReadonlySet<string>, view: [num
         p.quadStroke(x + 0.02, y + 0.02, 5.96, 5.96, p.col("#a8b0ba"), 1);
       } else if (kind === "farm") {
         const seed = hash(bx, by);
-        const crops = ["#c8b560", "#8fbf4f", "#b6c96b", "#d9b45a", "#7eaa48"];
+        const crops = ["#f2d36b", "#a4dc5c", "#cde07a", "#f4c062", "#93cf55"];
         for (let i = 0; i < 2; i++)
           for (let j = 0; j < 2; j++) {
             const col = crops[Math.floor(rand(seed * 9 + i, j) * crops.length)];
@@ -1118,11 +1123,11 @@ export function drawGround(p: Painter, unlocked: ReadonlySet<string>, view: [num
           }
         p.quad(x + 2.85, y, 0.3, 6, "#c9b48a");
       } else if (kind === "forest") {
-        p.quad(x - 0.5, y - 0.5, 7, 7, "#4f8f44");
+        p.quad(x - 0.5, y - 0.5, 7, 7, "#5cae4b");
       } else if (kind === "hills") {
-        p.quad(x - 0.5, y - 0.5, 7, 7, "#7d9a5a");
+        p.quad(x - 0.5, y - 0.5, 7, 7, "#8cbd5f");
       } else if (kind === "mountains") {
-        p.quad(x - 0.5, y - 0.5, 7, 7, "#6f7c5c");
+        p.quad(x - 0.5, y - 0.5, 7, 7, "#87966a");
       }
     }
   p.dim = false;
@@ -1232,7 +1237,7 @@ export function drawFog(p: Painter, unlocked: ReadonlySet<string>, t: number) {
   for (const z of areas) {
     if (unlocked.has(z.id)) continue;
     const blocks = z.blocks;
-    for (const [bx, by] of blocks) p.quad(bx * ROAD_STEP, by * ROAD_STEP, ROAD_STEP + 1, ROAD_STEP + 1, "rgba(9,13,24,0.16)");
+    for (const [bx, by] of blocks) p.quad(bx * ROAD_STEP, by * ROAD_STEP, ROAD_STEP + 1, ROAD_STEP + 1, "rgba(70,60,140,0.1)");
     c.setLineDash([10, 8]);
     c.lineDashOffset = -t * 12;
     const mine = (bx: number, by: number) => areaOfBlock(bx, by) === z.id;

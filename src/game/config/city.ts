@@ -29,42 +29,42 @@ export interface ZoneConfig {
 
 export const ZONES: ZoneConfig[] = [
   {
-    id: "town", stage: 1, letter: "T", cost: 0, scale: 1, ground: "#6cb35a", accent: "#60a5fa",
+    id: "town", stage: 1, letter: "T", cost: 0, scale: 1, ground: "#7fd062", accent: "#60a5fa",
     builds: ["garage", "carWash", "parking", "serviceCenter", "warehouse"],
     mix: "....hhhhttsa",
   },
   {
-    id: "industrial", stage: 2, letter: "I", cost: 25_000, scale: 1.5, ground: "#94a06f", accent: "#38bdf8",
+    id: "industrial", stage: 2, letter: "I", cost: 25_000, scale: 1.5, ground: "#a9b87c", accent: "#38bdf8",
     builds: ["garage", "partsFactory", "warehouse", "logistics", "truckDepot", "parking", "fleetPlant"],
     mix: "....iiiit",
   },
   {
-    id: "downtown", stage: 3, letter: "D", cost: 150_000, scale: 2.5, ground: "#7fae6e", accent: "#22d3ee",
+    id: "downtown", stage: 3, letter: "D", cost: 150_000, scale: 2.5, ground: "#8fcf78", accent: "#22d3ee",
     builds: ["garage", "carWash", "parking", "serviceCenter", "researchCenter", "museum"],
     mix: "....ooooaasst",
   },
   {
-    id: "automotive", stage: 4, letter: "A", cost: 600_000, scale: 4, ground: "#8fa77a", accent: "#818cf8",
+    id: "automotive", stage: 4, letter: "A", cost: 600_000, scale: 4, ground: "#9fc584", accent: "#818cf8",
     builds: ["garage", "partsFactory", "researchCenter", "logistics", "warehouse", "fleetPlant"],
     mix: "....iiisot",
   },
   {
-    id: "luxury", stage: 5, letter: "L", cost: 2_500_000, scale: 7, ground: "#5fbf74", accent: "#facc15",
+    id: "luxury", stage: 5, letter: "L", cost: 2_500_000, scale: 7, ground: "#6fd486", accent: "#facc15",
     builds: ["garage", "serviceCenter", "carWash", "parking", "hq", "museum"],
     mix: "....hhhttta",
   },
   {
-    id: "supercar", stage: 6, letter: "S", cost: 10_000_000, scale: 12, ground: "#b9a46c", accent: "#fb923c",
+    id: "supercar", stage: 6, letter: "S", cost: 10_000_000, scale: 12, ground: "#d4bd78", accent: "#fb923c",
     builds: ["garage", "researchCenter", "exportTerminal", "warehouse"],
     mix: "....iitto",
   },
   {
-    id: "mega", stage: 7, letter: "M", cost: 40_000_000, scale: 20, ground: "#86a08a", accent: "#e879f9",
+    id: "mega", stage: 7, letter: "M", cost: 40_000_000, scale: 20, ground: "#97be9a", accent: "#e879f9",
     builds: ["garage", "hq", "exportTerminal", "logistics", "truckDepot"],
     mix: "....ooooooaa",
   },
   {
-    id: "global", stage: 8, letter: "G", cost: 150_000_000, scale: 35, ground: "#7aa2a8", accent: "#c084fc",
+    id: "global", stage: 8, letter: "G", cost: 150_000_000, scale: 35, ground: "#86c2c9", accent: "#c084fc",
     builds: ["garage", "airport", "hq", "exportTerminal"],
     mix: "....oooost",
   },

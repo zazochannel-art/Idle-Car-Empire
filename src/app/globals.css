@@ -1,16 +1,17 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ink: #06070a;
-  --color-ink-2: #0b0d12;
-  --color-panel: #10131a;
-  --color-electric: #3b82f6;
-  --color-electric-deep: #1d4ed8;
-  --color-cyan-glow: #22d3ee;
-  --color-gold: #f5c451;
-  --color-gold-deep: #c98d12;
+  /* bright arcade palette: deep indigo night sky, punchy blue and sunny gold */
+  --color-ink: #141a3f;
+  --color-ink-2: #1a2150;
+  --color-panel: #232b66;
+  --color-electric: #3d8bff;
+  --color-electric-deep: #1f5fe0;
+  --color-cyan-glow: #2ee6ff;
+  --color-gold: #ffcc33;
+  --color-gold-deep: #f59e0b;
 
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-nunito), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
   --animate-shimmer: shimmer 1.2s linear infinite;
@@ -43,29 +44,32 @@ a {
 
 body {
   background:
-    radial-gradient(1200px 600px at 15% -10%, rgba(59, 130, 246, 0.14), transparent 60%),
-    radial-gradient(900px 500px at 110% 10%, rgba(34, 211, 238, 0.08), transparent 60%),
-    radial-gradient(700px 400px at 50% 120%, rgba(245, 196, 81, 0.05), transparent 60%),
+    radial-gradient(1200px 600px at 15% -10%, rgba(99, 102, 241, 0.35), transparent 60%),
+    radial-gradient(900px 500px at 110% 10%, rgba(46, 230, 255, 0.18), transparent 60%),
+    radial-gradient(700px 400px at 50% 120%, rgba(255, 204, 51, 0.12), transparent 60%),
     var(--color-ink);
   background-attachment: fixed;
 }
 
 @utility glass {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015));
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  /* colourful arcade panels with a light rim and a chunky drop shadow */
+  background: linear-gradient(180deg, rgba(74, 92, 220, 0.82), rgba(44, 54, 150, 0.84));
+  border: 2px solid rgba(255, 255, 255, 0.16);
   box-shadow:
-    0 1px 0 0 rgba(255, 255, 255, 0.04) inset,
-    0 20px 40px -24px rgba(0, 0, 0, 0.8);
+    0 2px 0 0 rgba(255, 255, 255, 0.18) inset,
+    0 5px 0 0 rgba(12, 16, 52, 0.55),
+    0 18px 30px -18px rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
 }
 
 @utility glass-strong {
-  background: linear-gradient(180deg, rgba(22, 26, 36, 0.92), rgba(12, 14, 20, 0.96));
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: linear-gradient(180deg, rgba(48, 58, 160, 0.97), rgba(28, 34, 98, 0.98));
+  border: 2px solid rgba(255, 255, 255, 0.18);
   box-shadow:
-    0 1px 0 0 rgba(255, 255, 255, 0.06) inset,
-    0 40px 80px -20px rgba(0, 0, 0, 0.9);
+    0 2px 0 0 rgba(255, 255, 255, 0.2) inset,
+    0 6px 0 0 rgba(10, 14, 46, 0.6),
+    0 40px 80px -20px rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }

@@ -164,7 +164,7 @@ export function Minimap({ engine }: { engine: RefObject<MapEngine | null> }) {
     engine.current?.lookAt(Math.max(0, Math.min(WORLD, tile.x)), Math.max(0, Math.min(WORLD, tile.y)));
   };
 
-  const btn = "flex size-8 items-center justify-center rounded-lg border border-white/10 bg-ink/75 text-white/70 backdrop-blur-xl transition hover:text-white";
+  const btn = "flex size-8 items-center justify-center rounded-lg border border-white/10 bg-[#2a3388]/90 shadow-[0_4px_0_0_rgba(10,14,46,0.5)] text-white/70 backdrop-blur-xl transition hover:text-white";
   return (
     <div className="pointer-events-auto flex flex-col items-end gap-1.5">
       <div className="overflow-hidden rounded-xl border border-white/10 bg-ink/70 p-0.5 shadow-[0_10px_30px_-10px_rgba(0,0,0,.9)] backdrop-blur-xl">
