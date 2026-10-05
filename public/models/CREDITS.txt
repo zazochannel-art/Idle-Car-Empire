@@ -13,3 +13,15 @@ sports-1975.glb — the Sports Car platform
   recoloured. This adapted model is shared under the same licence
   (CC BY-NC-SA 4.0). Non-commercial use only. Not affiliated with or
   endorsed by Porsche AG; all trademarks belong to their owners.
+
+gt-r34.glb — the MC GT platform (Performance car)
+  Original: "Nissan R34 Brians Fast Furious | www.vecarz.com" by vecarz
+  https://sketchfab.com/heynic
+  https://sketchfab.com/3d-models/nissan-r34-brians-fast-furious-wwwvecarzcom-412aa249c2f548eebf64bdb35f3553af
+  Licence: CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/
+
+  Changes: geometry simplified and meshopt-compressed, textures resized to
+  512 px WebP (gltf-transform optimize). In the game the badges and the
+  manufacturer plate are hidden; the body is repainted only when the player
+  picks a colour. Not affiliated with or endorsed by Nissan or the makers of
+  the Fast & Furious films; all trademarks belong to their owners.

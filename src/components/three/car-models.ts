@@ -342,12 +342,22 @@ function box(T: Three, w: number, h: number, d: number, mat: THREE_NS.Material, 
  * Files live in public/models/; their licences and credits are in
  * public/models/CREDITS.txt and on the Settings screen.
  */
-const HERO_FILES: Partial<Record<BodyModel, { url: string; hide?: RegExp }>> = {
+interface HeroFile {
+  url: string;
+  /** Parts left out, by material name. */
+  hide?: RegExp;
+  /** The file's own paint (with its decals) is the factory look; only a Design-studio colour repaints it. */
+  ownPaint?: boolean;
+}
+const HERO_FILES: Partial<Record<BodyModel, HeroFile>> = {
   // "Porsche 911(930) Turbo 1975" by vecarz, CC BY-NC-SA 4.0 — badges and plates left out
   sports: { url: "models/sports-1975.glb", hide: /sticker|plate|wunderbaum/i },
+  // "Nissan R34 Brians Fast Furious" by vecarz, CC BY 4.0 — silver with blue graphics, badges left out
+  muscle: { url: "models/gt-r34.glb", hide: /badge|manufacturerplate/i, ownPaint: true },
 };
 interface Hero {
   car: THREE_NS.Group;
+  ownPaint: boolean;
   /** Names of the body-paint materials (repainted per car). */
   paint: Set<string>;
   /** One repainted copy of each paint material per colour. */
@@ -362,7 +372,7 @@ export function loadHeroes(T: Three): Promise<void> {
     const { loadGlbCar, paintMaterials } = await import("./glb-car");
     const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
     await Promise.all(
-      (Object.entries(HERO_FILES) as [BodyModel, { url: string; hide?: RegExp }][]).map(async ([model, f]) => {
+      (Object.entries(HERO_FILES) as [BodyModel, HeroFile][]).map(async ([model, f]) => {
         try {
           const car = await loadGlbCar(T, `${base}/${f.url}`, { length: CAR_SPECS[model].L, hide: f.hide });
           // shared by every copy: never disposed with a sprite
@@ -372,7 +382,7 @@ export function loadHeroes(T: Three): Promise<void> {
             m.geometry.userData.keep = true;
             for (const mm of Array.isArray(m.material) ? m.material : [m.material]) mm.userData.keep = true;
           });
-          HEROES[model] = { car, paint: new Set(paintMaterials(T, car).map((m) => m.name)), coats: new Map() };
+          HEROES[model] = { car, ownPaint: !!f.ownPaint, paint: new Set(paintMaterials(T, car).map((m) => m.name)), coats: new Map() };
         } catch {
           // no file or no network: the procedural body stays
         }
@@ -385,9 +395,10 @@ export function loadHeroes(T: Three): Promise<void> {
 /** Whether a body is drawn from a ready-made model. */
 export const hasHero = (model: BodyModel) => !!HEROES[model];
 
-/** A copy of a ready-made model in the given paint (geometry and other materials shared). */
-function heroCopy(hero: Hero, color: string): THREE_NS.Group {
+/** A copy of a ready-made model in the given paint, or its own (geometry and other materials shared). */
+function heroCopy(hero: Hero, color: string | null): THREE_NS.Group {
   const car = hero.car.clone(true);
+  if (!color) return car;
   car.traverse((o) => {
     const m = o as THREE_NS.Mesh;
     if (!m.isMesh || Array.isArray(m.material) || !hero.paint.has(m.material.name)) return;
@@ -491,7 +502,7 @@ export function buildCar(T: Three, kit: MaterialKit, look: CarLook): THREE_NS.Gr
   const st = look.stage?.station ?? 8;
   // a finished car with a ready-made model: that model, in its paint
   const hero = HEROES[look.model];
-  if (hero && st >= 8) return heroCopy(hero, look.build?.color || liveryOf(look.model).color);
+  if (hero && st >= 8) return heroCopy(hero, look.build?.color || (hero.ownPaint ? null : liveryOf(look.model).color));
   const painted = st >= 6;
   // every model leaves the line in its own factory colour
   const liv = liveryOf(look.model);
