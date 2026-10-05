@@ -319,7 +319,7 @@ export const en = {
   "settings.import": "Import save",
   "settings.erase": "Erase everything",
   "settings.credits": "Credits",
-  "settings.creditsModel": "3D models: Sports Car — “Porsche 911 (930) Turbo 1975” by vecarz (sketchfab.com/heynic), CC BY-NC-SA 4.0; MC GT — “Nissan R34 Brians Fast Furious” by vecarz, CC BY 4.0; City Car, Sedan, SUV, Luxury, Supercar, Hypercar, Electric and street traffic — “Generic passenger car pack” by Comrade1280 (sketchfab.com/comrade1280), CC BY 4.0. All adapted (simplified, badges removed, repainted). Not affiliated with Porsche, Nissan or the Fast & Furious films.",
+  "settings.creditsModel": "3D models: Sports Car — “Porsche 911 (930) Turbo 1975” by vecarz (sketchfab.com/heynic), CC BY-NC-SA 4.0; MC GT — “Nissan R34 Brians Fast Furious” by vecarz, CC BY 4.0; City Car, Sedan, SUV, Luxury, Supercar, Hypercar and street traffic — “Generic passenger car pack” by Comrade1280 (sketchfab.com/comrade1280), CC BY 4.0; Electric — “2010 Citroën DS Survolt” by Ddiaz Design (sketchfab.com/ddiaz-design), CC BY-NC-SA 4.0. All adapted (simplified, badges removed, repainted). Not affiliated with Porsche, Citroën, Nissan or the Fast & Furious films.",
   "settings.reset": "Reset game",
 
   "toast.achievement": "Achievement: {name}",

@@ -346,7 +346,8 @@ function shadowAll(T: Three, root: THREE_NS.Object3D) {
     const m = o as THREE_NS.Mesh;
     if (!m.isMesh) return;
     const geo = m.geometry;
-    if (Array.isArray(m.material) || !geo.getAttribute("normal") || !geo.getAttribute("uv")) {
+    // ready-made car models stay whole: their geometry is shared (and compressed)
+    if (geo.userData.keep || Array.isArray(m.material) || !geo.getAttribute("normal") || !geo.getAttribute("uv")) {
       keep.push(m);
       return;
     }

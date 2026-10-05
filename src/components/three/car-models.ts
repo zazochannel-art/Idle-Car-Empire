@@ -297,6 +297,8 @@ interface HeroFile {
   hide?: RegExp;
   /** The file's own paint (with its decals) is the factory look; only a Design-studio colour repaints it. */
   ownPaint?: boolean;
+  /** Only these materials take the paint (two-tone cars: the rest keeps its own colour). */
+  paint?: RegExp;
   /** One car out of a pack (its body's node name), and which way it faces once straightened. */
   pick?: string;
   facing?: Facing;
@@ -314,7 +316,8 @@ const HERO_FILES: Partial<Record<BodyModel, HeroFile>> = {
   luxury: { url: PACK, pick: "Coupe Body" },
   supercar: { url: PACK, pick: "Sport body", facing: "-x" },
   hypercar: { url: PACK, pick: "Sport body", facing: "-x" },
-  electric: { url: PACK, pick: "Compact Body" },
+  // "2010 Citroën DS Survolt" by Ddiaz Design, CC BY-NC-SA 4.0 — black body, the accents take the paint
+  electric: { url: "models/electric-survolt.glb", hide: /licenseplate/i, paint: /^CarPaint_Color$/ },
   // street traffic
   compact: { url: PACK, pick: "Compact Body" },
   minivan: { url: PACK, pick: "minivan body" },
@@ -333,6 +336,17 @@ interface Hero {
 const HEROES: Partial<Record<BodyModel, Hero>> = {};
 let heroLoad: Promise<void> | null = null;
 
+/** The materials of a model whose names match. */
+function materialsNamed(T: Three, car: THREE_NS.Object3D, re: RegExp): THREE_NS.MeshStandardMaterial[] {
+  const out = new Set<THREE_NS.MeshStandardMaterial>();
+  car.traverse((o) => {
+    const m = o as THREE_NS.Mesh;
+    if (!m.isMesh) return;
+    for (const mm of Array.isArray(m.material) ? m.material : [m.material]) if (mm instanceof T.MeshStandardMaterial && re.test(mm.name)) out.add(mm);
+  });
+  return [...out];
+}
+
 /** Loads the ready-made models (once); bodies without one stay procedural. */
 export function loadHeroes(T: Three): Promise<void> {
   heroLoad ??= (async () => {
@@ -342,7 +356,7 @@ export function loadHeroes(T: Three): Promise<void> {
       (Object.entries(HERO_FILES) as [BodyModel, HeroFile][]).map(async ([model, f]) => {
         try {
           const car = await loadGlbCar(T, `${base}/${f.url}`, { length: CAR_LENGTH[model], hide: f.hide, pick: f.pick, facing: f.facing });
-          const paint = paintMaterials(T, car);
+          const paint = f.paint ? materialsNamed(T, car, f.paint) : paintMaterials(T, car);
           if (!f.ownPaint) neutralizePaint(T, paint);
           // shared by every copy: never disposed with a sprite
           car.traverse((o) => {
