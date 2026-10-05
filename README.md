@@ -64,8 +64,8 @@ npm run simulate -- 3   # balance bot: plays 3 hours and logs milestones
 7. **Sell them, then build better cars.** Car transporters fill the showroom,
    customers come in and drive off in your cars. Each better model needs one
    more plant and better grades: City Car (body, engine, tyres) → Sedan
-   (+ Interior and Suspension factories) → SUV (+ Glass) → Sports Car (+ Paint) → Luxury Sedan,
-   Performance SUV, Supercar and Hypercar (+ Electronics) → Electric
+   (+ Interior and Suspension factories) → SUV (+ Glass) → Sports Car (+ Paint) → Luxury Coupe,
+   Tuner GT, Supercar and Hypercar (+ Electronics) → Electric
    Performance (+ Battery Factory). More dealerships add customers and markup. Each dealer specialises in
    car classes (Economy, Sport, Premium, Luxury, Supercar/Hypercar, Global
    takes all): its speciality sells for +20% and 1.5× faster, so transporters
