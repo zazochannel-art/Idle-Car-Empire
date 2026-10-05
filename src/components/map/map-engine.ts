@@ -2,6 +2,7 @@
 // every animation frame and turns taps into selections. React only feeds it
 // state and listens to its callbacks.
 import { networkTraffic } from "./highway";
+import { drawSky, drawSkyShadows, lifeMovers } from "./life";
 import type { PlotStatus } from "@/game/engine/construction";
 import { LEGACY_OFFSET } from "@/game/config/city";
 import { ROAD_STEP as STEP_TILES, territoryCenterTile } from "@/game/city/layout";
@@ -451,12 +452,13 @@ export class MapEngine {
     this.drawShips();
     drawGround(p, this.unlocked, view, this.t);
     drawRacingGround(p, this.racingOpen);
+    drawSkyShadows(p, this.t, this.unlocked);
 
     const info: DrawInfo = { zoom: cam.zoom, selected: this.selected, t: this.t };
     const inView = (b: [number, number, number, number]) => b[2] >= view[0] && b[0] <= view[2] && b[3] >= view[1] && b[1] <= view[3];
 
     // merge static scene with moving traffic, both sorted by depth
-    const moving = [...this.traffic.drawables(), ...networkTraffic(this.t, this.unlocked, this.traffic.density, this.cam.zoom), ...(this.race?.drawables(this.t) ?? [])].sort((a, b) => a.depth - b.depth);
+    const moving = [...this.traffic.drawables(), ...networkTraffic(this.t, this.unlocked, this.traffic.density, this.cam.zoom), ...lifeMovers(this.t, this.unlocked, this.traffic.density, this.cam.zoom), ...(this.race?.drawables(this.t) ?? [])].sort((a, b) => a.depth - b.depth);
     let mi = 0;
     const visible: Drawable[] = [];
     const drawMoving = (upTo: number) => {
@@ -488,6 +490,8 @@ export class MapEngine {
     }
     drawMoving(Infinity);
     p.dim = false;
+    // aircraft and birds fly over everything
+    drawSky(p, this.t, this.unlocked, this.low);
     applyLighting(ctx, sky, p.lights, view);
 
     // BUILD mode: dim the city, light up the plots by availability

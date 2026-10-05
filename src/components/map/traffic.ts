@@ -211,7 +211,7 @@ export class Traffic {
     const zonesChanged = !this.world || [...w.unlocked].join() !== [...this.world.unlocked].join();
     this.world = w;
     if (zonesChanged) this.buildGraph();
-    const want = Math.min(40, w.busyBlocks.length * 2);
+    const want = Math.min(64, w.busyBlocks.length * 2);
     while (this.walkers.length < want) {
       const [bx, by] = w.busyBlocks[this.walkers.length % w.busyBlocks.length];
       this.walkers.push({ bx, by, s: Math.random() * 24, speed: (0.3 + Math.random() * 0.25) * (Math.random() < 0.5 ? 1 : -1), shirt: CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)] });
