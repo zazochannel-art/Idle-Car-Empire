@@ -26,7 +26,8 @@ gt-r34.glb — the MC GT platform (Performance car)
   picks a colour. Not affiliated with or endorsed by Nissan or the makers of
   the Fast & Furious films; all trademarks belong to their owners.
 
-car-pack.glb — City Car, Sedan, SUV, Luxury and Supercar platforms
+car-pack.glb — City Car, Sedan, SUV, Luxury, Supercar, Hypercar and Electric
+  platforms, and the street traffic (compact, minivan, off-roader, pickup, wagon)
   Original: "Generic passenger car pack" by Comrade1280
   https://sketchfab.com/comrade1280
   https://sketchfab.com/3d-models/generic-passenger-car-pack-20f9af9b8a404d5cb022ac6fe87f21f5

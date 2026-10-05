@@ -155,15 +155,9 @@ class SpriteFactory {
     return null;
   }
 
-  /** Drops cached sprites (they are made again when next drawn). */
-  forget(match: (key: string) => boolean) {
-    for (const [key, sp] of [...this.cache.entries()]) {
-      if (!match(key)) continue;
-      if (sp) this.bytes -= sp.img.width * sp.img.height * 4;
-      this.cache.delete(key);
-      this.lastUse.delete(key);
-    }
-    this.listeners.forEach((l) => l());
+  /** WebGL is missing or broken: callers fall back to their flat drawings. */
+  get broken() {
+    return this.failed;
   }
 
   private kick() {
@@ -183,8 +177,8 @@ class SpriteFactory {
       const T = await import("three");
       const models = await import("./car-models");
       await models.loadShapes();
-      // ready-made models arrive a little later: redraw the cars once they do
-      void models.loadHeroes(T).then(() => this.forget((key) => /\bcar\|/.test(key)));
+      // every car is a ready-made model: none is drawn before they are in
+      await models.loadHeroes(T);
       const industrial = await import("./industrial-models");
       const buildings = await import("./building-models");
       const homes = await import("./home-models");

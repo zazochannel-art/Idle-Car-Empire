@@ -9,7 +9,7 @@ import type { Facing } from "./glb-car";
 
 type Three = typeof THREE_NS;
 
-export type BodyModel = "city" | "sedan" | "suv" | "sports" | "muscle" | "luxury" | "supercar" | "hypercar" | "electric";
+export type BodyModel = "city" | "sedan" | "suv" | "sports" | "muscle" | "luxury" | "supercar" | "hypercar" | "electric" | "compact" | "minivan" | "offroad" | "pickup" | "wagon";
 
 interface CarSpec {
   L: number;
@@ -63,7 +63,7 @@ interface CarSpec {
   grille?: [number, number];
 }
 
-export const CAR_SPECS: Record<BodyModel, CarSpec> = {
+const BASE_SPECS: Record<Exclude<BodyModel, "compact" | "minivan" | "offroad" | "pickup" | "wagon">, CarSpec> = {
   // red 80s hot hatch: boxy, upright tailgate, black grille band with round lamps
   city: { L: 3.98, W: 1.68, R: 0.3, tw: 0.19, wb: 2.47, fa: 0.18, clear: 0.15, nose: 0.66, hood: 0.9, deck: 1.02, tail: 0.96, roof: 1.42, ws: 0.32, rs: 0.46, re: 0.88, rw: 0.975, flare: 0.012, taper: 0.04, roofW: 0.84, spokes: 7, n: 3.9, gn: 3.8, lamps: "quad", bumper: "black", rims: "silver", grille: [0.86, 0.2] },
   // silver box-flared sports sedan with a bootlid wing
@@ -82,6 +82,16 @@ export const CAR_SPECS: Record<BodyModel, CarSpec> = {
   hypercar: { L: 4.6, W: 2.0, R: 0.35, tw: 0.3, wb: 2.67, fa: 0.2, clear: 0.09, nose: 0.42, hood: 0.6, deck: 0.98, tail: 0.98, roof: 1.15, ws: 0.25, rs: 0.42, re: 0.55, rw: 0.8, flare: 0.12, taper: 0.17, roofW: 0.55, spoiler: "big", intakes: true, led: true, spokes: 10, n: 2.3, gn: 2.6, roofColor: "#0f1013", lamps: "led", rims: "black" },
   // green classic coupe: black vinyl roof, white stripes, chrome bumpers
   electric: { L: 4.5, W: 1.76, R: 0.33, tw: 0.23, wb: 2.55, fa: 0.15, clear: 0.13, nose: 0.72, hood: 0.88, deck: 0.93, tail: 0.9, roof: 1.32, ws: 0.41, rs: 0.49, re: 0.73, rw: 0.81, flare: 0.04, taper: 0.05, roofW: 0.82, spoiler: "lip", spokes: 6, n: 3.3, gn: 3.3, roofColor: "#0f1013", band: "ends", sideStripe: true, lamps: "round", bumper: "chrome", rims: "dark", grille: [0.6, 0.2] },
+};
+
+export const CAR_SPECS: Record<BodyModel, CarSpec> = {
+  ...BASE_SPECS,
+  // traffic bodies drawn from the car pack; these procedural specs are only a fallback
+  compact: { ...BASE_SPECS.city, L: 3.9 },
+  minivan: { ...BASE_SPECS.suv, L: 4.9, roofColor: undefined },
+  offroad: { ...BASE_SPECS.suv, L: 4.3, roofColor: undefined },
+  pickup: { ...BASE_SPECS.suv, L: 5.3, roofColor: undefined },
+  wagon: { ...BASE_SPECS.sedan, L: 4.6, spoiler: undefined },
 };
 
 /** How far the car is in the assembly process (assembly-line view). */
@@ -365,6 +375,14 @@ const HERO_FILES: Partial<Record<BodyModel, HeroFile>> = {
   suv: { url: PACK, pick: "SUV Body", facing: "-x" },
   luxury: { url: PACK, pick: "Coupe Body" },
   supercar: { url: PACK, pick: "Sport body", facing: "-x" },
+  hypercar: { url: PACK, pick: "Sport body", facing: "-x" },
+  electric: { url: PACK, pick: "Compact Body" },
+  // street traffic
+  compact: { url: PACK, pick: "Compact Body" },
+  minivan: { url: PACK, pick: "minivan body" },
+  offroad: { url: PACK, pick: "Offroad Body", facing: "-x" },
+  pickup: { url: PACK, pick: "Pickup Body" },
+  wagon: { url: PACK, pick: "Wagon Body", facing: "-x" },
 };
 interface Hero {
   car: THREE_NS.Group;
@@ -513,9 +531,9 @@ function wheel(T: Three, kit: MaterialKit, R: number, w: number, spokes: number,
 export function buildCar(T: Three, kit: MaterialKit, look: CarLook): THREE_NS.Group {
   const sp = CAR_SPECS[look.model];
   const st = look.stage?.station ?? 8;
-  // a finished car with a ready-made model: that model, in its paint
+  // every car is a ready-made model: grey primer on the line until the paint shop, then its paint
   const hero = HEROES[look.model];
-  if (hero && st >= 8) return heroCopy(hero, look.build?.color || (hero.ownPaint ? null : liveryOf(look.model).color));
+  if (hero) return heroCopy(hero, st < 6 ? "#9aa3ad" : look.build?.color || (hero.ownPaint ? null : liveryOf(look.model).color));
   const painted = st >= 6;
   // every model leaves the line in its own factory colour
   const liv = liveryOf(look.model);

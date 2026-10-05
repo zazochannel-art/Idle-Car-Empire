@@ -9,8 +9,8 @@ export type Dir = 0 | 1 | 2 | 3;
 export const CAR_COLORS = ["#dc2626", "#2563eb", "#f1f5f9", "#facc15", "#16a34a", "#111827", "#ea580c", "#7c3aed", "#94a3b8", "#0891b2"];
 
 /** Fictional car classes, from cheap to spectacular. */
-export type CarModel = "city" | "sedan" | "suv" | "sports" | "muscle" | "luxury" | "supercar" | "hypercar" | "electric";
-export const CAR_MODELS: CarModel[] = ["city", "sedan", "suv", "sports", "muscle", "luxury", "supercar", "hypercar", "electric"];
+export type CarModel = "city" | "sedan" | "suv" | "sports" | "muscle" | "luxury" | "supercar" | "hypercar" | "electric" | "compact" | "minivan" | "offroad" | "pickup" | "wagon";
+export const CAR_MODELS: CarModel[] = ["city", "sedan", "suv", "sports", "muscle", "luxury", "supercar", "hypercar", "electric", "compact", "minivan", "offroad", "pickup", "wagon"];
 
 interface Spec {
   /** Length and width in tiles (at s = 1). */
@@ -44,6 +44,11 @@ const SPECS: Record<CarModel, Spec> = {
   supercar: { len: 0.6, wid: 0.32, clear: 1, body: 1.8, cabin: 1.6, cabinLen: 0.3, cabinOff: 0.02, cabinW: 0.7, wheel: 1.8, spoiler: 2 },
   hypercar: { len: 0.64, wid: 0.33, clear: 0.9, body: 1.7, cabin: 1.5, cabinLen: 0.26, cabinOff: 0, cabinW: 0.62, wheel: 1.9, spoiler: 3, led: true },
   electric: { len: 0.58, wid: 0.29, clear: 1.3, body: 2.3, cabin: 2, cabinLen: 0.5, cabinOff: 0.02, cabinW: 0.84, wheel: 1.7, led: true },
+  compact: { len: 0.5, wid: 0.27, clear: 1.5, body: 2.8, cabin: 3, cabinLen: 0.6, cabinOff: 0.02, cabinW: 0.86, wheel: 1.5 },
+  minivan: { len: 0.63, wid: 0.29, clear: 1.7, body: 3.2, cabin: 3, cabinLen: 0.72, cabinOff: 0.04, cabinW: 0.88, wheel: 1.7 },
+  offroad: { len: 0.55, wid: 0.3, clear: 2.3, body: 3.2, cabin: 2.8, cabinLen: 0.56, cabinOff: 0.08, cabinW: 0.86, wheel: 2.1 },
+  pickup: { len: 0.68, wid: 0.3, clear: 2.1, body: 3.2, cabin: 2.6, cabinLen: 0.34, cabinOff: -0.12, cabinW: 0.86, wheel: 2 },
+  wagon: { len: 0.59, wid: 0.27, clear: 1.5, body: 2.6, cabin: 2.4, cabinLen: 0.62, cabinOff: 0.06, cabinW: 0.84, wheel: 1.6, rails: true },
 };
 
 export interface CarOpts {
@@ -108,6 +113,9 @@ export function drawModel(p: Painter, x: number, y: number, dir: Dir, model: Car
   // finished cars wear their model's factory colour
   if ((opts.stage ?? 8) >= 6 && !opts.paint) color = liveryOf(model).color;
   if (!p.dim && drawCarSprite(p, x, y, opts.yaw ?? DIR_YAW[dir], model, color, s, opts)) return;
+  // the flat drawing below is only for faded areas and devices without WebGL:
+  // elsewhere a car waits (a frame or two) for its 3D model
+  if (!p.dim && !sprites3d.broken) return;
   const sp = SPECS[model];
   const ax = dir === 0 || dir === 2;
   const sgn = dir === 0 || dir === 1 ? 1 : -1;
