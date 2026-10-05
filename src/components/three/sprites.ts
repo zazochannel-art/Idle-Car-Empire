@@ -155,6 +155,11 @@ class SpriteFactory {
     return null;
   }
 
+  /** WebGL is missing or broken: callers fall back to their flat drawings. */
+  get broken() {
+    return this.failed;
+  }
+
   private kick() {
     if (!this.T && !this.loading) {
       this.loading = true;
@@ -172,6 +177,8 @@ class SpriteFactory {
       const T = await import("three");
       const models = await import("./car-models");
       await models.loadShapes();
+      // every car is a ready-made model: none is drawn before they are in
+      await models.loadHeroes(T);
       const industrial = await import("./industrial-models");
       const buildings = await import("./building-models");
       const homes = await import("./home-models");
@@ -348,7 +355,7 @@ class SpriteFactory {
     obj.traverse((o) => {
       const m = o as THREE_NS.Mesh;
       if (!m.isMesh) return;
-      m.geometry.dispose();
+      if (!m.geometry.userData.keep) m.geometry.dispose();
       for (const mm of Array.isArray(m.material) ? m.material : [m.material]) if (!this.keep.has(mm) && !mm.userData.keep) mm.dispose();
     });
 

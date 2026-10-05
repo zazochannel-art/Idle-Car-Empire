@@ -1096,13 +1096,18 @@ function hashNode(i: number, j: number) {
 /** Mostly everyday cars, now and then something special. */
 function pickModel(): CarModel {
   const r = Math.random();
-  if (r < 0.22) return "city";
-  if (r < 0.48) return "sedan";
-  if (r < 0.66) return "suv";
-  if (r < 0.74) return "sports";
-  if (r < 0.8) return "muscle";
-  if (r < 0.87) return "luxury";
-  if (r < 0.93) return "electric";
+  if (r < 0.14) return "city";
+  if (r < 0.3) return "sedan";
+  if (r < 0.42) return "suv";
+  if (r < 0.5) return "compact";
+  if (r < 0.58) return "wagon";
+  if (r < 0.65) return "minivan";
+  if (r < 0.71) return "pickup";
+  if (r < 0.76) return "offroad";
+  if (r < 0.81) return "sports";
+  if (r < 0.86) return "muscle";
+  if (r < 0.9) return "luxury";
+  if (r < 0.94) return "electric";
   if (r < 0.98) return "supercar";
   return "hypercar";
 }

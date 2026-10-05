@@ -5,10 +5,11 @@
 // not texture. Units are metres; +X is forward, +Y up, +Z to the right.
 import type * as THREE_NS from "three";
 import { liveryOf } from "./livery";
+import type { Facing } from "./glb-car";
 
 type Three = typeof THREE_NS;
 
-export type BodyModel = "city" | "sedan" | "suv" | "sports" | "muscle" | "luxury" | "supercar" | "hypercar" | "electric";
+export type BodyModel = "city" | "sedan" | "suv" | "sports" | "muscle" | "luxury" | "supercar" | "hypercar" | "electric" | "compact" | "minivan" | "offroad" | "pickup" | "wagon";
 
 interface CarSpec {
   L: number;
@@ -62,7 +63,7 @@ interface CarSpec {
   grille?: [number, number];
 }
 
-export const CAR_SPECS: Record<BodyModel, CarSpec> = {
+const BASE_SPECS: Record<Exclude<BodyModel, "compact" | "minivan" | "offroad" | "pickup" | "wagon">, CarSpec> = {
   // red 80s hot hatch: boxy, upright tailgate, black grille band with round lamps
   city: { L: 3.98, W: 1.68, R: 0.3, tw: 0.19, wb: 2.47, fa: 0.18, clear: 0.15, nose: 0.66, hood: 0.9, deck: 1.02, tail: 0.96, roof: 1.42, ws: 0.32, rs: 0.46, re: 0.88, rw: 0.975, flare: 0.012, taper: 0.04, roofW: 0.84, spokes: 7, n: 3.9, gn: 3.8, lamps: "quad", bumper: "black", rims: "silver", grille: [0.86, 0.2] },
   // silver box-flared sports sedan with a bootlid wing
@@ -81,6 +82,16 @@ export const CAR_SPECS: Record<BodyModel, CarSpec> = {
   hypercar: { L: 4.6, W: 2.0, R: 0.35, tw: 0.3, wb: 2.67, fa: 0.2, clear: 0.09, nose: 0.42, hood: 0.6, deck: 0.98, tail: 0.98, roof: 1.15, ws: 0.25, rs: 0.42, re: 0.55, rw: 0.8, flare: 0.12, taper: 0.17, roofW: 0.55, spoiler: "big", intakes: true, led: true, spokes: 10, n: 2.3, gn: 2.6, roofColor: "#0f1013", lamps: "led", rims: "black" },
   // green classic coupe: black vinyl roof, white stripes, chrome bumpers
   electric: { L: 4.5, W: 1.76, R: 0.33, tw: 0.23, wb: 2.55, fa: 0.15, clear: 0.13, nose: 0.72, hood: 0.88, deck: 0.93, tail: 0.9, roof: 1.32, ws: 0.41, rs: 0.49, re: 0.73, rw: 0.81, flare: 0.04, taper: 0.05, roofW: 0.82, spoiler: "lip", spokes: 6, n: 3.3, gn: 3.3, roofColor: "#0f1013", band: "ends", sideStripe: true, lamps: "round", bumper: "chrome", rims: "dark", grille: [0.6, 0.2] },
+};
+
+export const CAR_SPECS: Record<BodyModel, CarSpec> = {
+  ...BASE_SPECS,
+  // traffic bodies drawn from the car pack; these procedural specs are only a fallback
+  compact: { ...BASE_SPECS.city, L: 3.9 },
+  minivan: { ...BASE_SPECS.suv, L: 4.9, roofColor: undefined },
+  offroad: { ...BASE_SPECS.suv, L: 4.3, roofColor: undefined },
+  pickup: { ...BASE_SPECS.suv, L: 5.3, roofColor: undefined },
+  wagon: { ...BASE_SPECS.sedan, L: 4.6, spoiler: undefined },
 };
 
 /** How far the car is in the assembly process (assembly-line view). */
@@ -337,6 +348,111 @@ function box(T: Three, w: number, h: number, d: number, mat: THREE_NS.Material, 
   return m;
 }
 
+/**
+ * Ready-made 3D models standing in for a procedural body (see glb-car.ts).
+ * Files live in public/models/; their licences and credits are in
+ * public/models/CREDITS.txt and on the Settings screen.
+ */
+interface HeroFile {
+  url: string;
+  /** Parts left out, by material name. */
+  hide?: RegExp;
+  /** The file's own paint (with its decals) is the factory look; only a Design-studio colour repaints it. */
+  ownPaint?: boolean;
+  /** One car out of a pack (its body's node name), and which way it faces once straightened. */
+  pick?: string;
+  facing?: Facing;
+}
+const PACK = "models/car-pack.glb";
+const HERO_FILES: Partial<Record<BodyModel, HeroFile>> = {
+  // "Porsche 911(930) Turbo 1975" by vecarz, CC BY-NC-SA 4.0 — badges and plates left out
+  sports: { url: "models/sports-1975.glb", hide: /sticker|plate|wunderbaum/i },
+  // "Nissan R34 Brians Fast Furious" by vecarz, CC BY 4.0 — silver with blue graphics, badges left out
+  muscle: { url: "models/gt-r34.glb", hide: /badge|manufacturerplate/i, ownPaint: true },
+  // "Generic passenger car pack" by Comrade1280, CC BY 4.0 — unbranded cars, painted in the game's colours
+  city: { url: PACK, pick: "Hatchback Body" },
+  sedan: { url: PACK, pick: "Sedan Body", facing: "-x" },
+  suv: { url: PACK, pick: "SUV Body", facing: "-x" },
+  luxury: { url: PACK, pick: "Coupe Body" },
+  supercar: { url: PACK, pick: "Sport body", facing: "-x" },
+  hypercar: { url: PACK, pick: "Sport body", facing: "-x" },
+  electric: { url: PACK, pick: "Compact Body" },
+  // street traffic
+  compact: { url: PACK, pick: "Compact Body" },
+  minivan: { url: PACK, pick: "minivan body" },
+  offroad: { url: PACK, pick: "Offroad Body", facing: "-x" },
+  pickup: { url: PACK, pick: "Pickup Body" },
+  wagon: { url: PACK, pick: "Wagon Body", facing: "-x" },
+};
+interface Hero {
+  car: THREE_NS.Group;
+  ownPaint: boolean;
+  /** Names of the body-paint materials (repainted per car). */
+  paint: Set<string>;
+  /** One repainted copy of each paint material per colour. */
+  coats: Map<string, THREE_NS.Material>;
+}
+const HEROES: Partial<Record<BodyModel, Hero>> = {};
+let heroLoad: Promise<void> | null = null;
+
+/** Loads the ready-made models (once); bodies without one stay procedural. */
+export function loadHeroes(T: Three): Promise<void> {
+  heroLoad ??= (async () => {
+    const { loadGlbCar, paintMaterials, neutralizePaint } = await import("./glb-car");
+    const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+    await Promise.all(
+      (Object.entries(HERO_FILES) as [BodyModel, HeroFile][]).map(async ([model, f]) => {
+        try {
+          const car = await loadGlbCar(T, `${base}/${f.url}`, { length: CAR_SPECS[model].L, hide: f.hide, pick: f.pick, facing: f.facing });
+          const paint = paintMaterials(T, car);
+          if (!f.ownPaint) neutralizePaint(T, paint);
+          // shared by every copy: never disposed with a sprite
+          car.traverse((o) => {
+            const m = o as THREE_NS.Mesh;
+            if (!m.isMesh) return;
+            m.geometry.userData.keep = true;
+            for (const mm of Array.isArray(m.material) ? m.material : [m.material]) mm.userData.keep = true;
+          });
+          HEROES[model] = { car, ownPaint: !!f.ownPaint, paint: new Set(paint.map((m) => m.name)), coats: new Map() };
+        } catch {
+          // no file or no network: the procedural body stays
+        }
+      }),
+    );
+  })();
+  return heroLoad;
+}
+
+/** Whether a body is drawn from a ready-made model. */
+export const hasHero = (model: BodyModel) => !!HEROES[model];
+
+/** A copy of a ready-made model in the given paint, or its own (geometry and other materials shared). */
+function heroCopy(hero: Hero, color: string | null): THREE_NS.Group {
+  const car = hero.car.clone(true);
+  if (!color) return car;
+  car.traverse((o) => {
+    const m = o as THREE_NS.Mesh;
+    if (!m.isMesh || Array.isArray(m.material) || !hero.paint.has(m.material.name)) return;
+    const key = `${m.material.name}|${color}`;
+    let coat = hero.coats.get(key);
+    if (!coat) {
+      coat = m.material.clone();
+      const c = coat as THREE_NS.MeshPhysicalMaterial;
+      c.color.set(color);
+      // a soft gloss: a mirror-like clearcoat shows the studio walls as grey streaks
+      c.envMapIntensity = 0.7;
+      if ("clearcoat" in c) {
+        c.clearcoat = Math.min(c.clearcoat, 0.35);
+        c.clearcoatRoughness = Math.max(c.clearcoatRoughness, 0.2);
+      }
+      coat.userData.keep = true;
+      hero.coats.set(key, coat);
+    }
+    m.material = coat;
+  });
+  return car;
+}
+
 let RoundedBox: typeof import("three/addons/geometries/RoundedBoxGeometry.js").RoundedBoxGeometry | null = null;
 /** Loads the rounded box geometry (call once before building). */
 export async function loadShapes() {
@@ -415,6 +531,9 @@ function wheel(T: Three, kit: MaterialKit, R: number, w: number, spokes: number,
 export function buildCar(T: Three, kit: MaterialKit, look: CarLook): THREE_NS.Group {
   const sp = CAR_SPECS[look.model];
   const st = look.stage?.station ?? 8;
+  // every car is a ready-made model: grey primer on the line until the paint shop, then its paint
+  const hero = HEROES[look.model];
+  if (hero) return heroCopy(hero, st < 6 ? "#9aa3ad" : look.build?.color || (hero.ownPaint ? null : liveryOf(look.model).color));
   const painted = st >= 6;
   // every model leaves the line in its own factory colour
   const liv = liveryOf(look.model);

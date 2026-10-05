@@ -146,6 +146,7 @@ function Turntable({ v }: { v: VehiclePick }) {
         scene.add(turn);
 
         await models.loadShapes();
+        await models.loadHeroes(T);
         const kit = models.materialKit(T);
         const finish = (c: string) => (/^#(f8fafc|ffffff|111827|0f172a)$/i.test(c) ? "gloss" : "metallic") as "gloss" | "metallic";
         const obj =
