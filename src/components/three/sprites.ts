@@ -183,8 +183,8 @@ class SpriteFactory {
       const T = await import("three");
       const models = await import("./car-models");
       await models.loadShapes();
-      // ready-made models arrive a little later: redraw those cars once they do
-      void models.loadHeroes(T).then(() => this.forget((key) => /\bcar\|(sports|muscle)\|/.test(key)));
+      // ready-made models arrive a little later: redraw the cars once they do
+      void models.loadHeroes(T).then(() => this.forget((key) => /\bcar\|/.test(key)));
       const industrial = await import("./industrial-models");
       const buildings = await import("./building-models");
       const homes = await import("./home-models");

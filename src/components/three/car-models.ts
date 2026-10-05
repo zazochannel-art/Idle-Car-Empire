@@ -5,6 +5,7 @@
 // not texture. Units are metres; +X is forward, +Y up, +Z to the right.
 import type * as THREE_NS from "three";
 import { liveryOf } from "./livery";
+import type { Facing } from "./glb-car";
 
 type Three = typeof THREE_NS;
 
@@ -348,12 +349,22 @@ interface HeroFile {
   hide?: RegExp;
   /** The file's own paint (with its decals) is the factory look; only a Design-studio colour repaints it. */
   ownPaint?: boolean;
+  /** One car out of a pack (its body's node name), and which way it faces once straightened. */
+  pick?: string;
+  facing?: Facing;
 }
+const PACK = "models/car-pack.glb";
 const HERO_FILES: Partial<Record<BodyModel, HeroFile>> = {
   // "Porsche 911(930) Turbo 1975" by vecarz, CC BY-NC-SA 4.0 — badges and plates left out
   sports: { url: "models/sports-1975.glb", hide: /sticker|plate|wunderbaum/i },
   // "Nissan R34 Brians Fast Furious" by vecarz, CC BY 4.0 — silver with blue graphics, badges left out
   muscle: { url: "models/gt-r34.glb", hide: /badge|manufacturerplate/i, ownPaint: true },
+  // "Generic passenger car pack" by Comrade1280, CC BY 4.0 — unbranded cars, painted in the game's colours
+  city: { url: PACK, pick: "Hatchback Body" },
+  sedan: { url: PACK, pick: "Sedan Body", facing: "-x" },
+  suv: { url: PACK, pick: "SUV Body", facing: "-x" },
+  luxury: { url: PACK, pick: "Coupe Body" },
+  supercar: { url: PACK, pick: "Sport body", facing: "-x" },
 };
 interface Hero {
   car: THREE_NS.Group;
@@ -369,12 +380,14 @@ let heroLoad: Promise<void> | null = null;
 /** Loads the ready-made models (once); bodies without one stay procedural. */
 export function loadHeroes(T: Three): Promise<void> {
   heroLoad ??= (async () => {
-    const { loadGlbCar, paintMaterials } = await import("./glb-car");
+    const { loadGlbCar, paintMaterials, neutralizePaint } = await import("./glb-car");
     const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
     await Promise.all(
       (Object.entries(HERO_FILES) as [BodyModel, HeroFile][]).map(async ([model, f]) => {
         try {
-          const car = await loadGlbCar(T, `${base}/${f.url}`, { length: CAR_SPECS[model].L, hide: f.hide });
+          const car = await loadGlbCar(T, `${base}/${f.url}`, { length: CAR_SPECS[model].L, hide: f.hide, pick: f.pick, facing: f.facing });
+          const paint = paintMaterials(T, car);
+          if (!f.ownPaint) neutralizePaint(T, paint);
           // shared by every copy: never disposed with a sprite
           car.traverse((o) => {
             const m = o as THREE_NS.Mesh;
@@ -382,7 +395,7 @@ export function loadHeroes(T: Three): Promise<void> {
             m.geometry.userData.keep = true;
             for (const mm of Array.isArray(m.material) ? m.material : [m.material]) mm.userData.keep = true;
           });
-          HEROES[model] = { car, ownPaint: !!f.ownPaint, paint: new Set(paintMaterials(T, car).map((m) => m.name)), coats: new Map() };
+          HEROES[model] = { car, ownPaint: !!f.ownPaint, paint: new Set(paint.map((m) => m.name)), coats: new Map() };
         } catch {
           // no file or no network: the procedural body stays
         }

@@ -318,7 +318,7 @@ export const ro: Record<MessageKey, string> = {
   "settings.import": "Importă salvarea",
   "settings.erase": "Șterge tot",
   "settings.credits": "Credite",
-  "settings.creditsModel": "Modele 3D: mașina sport — „Porsche 911 (930) Turbo 1975” de vecarz (sketchfab.com/heynic), CC BY-NC-SA 4.0; MC GT — „Nissan R34 Brians Fast Furious” de vecarz, CC BY 4.0. Ambele adaptate (simplificate, fără embleme; mașina sport e revopsită). Fără legătură cu Porsche, Nissan sau filmele Fast & Furious.",
+  "settings.creditsModel": "Modele 3D: mașina sport — „Porsche 911 (930) Turbo 1975” de vecarz (sketchfab.com/heynic), CC BY-NC-SA 4.0; MC GT — „Nissan R34 Brians Fast Furious” de vecarz, CC BY 4.0; City Car, Sedan, SUV, Luxury și Supercar — „Generic passenger car pack” de Comrade1280 (sketchfab.com/comrade1280), CC BY 4.0. Toate adaptate (simplificate, fără embleme, revopsite). Fără legătură cu Porsche, Nissan sau filmele Fast & Furious.",
   "settings.reset": "Resetează jocul",
 
   "toast.achievement": "Realizare: {name}",

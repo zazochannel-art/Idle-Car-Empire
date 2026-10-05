@@ -25,3 +25,15 @@ gt-r34.glb — the MC GT platform (Performance car)
   manufacturer plate are hidden; the body is repainted only when the player
   picks a colour. Not affiliated with or endorsed by Nissan or the makers of
   the Fast & Furious films; all trademarks belong to their owners.
+
+car-pack.glb — City Car, Sedan, SUV, Luxury and Supercar platforms
+  Original: "Generic passenger car pack" by Comrade1280
+  https://sketchfab.com/comrade1280
+  https://sketchfab.com/3d-models/generic-passenger-car-pack-20f9af9b8a404d5cb022ac6fe87f21f5
+  Licence: CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/
+
+  Changes: meshopt-compressed, textures resized to 512 px WebP (gltf-transform
+  optimize); two textures of the Wagon body, missing from the received file,
+  replaced with plain grey. In the game each car is taken out of the pack,
+  straightened and scaled, and its paint texture is turned grey so the body
+  can be painted in the game's colours.
