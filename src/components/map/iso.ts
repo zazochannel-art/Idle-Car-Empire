@@ -40,13 +40,28 @@ export function shade(hex: string, k: number): string {
   return k >= 0 ? mix(hex, "#ffffff", k) : mix(hex, "#000000", -k);
 }
 
-/** Locked areas fade towards a soft lilac-grey (bright toon style, not a dark veil). */
-const FOG = "#8d93b8";
+/** Locked areas fade into a light blue-grey haze, like distant hills on a clear day. */
+const FOG = "#a9b8c6";
+
+let raceFamily = "";
+/**
+ * Canvas lettering in the game's racing face (the narrow, heavy Barlow the
+ * page loads), slanted by default; falls back to the system face until the
+ * web font is in.
+ */
+export function raceFont(weight: number, size: number, italic = true): string {
+  if (!raceFamily && typeof document !== "undefined") {
+    const css = getComputedStyle(document.documentElement);
+    const fam = [css.getPropertyValue("--font-barlow-c"), css.getPropertyValue("--font-fira-xc")].map((v) => v.trim()).filter(Boolean);
+    if (fam.length) raceFamily = fam.join(", ");
+  }
+  return `${italic ? "italic " : ""}${weight} ${size}px ${raceFamily ? `${raceFamily}, ` : ""}ui-sans-serif, system-ui, sans-serif`;
+}
 
 // ───────────────────────────── painter ─────────────────────────────
 
-/** Dark outlines round boxes: the toon style of the whole map. */
-const OUTLINES = true;
+/** Dark outlines round boxes (off: the low-poly look has clean flat faces). */
+const OUTLINES = false;
 
 export class Painter {
   ctx: CanvasRenderingContext2D;
@@ -86,7 +101,7 @@ export class Painter {
     let c = this.cache.get(key);
     if (!c) {
       c = k ? shade(hex, k) : hex;
-      if (this.dim) c = mix(mix(c, "#c3c8d8", 0.45), FOG, 0.35);
+      if (this.dim) c = mix(mix(c, "#d0d7de", 0.45), FOG, 0.35);
       this.cache.set(key, c);
     }
     return c;
@@ -424,7 +439,7 @@ export class Painter {
     const c = this.ctx;
     c.save();
     c.transform(1, 0.5, 0, 1, sx(x, y1), sy(x, y1, z));
-    c.font = `${weight} ${size}px ui-sans-serif, system-ui, sans-serif`;
+    c.font = raceFont(Math.max(700, weight), size * 1.1, false);
     c.fillStyle = color;
     c.textAlign = "center";
     c.textBaseline = "middle";
@@ -437,7 +452,7 @@ export class Painter {
     const c = this.ctx;
     c.save();
     c.transform(1, -0.5, 0, 1, sx(x1, y), sy(x1, y, z));
-    c.font = `${weight} ${size}px ui-sans-serif, system-ui, sans-serif`;
+    c.font = raceFont(Math.max(700, weight), size * 1.1, false);
     c.fillStyle = color;
     c.textAlign = "center";
     c.textBaseline = "middle";
@@ -454,7 +469,7 @@ export class Painter {
   tag(text: string, x: number, y: number, z: number, opts: { bg?: string; fg?: string; size?: number; icon?: string } = {}) {
     const c = this.ctx;
     const size = opts.size ?? 10;
-    c.font = `700 ${size}px ui-sans-serif, system-ui, sans-serif`;
+    c.font = raceFont(800, size * 1.12);
     const label = opts.icon ? `${opts.icon} ${text}` : text;
     const w = c.measureText(label).width + size * 1.2;
     const h = size * 1.75;
@@ -462,8 +477,8 @@ export class Painter {
     const px = ax - w / 2;
     const py = ay - h;
     c.beginPath();
-    c.roundRect(px, py, w, h, h / 2);
-    c.fillStyle = opts.bg ?? "rgba(8,12,20,0.78)";
+    c.roundRect(px, py, w, h, h * 0.28);
+    c.fillStyle = opts.bg ?? "rgba(32,32,36,0.86)";
     c.fill();
     c.strokeStyle = "rgba(255,255,255,0.18)";
     c.lineWidth = 1;

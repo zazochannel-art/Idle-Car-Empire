@@ -123,7 +123,7 @@ export class FloorEngine {
     const W = this.canvas.width;
     const H = this.canvas.height;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = "#0b1220";
+    ctx.fillStyle = "#2b2b2e";
     ctx.fillRect(0, 0, W, H);
     const z = cam.zoom * this.dpr;
     ctx.setTransform(z, 0, 0, z, this.dpr * (cam.w / 2 - cam.x * cam.zoom), this.dpr * (cam.h / 2 - cam.y * cam.zoom));

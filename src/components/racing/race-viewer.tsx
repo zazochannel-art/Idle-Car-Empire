@@ -26,7 +26,7 @@ export function RaceViewer() {
   const race = useUi((u) => u.race);
   if (!race) return null;
   return (
-    <div className="fixed inset-0 z-[70] flex flex-col bg-[#05080f] text-white">
+    <div className="fixed inset-0 z-[70] flex flex-col bg-ink text-white">
       {race.phase === "prep" ? <RacePrep event={race.event} special={race.special} /> : <RaceWatch />}
     </div>
   );
@@ -79,8 +79,8 @@ function RacePrep({ event, special }: { event: string; special?: string }) {
     <>
       <div className="relative h-[34vh] min-h-[180px] shrink-0">
         <canvas ref={ref} className="absolute inset-0 h-full w-full" />
-        <button onClick={() => setRace(null)} className="absolute right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] rounded-full bg-black/50 p-2 ring-1 ring-white/20" aria-label="close">
-          <X className="size-5" />
+        <button onClick={() => setRace(null)} className="absolute right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] rounded-full bg-stop p-2 shadow-[0_3px_0_0_#a82424]" aria-label="close">
+          <X className="size-5 stroke-[3.5]" />
         </button>
         <div className="absolute bottom-2 left-3 rounded-xl bg-black/55 px-3 py-1.5 backdrop-blur">
           <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-gold/80">{t("racing.prep")}</div>
@@ -307,8 +307,8 @@ function RaceWatch() {
               {TRACK_BY_ID[rec.track].emoji} {trackName(t, rec.track)}{rec.wet ? " · 🌧️" : ""} · {done ? t("racing.finished") : t("racing.lap", { n: Math.max(1, lap), of: rec.laps })}
             </div>
           </div>
-          <button onClick={() => setRace(null)} className="rounded-full bg-black/55 p-2 ring-1 ring-white/20 backdrop-blur" aria-label="close">
-            <X className="size-5" />
+          <button onClick={() => setRace(null)} className="rounded-full bg-stop p-2 shadow-[0_3px_0_0_#a82424]" aria-label="close">
+            <X className="size-5 stroke-[3.5]" />
           </button>
         </div>
         {/* 3, 2, 1, GO! */}

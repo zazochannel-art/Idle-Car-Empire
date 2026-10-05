@@ -961,9 +961,9 @@ function port(p: Painter, X: number, Y: number, W: number, D: number, seed: numb
 
 // ───────────────────────────── ground ─────────────────────────────
 
-const ASPHALT = "#565e6d";
-const SIDEWALK = "#eef1f5";
-const GRASS = "#7acd55";
+const ASPHALT = "#3f4148";
+const SIDEWALK = "#ebe6da";
+const GRASS = "#78c04c";
 
 let grassPattern: CanvasPattern | null | undefined;
 /** A soft speckle texture laid over the grass so it doesn't look flat. */
@@ -1362,7 +1362,7 @@ function mountain(p: Painter, x: number, y: number, w: number, d: number, h: num
     c.ellipse(foot[0], foot[1] + 2, 12, 5, 0, 0, Math.PI * 2);
     c.fill();
     for (let k = 0; k < 3; k++) {
-      const r = 3 + ((p.t * 0.7 + k / 3) % 1) * 6;
+      const r = 3 + ((((p.t * 0.7 + k / 3) % 1) + 1) % 1) * 6;
       c.fillStyle = `rgba(255,255,255,${0.45 - r / 22})`;
       c.beginPath();
       c.arc(foot[0] + (k - 1) * 4, foot[1] - 1, r, 0, Math.PI * 2);

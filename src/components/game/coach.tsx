@@ -21,7 +21,7 @@ export function Coach() {
           exit={{ opacity: 0, y: 12 }}
           className="pointer-events-none absolute inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+10.5rem)] z-20 flex justify-center px-3"
         >
-          <div className="pointer-events-auto flex w-full max-w-md items-start gap-3 rounded-2xl border border-sky-400/30 bg-[#0c1a2b]/90 p-3 shadow-xl backdrop-blur-xl">
+          <div className="pointer-events-auto flex w-full max-w-md items-start gap-3 rounded-xl border-2 border-electric bg-[#2b2b2e]/95 p-3 shadow-xl backdrop-blur-xl">
             <span className="text-2xl leading-none">💡</span>
             <p className="min-w-0 flex-1 text-[13px] leading-snug text-white/85">{t(`tip.${tip}` as MessageKey)}</p>
             <button onClick={() => dismissTip(tip)} className="shrink-0 rounded-lg bg-sky-500/20 px-2.5 py-1.5 text-xs font-bold text-sky-200 ring-1 ring-sky-400/30">

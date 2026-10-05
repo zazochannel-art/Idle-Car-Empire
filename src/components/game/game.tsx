@@ -285,7 +285,7 @@ function LeftRail() {
     ...PILLARS.map((p) => ({ id: p.id, icon: p.icon, badge: p.id === "empire" ? badges.research : p.id === "business" ? badges.missions : 0 })),
   ];
   return (
-    <nav className="absolute left-[calc(env(safe-area-inset-left)+0.5rem)] top-[6.75rem] z-20 flex flex-col gap-1 rounded-2xl border border-white/10 bg-[#2a3388]/90 shadow-[0_4px_0_0_rgba(10,14,46,0.5)] p-1 backdrop-blur-xl md:left-[calc(env(safe-area-inset-left)+0.75rem)] md:top-[5.5rem]">
+    <nav className="absolute left-[calc(env(safe-area-inset-left)+0.5rem)] top-[6.75rem] z-20 flex flex-col gap-1 rounded-xl hud-bar p-1 md:left-[calc(env(safe-area-inset-left)+0.75rem)] md:top-[5.5rem]">
       {items.map((r) => {
         const active = r.id === "map" ? nothing : current === r.id;
         const label = r.id === "map" ? t("map.nav.map") : t(`pillar.${r.id}`);
@@ -304,12 +304,12 @@ function LeftRail() {
               setView(active ? null : (last ?? pillar.views[0]));
             }}
             className={cn(
-              "relative flex flex-col items-center gap-0.5 rounded-xl px-1.5 py-2 text-[9px] font-bold uppercase tracking-wide transition md:w-[4.5rem] md:text-[10px]",
-              active ? "bg-electric/25 text-white ring-1 ring-electric/50" : "text-white/55 hover:bg-white/5 hover:text-white",
+              "race-type relative flex flex-col items-center gap-0.5 rounded-lg px-1.5 py-2 text-[11px] transition md:w-[4.5rem] md:text-[12px]",
+              active ? "bg-electric text-white shadow-[0_3px_0_0_#1747b8]" : "text-white hover:bg-white/10",
             )}
             aria-label={label}
           >
-            <r.icon className={cn("size-5", active && "text-sky-300")} />
+            <r.icon className="size-5 stroke-[2.5]" />
             <span className="hidden md:block">{label}</span>
             <NavBadge n={r.badge} className="absolute right-0.5 top-0.5" />
           </button>
@@ -335,7 +335,7 @@ function PillarTabs({ view }: { view: View }) {
         <button
           key={v}
           onClick={() => setView(v)}
-          className={cn("shrink-0 rounded-full px-3 py-1 text-[11px] font-bold ring-1 transition", v === view ? "bg-electric/25 text-white ring-electric/50" : "bg-white/[0.04] text-white/60 ring-white/10 hover:text-white")}
+          className={cn("race-type shrink-0 rounded-md px-3 py-1.5 text-[13px] leading-none transition", v === view ? "bg-electric text-white shadow-[0_2px_0_0_#1747b8]" : "bg-[#4b4b50] text-white/80 hover:text-white")}
         >
           {viewTitle(v, t)}
         </button>
@@ -358,8 +358,9 @@ function BottomDock() {
   const badges = useBadges();
   const { t } = useT();
   return (
-    <nav className="absolute inset-x-0 bottom-0 z-30 flex justify-center px-[calc(env(safe-area-inset-left)+0.5rem)] pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
-      <div className="grid w-full max-w-xl grid-cols-5 gap-1 rounded-2xl border border-white/10 bg-[#26307e]/92 p-1.5 shadow-[0_-10px_40px_-12px_rgba(0,0,0,.9)] backdrop-blur-xl">
+    <nav className="absolute inset-x-0 bottom-0 z-30 flex justify-center pb-[env(safe-area-inset-bottom)] lg:px-3 lg:pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
+      {/* full-width slanted tabs, as on the racing game's bottom bar */}
+      <div className="grid w-full max-w-2xl grid-cols-5 gap-[3px] overflow-hidden bg-[#232326] px-1 pt-1 pb-1 shadow-[0_-8px_30px_-12px_rgba(0,0,0,.8)] lg:rounded-xl">
         {DOCK.map((d) => {
           const active = view === d.id;
           const badge = d.badge ? badges[d.badge] : 0;
@@ -368,13 +369,19 @@ function BottomDock() {
               key={d.id}
               onClick={() => setView(active ? null : d.id)}
               className={cn(
-                "relative flex flex-col items-center gap-0.5 rounded-xl py-2 text-[10px] font-black uppercase tracking-wide transition",
-                active ? "bg-electric/25 text-white ring-1 ring-electric/50" : d.id === "build" ? "bg-gold/10 text-gold ring-1 ring-gold/30 hover:bg-gold/15" : "text-white/60 hover:bg-white/5",
+                "race-type relative flex -skew-x-[9deg] flex-col items-center gap-0.5 rounded-md py-2 text-[13px] leading-none transition active:translate-y-[2px]",
+                active
+                  ? "bg-electric text-white shadow-[0_3px_0_0_#1747b8]"
+                  : d.id === "build"
+                    ? "bg-gold text-[#2a1d00] shadow-[0_3px_0_0_#c48300]"
+                    : "bg-[#5a5a5f] text-white shadow-[0_3px_0_0_#2f2f33] hover:bg-[#646469]",
               )}
             >
-              <d.icon className="size-5" />
-              {t(d.label)}
-              <NavBadge n={badge} gold={d.badge === "prestige"} className="absolute right-1.5 top-1" />
+              <span className="flex skew-x-[9deg] flex-col items-center gap-0.5">
+                <d.icon className="size-5 stroke-[2.5]" />
+                {t(d.label)}
+              </span>
+              <NavBadge n={badge} gold={d.badge === "prestige"} className="absolute right-1 top-0.5 skew-x-[9deg]" />
             </button>
           );
         })}
@@ -397,18 +404,18 @@ function GoalTracker() {
   const eta = cost && !ready && snap.incomePerSec > 0 && (cost - state.cash) / snap.incomePerSec < 86400 * 30 ? (cost - state.cash) / snap.incomePerSec : null;
   const text = goalText(goal, t, n);
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+5.25rem)] z-20 flex justify-center px-3">
+    <div className="pointer-events-none absolute inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] z-20 flex justify-center px-3">
       <button
         onClick={() => runGoal(goal, ready)}
         className={cn(
-          "pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-2xl border p-2.5 text-left shadow-[0_10px_30px_-10px_rgba(0,0,0,.9)] backdrop-blur-xl transition hover:brightness-110",
-          ready ? "border-gold/40 bg-[#7a5208]/92" : "border-white/10 bg-[#26307e]/92",
+          "pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-xl p-2.5 text-left shadow-[0_4px_0_0_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:brightness-110",
+          ready ? "bg-[#2b2b2e]/95 ring-2 ring-gold" : "bg-[#2b2b2e]/90",
         )}
       >
         <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/5 text-xl">{goal.icon}</span>
         <span className="min-w-0 flex-1">
-          <span className="block text-[9px] font-bold uppercase tracking-[0.18em] text-white/40">{t("goal.next")}</span>
-          <span className="block truncate text-sm font-bold">{text.title}</span>
+          <span className="block text-[10px] font-bold uppercase tracking-[0.14em] text-white/50">{t("goal.next")}</span>
+          <span className="race-type block truncate text-[17px] leading-tight">{text.title}</span>
           {goal.kind === "made" ? (
             <span className="mt-1 flex items-center gap-2">
               <Progress value={pct} className="h-1.5" />
@@ -434,7 +441,7 @@ function GoalTracker() {
 function NavBadge({ n, gold, className }: { n?: number; gold?: boolean; className?: string }) {
   if (!n) return null;
   return (
-    <span className={cn("flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold tabular-nums", gold ? "bg-gold text-black" : "bg-electric text-white", className)}>
+    <span className={cn("flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-extrabold tabular-nums ring-2 ring-white", gold ? "bg-gold text-black" : "bg-stop text-white", className)}>
       {n > 9 ? "9+" : n}
     </span>
   );

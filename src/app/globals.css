@@ -1,17 +1,22 @@
 @import "tailwindcss";
 
 @theme {
-  /* bright arcade palette: deep indigo night sky, punchy blue and sunny gold */
-  --color-ink: #141a3f;
-  --color-ink-2: #1a2150;
-  --color-panel: #232b66;
-  --color-electric: #3d8bff;
-  --color-electric-deep: #1f5fe0;
-  --color-cyan-glow: #2ee6ff;
-  --color-gold: #ffcc33;
-  --color-gold-deep: #f59e0b;
+  /* racing-game palette: charcoal menus, flat bright accents */
+  --color-ink: #2b2b2e;
+  --color-ink-2: #232326;
+  --color-panel: #3a3a3e;
+  --color-electric: #2f7bff;
+  --color-electric-deep: #1d5ee6;
+  --color-cyan-glow: #4cc3ff;
+  --color-gold: #ffc21a;
+  --color-gold-deep: #f59f00;
+  --color-go: #26c94a;
+  --color-lime: #a6e33a;
+  --color-epic: #7a35f0;
+  --color-stop: #f04848;
 
-  --font-sans: var(--font-nunito), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-barlow-sc), var(--font-fira-c), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-barlow-c), var(--font-fira-xc), var(--font-barlow-sc), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
   --animate-shimmer: shimmer 1.2s linear infinite;
@@ -43,42 +48,66 @@ a {
 }
 
 body {
-  background:
-    radial-gradient(1200px 600px at 15% -10%, rgba(99, 102, 241, 0.35), transparent 60%),
-    radial-gradient(900px 500px at 110% 10%, rgba(46, 230, 255, 0.18), transparent 60%),
-    radial-gradient(700px 400px at 50% 120%, rgba(255, 204, 51, 0.12), transparent 60%),
-    var(--color-ink);
-  background-attachment: fixed;
+  background: var(--color-ink);
+  font-weight: 600;
+}
+
+/* headings in the game's lettering: heavy, narrow, slanted capitals */
+@layer base {
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: -0.01em;
+    line-height: 1;
+  }
+}
+
+@utility race-type {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0;
 }
 
 @utility glass {
-  /* colourful arcade panels with a light rim and a chunky drop shadow */
-  background: linear-gradient(180deg, rgba(74, 92, 220, 0.82), rgba(44, 54, 150, 0.84));
-  border: 2px solid rgba(255, 255, 255, 0.16);
+  /* flat charcoal cards with a faint top light and a short drop */
+  background: #3b3b3f;
+  border: 0;
   box-shadow:
-    0 2px 0 0 rgba(255, 255, 255, 0.18) inset,
-    0 5px 0 0 rgba(12, 16, 52, 0.55),
-    0 18px 30px -18px rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+    0 1px 0 0 rgba(255, 255, 255, 0.07) inset,
+    0 3px 0 0 rgba(0, 0, 0, 0.32);
 }
 
 @utility glass-strong {
-  background: linear-gradient(180deg, rgba(48, 58, 160, 0.97), rgba(28, 34, 98, 0.98));
-  border: 2px solid rgba(255, 255, 255, 0.18);
+  background: #2b2b2e;
+  border: 0;
+  box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.75);
+}
+
+/* the light grey showroom cards of the garage, dark lettering on top */
+@utility card-light {
+  background: linear-gradient(180deg, #e4e4e6, #c7c7ca);
+  color: #1d1d20;
   box-shadow:
-    0 2px 0 0 rgba(255, 255, 255, 0.2) inset,
-    0 6px 0 0 rgba(10, 14, 46, 0.6),
-    0 40px 80px -20px rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+    0 2px 0 0 rgba(255, 255, 255, 0.7) inset,
+    0 4px 0 0 rgba(0, 0, 0, 0.35);
+}
+
+/* blue panels over the 3D world (top bar, side rail) */
+@utility hud-bar {
+  background: rgba(36, 104, 214, 0.62);
+  box-shadow: 0 3px 0 0 rgba(10, 40, 110, 0.35);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 @utility text-gradient-gold {
-  background: linear-gradient(180deg, #ffe9a8, #f5c451 55%, #c98d12);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: #ffd23f;
 }
 
 @utility text-gradient-electric {
@@ -475,4 +504,14 @@ body {
 .cash-flash {
   animation: cash-flash 0.7s ease-out;
   opacity: 0;
+}
+
+/* every bold capitals label (tabs, chips, captions) in the racing lettering */
+.uppercase.font-black,
+.uppercase.font-extrabold,
+.uppercase.font-bold {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 800;
+  letter-spacing: 0.02em;
 }

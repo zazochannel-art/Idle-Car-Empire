@@ -71,7 +71,7 @@ export function Minimap({ engine }: { engine: RefObject<MapEngine | null> }) {
         }
       };
       const rect = (x: number, y: number, w: number, d: number): [number, number][] => [mm(x, y), mm(x + w, y), mm(x + w, y + d), mm(x, y + d)];
-      ctx.fillStyle = "#0f4f7a";
+      ctx.fillStyle = "#2aa7e0";
       ctx.fillRect(0, 0, W, H);
       ctx.beginPath();
       for (const loop of coastline()) {
@@ -82,7 +82,7 @@ export function Minimap({ engine }: { engine: RefObject<MapEngine | null> }) {
         });
         ctx.closePath();
       }
-      ctx.fillStyle = "#3f7d3a";
+      ctx.fillStyle = "#78c04c";
       ctx.fill("evenodd");
       for (let by = 0; by < WORLD_BLOCKS.length; by++)
         for (let bx = 0; bx < WORLD_BLOCKS.length; bx++) {
@@ -91,11 +91,11 @@ export function Minimap({ engine }: { engine: RefObject<MapEngine | null> }) {
           if (!zone) {
             const terr = territoryOfBlock(bx, by);
             const col = terr ? MINI_LANDMARK[kind] : kind === "mountains" ? "#8b917c" : kind === "lake" ? "#1d6fa5" : null;
-            if (col) poly(rect(bx * 7, by * 7, 8, 8), terr && !unlocked.has(terr) ? "#26313f" : col);
+            if (col) poly(rect(bx * 7, by * 7, 8, 8), terr && !unlocked.has(terr) ? "#aab4be" : col);
             continue;
           }
           const open = unlocked.has(zone);
-          poly(rect(bx * 7, by * 7, 8, 8), open ? ZONE_BY_ID[zone].ground : "#1f2937");
+          poly(rect(bx * 7, by * 7, 8, 8), open ? ZONE_BY_ID[zone].ground : "#9aa5b1");
         }
       for (const z of ZONES) {
         if (unlocked.has(z.id)) continue;
@@ -164,10 +164,10 @@ export function Minimap({ engine }: { engine: RefObject<MapEngine | null> }) {
     engine.current?.lookAt(Math.max(0, Math.min(WORLD, tile.x)), Math.max(0, Math.min(WORLD, tile.y)));
   };
 
-  const btn = "flex size-8 items-center justify-center rounded-lg border border-white/10 bg-[#2a3388]/90 shadow-[0_4px_0_0_rgba(10,14,46,0.5)] text-white/70 backdrop-blur-xl transition hover:text-white";
+  const btn = "flex size-8 items-center justify-center rounded-lg hud-bar text-white transition hover:brightness-110";
   return (
     <div className="pointer-events-auto flex flex-col items-end gap-1.5">
-      <div className="overflow-hidden rounded-xl border border-white/10 bg-ink/70 p-0.5 shadow-[0_10px_30px_-10px_rgba(0,0,0,.9)] backdrop-blur-xl">
+      <div className="overflow-hidden rounded-xl bg-white p-1 shadow-[0_3px_0_0_rgba(0,0,0,0.3)]">
         <canvas ref={ref} onPointerDown={onTap} style={{ aspectRatio: `${W} / ${H}` }} className="block w-[118px] cursor-pointer md:w-[172px]" aria-label={t("map.minimap")} />
       </div>
       <div className="flex gap-1.5">
