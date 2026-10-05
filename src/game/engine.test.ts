@@ -6,9 +6,10 @@ import * as M from "./engine/materials";
 import { componentStdCost } from "./engine/costs";
 import { MANAGER_BY_ID } from "./config/managers";
 import { PRESTIGE } from "./config/prestige";
-import { DEPOT, MARKET, STARTER_PLOT, WORLD_MAP } from "./city/layout";
+import { DEPOT, MARKET, STARTER_PLOT } from "./city/layout";
 import * as A from "./engine/actions";
 import * as Ch from "./engine/chain";
+import * as Co from "./engine/construction";
 import * as C from "./engine/city";
 import * as D from "./engine/design";
 import * as K from "./engine/contracts";
@@ -36,11 +37,14 @@ import { tick } from "./engine/tick";
 import { formatMoney, formatNumber } from "./format";
 import { decodeSave, encodeSave, migrate } from "./save/serialize";
 import { decodeTransfer, transferCodeIn, transferLink } from "./save/transfer";
-import type { CarId, GameEvent, GameState, PlantType } from "./types";
+import type { CarId, GameEvent, GameState, PlantType, StructureType } from "./types";
 
 // outside every season (seasons add income) and outside market events
 const T0 = Date.UTC(2026, 2, 1, 12);
-const freePlots = () => WORLD_MAP.plots.filter((p) => p.zone === "town" && p.kind === "plot" && !p.starter && !p.big).map((p) => p.id);
+/** The n-th plot zoned for a kind of building. */
+const P = (type: StructureType, n = 0) => Co.plotsFor(type)[n];
+/** Lets every construction and upgrade in progress finish. */
+const finish = (s: GameState) => Co.constructionTick(s, 1e9);
 
 /** Runs the game in small steps, as the store does. */
 function run(s: GameState, seconds: number, step = 0.5): GameEvent[] {
@@ -54,6 +58,7 @@ function build(s: GameState, plot: string, type: PlantType, units = 30) {
   s.lifetime.parts.body = Math.max(s.lifetime.parts.body, 12);
   s.cash += Ch.plantBuildCost(s, type);
   expect(C.buildStructure(s, plot, type)).toBe(true);
+  finish(s);
   supply(s, plot, units);
 }
 
@@ -163,6 +168,9 @@ describe("the start: a small car body works", () => {
     expect(Ch.upgradePlantSpeed(s, STARTER_PLOT, gm)).toBe(true);
     expect(Ch.upgradeAutomation(s, STARTER_PLOT, gm)).toBe(true);
     expect(Ch.upgradeGrade(s, STARTER_PLOT, gm)).toBe(true);
+    // the new level is built first
+    expect(snapshot(s).chain.plants[STARTER_PLOT].lines).toBe(1);
+    finish(s);
     const after = snapshot(s).chain.plants[STARTER_PLOT];
     expect(after.lines).toBe(2);
     expect(after.unitsPerSec).toBeGreaterThan(before.unitsPerSec * 2);
@@ -176,7 +184,8 @@ describe("the start: a small car body works", () => {
 describe("growing the chain", () => {
   it("plants unlock in order: engine after body works, then tyres, then assembly…", () => {
     const s = createInitialState(T0);
-    const [a, b] = freePlots();
+    const a = P("engineFactory");
+    const b = P("assemblyPlant");
     // the Engine Factory needs 12 bodies first
     expect(Ch.plantLock(s, "engineFactory")).toEqual({ kind: "made", item: "body", n: 12, have: 0 });
     s.lifetime.parts.body = 12;
@@ -184,11 +193,20 @@ describe("growing the chain", () => {
     expect(Ch.plantLock(s, "tireFactory")).toEqual({ kind: "plant", plant: "engineFactory" });
     expect(Ch.plantLock(s, "interiorFactory")).toEqual({ kind: "plant", plant: "assemblyPlant" });
     expect(Ch.plantBuildCost(s, "engineFactory")).toBe(6_000);
-    s.cash = 5_999;
+    // land, then construction: together no more than the plant's price
+    const total = Co.landCost(s, a) + Co.constructionCost(s, a);
+    expect(total).toBeLessThanOrEqual(6_000);
+    s.cash = total - 1;
     expect(C.buildStructure(s, a, "engineFactory")).toBe(false);
-    s.cash = 6_000;
+    s.cash = total;
     expect(C.buildStructure(s, a, "engineFactory")).toBe(true);
-    expect(s.cash).toBe(0);
+    expect(s.cash).toBeCloseTo(0);
+    // it is a building site until the construction is finished; the next plant may start alongside
+    expect(s.city.buildings[a]).toBeUndefined();
+    expect(Ch.hasPlant(s, "engineFactory")).toBe(false);
+    expect(Ch.plantLock(s, "tireFactory")).toBeNull();
+    finish(s);
+    expect(s.city.buildings[a].type).toBe("engineFactory");
     expect(Ch.plantLock(s, "tireFactory")).toBeNull();
     // a second engine factory costs more
     expect(Ch.plantBuildCost(s, "engineFactory")).toBe(6_000 * 2.5);
@@ -198,18 +216,23 @@ describe("growing the chain", () => {
 
   it("without an assembly plant, engines are sold at the market", () => {
     const s = createInitialState(T0);
-    const [a] = freePlots();
+    const a = P("engineFactory");
     build(s, a, "engineFactory");
-    run(s, 120);
+    let shipped = false;
+    for (let t = 0; t < 300 && !shipped; t += 0.5) {
+      tick(s, 0.5);
+      shipped = s.chain.shipments.some((sh) => sh.from === a && sh.to === MARKET && sh.item === "engine");
+    }
     expect(s.lifetime.parts.engine).toBeGreaterThan(0);
-    expect(s.chain.shipments.some((sh) => sh.from === a && sh.to === MARKET && sh.item === "engine")).toBe(true);
+    expect(shipped).toBe(true);
   });
 });
 
 describe("tyre supplier and unlock moments", () => {
   it("builds the first cars with supplier tyres before the Tire Factory", () => {
     const s = createInitialState(T0);
-    const [a, b] = freePlots();
+    const a = P("engineFactory");
+    const b = P("assemblyPlant");
     build(s, a, "engineFactory");
     // the first assembly plant is cheap and needs only the engine factory
     expect(Ch.plantLock(s, "assemblyPlant")).toBeNull();
@@ -243,7 +266,7 @@ describe("tyre supplier and unlock moments", () => {
 
   it("restocks every plant running low in one tap", () => {
     const s = createInitialState(T0);
-    const [a] = freePlots();
+    const a = P("engineFactory");
     build(s, a, "engineFactory", 0);
     for (const id of [a, STARTER_PLOT]) s.city.buildings[id].plant!.stock = {};
     s.cash = 1e6;
@@ -402,23 +425,24 @@ describe("VIP orders, racing season, Auto Show, classics", () => {
     const s = createInitialState(T0);
     s.cash = 1e7;
     expect(Cl.classicLock(s, "arrow55")).toBe("garage");
-    const [g, m] = freePlots();
+    const g = P("garage");
     expect(C.buildStructure(s, g, "garage")).toBe(true);
+    finish(s);
     expect(Cl.restoreClassic(s, "arrow55", T0)).toBe(true);
     expect(Cl.classicLock(s, "riviera63")).toBe("busy");
     expect(Cl.classicsTick(s, T0 + 60_000)).toBeNull();
     expect(Cl.classicsTick(s, T0 + 5 * 60_000)).toBe("arrow55");
     // the museum: base income plus tickets
     s.city.zones.push("downtown");
-    const plot = WORLD_MAP.plots.find((p) => p.zone === "downtown" && p.kind === "plot" && !p.big)!.id;
+    const plot = P("museum");
     expect(C.buildStructure(s, plot, "museum")).toBe(true);
+    finish(s);
     const inc = snapshot(s).city.structureIncome[plot];
     s.classics.owned = [];
     expect(snapshot(s).city.structureIncome[plot]).toBeLessThan(inc);
     // the collection survives an expansion and a save
     s.classics.owned = ["arrow55"];
     expect(migrate(JSON.parse(JSON.stringify(s)), T0).classics.owned).toEqual(["arrow55"]);
-    void m;
   });
 });
 
@@ -451,8 +475,9 @@ describe("prototypes, export, truck & bus division, star engineers", () => {
     s.cash = 1e9;
     expect(Ex.openMarket(s, "europe")).toBe(false); // no port yet
     s.city.zones.push("supercar");
-    const port = WORLD_MAP.plots.find((p) => p.zone === "supercar" && p.kind === "plot" && !p.big)!.id;
+    const port = P("exportTerminal");
     expect(C.buildStructure(s, port, "exportTerminal")).toBe(true);
+    finish(s);
     expect(Ex.portPlot(s)).toBe(port);
     expect(Ex.openMarket(s, "europe")).toBe(true);
     expect(Ch.setCarRoute(s, assembly, "export:europe")).toBe(true);
@@ -470,8 +495,9 @@ describe("prototypes, export, truck & bus division, star engineers", () => {
     const s = createInitialState(T0);
     s.cash = 1e8;
     s.city.zones.push("industrial");
-    const plot = WORLD_MAP.plots.find((p) => p.zone === "industrial" && p.kind === "plot" && !p.big)!.id;
+    const plot = P("fleetPlant");
     expect(C.buildStructure(s, plot, "fleetPlant")).toBe(true);
+    finish(s);
     const u = Ex.fleetUnit("van");
     expect(u.price).toBeGreaterThan(u.cost);
     const cash = s.cash;
@@ -520,16 +546,15 @@ describe("prototypes, export, truck & bus division, star engineers", () => {
 /** A company with every plant of the base recipe (body, engine, tyres) and an assembly plant. */
 function fullChain() {
   const s = createInitialState(T0);
-  const plots = freePlots();
   const types: PlantType[] = ["engineFactory", "tireFactory", "assemblyPlant"];
-  types.forEach((ty, i) => build(s, plots[i], ty));
-  return { s, assembly: plots[2] };
+  for (const ty of types) build(s, P(ty), ty);
+  return { s, assembly: P("assemblyPlant") };
 }
 
 describe("motorized chassis", () => {
   it("an engine factory can fit engines into bodies and sell them for more", () => {
     const s = createInitialState(T0);
-    const [a] = freePlots();
+    const a = P("engineFactory");
     build(s, a, "engineFactory");
     s.cash = 1e6;
     const st0 = snapshot(s).chain.plants[a];
@@ -589,7 +614,7 @@ describe("manager categories", () => {
     A.assignManager(s, "leo", STARTER_PLOT); // takes Nina's place (one manager per plant)
     A.assignManager(s, "nina", null);
     // global managers work while assigned anywhere
-    const free = freePlots()[0];
+    const free = P("engineFactory");
     build(s, free, "engineFactory");
     A.assignManager(s, "nina", free);
     const gm = snapshot(s).gm;
@@ -748,7 +773,7 @@ describe("prestige", () => {
     expect(canPrestige(s)).toBe(false);
     s.run.moneyEarned = PRESTIGE.minRunEarnings;
     s.lifetime.moneyEarned = PRESTIGE.minRunEarnings;
-    build(s, freePlots()[0], "engineFactory");
+    build(s, P("engineFactory"), "engineFactory");
     s.research.push("advanced_engines");
     s.managers.mike = { hired: true, level: 3, assignedTo: STARTER_PLOT };
     const expected = pendingPoints(s);

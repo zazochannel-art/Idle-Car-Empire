@@ -4,7 +4,7 @@ import type { CarId, ItemId } from "@/game/types";
 export type UiEvent =
   | { type: "sale"; plot: string; item: ItemId; count: number; amount: number }
   | { type: "firstCar"; plot: string; car: CarId }
-  | { type: "toast"; tone: "success" | "gold" | "info" | "warn"; title: string; body?: string; icon?: string }
+  | { type: "toast"; tone: "success" | "gold" | "info" | "warn"; title: string; body?: string; icon?: string; action?: { label: string; plot: string } }
   | { type: "prestige"; points: number; stars?: boolean }
   | { type: "race"; id: number }
   | { type: "unlock"; kind: "car" | "plant"; id: string };

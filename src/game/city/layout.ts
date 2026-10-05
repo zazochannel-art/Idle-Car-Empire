@@ -6,8 +6,8 @@
 // forest, farmland, hills) each block belongs to, so districts have organic
 // shapes. A river follows one node column. Pure data — shared by the engine
 // (plot rules) and the renderer.
-import { BIG_LOTS, DEALER_LOTS, DEPOT_CELL, LEGACY_OFFSET, MARKET_CELL, RACING_PADDOCK_BLOCK, RIVER_LINE, STARTER_CELL, TERRITORIES, WORLD_BLOCKS, ZONES, type TerritoryId } from "../config/city";
-import type { DealerId, ZoneId } from "../types";
+import { BIG_LOTS, DEALER_LOTS, DEPOT_CELL, LEGACY_OFFSET, MARKET_CELL, PLOT_USES, RACING_PADDOCK_BLOCK, RIVER_LINE, STARTER_CELL, TERRITORIES, WORLD_BLOCKS, ZONES, plotSizeOf, type PlotSize, type TerritoryId } from "../config/city";
+import type { DealerId, StructureType, ZoneId } from "../types";
 
 export const ROAD_STEP = 7;
 export const CELL = 3;
@@ -49,6 +49,12 @@ export interface Plot {
   starter?: boolean;
   /** A whole-block industrial lot. */
   big?: boolean;
+  /** What may be built here (plots only): each plot is zoned for one kind of building. */
+  use?: StructureType;
+  /** Size class (plots only). */
+  size?: PlotSize;
+  /** Order in which plots are offered: earlier districts first, nearest first. */
+  rank?: number;
   entry: Entry;
 }
 
@@ -164,6 +170,11 @@ export interface World {
   landmarks: Landmark[];
 }
 
+function zoneCenterOf(list: [number, number][]) {
+  const n = Math.max(1, list.length);
+  return { x: list.reduce((a, [bx]) => a + bx * ROAD_STEP + 4, 0) / n, y: list.reduce((a, [, by]) => a + by * ROAD_STEP + 4, 0) / n };
+}
+
 function build(): World {
   const plots: Plot[] = [];
   const decor: Decor[] = [];
@@ -262,6 +273,26 @@ function build(): World {
             decor.push({ kind: DECOR[ch] ?? "park", zone: z.id, x, y, w: CELL, d: CELL, seed });
           }
         }
+    }
+  }
+
+  // Zone every plot for one kind of building, nearest first.
+  let rank = 0;
+  for (const z of [...ZONES].sort((a, b) => a.stage - b.stage)) {
+    const anchor = z.id === "town" ? { x: cellOrigin(STARTER_CELL[0]), y: cellOrigin(STARTER_CELL[1]) } : zoneCenterOf(zoneBlocks[z.id]);
+    const near = (p: Plot) => Math.hypot(p.x - anchor.x, p.y - anchor.y) + (p.x + p.y) * 1e-4;
+    // the starting town keeps the first map's order (the plots a new company has always used first)
+    const mine = plots.filter((p) => p.zone === z.id && p.kind === "plot");
+    if (z.id !== "town") mine.sort((a, b) => near(a) - near(b));
+    let ci = 0;
+    let bi = 0;
+    const uses = PLOT_USES[z.id];
+    for (const p of mine) {
+      p.rank = rank++;
+      p.size = plotSizeOf(z.id, !!p.big);
+      if (p.starter) p.use = "bodyWorks";
+      else if (p.big) p.use = uses.big[bi++ % uses.big.length];
+      else p.use = uses.cells[ci++ % uses.cells.length];
     }
   }
 

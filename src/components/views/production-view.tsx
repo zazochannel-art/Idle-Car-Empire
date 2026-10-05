@@ -9,7 +9,7 @@ import { TRANSPORT_TIERS } from "@/game/config/logistics";
 import type { MessageKey } from "@/i18n";
 import { DEPOT, MARKET } from "@/game/city/layout";
 import { plantBuildCost, plantLock, plantsOf } from "@/game/engine/chain";
-import { freePlot } from "@/game/engine/insights";
+import { freePlotFor } from "@/game/engine/construction";
 import { formatMoney, formatNumber } from "@/game/format";
 import { useContent } from "@/i18n/content";
 import { useT } from "@/i18n/use-t";
@@ -72,14 +72,15 @@ export function ProductionView() {
             if (!mine.length) {
               const lock = plantLock(state, cfg.id);
               if (lock?.kind === "plant" && plantLock(state, lock.plant)) return null;
-              const where = freePlot(state);
+              const site = Object.entries(state.city.sites).find(([, st]) => st.type === cfg.id)?.[0];
+              const where = site ?? freePlotFor(state, cfg.id);
               return (
                 <Fragment key={cfg.id}>
                   {node(
                     cfg.id,
                     cfg.emoji,
                     t(`structure.${cfg.id}`),
-                    lock ? `🔒 ${n.plantLock(lock)}` : t("chain.buildFor", { cost: formatMoney(plantBuildCost(state, cfg.id)) }),
+                    lock ? `🔒 ${n.plantLock(lock)}` : site ? t("goal.site", { name: t(`structure.${cfg.id}`) }) : t("chain.buildFor", { cost: formatMoney(plantBuildCost(state, cfg.id)) }),
                     "off",
                     where && !lock ? () => selectPlot(where) : undefined,
                   )}

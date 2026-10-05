@@ -1,9 +1,10 @@
 import { EMPIRE_PERKS, PRESTIGE } from "../config/prestige";
 import { createExport, createFleet } from "./expansion";
 import type { GameState } from "../types";
-import { STARTER_PLOT, WORLD_MAP } from "../city/layout";
-import { createChain, newPlant } from "./chain";
+import { STARTER_PLOT, plotOf } from "../city/layout";
+import { createChain } from "./chain";
 import { createCity } from "./city";
+import { constructionTime, plotsFor } from "./construction";
 import { resetDesignLevels } from "./design";
 import { createLogistics } from "./logistics";
 import { createDealers, createStats, emptyCarCounts } from "./state";
@@ -84,9 +85,12 @@ export function applyStartPerks(s: GameState) {
   const starter = s.city.buildings[STARTER_PLOT]?.plant;
   if (starter && perks.some((p) => p.startAutomation)) starter.automation = Math.max(1, starter.automation);
   const types = [...new Set(perks.flatMap((p) => p.startPlants ?? []))];
+  // perk plants: free land and construction on their plots, but they are still built (nothing appears at once)
   for (const type of types) {
-    if (Object.values(s.city.buildings).some((b) => b.type === type)) continue;
-    const free = WORLD_MAP.plots.find((p) => p.kind === "plot" && !p.big && p.zone === "town" && !s.city.buildings[p.id]);
-    if (free) s.city.buildings[free.id] = { type, level: 1, plant: newPlant() };
+    if (Object.values(s.city.buildings).some((b) => b.type === type) || Object.values(s.city.sites).some((st) => st.type === type)) continue;
+    const free = plotsFor(type).find((id) => s.city.zones.includes(plotOf(id)!.zone) && !s.city.buildings[id] && !s.city.sites[id]);
+    if (!free) continue;
+    if (!s.city.land.includes(free)) s.city.land.push(free);
+    s.city.sites[free] = { type, t: 0, dur: constructionTime(s, free), cost: 0 };
   }
 }

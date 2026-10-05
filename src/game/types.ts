@@ -173,6 +173,8 @@ export interface OfflineReport {
   carsByType: Partial<Record<CarId, number>>;
   /** Automatic races run while away. */
   racing?: OfflineRacing;
+  /** Constructions finished while away (plot ids). */
+  built?: string[];
 }
 
 export interface OfflineRacing {
@@ -340,9 +342,29 @@ export interface QualityState {
   recalls: number;
 }
 
+/** A new building going up on a plot the player owns (engine/construction.ts). */
+export interface ConstructionSite {
+  type: StructureType;
+  /** Seconds worked and seconds needed. */
+  t: number;
+  dur: number;
+  /** What the construction cost (speed-ups are priced from it). */
+  cost: number;
+}
+
+/** An upgrade being built onto an existing building: it reaches `to` when done. */
+export interface BuildingWorks {
+  to: number;
+  t: number;
+  dur: number;
+  cost: number;
+}
+
 export interface BuildingState {
   type: StructureType;
   level: number;
+  /** A level upgrade under construction (the building keeps working meanwhile). */
+  works?: BuildingWorks;
   /** Present when type === "garage". */
   garage?: GarageData;
   /** Present on supply-chain plants. */
@@ -411,6 +433,10 @@ export interface CityState {
   territories?: import("./config/city").TerritoryId[];
   /** Keyed by plot id (see game/city/layout.ts). */
   buildings: Record<string, BuildingState>;
+  /** Plots whose land the player owns (built on or not). */
+  land: string[];
+  /** Buildings under construction, by plot: they appear in `buildings` when finished. */
+  sites: Record<string, ConstructionSite>;
   nextUid: number;
   nextGarageNo: number;
   carsServiced: number;
@@ -516,7 +542,8 @@ export type GameEvent =
   | { type: "carBuilt"; plot: string; car: CarId; first: boolean }
   | { type: "achievement"; id: string }
   | { type: "carUnlocked"; car: CarId }
-  | { type: "raceFinished"; race: number };
+  | { type: "raceFinished"; race: number }
+  | { type: "built"; plot: string; structure: StructureType; level: number; upgrade: boolean };
 
 // ───────────────────────────── racing ─────────────────────────────
 

@@ -14,6 +14,8 @@ import { landmarkDrawables, landmarkGround } from "./landmarks";
 const LANDMARKS_AT = new Map(WORLD_MAP.landmarks.map((l) => [l.by * BLOCKS + l.bx, l]));
 import { coastline } from "./terrain";
 import { drawNetworkGround, networkDrawables } from "./highway";
+import { drawSite, drawWorks, siteTag } from "./sites";
+import { plotStatus, type PlotStatus } from "@/game/engine/construction";
 import { corridors } from "@/game/city/network";
 import type { EconomySnapshot } from "@/game/engine/economy";
 import type { BuildingState, CarId, GameState, StructureType, ZoneId } from "@/game/types";
@@ -172,12 +174,19 @@ function parkedCars(p: Painter, x: number, y: number, n: number, seed: number, d
 
 const M = 0.3;
 
-function emptyPlot(p: Painter, plot: Plot, info: DrawInfo, buildable: boolean) {
+function emptyPlot(p: Painter, plot: Plot, info: DrawInfo, buildable: boolean, status: PlotStatus = "available") {
   const { x, y, w, d } = plot;
-  p.quad(x + M, y + M, w - 2 * M, d - 2 * M, p.col("#b7c98f"));
-  p.quad(x + M + 0.15, y + M + 0.15, w - 2 * M - 0.3, d - 2 * M - 0.3, p.col("#c9d6a3"));
+  const owned = status === "owned";
+  p.quad(x + M, y + M, w - 2 * M, d - 2 * M, p.col(owned ? "#a9bf8a" : "#b7c98f"));
+  p.quad(x + M + 0.15, y + M + 0.15, w - 2 * M - 0.3, d - 2 * M - 0.3, p.col(owned ? "#bccd9a" : "#c9d6a3"));
   const sel = info.selected === plot.id;
-  p.quadStroke(x + M + 0.1, y + M + 0.1, w - 2 * M - 0.2, d - 2 * M - 0.2, sel ? "#fbbf24" : buildable ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.35)", sel ? 2.5 : 1.4, [6, 5]);
+  const edge = sel ? "#fbbf24" : owned ? "rgba(125,211,252,0.95)" : buildable && status === "available" ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.35)";
+  p.quadStroke(x + M + 0.1, y + M + 0.1, w - 2 * M - 0.2, d - 2 * M - 0.2, edge, sel ? 2.5 : 1.4, [6, 5]);
+  if (owned) {
+    // the owner's flag on bought land, waiting for the builders
+    p.box(x + w - 0.6, y + d - 0.6, 0.05, 0.05, 0, 22, "#64748b");
+    flag(p, sx(x + w - 0.58, y + d - 0.58), sy(x + w - 0.58, y + d - 0.58, 22), "#2563eb", info.t);
+  }
   // corner foundation pegs
   for (const [a, b] of [[0.45, 0.45], [w - 0.45, 0.45], [0.45, d - 0.45], [w - 0.45, d - 0.45]]) p.box(x + a - 0.05, y + b - 0.05, 0.1, 0.1, 0, 4, "#a16207");
   if (p.zoom < 0.85) return;
@@ -1561,32 +1570,38 @@ export function buildScene(state: GameState, snap: EconomySnapshot, names: Scene
       });
     } else {
       const b = state.city.buildings[plot.id];
-      if (!b) {
+      const site = state.city.sites[plot.id];
+      if (site) {
+        // a building site going through its phases
+        out.push({
+          ...base,
+          bbox: bboxOf(plot.x - 1.5, plot.y - 1, plot.w + 3, plot.d + 2.5, 150),
+          sig: `site:${site.type}`,
+          draw: (p, info) => {
+            const st = live().city.sites[plot.id];
+            if (st) drawSite(p, plot, st.type, st.t / st.dur, info.t, seed);
+            if (info.selected === plot.id) p.quadStroke(plot.x + 0.2, plot.y + 0.2, plot.w - 0.4, plot.d - 0.4, "#fbbf24", 2.5);
+          },
+          label: (p, info) => {
+            const st = live().city.sites[plot.id];
+            if (st && isOpen && info.zoom >= 0.3) siteTag(p, plot, st.t / st.dur);
+          },
+        });
+      } else if (!b) {
         out.push({
           ...base,
           sig: "lot",
-          draw: (p, info) => emptyPlot(p, plot, info, isOpen),
+          draw: (p, info) => emptyPlot(p, plot, info, isOpen, plotStatus(live(), plot.id)),
           label: (p, info) => {
-            if (!isOpen || info.zoom < 0.38) return;
+            if (!isOpen || info.zoom < 0.38 || !plot.use) return;
             const cx = plot.x + plot.w / 2;
             const cy = plot.y + plot.d / 2;
-            const bob = Math.sin(info.t * 2.4 + seed * 6) * 2;
-            const c = p.ctx;
-            const [px, py] = p.at(cx, cy, 16 + bob);
-            c.beginPath();
-            c.arc(px, py, 9, 0, Math.PI * 2);
-            c.fillStyle = info.selected === plot.id ? "#f59e0b" : "rgba(37,99,235,0.92)";
-            c.fill();
-            c.strokeStyle = "#fff";
-            c.lineWidth = 1.5;
-            c.stroke();
-            c.beginPath();
-            c.moveTo(px - 4, py);
-            c.lineTo(px + 4, py);
-            c.moveTo(px, py - 4);
-            c.lineTo(px, py + 4);
-            c.lineWidth = 2;
-            c.stroke();
+            const st = plotStatus(live(), plot.id);
+            const bob = st === "available" ? Math.sin(info.t * 2.4 + seed * 6) * 2 : 0;
+            // what the plot is zoned for, coloured by its status
+            const bg = info.selected === plot.id ? "rgba(245,158,11,0.95)" : st === "owned" ? "rgba(37,99,235,0.9)" : st === "available" ? "rgba(21,128,61,0.88)" : "rgba(30,41,59,0.75)";
+            const mark = st === "owned" ? "🟦" : st === "locked" ? "🔒" : "+";
+            p.tag(info.zoom >= 0.85 ? `${mark} ${names.structure(plot.use)}` : mark, cx, cy, 16 + bob, { icon: STRUCTURE_BY_ID[plot.use].emoji, bg, size: 9 });
           },
         });
       } else if (b.plant && isPlantType(b.type)) {
@@ -1647,6 +1662,23 @@ export function buildScene(state: GameState, snap: EconomySnapshot, names: Scene
             p.tag(names.level(b.level), plot.x + plot.w / 2, plot.y + plot.d / 2, b.type === "hq" ? 160 : 50, { icon: STRUCTURE_BY_ID[b.type].emoji });
           },
         });
+      }
+      // an upgrade under construction: scaffolding and a crane on the working building
+      if (b?.works) {
+        const d = out[out.length - 1];
+        const inner = d.draw;
+        const innerLabel = d.label;
+        d.bbox = bboxOf(plot.x - 1, plot.y - 1, plot.w + 2, plot.d + 2, tall ? 190 : 140);
+        d.draw = (p, info) => {
+          inner(p, info);
+          const w = live().city.buildings[plot.id]?.works;
+          if (w) drawWorks(p, plot, w.t / w.dur, info.t, seed);
+        };
+        d.label = (p, info) => {
+          innerLabel?.(p, info);
+          const w = live().city.buildings[plot.id]?.works;
+          if (w && isOpen && info.zoom >= 0.3) siteTag(p, plot, w.t / w.dur, "⬆️", (tall ? 96 : 76) + b.level * 3);
+        };
       }
     }
   }

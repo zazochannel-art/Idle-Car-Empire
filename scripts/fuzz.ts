@@ -2,6 +2,7 @@
 // clock jumping forward, offline gaps, saves reloaded — checking after each
 // step that nothing throws and the state stays sound.
 // Run: npx tsx scripts/fuzz.ts [steps] [seed]
+import * as Co from "../src/game/engine/construction";
 import { CARS } from "../src/game/config/cars";
 import { PLANTS } from "../src/game/config/chain";
 import { FACILITIES, SPECS, STRUCTURES, ZONES } from "../src/game/config/city";
@@ -74,6 +75,14 @@ const actions: [string, () => unknown][] = [
   ["zone", () => C.unlockZone(s, pick(ZONES).id)],
   ["build", () => C.buildStructure(s, pick(plots()), pick([...STRUCTURES.map((x) => x.id), ...PLANTS.map((x) => x.id)]))],
   ["buildSpecial", () => C.buildStructure(s, pick(plots()), pick(["museum", "fleetPlant", "exportTerminal", "garage"] as const))],
+  ["buildZoned", () => {
+    const p = pick(plots());
+    const use = WORLD_MAP.plotById[p].use;
+    return use && C.buildStructure(s, p, use);
+  }],
+  ["buyLand", () => Co.buyLand(s, pick(plots()))],
+  ["startConstruction", () => Co.startConstruction(s, pick(plots()))],
+  ["speedUp", () => Co.speedUp(s, pick([...Object.keys(s.city.sites), ...built()].concat(plots()[0])))],
   ["upgradeBuilding", () => built().length && C.upgradeBuilding(s, pick(built()))],
   ["plantLevel", () => plantPlots().length && Ch.upgradePlantLevel(s, pick(plantPlots()), snapshot(s).gm)],
   ["plantSpeed", () => plantPlots().length && Ch.upgradePlantSpeed(s, pick(plantPlots()), snapshot(s).gm)],

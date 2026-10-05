@@ -14,6 +14,7 @@ import * as Ch from "../src/game/engine/chain";
 import * as C from "../src/game/engine/city";
 import { carModelCost, dealerUpgradeCost, snapshot } from "../src/game/engine/economy";
 import { freePlot } from "../src/game/engine/insights";
+import { freePlotFor } from "../src/game/engine/construction";
 import { checkAchievements, claimMilestone, openMilestones } from "../src/game/engine/progress";
 import { cloneState, createInitialState } from "../src/game/engine/state";
 import { tick } from "../src/game/engine/tick";
@@ -34,13 +35,13 @@ function options(g: GameState): Option[] {
   const gm = snapshot(g).gm;
   for (const p of PLANTS) {
     if (Ch.plantLock(g, p.id)) continue;
-    const plot = freePlot(g);
-    const count = Ch.plantCount(g, p.id);
+    const plot = freePlotFor(g, p.id);
+    const count = Ch.plantCount(g, p.id) + Object.values(g.city.sites).filter((st) => st.type === p.id).length;
     // build each type once, later a second assembly feeder line
     if (count >= (p.id === "bodyWorks" ? 2 : 1)) continue;
     if (plot) out.push({ label: `build ${p.id}`, cost: Ch.plantBuildCost(g, p.id), act: (x) => C.buildStructure(x, plot, p.id), weight: 0.5 });
   }
-  if (!freePlot(g)) {
+  if (PLANTS.some((p) => !Ch.plantLock(g, p.id) && !Ch.hasPlant(g, p.id) && !freePlotFor(g, p.id))) {
     const z = C.nextZone(g);
     if (z && !C.zoneBlocker(g, z.id)) out.push({ label: `zone ${z.id}`, cost: ZONE_BY_ID[z.id].cost, act: (x) => C.unlockZone(x, z.id) });
   }

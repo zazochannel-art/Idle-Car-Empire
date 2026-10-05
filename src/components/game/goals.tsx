@@ -14,7 +14,7 @@ import { CAR_BY_ID } from "@/game/config/cars";
 import { MAKER } from "@/game/config/chain";
 import { DEALER_BY_ID } from "@/game/config/dealerships";
 import { MANAGER_BY_ID } from "@/game/config/managers";
-import { freePlot, type Goal } from "@/game/engine/insights";
+import { type Goal } from "@/game/engine/insights";
 import { plantFlow, plantName } from "../panels/plant-panel";
 import type { Content } from "@/i18n/content";
 import { useContent } from "@/i18n/content";
@@ -30,6 +30,8 @@ export function goalText(g: Goal, t: (k: MessageKey, v?: Vars) => string, n: Con
   switch (g.kind) {
     case "plant":
       return { title: t("goal.plant", { name: t(`structure.${g.plant}`) }), detail: plantFlow(g.plant, t) };
+    case "site":
+      return { title: t("goal.site", { name: t(`structure.${g.type}`) }), detail: t("goal.siteDetail", { time: formatDuration(g.left), pct: Math.floor(g.progress * 100) }) };
     case "upgrade": {
       const s = useGame.getState().state;
       return { title: t(g.what === "speed" ? "goal.speed" : "goal.level", { name: plantName(s, g.plot, t) }), detail: t("goal.upgradeDetail") };
@@ -89,15 +91,14 @@ export function runGoal(g: Goal, ready: boolean) {
   const game = useGame.getState();
   const ui = useUi.getState();
   switch (g.kind) {
-    case "plant": {
-      // show the plant on the nearest free plot, ready to confirm
-      const plot = freePlot(game.state);
-      if (plot) {
-        ui.selectPlot(plot);
-        ui.setPreview({ plot, type: g.plant });
-      }
+    case "plant":
+      // the plot zoned for it: land details, ready to buy and build
+      ui.selectPlot(g.plot);
+      ui.setPreview({ plot: g.plot, type: g.plant });
       break;
-    }
+    case "site":
+      ui.selectPlot(g.plot);
+      break;
     case "upgrade":
       if (ready) {
         if (g.what === "speed") game.plantSpeed(g.plot);
@@ -200,7 +201,7 @@ export function NextGoals() {
         // a new plant is "ready" once its price and the materials to keep the others running are there
         const reserve = g.kind === "plant" ? g.reserve : 0;
         const cost = "cost" in g && g.cost !== undefined ? g.cost + reserve : undefined;
-        const pct = g.kind === "made" ? Math.min(100, (g.have / g.n) * 100) : cost ? Math.min(100, (state.cash / cost) * 100) : 100;
+        const pct = g.kind === "made" ? Math.min(100, (g.have / g.n) * 100) : g.kind === "site" ? g.progress * 100 : cost ? Math.min(100, (state.cash / cost) * 100) : 100;
         const ready = !cost || state.cash >= cost;
         const keep = !ready && reserve > 0 && cost !== undefined && state.cash >= cost - reserve;
         const eta = cost && !ready && snap.incomePerSec > 0 && (cost - state.cash) / snap.incomePerSec < 86400 * 30 ? (cost - state.cash) / snap.incomePerSec : null;

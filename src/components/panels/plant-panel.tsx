@@ -1,5 +1,6 @@
 "use client";
 
+import { WorksBanner } from "./land-panel";
 import { Factory, Truck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -84,6 +85,7 @@ export function PlantPanel({ id }: { id: string }) {
         <Badge variant="muted">📍 {t(`zone.${plot.zone}`)}</Badge>
       </div>
 
+      <WorksBanner id={id} />
       <StatusLine id={id} />
 
       {/* production */}
@@ -185,7 +187,7 @@ export function PlantPanel({ id }: { id: string }) {
           onBuy={() => g.plantLevel(id)}
           gold
           // levels 11+ open one per region: name the region that unlocks the next one
-          maxedLabel={b.level < PLANT_LEVELS.length && b.level >= gm.maxPlantLevel ? `🔒 ${REGIONS[b.level + 1 - BASE_MAX_LEVEL].emoji} ${n.region(REGIONS[b.level + 1 - BASE_MAX_LEVEL])}` : undefined}
+          maxedLabel={b.works ? t("works.inProgress") : b.level < PLANT_LEVELS.length && b.level >= gm.maxPlantLevel ? `🔒 ${REGIONS[b.level + 1 - BASE_MAX_LEVEL].emoji} ${n.region(REGIONS[b.level + 1 - BASE_MAX_LEVEL])}` : undefined}
         />
         <UpgradeRow icon="⚡" title={t("plant.speed", { n: p.speed })} detail={t("plant.speedDetail", { pct: formatPercent(SPEED.mult - 1) })} cost={speedCost(b, gm)} onBuy={() => g.plantSpeed(id)} />
         <UpgradeRow
