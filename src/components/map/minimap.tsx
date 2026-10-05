@@ -1,9 +1,9 @@
 "use client";
 
 import { unlockedAreas } from "@/game/engine/territory";
-import { Home, Minus, Plus } from "lucide-react";
-import { useEffect, useRef, type RefObject } from "react";
-import { STRUCTURE_BY_ID, WORLD_BLOCKS, ZONES, ZONE_BY_ID } from "@/game/config/city";
+import { Building2, Factory, Globe2, Home, Lock, MapPin, Minus, Plus, Map as MapIcon } from "lucide-react";
+import { useEffect, useRef, useState, type RefObject } from "react";
+import { STRUCTURE_BY_ID, TERRITORIES, WORLD_BLOCKS, ZONES, ZONE_BY_ID } from "@/game/config/city";
 import { WAYS } from "@/game/city/network";
 import { RIVER, WORLD, WORLD_MAP, blockKind, territoryOfBlock, zoneCenterTile, zoneOfBlock } from "@/game/city/layout";
 
@@ -15,7 +15,10 @@ const MINI_LANDMARK: Record<string, string | null> = {
 import { coastline } from "./terrain";
 import { useT } from "@/i18n/use-t";
 import { useGame } from "@/store/game-store";
-import type { MapEngine } from "./map-engine";
+import { ZOOM_TIERS, type MapEngine, type ZoomTier } from "./map-engine";
+import { cn } from "@/lib/utils";
+
+const TIER_ICON: Record<ZoomTier, typeof Globe2> = { region: Globe2, districts: MapIcon, buildings: Building2, detail: Factory };
 
 const W = 172;
 const H = 92;
@@ -39,6 +42,8 @@ export function Minimap({ engine }: { engine: RefObject<MapEngine | null> }) {
   const state = useGame((g) => g.state);
   const stateRef = useRef(state);
   const { t } = useT();
+  const [tier, setTier] = useState<ZoomTier>("buildings");
+  const [list, setList] = useState(false);
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
@@ -143,6 +148,8 @@ export function Minimap({ engine }: { engine: RefObject<MapEngine | null> }) {
       }
       const e = engine.current;
       if (e) {
+        const now = e.zoomTier();
+        setTier((old) => (old === now ? old : now));
         const v = e.viewTiles().map((p) => mm(p.x, p.y));
         ctx.beginPath();
         v.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
@@ -165,12 +172,39 @@ export function Minimap({ engine }: { engine: RefObject<MapEngine | null> }) {
   };
 
   const btn = "flex size-8 items-center justify-center rounded-lg hud-bar text-white transition hover:brightness-110";
+  const areas = unlockedAreas(state);
+  const go = (id: Parameters<MapEngine["flyToArea"]>[0]) => {
+    engine.current?.flyToArea(id);
+    setList(false);
+  };
   return (
     <div className="pointer-events-auto flex flex-col items-end gap-1.5">
       <div className="overflow-hidden rounded-xl bg-white p-1 shadow-[0_3px_0_0_rgba(0,0,0,0.3)]">
         <canvas ref={ref} onPointerDown={onTap} style={{ aspectRatio: `${W} / ${H}` }} className="block w-[118px] cursor-pointer md:w-[172px]" aria-label={t("map.minimap")} />
       </div>
+      {/* zoom tiers: the whole region, districts, buildings, factory detail */}
+      <div className="flex gap-0.5 rounded-lg hud-bar p-0.5" role="radiogroup" aria-label={t("map.tiers")}>
+        {ZOOM_TIERS.map((k) => {
+          const Icon = TIER_ICON[k];
+          return (
+            <button
+              key={k}
+              role="radio"
+              aria-checked={tier === k}
+              title={t(`map.tier.${k}`)}
+              aria-label={t(`map.tier.${k}`)}
+              onClick={() => engine.current?.setTier(k)}
+              className={cn("flex size-7 items-center justify-center rounded-md transition", tier === k ? "bg-gold text-[#2a1d00]" : "text-white/75 hover:text-white")}
+            >
+              <Icon className="size-3.5" />
+            </button>
+          );
+        })}
+      </div>
       <div className="flex gap-1.5">
+        <button className={cn(btn, list && "bg-gold text-[#2a1d00]")} onClick={() => setList((v) => !v)} aria-label={t("map.districts")} aria-expanded={list}>
+          <MapPin className="size-4" />
+        </button>
         <button className={btn} onClick={() => engine.current?.zoomBy(1.35)} aria-label={t("map.zoomIn")}>
           <Plus className="size-4" />
         </button>
@@ -181,6 +215,27 @@ export function Minimap({ engine }: { engine: RefObject<MapEngine | null> }) {
           <Home className="size-4" />
         </button>
       </div>
+      {list && (
+        <div className="max-h-[50vh] w-56 overflow-y-auto rounded-xl bg-[#232b66] p-1.5 ring-1 ring-white/10 text-xs shadow-[0_10px_30px_-8px_rgba(0,0,0,0.6)]">
+          <div className="px-1.5 pb-1 text-[10px] font-black uppercase tracking-widest text-white/50">{t("map.districts")}</div>
+          {ZONES.map((z) => (
+            <AreaRow key={z.id} open={areas.has(z.id)} label={t(`zone.${z.id}`)} onClick={() => go(z.id)} />
+          ))}
+          <div className="mt-1 px-1.5 pb-1 pt-1 text-[10px] font-black uppercase tracking-widest text-white/50">{t("map.territories")}</div>
+          {TERRITORIES.map((x) => (
+            <AreaRow key={x.id} open={areas.has(x.id)} label={`${x.emoji} ${t(`territory.${x.id}`)}`} onClick={() => go(`t:${x.id}`)} />
+          ))}
+        </div>
+      )}
     </div>
+  );
+}
+
+function AreaRow({ open, label, onClick }: { open: boolean; label: string; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className={cn("flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-left font-bold transition hover:bg-white/10", open ? "text-white" : "text-white/45")}>
+      {open ? <MapPin className="size-3 shrink-0 text-gold" /> : <Lock className="size-3 shrink-0" />}
+      <span className="truncate">{label}</span>
+    </button>
   );
 }
