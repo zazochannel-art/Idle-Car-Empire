@@ -318,7 +318,7 @@ export const ru: Record<MessageKey, string> = {
   "settings.import": "Импорт сохранения",
   "settings.erase": "Стереть всё",
   "settings.credits": "Авторы",
-  "settings.creditsModel": "3D-модели: спорткар — «Porsche 911 (930) Turbo 1975», автор vecarz (sketchfab.com/heynic), CC BY-NC-SA 4.0; MC GT — «Nissan R34 Brians Fast Furious», автор vecarz, CC BY 4.0; City Car, Sedan, SUV, Luxury, Supercar, Hypercar, Electric и уличный трафик — «Generic passenger car pack», автор Comrade1280 (sketchfab.com/comrade1280), CC BY 4.0. Все переработаны (упрощены, без эмблем, перекрашены). Не связано с Porsche, Nissan или фильмами «Форсаж».",
+  "settings.creditsModel": "3D-модели: спорткар — «Porsche 911 (930) Turbo 1975», автор vecarz (sketchfab.com/heynic), CC BY-NC-SA 4.0; MC GT — «Nissan R34 Brians Fast Furious», автор vecarz, CC BY 4.0; City Car, Sedan, SUV, Luxury, Supercar и уличный трафик — «Generic passenger car pack», автор Comrade1280 (sketchfab.com/comrade1280), CC BY 4.0; Electric — «2010 Citroën DS Survolt», автор Ddiaz Design (sketchfab.com/ddiaz-design), CC BY-NC-SA 4.0; Hypercar — «1985 DeLorean DMC-12 Time Machine BTTF», автор Ddiaz Design, CC BY-NC-SA 4.0. Все переработаны (упрощены, без эмблем, перекрашены). Не связано с Porsche, Citroën, DeLorean, Nissan или фильмами «Форсаж» и «Назад в будущее».",
   "settings.reset": "Сбросить игру",
 
   "toast.achievement": "Достижение: {name}",
