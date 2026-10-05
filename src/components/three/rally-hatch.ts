@@ -143,8 +143,8 @@ if (P.x < split + 0.46 && P.x > split + 0.4) paint = uOrange * 0.82;
 if (P.x < split) paint = uBlack;
 // the bonnet swoosh: one orange line with a black shadow, running diagonally
 // from the left corner of the windscreen to the middle of the nose
-if (N.y > 0.35 && P.x > 0.95 && P.x < 2.0 && P.y > 0.7) {
-  float u = clamp((P.x - 0.95) / 1.05, 0.0, 1.0);
+if (N.y > 0.35 && P.x > 0.85 && P.x < 2.05 && P.y > 0.75) {
+  float u = clamp((P.x - 0.85) / 1.2, 0.0, 1.0);
   float zc = -0.62 + 0.66 * pow(u, 1.25);
   float d = P.z - zc;
   if (d > 0.0 && d < 0.09) paint = uOrange;
@@ -158,18 +158,17 @@ if (az > 0.7 && P.y < 0.95) {
   if (s > 0.5) paint = vec3(0.96);
 }
 // mud thrown up on the roof edges and the top of the tailgate
-if (P.y > 1.48 && az > 0.55) {
-  float s = blob(P.xz, vec2(-0.05, sign(P.z) * 0.72), vec2(0.22, 0.12)) + blob(P.xz, vec2(-1.5, sign(P.z) * 0.68), vec2(0.16, 0.12));
+if (P.y > 1.53 && az > 0.6) {
+  float s = blob(P.xz, vec2(-0.2, sign(P.z) * 0.78), vec2(0.24, 0.12)) + blob(P.xz, vec2(-1.5, sign(P.z) * 0.76), vec2(0.18, 0.12));
   if (s > 0.5) paint = vec3(0.96);
 }
-// glass above the beltline: windscreen, side windows and the rear window,
-// framed by the painted pillars and roof
-if (P.y > ${BELT.toFixed(2)} + 0.05) {
-  float roofEdge = P.y > 1.51 ? 1.0 : 0.0;
-  bool front = N.x > 0.42 && az < 0.6;
-  bool rear = N.x < -0.45 && az < 0.58 && P.y < 1.47;
-  bool side = abs(N.z) > 0.5 && P.y < 1.5 && P.x < 0.86 - (P.y - 1.05) * 1.7 && P.x > -1.0 + (P.y - 1.05) * 0.35 && abs(P.x + 0.36) > 0.045;
-  if ((front || rear || side) && roofEdge < 0.5) { paint = vec3(0.07, 0.075, 0.09); gGlass = 1.0; }
+// blacked-out glasshouse: windscreen, side glass and pillars all dark up to the
+// red roof; the band paints the rear pillar, the tailgate has its own window
+if (P.y > ${BELT.toFixed(2)} + 0.05 && P.y < 1.53) {
+  bool screen = N.x > 0.3;
+  bool flank = N.y < 0.8 && P.x > split + 0.46;
+  bool rear = N.x < -0.5 && az < 0.62 && P.y < 1.48;
+  if (screen || flank || rear) { paint = vec3(0.07, 0.075, 0.09); gGlass = 1.0; }
 }
 if (!gl_FrontFacing) paint = vec3(0.05);
 vec4 diffuseColor = vec4( paint, opacity );`,
@@ -290,60 +289,60 @@ export function buildRallyHatch(T: Three): THREE_NS.Group {
 
   // ── the body: a rounded tub from the nose to the tail ──
   const bodyTop = spline([
-    [-2.06, 0.5],
-    [-2.0, 0.86],
-    [-1.86, 1.0],
-    [-1.2, 1.03],
-    [0.3, 1.03],
-    [1.0, 1.0],
-    [1.55, 0.9],
-    [1.9, 0.8],
-    [2.06, 0.66],
-    [2.13, 0.42],
+    [-2.06, 0.55],
+    [-2.02, 0.9],
+    [-1.9, 1.02],
+    [-1.2, 1.05],
+    [0.3, 1.05],
+    [0.95, 1.03],
+    [1.5, 0.97],
+    [1.88, 0.9],
+    [2.06, 0.8],
+    [2.14, 0.5],
   ]);
   const bodyBottom = spline([
     [-2.06, 0.4],
     [-1.95, 0.26],
     [1.95, 0.24],
-    [2.13, 0.34],
+    [2.14, 0.34],
   ]);
   // widest over the wheels (the flared arches), tucked in at the ends
   const bodyHalf = spline([
-    [-2.06, 0.66],
-    [-1.92, 0.84],
-    [-1.27, 0.92],
-    [0, 0.86],
-    [1.27, 0.92],
-    [1.95, 0.84],
-    [2.13, 0.62],
+    [-2.06, 0.74],
+    [-1.94, 0.88],
+    [-1.27, 0.93],
+    [0, 0.9],
+    [1.27, 0.93],
+    [1.96, 0.88],
+    [2.14, 0.76],
   ]);
-  car.add(new T.Mesh(loft(T, -2.06, 2.13, 64, bodyBottom, bodyTop, bodyHalf, 3.8, 0.05), paint));
+  car.add(new T.Mesh(loft(T, -2.06, 2.14, 64, bodyBottom, bodyTop, bodyHalf, 5.2, 0.04), paint));
 
   // ── the glasshouse: a rounded hood over the cabin, painted with glass ──
   const cabTop = spline([
-    [-1.98, 0.96],
-    [-1.86, 1.2],
-    [-1.62, 1.47],
-    [-0.9, 1.6],
-    [0.0, 1.58],
-    [0.5, 1.4],
-    [0.95, 1.12],
-    [1.12, 0.96],
+    [-2.0, 1.0],
+    [-1.94, 1.25],
+    [-1.78, 1.52],
+    [-1.4, 1.58],
+    [-0.1, 1.58],
+    [0.35, 1.42],
+    [0.8, 1.15],
+    [1.0, 1.0],
   ]);
   const cabHalf = spline([
-    [-1.98, 0.76],
-    [-1.7, 0.84],
-    [0.6, 0.84],
-    [1.12, 0.76],
+    [-2.0, 0.8],
+    [-1.8, 0.86],
+    [0.5, 0.86],
+    [1.0, 0.8],
   ]);
-  car.add(new T.Mesh(loft(T, -1.98, 1.12, 56, () => 0.9, cabTop, cabHalf, 4.6, 0.13), paint));
+  car.add(new T.Mesh(loft(T, -2.0, 1.0, 56, () => 0.92, cabTop, cabHalf, 5.5, 0.1), paint));
 
   // ── fat flares round the arches ──
   for (const x of [L.xf, L.xr])
     for (const s of [-1, 1]) {
-      const f = new T.Mesh(new T.TorusGeometry(L.arch + 0.03, 0.075, 10, 24, Math.PI), paint);
-      f.position.set(x, L.R, s * (bodyHalf(x) - 0.06));
-      f.scale.set(1, 1, 1.6);
+      const f = new T.Mesh(new T.TorusGeometry(L.arch + 0.02, 0.06, 10, 24, Math.PI), paint);
+      f.position.set(x, L.R, s * (bodyHalf(x) - 0.08));
+      f.scale.set(1, 1, 1.4);
       car.add(f);
     }
   // side skirts between the arches
@@ -363,30 +362,30 @@ export function buildRallyHatch(T: Three): THREE_NS.Group {
   // six rally lamps in a row across the nose, taped with an X (the outer
   // ones stand where the headlights would be, set a little further back)
   for (const z of [-0.7, -0.5, -0.3, 0.3, 0.5, 0.7]) {
-    const back = Math.abs(z) > 0.6 ? 0.07 : Math.abs(z) > 0.4 ? 0.03 : 0;
-    const x = 2.03 - back;
-    const housing = new T.Mesh(new T.CylinderGeometry(0.092, 0.1, 0.14, 20, 1), trim);
+    const back = Math.abs(z) > 0.6 ? 0.08 : Math.abs(z) > 0.4 ? 0.03 : 0;
+    const x = 2.13 - back;
+    const housing = new T.Mesh(new T.CylinderGeometry(0.1, 0.105, 0.16, 20, 1), trim);
     housing.rotation.z = -Math.PI / 2;
-    housing.position.set(x, 0.68, z);
+    housing.position.set(x, 0.72, z);
     car.add(housing);
-    const face = new T.Mesh(new T.CircleGeometry(0.083, 24), lampFace);
+    const face = new T.Mesh(new T.CircleGeometry(0.09, 24), lampFace);
     face.rotation.y = Math.PI / 2;
-    face.position.set(x + 0.072, 0.68, z);
+    face.position.set(x + 0.082, 0.72, z);
     car.add(face);
   }
   // the square tow-hook plate in the middle
-  car.add(rounded(T, 0.06, 0.1, 0.1, 0.015, trim, 2.12, 0.66, 0));
+  car.add(rounded(T, 0.06, 0.1, 0.1, 0.015, trim, 2.14, 0.7, 0));
 
   // ── mirrors: gold rounded caps on short black arms ──
   for (const s of [-1, 1]) {
-    car.add(rounded(T, 0.08, 0.04, 0.12, 0.015, trim, 0.86, 1.06, s * 0.84));
-    car.add(rounded(T, 0.16, 0.11, 0.13, 0.04, gold, 0.84, 1.1, s * 0.93));
+    car.add(rounded(T, 0.08, 0.04, 0.12, 0.015, trim, 0.78, 1.09, s * 0.86));
+    car.add(rounded(T, 0.16, 0.11, 0.13, 0.04, gold, 0.76, 1.13, s * 0.95));
   }
 
   // ── roof spoiler: a low black lip along the rear edge of the roof, overhanging the tailgate ──
-  car.add(rounded(T, 0.42, 0.045, 1.46, 0.02, trim, -1.76, 1.53, 0, -0.06));
-  for (const s of [-1, 1]) car.add(rounded(T, 0.42, 0.1, 0.035, 0.014, trim, -1.76, 1.52, s * 0.74, -0.06));
-  car.add(rounded(T, 0.06, 0.1, 1.2, 0.02, trim, -1.98, 1.5, 0));
+  car.add(rounded(T, 0.42, 0.045, 1.5, 0.02, trim, -1.82, 1.6, 0, -0.06));
+  for (const s of [-1, 1]) car.add(rounded(T, 0.42, 0.1, 0.035, 0.014, trim, -1.82, 1.59, s * 0.76, -0.06));
+  car.add(rounded(T, 0.06, 0.08, 1.2, 0.02, trim, -2.02, 1.56, 0));
 
   // ── tail: lights, plate recess, diffuser, twin exhausts ──
   for (const s of [-1, 1]) car.add(blob(T, tail, -2.0, 0.86, s * 0.58, 0.05, 0.07, 0.18));
@@ -424,5 +423,7 @@ export function buildRallyHatch(T: Three): THREE_NS.Group {
     m.castShadow = true;
     m.receiveShadow = true;
   });
+  // a touch shorter overall: the stubby hot-hatch stance of the reference
+  car.scale.x = 0.93;
   return car;
 }
