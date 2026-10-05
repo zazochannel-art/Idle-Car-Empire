@@ -1,9 +1,16 @@
 "use client";
 
+import { unlockedAreas } from "@/game/engine/territory";
 import { Home, Minus, Plus } from "lucide-react";
 import { useEffect, useRef, type RefObject } from "react";
 import { STRUCTURE_BY_ID, WORLD_BLOCKS, ZONES, ZONE_BY_ID } from "@/game/config/city";
-import { RIVER, WORLD, WORLD_MAP, zoneCenterTile, zoneOfBlock } from "@/game/city/layout";
+import { RIVER, WORLD, WORLD_MAP, blockKind, territoryOfBlock, zoneCenterTile, zoneOfBlock } from "@/game/city/layout";
+
+/** Territory landmark colours on the minimap. */
+const MINI_LANDMARK: Record<string, string | null> = {
+  testFacility: "#64748b", port: "#94a3b8", railyard: "#78716c", raw: "#a16207", suburbs: "#86c06c", boulevard: "#f5c451",
+  skyline: "#cbd5e1", airport: "#e2e8f0", campus: "#a5b4fc", racing: "#ef4444", racingAnnex: "#f87171", road: "#4d7c3a",
+};
 import { coastline } from "./terrain";
 import { useT } from "@/i18n/use-t";
 import { useGame } from "@/store/game-store";
@@ -47,7 +54,7 @@ export function Minimap({ engine }: { engine: RefObject<MapEngine | null> }) {
       raf = requestAnimationFrame(draw);
       if (frame++ % 3) return; // 20 fps is plenty
       const s = stateRef.current;
-      const unlocked = new Set(s.city.zones);
+      const unlocked = unlockedAreas(s);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, W, H);
       const poly = (pts: [number, number][], fill: string, stroke?: string) => {
@@ -79,7 +86,13 @@ export function Minimap({ engine }: { engine: RefObject<MapEngine | null> }) {
       for (let by = 0; by < WORLD_BLOCKS.length; by++)
         for (let bx = 0; bx < WORLD_BLOCKS.length; bx++) {
           const zone = zoneOfBlock(bx, by);
-          if (!zone) continue;
+          const kind = blockKind(bx, by);
+          if (!zone) {
+            const terr = territoryOfBlock(bx, by);
+            const col = terr ? MINI_LANDMARK[kind] : kind === "mountains" ? "#8b917c" : kind === "lake" ? "#1d6fa5" : null;
+            if (col) poly(rect(bx * 7, by * 7, 8, 8), terr && !unlocked.has(terr) ? "#26313f" : col);
+            continue;
+          }
           const open = unlocked.has(zone);
           poly(rect(bx * 7, by * 7, 8, 8), open ? ZONE_BY_ID[zone].ground : "#1f2937");
         }

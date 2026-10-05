@@ -1,6 +1,7 @@
 // The Empire Map economy: zones, plot buildings and garages with their
 // interior facilities. Garages earn by servicing cars at their workstations;
 // support facilities and nearby buildings make them faster or pricier.
+import { BUYABLE_TERRITORIES, type TerritoryId } from "../config/city";
 import { museumTickets } from "./classics";
 import {
   FACILITY_BY_ID,
@@ -49,7 +50,7 @@ export function newGarage(no: number): BuildingState {
 export function createCity(): CityState {
   // the first few car bodies' worth of material is already in the warehouse
   const plant = { ...newPlant(), stock: starterStock("bodyWorks", 1, 3) };
-  return { zones: ["town"], buildings: { [STARTER_PLOT]: { type: "bodyWorks", level: 1, plant } }, nextUid: 1, nextGarageNo: 1, carsServiced: 0 };
+  return { zones: ["town"], territories: [], buildings: { [STARTER_PLOT]: { type: "bodyWorks", level: 1, plant } }, nextUid: 1, nextGarageNo: 1, carsServiced: 0 };
 }
 
 export const isZoneUnlocked = (s: GameState, zone: ZoneId) => s.city.zones.includes(zone);
@@ -481,6 +482,10 @@ export function migrateCity(raw: unknown): CityState {
   if (Array.isArray(raw.zones)) {
     const ids = new Set(ZONES.map((z) => z.id as string));
     city.zones = [...new Set(["town", ...raw.zones.filter((z): z is string => typeof z === "string" && ids.has(z))])] as ZoneId[];
+  }
+  if (Array.isArray(raw.territories)) {
+    const ids = new Set(BUYABLE_TERRITORIES.map((t) => t.id as string));
+    city.territories = [...new Set(raw.territories.filter((t): t is string => typeof t === "string" && ids.has(t)))] as TerritoryId[];
   }
   if (isObj(raw.buildings)) {
     city.buildings = {};

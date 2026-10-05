@@ -15,6 +15,8 @@ import type { CarDesign, CarId, ComponentId, DealerId, DealerState, GameState, M
 
 /** v3: the supply-chain economy (older saves start a new company). */
 export const SAVE_VERSION = 3;
+/** The world map the plot ids refer to: 2 is the 24×24 automotive region. */
+export const MAP_VERSION = 2;
 
 export function createDealers(): Record<DealerId, DealerState> {
   return Object.fromEntries(DEALER_IDS.map((d) => [d, { owned: false, level: 1 }])) as Record<DealerId, DealerState>;
@@ -83,6 +85,7 @@ export function createInitialState(now: number): GameState {
     contracts: { offer: null, active: null, nextAt: 0, done: 0 },
     logistics: createLogistics(),
     market: { t: 0, bought: 0 },
+    mapVersion: MAP_VERSION,
     eventGoal: { start: 0, base: 0, claimed: false },
     brand: createBrand(),
     showroom: { campaignUntil: 0, campaigns: 0, sold: 0, revenue: 0 },

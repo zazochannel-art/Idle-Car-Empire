@@ -7,7 +7,8 @@ import { migrateClassics } from "../engine/classics";
 import { migrateExpansion } from "../engine/expansion";
 import { migrateCity, unlockOwnedZones } from "../engine/city";
 import { applyStartPerks } from "../engine/prestige";
-import { createInitialState, SAVE_VERSION } from "../engine/state";
+import { createInitialState, MAP_VERSION, SAVE_VERSION } from "../engine/state";
+import { remapLegacyPlots } from "../engine/territory";
 import type { GameState } from "../types";
 
 type Json = Record<string, unknown>;
@@ -55,7 +56,10 @@ export function migrate(raw: unknown, now: number): GameState {
   const fresh = createInitialState(now);
   if (!isObject(raw)) return fresh;
   if (typeof raw.version !== "number" || raw.version < SAVE_VERSION) return fromOldEconomy(raw, now);
+  // a save from the first (10×10) map: its lots move to the middle of this one
+  if (raw.mapVersion !== MAP_VERSION) remapLegacyPlots(raw);
   const state = mergeDefaults(fresh, raw);
+  state.mapVersion = MAP_VERSION;
   // Nullable fields have no typed default to merge against.
   state.pendingOffline = isObject(raw.pendingOffline) ? (raw.pendingOffline as unknown as GameState["pendingOffline"]) : null;
   // The city has open-ended keys (plot ids), so it is validated on its own.

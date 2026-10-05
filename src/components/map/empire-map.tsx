@@ -1,5 +1,8 @@
 "use client";
 
+import { BUYABLE_TERRITORIES, TERRITORY_BY_ID, type TerritoryId } from "@/game/config/city";
+import { territoryLock } from "@/game/engine/territory";
+import { unlockedAreas } from "@/game/engine/territory";
 import { Lock } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { CAR_BY_ID } from "@/game/config/cars";
@@ -40,7 +43,7 @@ function sceneKey(s: GameState, snap: EconomySnapshot) {
 }
 
 function trafficWorld(s: GameState, snap: EconomySnapshot): TrafficWorld {
-  const unlocked = new Set(s.city.zones);
+  const unlocked = unlockedAreas(s);
   const garages: Site[] = [];
   const suppliers: Site[] = [];
   for (const [id, b] of Object.entries(s.city.buildings)) {
@@ -221,7 +224,7 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
       money: (v) => formatMoney(v),
       racing: t("racing.district"),
     }, () => useGame.getState().state);
-    e.setScene(scene, new Set(s.city.zones), trafficWorld(s, sn));
+    e.setScene(scene, unlockedAreas(s), trafficWorld(s, sn));
     e.traffic.setShipments(shipViews(s));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, lang]);
@@ -289,6 +292,7 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
 
   const nextLocked = ZONES.find((z) => !state.city.zones.includes(z.id));
   const locked = ZONES.filter((z) => !state.city.zones.includes(z.id));
+  const areas = unlockedAreas(state);
 
   return (
     <div className="absolute inset-0">
@@ -298,6 +302,9 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
           <ZoneCard key={z.id} id={z.id} full={z.id === nextLocked?.id} />
         ))}
         {!state.racing.unlocked && state.chain.firstCar && <RacingCard />}
+        {BUYABLE_TERRITORIES.filter((t) => !areas.has(t.id)).map((t) => (
+          <TerritoryCard key={t.id} id={t.id} />
+        ))}
       </div>
       <div className="pointer-events-none absolute right-[calc(env(safe-area-inset-right)+0.5rem)] top-[9.25rem] z-20 md:right-[calc(env(safe-area-inset-right)+0.75rem)] md:top-[5.5rem]">
         <Minimap engine={engineRef} />
@@ -344,6 +351,42 @@ function ZoneCard({ id, full }: { id: ZoneId; full: boolean }) {
           <span>{t(`zone.${id}`)}</span>
         </button>
       )}
+    </div>
+  );
+}
+
+/** Over a territory not bought yet: what it is, what it takes, and its price. */
+function TerritoryCard({ id }: { id: TerritoryId }) {
+  const state = useGame((g) => g.state);
+  const lock = territoryLock(state, id);
+  const unlock = useGame((g) => g.unlockTerritory);
+  const { t } = useT();
+  const cfg = TERRITORY_BY_ID[id];
+  const why =
+    lock?.kind === "zone"
+      ? t("map.requires", { name: t(`zone.${lock.zone}`) })
+      : lock?.kind === "rep"
+        ? t("territory.needRep", { n: lock.need.toLocaleString() })
+        : lock?.kind === "ep"
+          ? t("territory.needEp", { n: lock.need })
+          : null;
+  return (
+    <div data-zone={`t:${id}`} className="pointer-events-auto absolute left-0 top-0 will-change-transform" style={{ visibility: "hidden" }}>
+      <button
+        onClick={() => !lock && unlock(id)}
+        className={cn(
+          "flex max-w-[15rem] flex-col items-center rounded-2xl border px-3 py-1.5 text-center backdrop-blur-md",
+          !lock ? "border-gold/50 bg-[#2a2210]/85 shadow-[0_0_20px_rgba(245,196,81,.35)]" : "border-white/15 bg-ink/80",
+        )}
+      >
+        <span className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wide">
+          <Lock className="size-3 text-white/60" />
+          {cfg.emoji} {t(`territory.${id}`)}
+        </span>
+        <span className="text-[10px] leading-snug text-white/55">{t(`territoryDesc.${id}`)}</span>
+        <span className={cn("mt-0.5 text-[11px] font-black", !lock ? "text-gold" : "text-white/70")}>🔓 {formatMoney(cfg.cost)}</span>
+        {why && <span className="text-[10px] text-amber-300/80">{why}</span>}
+      </button>
     </div>
   );
 }

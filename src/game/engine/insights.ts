@@ -2,6 +2,8 @@
 // and why something is locked. They return data, not text — the UI words it
 // in the player's language. Never mutate state.
 import { atTrack, racingCost } from "./racing";
+import { nextTerritory, territoryLock } from "./territory";
+import type { TerritoryId } from "../config/city";
 import { LOW_STOCK_UNITS, MATERIAL_BY_ID, RESERVE_UNITS, RESTOCK_UNITS, WAREHOUSE_MINUTES, type MaterialId } from "../config/economy";
 import { buyPlan, plantMaterials, restockPlan, stockTotal, supplierOf, unitsInStock, warehouseCap, warehouseCost } from "./materials";
 import { CARS } from "../config/cars";
@@ -51,6 +53,7 @@ export type Goal =
   | { kind: "facility"; icon: string; plot: string }
   | { kind: "worker"; icon: string; plot: string; idle: number }
   | { kind: "zone"; icon: string; cost: number; zone: ZoneId }
+  | { kind: "territory"; icon: string; cost: number; territory: TerritoryId }
   | { kind: "made"; icon: string; plant: PlantType; item: ComponentId; n: number; have: number; plot: string | null };
 
 export function dealerRequirement(s: GameState, id: DealerId): Requirement | null {
@@ -269,6 +272,13 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
       if (trip) goals.push({ kind: "sendCar", icon: "🚚", car: rc.id, cost: trip.fee });
     }
     else if (R.cars.length && R.stats.races === 0 && !R.live) goals.push({ kind: "firstRace", icon: "🏎️" });
+  }
+
+  // new land around the districts, once the requirements are met
+  const terr = nextTerritory(s);
+  if (terr && s.chain.firstCar) {
+    const lock = territoryLock(s, terr.id);
+    if (!lock || lock.kind === "cash") goals.push({ kind: "territory", icon: terr.emoji, cost: terr.cost, territory: terr.id });
   }
 
   const nextManager = MANAGERS.find((m) => !s.managers[m.id].hired && isManagerUnlocked(s, m.id));

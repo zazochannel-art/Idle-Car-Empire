@@ -1,5 +1,6 @@
 "use client";
 
+import { territoryCenterTile } from "@/game/city/layout";
 import { restockPlan } from "@/game/engine/materials";
 import { RESTOCK_UNITS } from "@/game/config/economy";
 import { ArrowRight, CheckCircle2, Target } from "lucide-react";
@@ -76,6 +77,8 @@ export function goalText(g: Goal, t: (k: MessageKey, v?: Vars) => string, n: Con
       return { title: t("goal.worker"), detail: t("goal.workerDetail", { n: g.idle }) };
     case "zone":
       return { title: t("goal.zone", { name: t(`zone.${g.zone}`) }), detail: t("goal.zoneDetail") };
+    case "territory":
+      return { title: t("goal.territory", { name: t(`territory.${g.territory}`) }), detail: t(`territoryDesc.${g.territory}`) };
     case "made":
       return { title: t("goal.made", { n: g.n, item: t(`item.${g.item}`) }), detail: t("goal.madeDetail", { have: Math.min(g.have, g.n), n: g.n, name: t(`structure.${g.plant}`) }) };
   }
@@ -170,6 +173,12 @@ export function runGoal(g: Goal, ready: boolean) {
       if (ready) game.unlockZone(g.zone);
       ui.selectZone(g.zone);
       break;
+    case "territory": {
+      if (ready) game.unlockTerritory(g.territory);
+      const c = territoryCenterTile(g.territory);
+      ui.map({ kind: "look", x: c.x, y: c.y });
+      break;
+    }
     case "made":
       if (g.plot) ui.selectPlot(g.plot);
       break;

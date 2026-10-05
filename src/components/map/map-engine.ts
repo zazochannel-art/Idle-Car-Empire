@@ -1,6 +1,11 @@
 // Runs the Empire Map: owns the canvas, camera, scene and traffic, renders
 // every animation frame and turns taps into selections. React only feeds it
 // state and listens to its callbacks.
+import { LEGACY_OFFSET } from "@/game/config/city";
+import { ROAD_STEP as STEP_TILES, territoryCenterTile } from "@/game/city/layout";
+import type { TerritoryId } from "@/game/config/city";
+/** The first map sits this many tiles in from the corner of the region. */
+const LEGACY_TILES = LEGACY_OFFSET * STEP_TILES;
 import { RaceLayer } from "./race-layer";
 import { RACING_CENTER, drawRacingGround } from "./racing-district";
 import { seasonAt } from "@/game/engine/season";
@@ -37,7 +42,7 @@ export class MapEngine {
   private skip = 0;
   private slow = { frames: 0, time: 0 };
   private scene: Drawable[] = [];
-  private unlocked = new Set<ZoneId>();
+  private unlocked = new Set<string>();
   readonly traffic = new Traffic();
   /** Race cars on the circuit (set by the map component, which knows the state). */
   race: RaceLayer | null = null;
@@ -94,7 +99,7 @@ export class MapEngine {
 
   /** Where the camera starts: the body works between the depot and the market. */
   private homeTile(): [number, number] {
-    return this.cam.w < 700 ? [23, 9] : [25, 8];
+    return this.cam.w < 700 ? [23 + LEGACY_TILES, 9 + LEGACY_TILES] : [25 + LEGACY_TILES, 8 + LEGACY_TILES];
   }
 
   resize() {
@@ -104,11 +109,11 @@ export class MapEngine {
     this.cam.h = Math.max(1, r.height);
     this.canvas.width = Math.round(this.cam.w * this.dpr);
     this.canvas.height = Math.round(this.cam.h * this.dpr);
-    this.cam.minZoom = Math.max(0.18, Math.min(this.cam.w / (WORLD_BOUNDS.maxX - WORLD_BOUNDS.minX), 0.5) * 0.9);
+    this.cam.minZoom = Math.max(0.09, Math.min(this.cam.w / (WORLD_BOUNDS.maxX - WORLD_BOUNDS.minX), 0.5) * 0.9);
     if (!this.running) this.render(0);
   }
 
-  setScene(scene: Drawable[], unlocked: Set<ZoneId>, world: TrafficWorld) {
+  setScene(scene: Drawable[], unlocked: Set<string>, world: TrafficWorld) {
     // anything that changed on a plot gets a construction animation
     const first = this.sigs.size === 0;
     for (const d of scene) {
@@ -559,12 +564,14 @@ export class MapEngine {
     const cards = this.overlay?.children ?? [];
     for (const node of cards) {
       const el = node as HTMLElement;
-      const id = el.dataset.zone as ZoneId | "racing" | undefined;
+      const id = el.dataset.zone as ZoneId | "racing" | `t:${TerritoryId}` | undefined;
       if (!id) continue;
-      const c = id === "racing" ? RACING_CENTER : zoneCenter(id);
+      const c = id === "racing" ? RACING_CENTER : id.startsWith("t:") ? territoryCenterTile(id.slice(2) as TerritoryId) : zoneCenter(id as ZoneId);
       const [px, py] = cam.toScreen(sx(c.x, c.y), sy(c.x, c.y));
       const off = px < -200 || py < -200 || px > cam.w + 200 || py > cam.h + 200;
-      el.style.transform = `translate(${Math.round(px)}px, ${Math.round(py)}px) translate(-50%, -50%)`;
+      // far out, the cards shrink so the whole region stays readable
+      const k = Math.max(0.5, Math.min(1, cam.zoom * 2.4));
+      el.style.transform = `translate(${Math.round(px)}px, ${Math.round(py)}px) translate(-50%, -50%) scale(${k.toFixed(2)})`;
       el.style.visibility = off ? "hidden" : "visible";
     }
   }

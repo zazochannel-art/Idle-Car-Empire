@@ -1,12 +1,17 @@
 // Builds the list of things to draw on the Empire Map from the game state:
 // one drawable per plot/cell, depth-sorted by the renderer. Ground (zones,
 // roads, sidewalks) is drawn separately and first.
+import { unlockedAreas } from "@/game/engine/territory";
 import { CLASSIC_BY_ID } from "@/game/config/classics";
 import { racingScene } from "./racing-district";
-import { SPEC_BY_ID, STRUCTURE_BY_ID, ZONES, ZONE_BY_ID } from "@/game/config/city";
+import { SPEC_BY_ID, STRUCTURE_BY_ID, TERRITORIES, ZONES, ZONE_BY_ID } from "@/game/config/city";
 import { DEALER_BY_ID } from "@/game/config/dealerships";
 import { isPlantType } from "@/game/config/chain";
-import { BLOCKS, NODES, RIVER, ROAD_STEP, WORLD, WORLD_MAP, blockKind, hasRoad, hash, segmentSides, zoneCenterTile, zoneOfBlock, type Decor, type Plot, type Scenery } from "@/game/city/layout";
+import { BLOCKS, NODES, RIVER, ROAD_STEP, WORLD, WORLD_MAP, areaOfBlock, blockKind, hasRoad, hash, segmentSides, territoryOfBlock, zoneCenterTile, zoneOfBlock, type Decor, type Plot, type Scenery } from "@/game/city/layout";
+import { landmarkDrawables, landmarkGround } from "./landmarks";
+
+/** Landmark block by its index (by × BLOCKS + bx), for the ground pass. */
+const LANDMARKS_AT = new Map(WORLD_MAP.landmarks.map((l) => [l.by * BLOCKS + l.bx, l]));
 import { coastline } from "./terrain";
 import type { EconomySnapshot } from "@/game/engine/economy";
 import type { BuildingState, CarId, GameState, StructureType, ZoneId } from "@/game/types";
@@ -25,7 +30,8 @@ export interface DrawInfo {
 
 export interface Drawable {
   depth: number;
-  zone: ZoneId | null;
+  /** District or territory it belongs to (dimmed while locked). */
+  zone: string | null;
   /** World-pixel bounds for culling and picking. */
   bbox: [number, number, number, number];
   draw: (p: Painter, info: DrawInfo) => void;
@@ -1025,7 +1031,7 @@ function coastPath(c: CanvasRenderingContext2D) {
 
 const inBox = (b: [number, number, number, number], view: [number, number, number, number]) => b[2] >= view[0] && b[0] <= view[2] && b[3] >= view[1] && b[1] <= view[3];
 
-export function drawGround(p: Painter, unlocked: ReadonlySet<ZoneId>, view: [number, number, number, number], t: number) {
+export function drawGround(p: Painter, unlocked: ReadonlySet<string>, view: [number, number, number, number], t: number) {
   const c = p.ctx;
   const inView = (b: [number, number, number, number]) => inBox(b, view);
   p.dim = false;
@@ -1066,6 +1072,16 @@ export function drawGround(p: Painter, unlocked: ReadonlySet<ZoneId>, view: [num
       const y = by * ROAD_STEP + 1;
       if (!inView(bboxOf(x - 1, y - 1, 8, 8, 0))) continue;
       const zone = zoneOfBlock(bx, by);
+      const terr = territoryOfBlock(bx, by);
+      if (kind === "lake") continue;
+      if (terr && kind !== "racing") {
+        p.dim = !unlocked.has(terr);
+        const lm = LANDMARKS_AT.get(by * BLOCKS + bx);
+        if (lm) landmarkGround(p, lm, t);
+        else p.quad(x - 0.5, y - 0.5, 7, 7, p.col("#5f9a4e"));
+        p.dim = false;
+        continue;
+      }
       if (zone) {
         p.dim = !unlocked.has(zone);
         p.quad(x, y, 6, 6, p.col(SIDEWALK));
@@ -1094,6 +1110,8 @@ export function drawGround(p: Painter, unlocked: ReadonlySet<ZoneId>, view: [num
         p.quad(x - 0.5, y - 0.5, 7, 7, "#4f8f44");
       } else if (kind === "hills") {
         p.quad(x - 0.5, y - 0.5, 7, 7, "#7d9a5a");
+      } else if (kind === "mountains") {
+        p.quad(x - 0.5, y - 0.5, 7, 7, "#6f7c5c");
       }
     }
   p.dim = false;
@@ -1166,7 +1184,7 @@ export function drawGround(p: Painter, unlocked: ReadonlySet<ZoneId>, view: [num
       const x = i * ROAD_STEP;
       const y = j * ROAD_STEP;
       if (!inView(bboxOf(x - 1, y - 1, 3, 3, 30))) continue;
-      const zs = [zoneOfBlock(i - 1, j - 1), zoneOfBlock(i, j - 1), zoneOfBlock(i - 1, j), zoneOfBlock(i, j)];
+      const zs = [areaOfBlock(i - 1, j - 1), areaOfBlock(i, j - 1), areaOfBlock(i - 1, j), areaOfBlock(i, j)];
       p.dim = !zs.some((z) => z !== null && unlocked.has(z));
       if (i === RIVER) {
         // bridge deck over the river with parapets
@@ -1191,15 +1209,19 @@ export function drawGround(p: Painter, unlocked: ReadonlySet<ZoneId>, view: [num
 }
 
 /** Shade over locked districts, outlined along their real border. */
-export function drawFog(p: Painter, unlocked: ReadonlySet<ZoneId>, t: number) {
+export function drawFog(p: Painter, unlocked: ReadonlySet<string>, t: number) {
   const c = p.ctx;
-  for (const z of ZONES) {
+  const areas: { id: string; blocks: [number, number][] }[] = [
+    ...ZONES.map((z) => ({ id: z.id as string, blocks: WORLD_MAP.zoneBlocks[z.id] })),
+    ...TERRITORIES.filter((x) => x.id !== "racing").map((x) => ({ id: x.id as string, blocks: WORLD_MAP.territoryBlocks[x.id] })),
+  ];
+  for (const z of areas) {
     if (unlocked.has(z.id)) continue;
-    const blocks = WORLD_MAP.zoneBlocks[z.id];
+    const blocks = z.blocks;
     for (const [bx, by] of blocks) p.quad(bx * ROAD_STEP, by * ROAD_STEP, ROAD_STEP + 1, ROAD_STEP + 1, "rgba(9,13,24,0.16)");
     c.setLineDash([10, 8]);
     c.lineDashOffset = -t * 12;
-    const mine = (bx: number, by: number) => zoneOfBlock(bx, by) === z.id;
+    const mine = (bx: number, by: number) => areaOfBlock(bx, by) === z.id;
     for (const [bx, by] of blocks) {
       const x0 = bx * ROAD_STEP + 0.5;
       const y0 = by * ROAD_STEP + 0.5;
@@ -1282,10 +1304,16 @@ function scenery(p: Painter, sc: Scenery) {
     cyl(p, fx + 0.5, fy + 1.9, 0, 6, 30, "#d6d3d1");
     p.tree(fx - 0.4, fy + 2.2, 1, seed);
     p.tree(fx + 2.4, fy - 0.3, 0.9, seed + 0.3);
+  } else if (sc.kind === "mountains") {
+    // the northern range: big snow-capped peaks with pines on the slopes
+    mountain(p, x - 1, y - 1, 5.2, 5, 120 + rand(seed, 6) * 90, seed);
+    mountain(p, x + 2, y + 1.6, 4.6, 4.4, 90 + rand(seed, 7) * 80, seed + 1);
+    for (let i = 0; i < 5; i++) p.pine(x + rand(seed, i + 20) * 6, y + 5 + rand(seed, i + 30) * 1.2, 1);
   } else {
+    // rolling hills: green, no snow (the snow is on the northern range)
     const ox = rand(seed, 5) * 0.8;
-    mountain(p, x - 0.6 + ox, y - 0.4, 4.2, 4.0, 70 + rand(seed, 6) * 40, seed);
-    mountain(p, x + 2.4, y + 2.2, 3.8, 3.8, 50 + rand(seed, 7) * 50, seed + 1);
+    mountain(p, x - 0.6 + ox, y - 0.4, 4.2, 4.0, 34 + rand(seed, 6) * 26, seed);
+    mountain(p, x + 2.4, y + 2.2, 3.8, 3.8, 26 + rand(seed, 7) * 26, seed + 1);
     for (let i = 0; i < 6; i++) p.pine(x + rand(seed, i + 20) * 6, y + 4.6 + rand(seed, i + 30) * 1.4, 0.9);
   }
 }
@@ -1322,7 +1350,7 @@ function lamp(p: Painter, x: number, y: number, t: number) {
 
 export function buildScene(state: GameState, snap: EconomySnapshot, names: SceneNames, live: () => GameState = () => state): Drawable[] {
   const out: Drawable[] = [];
-  const unlocked = new Set(state.city.zones);
+  const unlocked = unlockedAreas(state);
 
   for (const dc of WORLD_MAP.decor) {
     const h = dc.kind === "office" ? 290 : dc.kind === "apartment" ? 110 : 60;
@@ -1338,7 +1366,7 @@ export function buildScene(state: GameState, snap: EconomySnapshot, names: Scene
     out.push({
       depth: sc.x + 3 + sc.y + 3,
       zone: null,
-      bbox: bboxOf(sc.x - 1, sc.y - 1, 8, 8, 130),
+      bbox: bboxOf(sc.x - 1, sc.y - 1, 8, 8, sc.kind === "mountains" ? 230 : 130),
       draw: (p) => scenery(p, sc),
     });
   }
@@ -1355,6 +1383,9 @@ export function buildScene(state: GameState, snap: EconomySnapshot, names: Scene
         out.push({ depth: lx + ly, zone, bbox: bboxOf(lx - 0.5, ly - 0.5, 1, 1, 30), draw: (p, info) => lamp(p, lx, ly, info.t) });
       }
     }
+
+  // the territories' landmarks: port, airport, mines, suburbs, skyline...
+  out.push(...landmarkDrawables());
 
   // the Racing District draws itself
   out.push(...racingScene(live, { locked: names.racing, title: names.racing }));
