@@ -325,7 +325,7 @@ function picketFence(T: Three, m: Mat, x0: number, z0: number, len: number, alon
 
 /** A parked car: the same detailed model the roads use, at map scale. */
 function parkedCar(T: Three, kit: MaterialKit, x: number, z: number, color: string, alongX: boolean, model: BodyModel = "sedan") {
-  const car = buildCar(T, kit, { model, color, finish: "metallic" });
+  const car = buildCar(T, { model, color, finish: "metallic" });
   car.scale.setScalar(0.118);
   const g = new T.Group();
   g.add(car);

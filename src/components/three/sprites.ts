@@ -155,11 +155,6 @@ class SpriteFactory {
     return null;
   }
 
-  /** WebGL is missing or broken: callers fall back to their flat drawings. */
-  get broken() {
-    return this.failed;
-  }
-
   private kick() {
     if (!this.T && !this.loading) {
       this.loading = true;
@@ -177,7 +172,7 @@ class SpriteFactory {
       const T = await import("three");
       const models = await import("./car-models");
       await models.loadShapes();
-      // every car is a ready-made model: none is drawn before they are in
+      // every car is a ready-made model: none is drawn before the files are in
       await models.loadHeroes(T);
       const industrial = await import("./industrial-models");
       const buildings = await import("./building-models");
