@@ -1,6 +1,6 @@
 "use client";
 
-import { BUYABLE_TERRITORIES, TERRITORY_BY_ID, type TerritoryId } from "@/game/config/city";
+import { BUYABLE_TERRITORIES, TERRITORIES, TERRITORY_BY_ID, type TerritoryId } from "@/game/config/city";
 import { territoryLock } from "@/game/engine/territory";
 import { unlockedAreas } from "@/game/engine/territory";
 import { Lock } from "lucide-react";
@@ -43,7 +43,7 @@ function sceneKey(s: GameState, snap: EconomySnapshot) {
   const d = Object.values(s.dealers).map((x) => `${x.owned ? 1 : 0}${x.level}`).join(",");
   // land bought, building sites and upgrades under way
   const w = Object.entries(s.city.buildings).filter(([, x]) => x.works).map(([id]) => id).join(",");
-  return `${s.city.zones.join()}#${b}#${d}#${s.city.land.length}#${Object.keys(s.city.sites).join(",")}#${w}`;
+  return `${s.city.zones.join()}#${(s.city.territories ?? []).join()}#${s.racing.unlocked ? 1 : 0}#${b}#${d}#${s.city.land.length}#${Object.keys(s.city.sites).join(",")}#${w}`;
 }
 
 function trafficWorld(s: GameState, snap: EconomySnapshot): TrafficWorld {
@@ -301,12 +301,34 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
         {BUYABLE_TERRITORIES.filter((t) => !areas.has(t.id)).map((t) => (
           <TerritoryCard key={t.id} id={t.id} />
         ))}
+        {/* from far away: the names of the districts and territories already open */}
+        {ZONES.filter((z) => areas.has(z.id)).map((z) => (
+          <AreaLabel key={z.id} id={z.id} name={t(`zone.${z.id}`)} engine={engineRef} />
+        ))}
+        {TERRITORIES.filter((x) => areas.has(x.id)).map((x) => (
+          <AreaLabel key={x.id} id={`t:${x.id}`} name={`${x.emoji} ${t(`territory.${x.id}`)}`} engine={engineRef} />
+        ))}
       </div>
       <div className="pointer-events-none absolute right-[calc(env(safe-area-inset-right)+0.5rem)] top-[9.25rem] z-20 md:right-[calc(env(safe-area-inset-right)+0.75rem)] md:top-[5.5rem]">
         <Minimap engine={engineRef} />
       </div>
       <Showcase />
     </div>
+  );
+}
+
+/** A district's name over the map at the region and districts zoom; a tap flies there. */
+function AreaLabel({ id, name, engine }: { id: ZoneId | `t:${TerritoryId}`; name: string; engine: React.RefObject<MapEngine | null> }) {
+  return (
+    <button
+      data-zone={id}
+      data-far=""
+      onClick={() => engine.current?.flyToArea(id)}
+      className="pointer-events-auto absolute left-0 top-0 whitespace-nowrap rounded-full bg-[#141a3f]/80 px-3 py-1 text-xs font-black uppercase tracking-wide text-white shadow-[0_3px_0_0_rgba(0,0,0,0.3)] will-change-transform"
+      style={{ visibility: "hidden" }}
+    >
+      {name}
+    </button>
   );
 }
 

@@ -21,6 +21,13 @@ import { applyLighting, skyAt, type TimeMode } from "./lighting";
 import { Traffic, type TrafficWorld, type VehiclePick } from "./traffic";
 import type { CarModel } from "./vehicles";
 
+export type ZoomTier = "region" | "districts" | "buildings" | "detail";
+export const ZOOM_TIERS: ZoomTier[] = ["region", "districts", "buildings", "detail"];
+/** Camera zoom of each tier ("region" is the minimum zoom, "buildings" the default zoom). */
+const TIER_ZOOM = { region: 0, districts: 0.42, buildings: 1, detail: 2.6 };
+/** Below this zoom the district names are shown over the map. */
+const LABEL_ZOOM = 0.55;
+
 export type MapTarget = { kind: "plot"; id: string } | { kind: "zone"; id: ZoneId } | { kind: "vehicle"; v: VehiclePick } | null;
 
 interface Pop {
@@ -208,6 +215,24 @@ export class MapEngine {
   /** Centre the camera on a tile position given as a fraction of the world. */
   lookAt(tx: number, ty: number) {
     this.cam.flyTo(sx(tx, ty), sy(tx, ty), this.cam.zoom, 0.45);
+  }
+
+  /** The zoom tier the camera is in: the whole region, districts, buildings or factory detail. */
+  zoomTier(): ZoomTier {
+    const z = this.cam.zoom;
+    return z < TIER_ZOOM.districts * 0.75 ? "region" : z < (TIER_ZOOM.districts + this.defaultZoom()) / 2 ? "districts" : z < 1.8 ? "buildings" : "detail";
+  }
+
+  /** Glides to a zoom tier, keeping the same spot in the middle. */
+  setTier(tier: ZoomTier) {
+    const z = tier === "region" ? this.cam.minZoom : tier === "buildings" ? this.defaultZoom() : TIER_ZOOM[tier];
+    this.cam.flyTo(this.cam.x, this.cam.y, z, 0.6);
+  }
+
+  /** Flies to a district, a territory ("t:port") or the racing district, at the districts tier. */
+  flyToArea(id: ZoneId | "racing" | `t:${TerritoryId}`) {
+    const c = id === "racing" ? RACING_CENTER : id.startsWith("t:") ? territoryCenterTile(id.slice(2) as TerritoryId) : zoneCenter(id as ZoneId);
+    this.cam.flyTo(sx(c.x, c.y), sy(c.x, c.y), Math.max(this.cam.minZoom, TIER_ZOOM.districts * 1.4), 0.9);
   }
 
   zoomBy(f: number) {
@@ -580,7 +605,9 @@ export class MapEngine {
       if (!id) continue;
       const c = id === "racing" ? RACING_CENTER : id.startsWith("t:") ? territoryCenterTile(id.slice(2) as TerritoryId) : zoneCenter(id as ZoneId);
       const [px, py] = cam.toScreen(sx(c.x, c.y), sy(c.x, c.y));
-      const off = px < -200 || py < -200 || px > cam.w + 200 || py > cam.h + 200;
+      // district names only from far away
+      const far = el.dataset.far !== undefined;
+      const off = px < -200 || py < -200 || px > cam.w + 200 || py > cam.h + 200 || (far && cam.zoom > LABEL_ZOOM);
       // far out, the cards shrink so the whole region stays readable
       const k = Math.max(0.5, Math.min(1, cam.zoom * 2.4));
       el.style.transform = `translate(${Math.round(px)}px, ${Math.round(py)}px) translate(-50%, -50%) scale(${k.toFixed(2)})`;
