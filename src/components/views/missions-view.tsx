@@ -1,6 +1,5 @@
 "use client";
 
-import { FleetPanel } from "./expansion-cards";
 import { MILESTONES } from "@/game/config/missions";
 import { dailyProgress, isMoneyMetric, metric, openMilestones } from "@/game/engine/progress";
 import { formatDuration } from "@/game/format";
@@ -10,7 +9,7 @@ import { useGame } from "@/store/game-store";
 import { MissionRow } from "../game/goals";
 import { EventCard, EventGoalCard } from "../game/event-chip";
 import { ContractCard } from "./contract-card";
-import { ClassicsPanel, SeasonCard, ShowCard, VipCard } from "./live-cards";
+import { VipCard } from "./live-cards";
 import { SectionTitle, ViewHeader } from "./section-title";
 
 function untilMidnight() {
@@ -42,14 +41,6 @@ export function MissionsView() {
       <section className="space-y-2">
         <SectionTitle title={t("vip.title")} subtitle={t("vip.subtitle", { n: state.vip.done })} />
         <VipCard />
-      </section>
-
-      <section className="space-y-2">
-        <SectionTitle title={t("live.title")} subtitle={t("live.subtitle")} />
-        <ShowCard />
-        <SeasonCard />
-        <ClassicsPanel />
-        <FleetPanel />
       </section>
 
       <section className="space-y-2">
