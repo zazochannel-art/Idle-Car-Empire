@@ -225,7 +225,7 @@ export function drawCarSprite(p: Painter, x: number, y: number, yaw: number, mod
     CAR_SIZE,
     k,
     yi,
-    (yi) => (T, { kit, models }) => {
+    (yi) => (T, { models }) => {
       const g = new T.Group();
       const car = models.buildCar(T, {
         model,
