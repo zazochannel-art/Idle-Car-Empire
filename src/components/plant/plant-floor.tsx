@@ -94,7 +94,7 @@ export function PlantFloor({ plotId }: { plotId: string }) {
           </div>
         )}
       </div>
-      <footer className="grid gap-2 border-t border-white/10 bg-ink/90 p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur-xl sm:grid-cols-[1fr_auto]">
+      <footer className="grid gap-2 border-t border-white/10 bg-ink/90 p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur-xl sm:grid-cols-[1fr_auto]">\n        <Button size="sm" variant={cinematic ? "default" : "secondary"} className="sm:hidden" onClick={() => setCinematic((v) => !v)}>\n          🎥 {cinematic ? "LIVE FACTORY" : "Factory Cam"}\n        </Button>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
           {cfg.item && <StockBar label={t(`raw.${cfg.raw}` as MessageKey)} value={stockTotal(b.plant.stock)} cap={st.rawCap} color="#a8a29e" />}
           <StockBar label={`📦 ${itemName(item, t)}`} value={b.plant.out} cap={st.outCap} color="#38bdf8" />
