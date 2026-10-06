@@ -5,10 +5,11 @@
 // what each plant earns, what materials cost today, and what is owed.
 import { MATERIALS, SUPPLIERS } from "@/game/config/economy";
 import { PLANT_BY_ID } from "@/game/config/chain";
-import { plantNetValue, plantProfitPerMin, plantsOf } from "@/game/engine/chain";
-import { LEDGER_KEYS, REVENUE_KEYS, ledgerNet, marketPrice, supplierOf, usedMaterials } from "@/game/engine/materials";
+import { partsPriceMult, plantNetValue, plantProfitPerMin, plantsOf } from "@/game/engine/chain";
+import { COST_KEYS, marketPrice, supplierOf, usedMaterials } from "@/game/engine/materials";
+import { economyReport } from "@/game/engine/report";
 import { formatMoney, formatNumber, formatPercent } from "@/game/format";
-import type { LedgerValues } from "@/game/types";
+import type { ItemId, LedgerValues } from "@/game/types";
 import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
@@ -16,7 +17,7 @@ import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { materialName } from "../panels/materials-panel";
 import { MarketNewsCard, ReputationCard } from "../panels/market-controls";
-import { plantName } from "../panels/plant-panel";
+import { itemName, plantName } from "../panels/plant-panel";
 import { LEDGER_ICON, LedgerTable } from "./ledger-table";
 import { SectionTitle } from "./section-title";
 
@@ -27,10 +28,9 @@ export function EconomyView() {
   const { t } = useT();
   const rate = state.chain.ledger.rate;
   const perMin = (v: number) => `${formatMoney(v * 60)}${t("unit.perMin")}`;
-  const revenue = REVENUE_KEYS.reduce((a, k) => a + rate[k], 0);
-  const costs = LEDGER_KEYS.filter((k) => !REVENUE_KEYS.includes(k)).reduce((a, k) => a + rate[k], 0);
-  const net = ledgerNet(rate);
-  const margin = revenue > 0 ? net / revenue : 0;
+  // every figure from one place (the ledger), the same the HUD profit reads
+  const r = economyReport(state);
+  const net = r.netPerSec;
   const carsMin = snap.carsPerSec * 60;
   const sp = supplierOf(state);
   return (
@@ -38,14 +38,19 @@ export function EconomyView() {
       <p className="text-sm text-white/60">{t("eco.desc")}</p>
       {/* the headline numbers */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Tile label={`💰 ${t("eco.money")}`} value={formatMoney(state.cash)} gold />
-        <Tile label={`📈 ${t("eco.revenue")}`} value={perMin(revenue)} tone="up" />
-        <Tile label={`🏭 ${t("eco.costs")}`} value={perMin(costs)} tone="down" />
+        <Tile label={`💰 ${t("eco.money")}`} value={formatMoney(r.cash)} gold />
+        <Tile label={`📈 ${t("eco.revenue")}`} value={perMin(r.revenuePerSec)} tone="up" />
+        <Tile label={`🏭 ${t("eco.costs")}`} value={perMin(r.costsPerSec)} tone="down" />
         <Tile label={`💵 ${t("eco.net")}`} value={`${net < 0 ? "−" : ""}${perMin(Math.abs(net))}`} gold={net >= 0} tone={net < 0 ? "down" : undefined} />
-        <Tile label={`📊 ${t("eco.margin")}`} value={formatPercent(margin)} />
+        <Tile label={`⏱️ ${t("eco.netHour")}`} value={`${net < 0 ? "−" : ""}${formatMoney(Math.abs(net) * 3600)}${t("unit.perHour")}`} gold={net >= 0} tone={net < 0 ? "down" : undefined} />
+        <Tile label={`📊 ${t("eco.margin")}`} value={formatPercent(r.margin)} />
+        <Tile label={`🧾 ${t("eco.owed")}`} value={`${formatMoney(r.owed)} / ${formatMoney(r.debtLimit)}`} tone={r.owed > 0 ? "down" : undefined} />
+        <Tile label={`📦 ${t("eco.inventory")}`} value={formatMoney(r.inventoryValue)} />
+        <Tile label={`🏭 ${t("eco.carsProduced")}`} value={formatNumber(r.carsProduced)} />
+        <Tile label={`🤝 ${t("eco.carsSold")}`} value={formatNumber(r.carsSold)} />
+        <Tile label={`🅿️ ${t("eco.carsStored")}`} value={formatNumber(r.carsInStorage)} />
         <Tile label={`🚘 ${t("eco.carsMin")}`} value={formatNumber(Math.round(carsMin * 100) / 100)} />
         <Tile label={`📅 ${t("eco.carsDay")}`} value={formatNumber(Math.round(carsMin * 60 * 24))} />
-        <Tile label={`🧾 ${t("eco.owed")}`} value={formatMoney(state.chain.owed)} tone={state.chain.owed > 0 ? "down" : undefined} />
       </div>
 
       <div className="grid gap-2 sm:grid-cols-2">
@@ -111,6 +116,16 @@ export function EconomyView() {
           })}
         </div>
         <p className="mt-2 text-[10px] text-white/40">{t("eco.bought", { n: formatNumber(state.market.bought) })}</p>
+        {r.inventoryIncoming > 0 && <p className="mt-1 text-[10px] text-white/40">🚚 {t("eco.inventoryComing", { v: formatMoney(r.inventoryIncoming) })}</p>}
+        {/* the Parts Market's appetite: items sold beyond it fetch less */}
+        {(Object.keys(state.chain.demand ?? {}) as ItemId[])
+          .map((item) => [item, partsPriceMult(state, item)] as const)
+          .filter(([, m]) => m < 0.995)
+          .map(([item, m]) => (
+            <p key={item} className="mt-1 text-[10px] text-amber-300">
+              ⚠️ {t("eco.partsDemand", { item: itemName(item, t), pct: formatPercent(m) })}
+            </p>
+          ))}
       </div>
 
       <SectionTitle title={t("eco.run")} />
@@ -131,7 +146,7 @@ function Tile({ label, value, gold, tone }: { label: string; value: string; gold
 /** Where every dollar of cost goes, as one bar. */
 function CostBar({ values }: { values: LedgerValues }) {
   const { t } = useT();
-  const keys = LEDGER_KEYS.filter((k) => !REVENUE_KEYS.includes(k) && values[k] > 0);
+  const keys = COST_KEYS.filter((k) => values[k] > 0);
   const total = keys.reduce((a, k) => a + values[k], 0);
   if (total <= 0) return null;
   const colors: Record<string, string> = { materials: "#f59e0b", labor: "#38bdf8", energy: "#facc15", maintenance: "#a78bfa", logistics: "#22c55e", dealerFees: "#f472b6", tax: "#94a3b8" };

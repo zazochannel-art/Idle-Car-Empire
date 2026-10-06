@@ -3,6 +3,7 @@
 import { PLANT_BY_ID } from "@/game/config/chain";
 import { plantNumber, plantProfitPerMin } from "@/game/engine/chain";
 import { formatMoney } from "@/game/format";
+import { debtVars } from "@/game/engine/materials";
 import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
 import { useGame } from "@/store/game-store";
@@ -57,6 +58,7 @@ export function ProfitReport() {
                   <div className="mt-1 text-[11px] text-amber-300">
                     ⚠️{" "}
                     {t(`status.${r.status}` as MessageKey, {
+                      ...debtVars(state, formatMoney),
                       raw: raw ? t(`raw.${raw}` as MessageKey) : "",
                       item: r.missing ? t(`item.${r.missing}` as MessageKey) : "",
                     })}

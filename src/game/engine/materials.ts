@@ -6,6 +6,7 @@ import { materialTrendMult } from "./market";
 import {
   AUTO_BUY,
   BULK_DISCOUNT,
+  DEBT,
   COMPONENT_RECIPE,
   DELIVERY_FEE,
   GRADE_MATERIAL,
@@ -16,6 +17,7 @@ import {
   WAREHOUSE_CAP,
   WAREHOUSE_COST,
   POWER_SYSTEM,
+  RESCUE,
   type MaterialId,
   type SupplierConfig,
 } from "../config/economy";
@@ -25,21 +27,46 @@ import type { BuildingState, GameState, Ledger, LedgerKey, LedgerValues, Materia
 
 // ───────────────────────────── ledger ─────────────────────────────
 
-export const LEDGER_KEYS: LedgerKey[] = ["carSales", "partSales", "services", "racing", "materials", "labor", "energy", "maintenance", "logistics", "dealerFees", "tax", "repairs"];
-export const REVENUE_KEYS: LedgerKey[] = ["carSales", "partSales", "services", "racing"];
+// Every dollar is booked once, under one key, and every key belongs to exactly
+// one group. Each figure the game shows (HUD profit, dashboard, stats, the
+// Welcome Back report) is a sum over these groups — never a formula that adds
+// a category and takes it out again.
+
+/** The manufacturing business: plants, trucks, dealers, the Parts Market, export and the truck & bus line. */
+export const CHAIN_REVENUE_KEYS: LedgerKey[] = ["carSales", "partSales"];
+export const CHAIN_COST_KEYS: LedgerKey[] = ["materials", "labor", "energy", "maintenance", "logistics", "dealerFees", "tax"];
+/** The side businesses: garages (services) earn, the racing team earns prizes and pays entry fees and repairs. */
+export const SIDE_REVENUE_KEYS: LedgerKey[] = ["services", "racing"];
+export const SIDE_COST_KEYS: LedgerKey[] = ["repairs"];
+/** Not earned by running the business: mission, achievement, event and contract rewards. Below the line. */
+export const OTHER_KEYS: LedgerKey[] = ["rewards"];
+
+export const REVENUE_KEYS: LedgerKey[] = [...CHAIN_REVENUE_KEYS, ...SIDE_REVENUE_KEYS];
+export const COST_KEYS: LedgerKey[] = [...CHAIN_COST_KEYS, ...SIDE_COST_KEYS];
+export const LEDGER_KEYS: LedgerKey[] = [...REVENUE_KEYS, ...COST_KEYS, ...OTHER_KEYS];
 export const emptyLedgerValues = (): LedgerValues => Object.fromEntries(LEDGER_KEYS.map((k) => [k, 0])) as LedgerValues;
 export const createLedger = (): Ledger => ({ rate: emptyLedgerValues(), run: emptyLedgerValues(), pending: emptyLedgerValues() });
 
-/** Net of a set of ledger values: revenue minus every cost. */
+const sumOf = (v: LedgerValues, keys: LedgerKey[]) => keys.reduce((a, k) => a + (v[k] ?? 0), 0);
+
+/** Operating revenue: car and part sales, services, racing. */
+export const ledgerRevenue = (v: LedgerValues) => sumOf(v, REVENUE_KEYS);
+/** Operating costs: everything the plants, trucks, dealers and the racing team cost. */
+export const ledgerCosts = (v: LedgerValues) => sumOf(v, COST_KEYS);
+
+/** Operating net profit: revenue minus costs (the manufacturing chain plus the side businesses). */
 export function ledgerNet(v: LedgerValues): number {
-  let n = 0;
-  for (const k of LEDGER_KEYS) n += REVENUE_KEYS.includes(k) ? v[k] : -v[k];
-  return n;
+  return ledgerRevenue(v) - ledgerCosts(v);
 }
 
-/** Net of the production chain alone: garages (services) and racing are counted on their own. */
+/** Net of the manufacturing chain alone. */
 export function chainNet(v: LedgerValues): number {
-  return ledgerNet(v) - v.services - v.racing + v.repairs;
+  return sumOf(v, CHAIN_REVENUE_KEYS) - sumOf(v, CHAIN_COST_KEYS);
+}
+
+/** Net of the side businesses (garages and racing). ledgerNet = chainNet + sideNet. */
+export function sideNet(v: LedgerValues): number {
+  return sumOf(v, SIDE_REVENUE_KEYS) - sumOf(v, SIDE_COST_KEYS);
 }
 
 /** Books revenue or a cost; the next tick folds it into the rates and run totals. */
@@ -58,6 +85,50 @@ export function settleLedger(s: GameState, dt: number, window = 60) {
     L.rate[key] += (v / dt - L.rate[key]) * k;
     L.pending[key] = 0;
   }
+}
+
+/**
+ * Pays a running cost now, or puts what the cash can't cover on the
+ * company's account (paid first from the next revenue). Every cost that may
+ * run on account goes through here, so a cost is never booked without being
+ * either paid or owed.
+ */
+export function payOrOwe(s: GameState, amount: number) {
+  if (!(amount > 0) || !Number.isFinite(amount)) return;
+  const now = Math.min(amount, Math.max(0, s.cash));
+  s.cash -= now;
+  s.chain.owed += amount - now;
+}
+
+/** The company account's limit (set each tick from what the plants cost to run). */
+export const debtLimit = (s: GameState) => Math.max(DEBT.min, s.chain.debtLimit ?? 0);
+
+/** Whether a cost of `amount` may go (partly) on the company's account now: not while suspended, never past the limit. */
+export function canOwe(s: GameState, amount: number): boolean {
+  if (!(amount > 0) || !Number.isFinite(amount) || s.chain.suspended) return false;
+  return s.chain.owed + Math.max(0, amount - Math.max(0, s.cash)) <= debtLimit(s);
+}
+
+/** What a SUSPENDED status line says: what is owed, the limit, and where production resumes (formatted by the caller). */
+export function debtVars(s: GameState, fmt: (n: number) => string) {
+  const limit = debtLimit(s);
+  return { owed: fmt(s.chain.owed), limit: fmt(limit), resume: fmt(limit * DEBT.resume) };
+}
+
+/** Pays `amount` of the account from the cash (as far as both go). */
+export function repay(s: GameState, amount: number) {
+  const pay = Math.min(s.chain.owed, Math.max(0, amount), Math.max(0, s.cash));
+  if (!(pay > 0)) return;
+  s.cash -= pay;
+  s.chain.owed -= pay;
+  if (s.chain.owed < 1e-6) s.chain.owed = 0;
+}
+
+/** A cash reward (missions, achievements, events, contracts…): paid in and booked below the line. */
+export function payReward(s: GameState, amount: number) {
+  if (!(amount > 0) || !Number.isFinite(amount)) return;
+  s.cash += amount;
+  book(s, "rewards", amount);
 }
 
 // ───────────────────────────── prices ─────────────────────────────
@@ -165,18 +236,33 @@ export function unitsInStock(p: PlantData, need: MaterialStock): { n: number; sh
 
 // ───────────────────────────── buying ─────────────────────────────
 
-function depotTrip(to: string) {
+/** Seconds a delivery from the depot takes to reach a plant. */
+export function depotTrip(to: string) {
   const a = plotOf(DEPOT)?.entry;
   const b = plotOf(to)?.entry;
   const tiles = a && b ? roadRoute(a, b).length : 20;
   return DOCK_TIME + (tiles / ROAD_SPEED) * (1 + TRAFFIC_ALLOWANCE);
 }
 
-/** A free delivery (supplier credit): sent like an order, but nothing is paid or booked. */
-export function grantMaterials(s: GameState, plotId: string, stock: MaterialStock) {
+/** What the emergency supplier charges for a set of materials: the market price × RESCUE.markup, plus delivery. */
+export function emergencyCost(s: GameState, stock: MaterialStock): number {
+  let c = 0;
+  for (const [m, n] of Object.entries(stock) as [MaterialId, number][]) c += (n ?? 0) * (marketPrice(s, m) * RESCUE.markup + DELIVERY_FEE);
+  return c;
+}
+
+/**
+ * An emergency delivery: material sent like an order, charged at the
+ * emergency price to the company's account (the emergency line: allowed
+ * past the debt limit). It enters the warehouse at that cost. Returns it.
+ */
+export function emergencyMaterials(s: GameState, plotId: string, stock: MaterialStock): number {
   const qty = stockTotal(stock);
-  if (qty <= 0) return;
-  s.chain.shipments.push({ id: s.chain.nextShip++, from: DEPOT, to: plotId, item: "raw", qty, value: 0, t: 0, dur: depotTrip(plotId), back: false, vehicle: qty > 600 ? "semi" : "truck", materials: { ...stock } });
+  if (qty <= 0) return 0;
+  const cost = emergencyCost(s, stock);
+  payOrOwe(s, cost);
+  s.chain.shipments.push({ id: s.chain.nextShip++, from: DEPOT, to: plotId, item: "raw", qty, value: cost, t: 0, dur: depotTrip(plotId), back: false, vehicle: qty > 600 ? "semi" : "truck", materials: { ...stock } });
+  return cost;
 }
 
 export type BuyResult = { ok: true; cost: number; qty: number } | { ok: false; why: "plant" | "material" | "qty" | "room" | "cash" };
@@ -300,27 +386,91 @@ export function autoRestock(s: GameState, plotId: string, unitsPerSec: number) {
   }
 }
 
-/**
- * Takes the materials for `units` finished units out of the warehouse and
- * books what they cost (their share of what was paid for the stock).
- */
-export function spendMaterials(s: GameState, p: PlantData, need: MaterialStock, units: number): number {
-  const before = stockTotal(p.stock);
-  const used = consume(p, need, units);
-  const paid = Math.max(0, p.stockCost ?? 0);
-  const cost = before > 0 ? (paid * Math.min(used, before)) / before : 0;
-  p.stockCost = paid - cost;
-  if (cost > 0) book(s, "materials", cost);
-  return used;
+// ───────────────────────────── cost basis ─────────────────────────────
+
+/** List-price weight of a set of materials (how a delivery's price is shared out when it carries several). */
+function listValue(st: MaterialStock): number {
+  let v = 0;
+  for (const [m, n] of Object.entries(st) as [MaterialId, number][]) v += (n ?? 0) * MATERIAL_BY_ID[m].price;
+  return v;
 }
 
-/** Takes the materials for `units` finished units out of the warehouse. */
-export function consume(p: PlantData, need: MaterialStock, units: number): number {
-  let used = 0;
-  for (const [m, per] of Object.entries(need) as [MaterialId, number][]) {
-    p.stock[m] = Math.max(0, (p.stock[m] ?? 0) - per * units);
-    used += per * units;
+/**
+ * Each material's cost basis, for plants whose state has only the total
+ * (saves from before per-material costs): the total is shared out by list
+ * price × quantity, so the stock keeps exactly what was paid for it.
+ */
+function basisOf(p: PlantData): MaterialStock {
+  if (p.stockCostBy) return p.stockCostBy;
+  const total = Math.max(0, p.stockCost ?? 0);
+  const weight = listValue(p.stock);
+  const by: MaterialStock = {};
+  if (total > 0 && weight > 0) for (const [m, n] of Object.entries(p.stock) as [MaterialId, number][]) if ((n ?? 0) > 0) by[m] = (total * n * MATERIAL_BY_ID[m].price) / weight;
+  return by;
+}
+
+/** The plant's cost basis, created from its total the first time it is changed. */
+function costBasis(p: PlantData): MaterialStock {
+  return (p.stockCostBy ??= basisOf(p));
+}
+
+/** Only materials that cost something carry a basis (a free or used-up one has none). */
+function setBasis(by: MaterialStock, m: MaterialId, v: number) {
+  if (v > 1e-9 && Number.isFinite(v)) by[m] = v;
+  else delete by[m];
+}
+
+const sumStock = (st: MaterialStock) => Object.values(st).reduce<number>((a, v) => a + (v ?? 0), 0);
+
+/** Puts a delivery into the warehouse: `value` is what it cost (shared by list price when it carries several materials). */
+export function addStock(p: PlantData, materials: MaterialStock, value: number) {
+  const by = costBasis(p);
+  const weight = listValue(materials);
+  const paid = Number.isFinite(value) && value > 0 ? value : 0;
+  for (const [m, n] of Object.entries(materials) as [MaterialId, number][]) {
+    if (!((n ?? 0) > 0)) continue;
+    p.stock[m] = (p.stock[m] ?? 0) + n;
+    setBasis(by, m, (by[m] ?? 0) + (weight > 0 ? (paid * n * MATERIAL_BY_ID[m].price) / weight : 0));
   }
+  p.stockCost = sumStock(by);
+}
+
+/** What one unit of a material in this warehouse cost (its weighted average), or null with none in stock. */
+export function unitCostOf(p: PlantData, m: MaterialId): number | null {
+  const n = p.stock[m] ?? 0;
+  return n > 0 ? (basisOf(p)[m] ?? 0) / n : null;
+}
+
+/** What the materials in a warehouse cost (their cost basis). */
+export function inventoryValue(p: PlantData): number {
+  return sumStock(basisOf(p));
+}
+
+
+/**
+ * Takes the materials for `units` finished units out of the warehouse and
+ * books what they cost: for each material, the quantity used × that
+ * material's own unit cost (never an average over the whole warehouse).
+ * Returns the material units used.
+ */
+export function spendMaterials(s: GameState, p: PlantData, need: MaterialStock, units: number): number {
+  const by = costBasis(p);
+  let used = 0;
+  let cost = 0;
+  for (const [m, per] of Object.entries(need) as [MaterialId, number][]) {
+    const have = p.stock[m] ?? 0;
+    const q = Math.min(have, per * units);
+    if (!(q > 0)) continue;
+    const basis = by[m] ?? 0;
+    const c = q >= have ? basis : (basis * q) / have;
+    cost += c;
+    used += q;
+    const left = have - q > 1e-9 ? have - q : 0;
+    p.stock[m] = left;
+    setBasis(by, m, left > 0 ? basis - c : 0);
+  }
+  p.stockCost = sumStock(by);
+  if (cost > 0) book(s, "materials", cost);
   return used;
 }
 
@@ -334,6 +484,29 @@ export function migrateStock(raw: unknown): MaterialStock {
     if (typeof v === "number" && Number.isFinite(v) && v > 0) out[m] = v;
   }
   return out;
+}
+
+/** A save's per-material cost basis; missing or broken values fall back to the plant's total, shared by list price. */
+export function migrateCostBasis(raw: unknown, p: PlantData): MaterialStock {
+  if (typeof raw === "object" && raw !== null) {
+    // kept when every value is a valid amount and together they add up to the plant's total
+    // (a material missing from it cost nothing: a free delivery)
+    const by: MaterialStock = {};
+    let ok = true;
+    for (const m of Object.keys(p.stock) as MaterialId[]) {
+      const v = (raw as Record<string, unknown>)[m];
+      if (typeof v === "number" && Number.isFinite(v) && v >= 0) {
+        if (v > 0) by[m] = v;
+      } else if (v !== undefined) ok = false;
+    }
+    const total = Math.max(0, p.stockCost ?? 0);
+    if (ok && Math.abs(sumStock(by) - total) <= 0.01 * Math.max(1, total)) {
+      p.stockCost = sumStock(by);
+      return by;
+    }
+  }
+  delete p.stockCostBy;
+  return basisOf(p);
 }
 
 export function migrateLedger(raw: unknown): Ledger {

@@ -1128,7 +1128,7 @@ describe("no money from nothing", () => {
     expect(net / cost).toBeLessThan(1.25);
   });
 
-  it("a stuck company gets material on supplier credit — never cash — and only then", () => {
+  it("a stuck company gets emergency material on its account — never cash — and only then", () => {
     const s = createInitialState(T0);
     const p = s.city.buildings[STARTER_PLOT].plant!;
     p.stock = {};
@@ -1217,7 +1217,7 @@ describe("economy audit fixes", () => {
 
   it("rewards are sized on the steady income, not a lucky second", () => {
     const s = createInitialState(T0);
-    s.chain.rate = 5_000;
+    s.chain.ledger.rate.carSales = 5_000;
     s.chain.steady = 50;
     const snap = snapshot(s);
     expect(snap.incomePerSec).toBeGreaterThan(4_000);

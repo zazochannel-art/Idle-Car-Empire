@@ -188,10 +188,13 @@ export const CAR_STORAGE = 6;
 /**
  * Upgrade prices scale from the plant's build cost:
  *   level n → cost × level.base × level.growth^(n-2)
+ * A level adds a whole production line, so it is priced to be a decision
+ * (Level 2 of the Body Works ≈ 10 minutes of its profit), not a reflex —
+ * see docs/ECONOMY_BALANCE.md for the model and the old values.
  */
 export const UPGRADE_SCALING = {
-  level: { base: 0.15, growth: 1.8 },
-  speed: { base: 0.06, growth: 1.5 },
+  level: { base: 0.3, growth: 1.8 },
+  speed: { base: 0.08, growth: 1.5 },
   /** Automation tiers, × plant cost. */
   automation: [0, 1.5, 5, 15, 45],
   /** Component grades, × plant cost. */
@@ -199,18 +202,29 @@ export const UPGRADE_SCALING = {
 };
 
 /**
- * Wages, energy and trip fees the cash cannot cover yet go on the company's
- * account and are paid first from the next sales. The debt stays small by
- * construction: materials are always paid up front, so a plant can only
- * work on account for as long as its warehouse has material.
+ * The company's account with its suppliers. Wages, energy, maintenance and
+ * truck trips the cash can't cover yet go on it (and, for bought-in tyres and
+ * drivetrain parts, the next batch; and the emergency supplier) — never
+ * materials: those are paid when ordered. It is paid back out of profit:
+ * `repay` of the chain's average net income, every second, from the cash —
+ * so the cash that buys the next materials is never swallowed by it — and
+ * cash that covers it twice over settles it. Its limit is `seconds` of what
+ * the plants cost to run, at least `min`: above it every plant is SUSPENDED
+ * until it is paid down to `resume` × the limit (cash that covers it settles
+ * it at once).
  */
+export const DEBT = { min: 10_000, seconds: 300, resume: 0.5, repay: 0.5 };
+
 
 /**
- * A company that is completely stuck (can't afford one unit of material
- * anywhere, nothing made, nothing on the road or at a dealer) gets material
- * for a few units on supplier credit — never cash, at most once per cooldown.
+ * The emergency supplier: a company that is completely stuck (can't afford
+ * one unit of material anywhere, nothing made, nothing on the road or at a
+ * dealer) gets material for `units` units at `markup` × the market price, on
+ * its account (up to twice its limit) — never cash, nothing written off, at
+ * most once per cooldown.
+ * Bad planning costs money; it never leaves a company stuck for good.
  */
-export const RESCUE = { units: 2, cooldown: 15 * 60 };
+export const RESCUE = { units: 2, cooldown: 15 * 60, markup: 1.5 };
 
 /** Money every new company starts with. */
 export const START_CASH = 10_000;

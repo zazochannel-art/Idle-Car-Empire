@@ -3,6 +3,7 @@
 import { PLANT_TYPES } from "../config/chain";
 import type { GameState, PlantType } from "../types";
 import { hasPlant, plantLock } from "./chain";
+import { payReward } from "./materials";
 
 /** The bonus is this many seconds of steady income… */
 export const UNLOCK_BONUS_SECONDS = 120;
@@ -28,6 +29,6 @@ export function claimUnlock(s: GameState, kind: UnlockKind, id: string): number 
   if (s.unlocks.includes(key)) return 0;
   const bonus = unlockBonus(s);
   s.unlocks.push(key);
-  s.cash += bonus;
+  payReward(s, bonus);
   return bonus;
 }

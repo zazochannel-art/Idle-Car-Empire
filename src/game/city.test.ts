@@ -182,6 +182,7 @@ describe("garages", () => {
     expect(st.staffed).toBe(1);
     expect(st.incomePerSec).toBeCloseTo((SERVICE_FEE * 2) / 16); // fee × repair bonus ×2 / 16s
     for (const [, b] of Object.entries(s.city.buildings)) if (b.plant) b.plant.stock = { steel: 1 }; // keep the body works quiet (too little for a body)
+    s.chain.rescueT = s.market.t; // no emergency supplier: this is about the garage
     tick(s, 32);
     expect(s.cash).toBeCloseTo(st.incomePerSec * 32);
     expect(s.city.buildings[GAR].garage!.serviced).toBe(2);

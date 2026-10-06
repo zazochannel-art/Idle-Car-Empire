@@ -2,7 +2,7 @@
 
 // Where the money came from and where it went: revenue lines, every cost,
 // and the net. Used by the Welcome Back report and the Economy dashboard.
-import { LEDGER_KEYS, REVENUE_KEYS, ledgerNet } from "@/game/engine/materials";
+import { COST_KEYS, REVENUE_KEYS, ledgerNet, ledgerRevenue } from "@/game/engine/materials";
 import { formatMoney } from "@/game/format";
 import type { LedgerKey, LedgerValues } from "@/game/types";
 import type { MessageKey } from "@/i18n";
@@ -22,14 +22,17 @@ export const LEDGER_ICON: Record<LedgerKey, string> = {
   dealerFees: "🏪",
   tax: "🏛️",
   repairs: "🧰",
+  rewards: "🎁",
 };
 
 /** `suffix` is appended to every amount (e.g. "/min"); `scale` converts the values (e.g. ×60 for per-minute rates). */
 export function LedgerTable({ values, scale = 1, suffix = "", compact }: { values: LedgerValues; scale?: number; suffix?: string; compact?: boolean }) {
   const { t } = useT();
   const net = ledgerNet(values) * scale;
-  const revenue = REVENUE_KEYS.reduce((a, k) => a + values[k], 0) * scale;
-  const rows = LEDGER_KEYS.filter((k) => values[k] * scale >= 0.5 || REVENUE_KEYS.includes(k));
+  const revenue = ledgerRevenue(values) * scale;
+  // operating revenue and costs; rewards are shown below the net (they are not earned by the business)
+  const rows = [...REVENUE_KEYS, ...COST_KEYS];
+  const rewards = (values.rewards ?? 0) * scale;
   return (
     <div className={cn("rounded-2xl bg-white/[0.04] ring-1 ring-white/[0.07]", compact ? "p-2.5" : "p-3")}>
       {rows.map((k) => {
@@ -61,6 +64,17 @@ export function LedgerTable({ values, scale = 1, suffix = "", compact }: { value
       {revenue > 0 && (
         <div className="text-right text-[10px] text-white/45">
           {t("ledger.margin", { pct: `${Math.round((net / revenue) * 100)}%` })}
+        </div>
+      )}
+      {rewards >= 0.5 && (
+        <div className="mt-1 flex items-center justify-between text-[11px] text-white/55">
+          <span>
+            {LEDGER_ICON.rewards} {t("ledger.rewards")}
+          </span>
+          <span className="tabular-nums text-sky-200">
+            +{formatMoney(rewards)}
+            {suffix}
+          </span>
         </div>
       )}
     </div>

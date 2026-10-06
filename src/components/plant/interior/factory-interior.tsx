@@ -13,7 +13,7 @@ import { automationCost, gradeCost, levelCost, speedCost } from "@/game/engine/c
 import { formatMoney, formatNumber, formatPercent } from "@/game/format";
 import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
-import { stockTotal } from "@/game/engine/materials";
+import { debtVars, stockTotal } from "@/game/engine/materials";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { CAR_MODEL_FOR } from "../../map/vehicles";
@@ -132,7 +132,7 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
         {p.status !== "ok" && (
           <div className="mt-2 flex justify-center">
             <div className="rounded-xl bg-amber-500/90 px-3 py-1.5 text-xs font-black text-black shadow-lg">
-              ⚠️ {t(`status.${p.status}` as MessageKey, { raw: p.short ? t(`mat.${p.short}` as MessageKey) : t("chain.raw"), item: itemName(p.missing ?? "engine", t) })} · {t("status.paused")}
+              ⚠️ {t(`status.${p.status}` as MessageKey, { ...debtVars(state, formatMoney), raw: p.short ? t(`mat.${p.short}` as MessageKey) : t("chain.raw"), item: itemName(p.missing ?? "engine", t) })} · {t("status.paused")}
             </div>
           </div>
         )}

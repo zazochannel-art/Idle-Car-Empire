@@ -122,7 +122,13 @@ export type MetricId =
   | "carsSold"
   | "plantTypes"
   | "carRevenue"
-  | "sportUnlocked";
+  | "sportUnlocked"
+  /** Net profit of this run (the ledger: revenue − every cost). */
+  | "netProfit"
+  /** Cars delivered to a dealer's lot. */
+  | "carsShipped"
+  /** 1 once the company runs the whole chain itself: Body Works, Engine and Tire Factory, Assembly, a car made. */
+  | "fullChain";
 
 export interface MissionState {
   id: string;
@@ -153,6 +159,8 @@ export interface Stats {
   carsSold: number;
   /** Money from cars sold at dealerships. */
   carRevenue: number;
+  /** Cars delivered to dealers' lots. */
+  carsShipped?: number;
 }
 
 export interface OfflineReport {
@@ -175,6 +183,8 @@ export interface OfflineReport {
   racing?: OfflineRacing;
   /** Constructions finished while away (plot ids). */
   built?: string[];
+  /** How the company's account changed while away (+ owed more, − paid back). */
+  owed?: number;
 }
 
 export interface OfflineRacing {
@@ -258,13 +268,13 @@ export interface GarageData {
 export type Route = "use" | "sell" | "store";
 
 /** Why a plant is not producing right now. */
-export type PlantStatus = "ok" | "noRaw" | "full" | "noParts" | "noModel" | "noCash";
+export type PlantStatus = "ok" | "noRaw" | "full" | "noParts" | "noModel" | "noCash" | "suspended";
 
 /** Units of each raw material (see config/economy.ts). */
 export type MaterialStock = Partial<Record<import("./config/economy").MaterialId, number>>;
 
 /** Where the money went: revenue and every kind of cost. */
-export type LedgerKey = "carSales" | "partSales" | "services" | "racing" | "materials" | "labor" | "energy" | "maintenance" | "logistics" | "dealerFees" | "tax" | "repairs";
+export type LedgerKey = "carSales" | "partSales" | "services" | "racing" | "materials" | "labor" | "energy" | "maintenance" | "logistics" | "dealerFees" | "tax" | "repairs" | "rewards";
 export type LedgerValues = Record<LedgerKey, number>;
 export interface Ledger {
   /** Smoothed $/s per category (for the dashboard). */
@@ -294,14 +304,22 @@ export interface PlantData {
   progress: number;
   /** Materials in the plant's warehouse. */
   stock: MaterialStock;
-  /** What the materials in the warehouse cost (booked as a cost when they are used). */
+  /** What the materials in the warehouse cost in all (the sum of `stockCostBy`; kept for older saves). */
   stockCost?: number;
+  /**
+   * What each material in the warehouse cost, in dollars (its cost basis):
+   * the unit cost of a material is stockCostBy[m] / stock[m] — a weighted
+   * average of what was paid for it. Using a unit books exactly that.
+   */
+  stockCostBy?: MaterialStock;
   /** Warehouse level (capacity, see WAREHOUSE_CAP). */
   warehouse: number;
   /** ⚡ Power System upgrades (cheaper energy). */
   power: number;
   /** Restock materials automatically (from the Wholesale supplier on). */
   autoBuy?: boolean;
+  /** Assembly: buy emergency parts (at the emergency price) when the company's own plants for them stop. Off unless set. */
+  backup?: boolean;
   /** With status noRaw: the material that ran out. */
   short?: import("./config/economy").MaterialId;
   /** Components waiting at an assembly plant. */
@@ -419,8 +437,14 @@ export interface ChainState {
   /** Smoothed cars per second sold wholesale because every dealer was full (no longer happens: cars wait). */
   wholesale: number;
   ledger: Ledger;
-  /** Trip fees not yet paid (the trucks left before the cash was there): paid from the next revenue. */
+  /** What the company owes on its account (wages, energy, trips… the cash didn't cover): paid back from sales. */
   owed: number;
+  /** The account's limit right now (DEBT: minutes of what the plants cost to run). */
+  debtLimit?: number;
+  /** Over the limit: every plant stops until sales pay the account down (DEBT.resume). */
+  suspended?: boolean;
+  /** Parts Market: units of each item sold recently (decays over PARTS_DEMAND.window). */
+  demand?: Partial<Record<ItemId, number>>;
   /** Net income per second averaged over ~10 minutes: sizes rewards, so a lucky moment doesn't. */
   steady?: number;
   /** Market time (s) of the last supplier rescue. */
@@ -543,7 +567,11 @@ export type GameEvent =
   | { type: "achievement"; id: string }
   | { type: "carUnlocked"; car: CarId }
   | { type: "raceFinished"; race: number }
-  | { type: "built"; plot: string; structure: StructureType; level: number; upgrade: boolean };
+  | { type: "built"; plot: string; structure: StructureType; level: number; upgrade: boolean }
+  /** The emergency supplier sent material at its price, on the company's account. */
+  | { type: "emergency"; cost: number }
+  /** The account went over its limit: every plant stops until sales pay it down. */
+  | { type: "suspended" };
 
 // ───────────────────────────── racing ─────────────────────────────
 

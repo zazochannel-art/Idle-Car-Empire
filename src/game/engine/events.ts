@@ -1,6 +1,7 @@
 import { CAR_BY_ID } from "../config/cars";
 import { EVENTS, EVENT_BLOCK_MS, EVENT_LENGTH_MS, EVENT_OFFSET_MS, type EventMetric, type MarketEvent } from "../config/events";
 import type { CarId, GameState } from "../types";
+import { payReward } from "./materials";
 
 export interface EventWindow {
   event: MarketEvent;
@@ -79,6 +80,8 @@ export function eventMetric(s: GameState, m: EventMetric): number {
       return s.lifetime.carsSold;
     case "upgrades":
       return s.lifetime.upgradesBought + s.lifetime.levelsBought;
+    case "componentsBuilt":
+      return Object.values(s.lifetime.parts).reduce((a, n) => a + (n || 0), 0);
     case "premiumBuilt":
       return builtWhere(s, (c) => CAR_BY_ID[c].tier >= 3);
     case "research":
@@ -103,6 +106,8 @@ export function eventGoalOpen(s: GameState, m: EventMetric): boolean {
       return builtWhere(s, (c) => CAR_BY_ID[c].tier >= 3) > 0;
     case "topBuilt":
       return builtWhere(s, (c) => CAR_BY_ID[c].tier >= 8) > 0;
+    case "componentsBuilt":
+      return Object.keys(s.city.buildings).length > 0;
     default:
       return s.chain.firstCar;
   }
@@ -139,7 +144,7 @@ export function claimEventGoal(s: GameState, now: number): number | null {
   if (!st || !st.done || st.claimed) return null;
   const g = st.window.event.goal;
   const cash = Math.max(1_000, Math.max(0, s.chain.steady ?? s.chain.rate) * g.incomeSeconds);
-  s.cash += cash;
+  payReward(s, cash);
   s.run.moneyEarned += cash;
   s.lifetime.moneyEarned += cash;
   if (g.parts) s.racing.parts += g.parts;

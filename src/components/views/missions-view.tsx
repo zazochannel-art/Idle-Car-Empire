@@ -2,7 +2,7 @@
 
 import { FleetPanel } from "./expansion-cards";
 import { MILESTONES } from "@/game/config/missions";
-import { dailyProgress, metric, openMilestones } from "@/game/engine/progress";
+import { dailyProgress, isMoneyMetric, metric, openMilestones } from "@/game/engine/progress";
 import { formatDuration } from "@/game/format";
 import { useContent } from "@/i18n/content";
 import { useT } from "@/i18n/use-t";
@@ -62,7 +62,7 @@ export function MissionsView() {
             target={m.target}
             reward={m.reward}
             claimed={m.claimed}
-            money={m.metric === "moneyEarned"}
+            money={isMoneyMetric(m.metric)}
             onClaim={() => claimDaily(m.id)}
           />
         ))}
@@ -78,7 +78,7 @@ export function MissionsView() {
             value={metric(state, m.metric, snap)}
             target={m.target}
             reward={m.reward}
-            money={m.metric === "moneyEarned"}
+            money={isMoneyMetric(m.metric)}
             onClaim={() => claimMilestone(m.id)}
           />
         ))}

@@ -246,7 +246,9 @@ export function retireRaceCar(s: GameState, id: number): number {
   const pay = carWorth(rc) * 0.4 * condition(rc);
   s.racing.cars.splice(i, 1);
   if (s.racing.selected === id) s.racing.selected = s.racing.cars[0]?.id ?? null;
+  // a collector buys it: racing-team income
   s.cash += pay;
+  book(s, "racing", pay);
   return pay;
 }
 
