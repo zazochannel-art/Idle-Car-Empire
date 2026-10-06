@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { ArrowLeft, SlidersHorizontal } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { COMPONENT_BY_ID, PLANT_BY_ID } from "@/game/config/chain";
@@ -61,7 +61,7 @@ export function PlantFloor({ plotId }: { plotId: string }) {
       paint: st.car?.color,
       accent: cfg.roof,
     });
-  }, [p, st, b, t]);
+  }, [p, st, b, t, cinematic]);
 
   if (!b?.plant || !st) return null;
   const cfg = PLANT_BY_ID[st.type];
@@ -86,7 +86,7 @@ export function PlantFloor({ plotId }: { plotId: string }) {
       </header>
       <div className="relative min-h-0 flex-1">
         <canvas ref={canvasRef} className="absolute inset-0 size-full touch-none" />
-        {b.plant.status !== "ok" && (
+        <div className="pointer-events-none absolute left-3 top-3 flex flex-wrap gap-2">\n          <div className="rounded-xl bg-black/60 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-white backdrop-blur-md ring-1 ring-white/10">\n            {cinematic ? "🎥 LIVE FACTORY" : "🏭 LIVE PRODUCTION"}\n          </div>\n          <div className="rounded-xl bg-black/60 px-3 py-1.5 text-[10px] font-bold text-white/75 backdrop-blur-md ring-1 ring-white/10">\n            🤖 {p.automation >= 4 ? "AI Factory" : p.automation >= 2 ? "Automated" : "Human Shift"}\n          </div>\n          <div className="rounded-xl bg-black/60 px-3 py-1.5 text-[10px] font-bold text-white/75 backdrop-blur-md ring-1 ring-white/10">\n            📦 {formatNumber(b.plant.out)} / {formatNumber(st.outCap)}\n          </div>\n        </div>\n        {b.plant.status !== "ok" && (
           <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center">
             <div className="rounded-xl bg-amber-500/90 px-3 py-1.5 text-xs font-black text-black shadow-lg">
               ⚠️ {b.plant.status === "noParts" ? t("status.noParts", { item: itemName(b.plant.missing ?? "engine", t).toUpperCase() }) : t(`status.${b.plant.status}` as MessageKey, { ...debtVars(state, formatMoney), raw: t(`raw.${cfg.raw}` as MessageKey) })} · {t("status.paused")}
