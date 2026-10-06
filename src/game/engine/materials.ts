@@ -244,12 +244,15 @@ export function depotTrip(to: string) {
   return DOCK_TIME + (tiles / ROAD_SPEED) * (1 + TRAFFIC_ALLOWANCE);
 }
 
-/** What the emergency supplier charges for a set of materials: the market price × RESCUE.markup, plus delivery. */
-export function emergencyCost(s: GameState, stock: MaterialStock): number {
-  let c = 0;
-  for (const [m, n] of Object.entries(stock) as [MaterialId, number][]) c += (n ?? 0) * (marketPrice(s, m) * RESCUE.markup + DELIVERY_FEE);
-  return c;
+/** What the emergency supplier charges for each material of a set: the market price × RESCUE.markup, plus delivery, per unit. */
+export function emergencyCosts(s: GameState, stock: MaterialStock): MaterialStock {
+  const out: MaterialStock = {};
+  for (const [m, n] of Object.entries(stock) as [MaterialId, number][]) if ((n ?? 0) > 0) out[m] = n * (marketPrice(s, m) * RESCUE.markup + DELIVERY_FEE);
+  return out;
 }
+
+/** What the emergency supplier charges for a set of materials, in all. */
+export const emergencyCost = (s: GameState, stock: MaterialStock) => sumStock(emergencyCosts(s, stock));
 
 /**
  * An emergency delivery: material sent like an order, charged at the
@@ -259,9 +262,10 @@ export function emergencyCost(s: GameState, stock: MaterialStock): number {
 export function emergencyMaterials(s: GameState, plotId: string, stock: MaterialStock): number {
   const qty = stockTotal(stock);
   if (qty <= 0) return 0;
-  const cost = emergencyCost(s, stock);
+  const costs = emergencyCosts(s, stock);
+  const cost = sumStock(costs);
   payOrOwe(s, cost);
-  s.chain.shipments.push({ id: s.chain.nextShip++, from: DEPOT, to: plotId, item: "raw", qty, value: cost, t: 0, dur: depotTrip(plotId), back: false, vehicle: qty > 600 ? "semi" : "truck", materials: { ...stock } });
+  s.chain.shipments.push({ id: s.chain.nextShip++, from: DEPOT, to: plotId, item: "raw", qty, value: cost, t: 0, dur: depotTrip(plotId), back: false, vehicle: qty > 600 ? "semi" : "truck", materials: { ...stock }, costs });
   return cost;
 }
 
@@ -285,7 +289,7 @@ export function buyMaterial(s: GameState, plotId: string, m: MaterialId, qty: nu
   s.cash -= cost;
   s.market.bought += qty;
   // booked as a cost when the plant uses the material (see spendMaterials)
-  s.chain.shipments.push({ id: s.chain.nextShip++, from: DEPOT, to: plotId, item: "raw", qty, value: cost, t: 0, dur: depotTrip(plotId), back: false, vehicle: qty > 600 ? "semi" : "truck", materials: { [m]: qty } });
+  s.chain.shipments.push({ id: s.chain.nextShip++, from: DEPOT, to: plotId, item: "raw", qty, value: cost, t: 0, dur: depotTrip(plotId), back: false, vehicle: qty > 600 ? "semi" : "truck", materials: { [m]: qty }, costs: { [m]: cost } });
   return { ok: true, cost, qty };
 }
 
@@ -422,15 +426,23 @@ function setBasis(by: MaterialStock, m: MaterialId, v: number) {
 
 const sumStock = (st: MaterialStock) => Object.values(st).reduce<number>((a, v) => a + (v ?? 0), 0);
 
-/** Puts a delivery into the warehouse: `value` is what it cost (shared by list price when it carries several materials). */
-export function addStock(p: PlantData, materials: MaterialStock, value: number) {
+/**
+ * Puts a delivery into the warehouse. Each material enters at exactly what
+ * was paid for it: `costs` (dollars per material, delivery included) when
+ * the delivery says so; a one-material delivery is its whole `value`. Only a
+ * mixed delivery without a breakdown (loads on the road in saves from before
+ * it existed) shares its value by list price.
+ */
+export function addStock(p: PlantData, materials: MaterialStock, value: number, costs?: MaterialStock) {
   const by = costBasis(p);
+  const kinds = (Object.entries(materials) as [MaterialId, number][]).filter(([, n]) => (n ?? 0) > 0);
   const weight = listValue(materials);
   const paid = Number.isFinite(value) && value > 0 ? value : 0;
-  for (const [m, n] of Object.entries(materials) as [MaterialId, number][]) {
-    if (!((n ?? 0) > 0)) continue;
+  for (const [m, n] of kinds) {
     p.stock[m] = (p.stock[m] ?? 0) + n;
-    setBasis(by, m, (by[m] ?? 0) + (weight > 0 ? (paid * n * MATERIAL_BY_ID[m].price) / weight : 0));
+    const exact = costs?.[m];
+    const share = exact !== undefined && Number.isFinite(exact) && exact >= 0 ? exact : kinds.length === 1 ? paid : weight > 0 ? (paid * n * MATERIAL_BY_ID[m].price) / weight : 0;
+    setBasis(by, m, (by[m] ?? 0) + share);
   }
   p.stockCost = sumStock(by);
 }
