@@ -15,7 +15,7 @@ import { ZONE_BY_ID } from "../config/city";
 import { WORLD_MAP, dealerPlot } from "../city/layout";
 import type { CarId, ComponentId, DealerId, GameState, ManagerId, MaterialStock, PlantType, StructureType, ZoneId } from "../types";
 import { canOpenDealers, isManagerUnlocked } from "./actions";
-import { bestGrade, carLock, carTrip, gradeCost, hasPlant, levelCost, plantBuildCost, plantLock, plantsOf, speedCost } from "./chain";
+import { bestGrade, carLock, carTrip, gradeCost, hasPlant, levelCost, plantLock, plantsOf, speedCost } from "./chain";
 import { isPlotUnlocked, nextZone, zoneBlocker } from "./city";
 import { dealerUpgradeCost, type EconomySnapshot } from "./economy";
 import { PRESTIGE } from "../config/prestige";
