@@ -4,18 +4,16 @@ import { BUYABLE_TERRITORIES, TERRITORIES, TERRITORY_BY_ID, type TerritoryId } f
 import { territoryLock } from "@/game/engine/territory";
 import { unlockedAreas } from "@/game/engine/territory";
 import { Lock } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CAR_BY_ID } from "@/game/config/cars";
 import { COMPONENT_BY_ID } from "@/game/config/chain";
-import { ZONES, ZONE_BY_ID, buildableIn } from "@/game/config/city";
+import { ZONES, ZONE_BY_ID } from "@/game/config/city";
 import { DEALER_BY_ID } from "@/game/config/dealerships";
-import { BLOCKS, RACING, WORLD_MAP, dealerPlot, plotOf } from "@/game/city/layout";
+import { RACING, WORLD_MAP, plotOf } from "@/game/city/layout";
 import { racingBlocker, racingCost } from "@/game/engine/racing";
-import { RaceLayer } from "./race-layer";
 import { zoneBlocker } from "@/game/engine/city";
 import { plotStatus, type PlotStatus } from "@/game/engine/construction";
 import * as Ch from "@/game/engine/chain";
-import type { EconomySnapshot } from "@/game/engine/economy";
 import { formatMoney } from "@/game/format";
 import type { GameState, ZoneId } from "@/game/types";
 import { useContent } from "@/i18n/content";
@@ -24,62 +22,23 @@ import { cn } from "@/lib/utils";
 import { uiEvents } from "@/store/events";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
-import { MapEngine } from "./map-engine";
+import type { MapEngine } from "./world/engine";
 import { Showcase } from "./showcase";
-import { sprites3d } from "../three/sprites";
 import { HAS_INTERIOR } from "../plant/interior/factory-interior";
 import { setLiveryOverrides } from "../three/livery";
 import { Minimap } from "./minimap";
 import { plantName } from "../panels/plant-panel";
-import { buildScene } from "./scene";
-import type { ShipView, Site, TrafficWorld } from "./traffic";
+import type { MapArea, MapNames, ShipView, Site } from "./map-types";
 import { CAR_MODEL_FOR } from "./vehicles";
 
 /** Changes only when something visible on the map changes (not every tick). */
-function sceneKey(s: GameState, snap: EconomySnapshot) {
+function sceneKey(s: GameState) {
   const b = Object.entries(s.city.buildings)
-    .map(([id, x]) => `${id}:${x.type}:${x.level}:${x.garage?.spec ?? ""}:${x.garage?.workers ?? ""}:${x.garage?.facilities.length ?? ""}:${(snap.city.garages[id]?.incomePerSec ?? 0) > 0 ? 1 : 0}:${snap.chain.plants[id]?.car?.id ?? ""}`)
+    .map(([id, x]) => `${id}:${x.type}:${x.level}:${x.garage?.spec ?? ""}:${x.garage?.no ?? ""}:${x.works ? 1 : 0}`)
     .join("|");
   const d = Object.values(s.dealers).map((x) => `${x.owned ? 1 : 0}${x.level}`).join(",");
-  // land bought, building sites and upgrades under way
-  const w = Object.entries(s.city.buildings).filter(([, x]) => x.works).map(([id]) => id).join(",");
-  return `${s.city.zones.join()}#${(s.city.territories ?? []).join()}#${s.racing.unlocked ? 1 : 0}#${b}#${d}#${s.city.land.length}#${Object.keys(s.city.sites).join(",")}#${w}`;
+  return `${s.city.zones.join()}#${(s.city.territories ?? []).join()}#${s.racing.unlocked ? 1 : 0}#${b}#${d}#${s.city.land.length}#${Object.keys(s.city.sites).join(",")}`;
 }
-
-function trafficWorld(s: GameState, snap: EconomySnapshot): TrafficWorld {
-  const unlocked = unlockedAreas(s);
-  const garages: Site[] = [];
-  const suppliers: Site[] = [];
-  for (const [id, b] of Object.entries(s.city.buildings)) {
-    const plot = plotOf(id);
-    if (!plot) continue;
-    if (b.type === "garage") {
-      const inc = snap.city.garages[id]?.incomePerSec ?? 0;
-      if (inc > 0) garages.push({ id, entry: plot.entry, weight: 1 + (snap.city.garages[id]?.staffed ?? 0) });
-    } else if (["warehouse", "partsFactory", "logistics", "truckDepot"].includes(b.type)) {
-      suppliers.push({ id, entry: plot.entry, weight: b.level });
-    }
-  }
-  // car transporters are real shipments now (see shipViews)
-  const factories: Site[] = [];
-  const dealers: Site[] = [];
-  for (const id of Object.keys(DEALER_BY_ID) as (keyof typeof DEALER_BY_ID)[]) {
-    const plot = dealerPlot(id);
-    if (plot && s.dealers[id].owned) dealers.push({ id: plot.id, entry: plot.entry, weight: 1 });
-  }
-  const busyBlocks: [number, number][] = [];
-  for (let by = 0; by < BLOCKS; by++)
-    for (let bx = 0; bx < BLOCKS; bx++) {
-      const z = WORLD_MAP.blockZone[by][bx];
-      if (z && unlocked.has(z)) busyBlocks.push([bx, by]);
-    }
-  // people stroll in the bought town quarters too
-  for (const lm of WORLD_MAP.landmarks) if (WALKABLE.has(lm.kind) && unlocked.has(lm.territory)) busyBlocks.push([lm.bx, lm.by]);
-  return { unlocked, garages, factories, dealers, suppliers, busyBlocks };
-}
-
-/** Landmarks with pavements full of people. */
-const WALKABLE = new Set(["boulevard", "skyline", "suburbs", "campus"]);
 
 const siteOf = (id: string): Site | null => {
   const plot = plotOf(id);
@@ -113,14 +72,18 @@ function enterFactory(engine: MapEngine, plotId: string) {
   const ui = useUi.getState();
   ui.closeAll();
   returnView.current = { x: engine.cam.x, y: engine.cam.y, zoom: engine.cam.zoom };
-  engine.focusPlot(plotId, { x: 0, y: 0 }, engine.cam.maxZoom, 0.55);
+  engine.focusPlot(plotId, { x: 0, y: 0 }, engine.cam.maxZoom * 0.8, 0.55);
   setTimeout(() => useUi.getState().openFloor(plotId), 480);
 }
 
 export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffset: { x: number; y: number } }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const labelsRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<MapEngine | null>(null);
+  /** Bumped when the engine is up (effects below re-run then). */
+  const [engine, setEngine] = useState(0);
+  const [status, setStatus] = useState<"loading" | "ready" | "failed">("loading");
   const state = useGame((g) => g.state);
   const snap = useGame((g) => g.snap);
   const plot = useUi((u) => u.plot);
@@ -129,65 +92,89 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
   const { t, lang } = useT();
   const n = useContent(lang);
   const offsetRef = useRef(panelOffset);
+  const activeRef = useRef(active);
   useEffect(() => {
     offsetRef.current = panelOffset;
-  }, [panelOffset]);
+    activeRef.current = active;
+  }, [panelOffset, active]);
 
+  // the 3D map loads on its own (three.js and the world files), after the game UI
   useEffect(() => {
-    const engine = new MapEngine(canvasRef.current!, (target) => {
-      const ui = useUi.getState();
-      if (!target) ui.closeAll();
-      else if (target.kind === "zone") ui.selectZone(target.id);
-      else if (target.kind === "vehicle") ui.setShowcase(target.v);
-      else if (target.id === RACING) ui.setView("racing");
-      else if (hasInterior(target.id)) enterFactory(engine, target.id);
-      else ui.selectPlot(target.id);
-    });
-    engine.money = (v) => formatMoney(v);
-    engine.race = new RaceLayer(() => useGame.getState().state);
-    engine.racingOpen = useGame.getState().state.racing.unlocked;
-    engine.setLowGraphics(useGame.getState().state.settings.lowGraphics);
-    engine.overlay = overlayRef.current;
-    engineRef.current = engine;
-    if (process.env.NODE_ENV !== "production") Object.assign(window, { __map: engine, __game: useGame, __ui: useUi, __sprites: sprites3d });
-    const onVis = () => (document.visibilityState === "hidden" ? engine.stop() : engine.start());
-    document.addEventListener("visibilitychange", onVis);
-    const off = uiEvents.on((e) => {
-      if (e.type === "sale") {
-        engine.pop(e.plot, `+${formatMoney(e.amount)}`);
-        // a buyer drives off in the car they just bought
-        if (e.item === "car") {
-          const site = siteOf(e.plot);
-          const stock = useGame.getState().state.chain.dealers[e.plot.slice(2) as keyof typeof DEALER_BY_ID];
-          if (site) engine.traffic.spawnBuyer(site, CAR_MODEL_FOR[stock?.models[0] ?? "sedan"]);
-        }
-      } else if (e.type === "firstCar") {
-        const car = CAR_BY_ID[e.car];
-        engine.celebrateFirstCar(e.plot, CAR_MODEL_FOR[car.id], car.color);
-      }
-    });
-    // cars on the map wear the colours picked in the Design studio
-    const paint = (designs: GameState["designs"]) =>
-      setLiveryOverrides(Object.fromEntries(Object.entries(designs).map(([id, d]) => [CAR_MODEL_FOR[id as keyof typeof CAR_MODEL_FOR], d.color])));
-    paint(useGame.getState().state.designs);
-    const offPaint = useGame.subscribe((g, prev) => {
-      if (g.state.designs !== prev.state.designs) paint(g.state.designs);
-    });
-    const offGfx = useGame.subscribe((g) => {
-      engine.setLowGraphics(g.state.settings.lowGraphics);
-      engine.racingOpen = g.state.racing.unlocked;
-    });
-    // trucks follow the engine's shipments
-    const offShips = useGame.subscribe((g, prev) => {
-      if (g.state.chain.shipments !== prev.state.chain.shipments) engine.traffic.setShipments(shipViews(g.state));
-    });
+    let alive = true;
+    let made: MapEngine | null = null;
+    const offs: (() => void)[] = [];
+    import("./world/engine")
+      .then(({ MapEngine }) => {
+        if (!alive) return;
+        const e = new MapEngine(
+          canvasRef.current!,
+          labelsRef.current!,
+          (target) => {
+            const ui = useUi.getState();
+            if (!target) ui.closeAll();
+            else if (target.kind === "zone") ui.selectZone(target.id);
+            else if (target.kind === "vehicle") ui.setShowcase(target.v);
+            else if (target.id === RACING) ui.setView("racing");
+            else if (hasInterior(target.id)) enterFactory(e, target.id);
+            else ui.selectPlot(target.id);
+          },
+          { base: process.env.NEXT_PUBLIC_BASE_PATH ?? "", low: useGame.getState().state.settings.lowGraphics },
+        );
+        made = e;
+        e.money = (v) => formatMoney(v);
+        e.live = () => {
+          const g = useGame.getState();
+          return { state: g.state, snap: g.snap };
+        };
+        e.overlay = overlayRef.current;
+        e.traffic.setShipments(shipViews(useGame.getState().state));
+        engineRef.current = e;
+        if (process.env.NODE_ENV !== "production") Object.assign(window, { __map: e, __game: useGame, __ui: useUi });
+        const onVis = () => (document.visibilityState === "hidden" ? e.stop() : activeRef.current ? e.start() : undefined);
+        document.addEventListener("visibilitychange", onVis);
+        offs.push(() => document.removeEventListener("visibilitychange", onVis));
+        offs.push(
+          uiEvents.on((ev) => {
+            if (ev.type === "sale") {
+              e.pop(ev.plot, `+${formatMoney(ev.amount)}`);
+              // a buyer drives off in the car they just bought
+              if (ev.item === "car") {
+                const site = siteOf(ev.plot);
+                const stock = useGame.getState().state.chain.dealers[ev.plot.slice(2) as keyof typeof DEALER_BY_ID];
+                if (site) e.traffic.spawnBuyer(site, CAR_MODEL_FOR[stock?.models[0] ?? "sedan"]);
+              }
+            } else if (ev.type === "firstCar") {
+              const car = CAR_BY_ID[ev.car];
+              e.celebrateFirstCar(ev.plot, CAR_MODEL_FOR[car.id], car.color);
+            }
+          }),
+        );
+        // cars wear the colours picked in the Design studio
+        const paint = (designs: GameState["designs"]) =>
+          setLiveryOverrides(Object.fromEntries(Object.entries(designs).map(([id, d]) => [CAR_MODEL_FOR[id as keyof typeof CAR_MODEL_FOR], d.color])));
+        paint(useGame.getState().state.designs);
+        offs.push(
+          useGame.subscribe((g, prev) => {
+            if (g.state.designs !== prev.state.designs) paint(g.state.designs);
+            if (g.state.settings.lowGraphics !== prev.state.settings.lowGraphics) e.setLowGraphics(g.state.settings.lowGraphics);
+            // trucks follow the engine's shipments
+            if (g.state.chain.shipments !== prev.state.chain.shipments) e.traffic.setShipments(shipViews(g.state));
+          }),
+        );
+        setEngine((k) => k + 1);
+        e.ready.then(
+          () => alive && setStatus("ready"),
+          () => alive && setStatus("failed"),
+        );
+      })
+      .catch((err) => {
+        console.error("map: could not start", err);
+        if (alive) setStatus("failed");
+      });
     return () => {
-      off();
-      offShips();
-      offPaint();
-      offGfx();
-      document.removeEventListener("visibilitychange", onVis);
-      engine.destroy();
+      alive = false;
+      offs.forEach((f) => f());
+      made?.destroy();
       engineRef.current = null;
     };
   }, []);
@@ -208,21 +195,21 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
   // the camera glides after the vehicle in the showroom
   useEffect(() => {
     engineRef.current?.track(showcase?.ref ?? null);
-  }, [showcase]);
+  }, [engine, showcase]);
 
   useEffect(() => {
     const e = engineRef.current;
     if (!e) return;
     if (active) e.start();
     else e.stop();
-  }, [active]);
+  }, [engine, active]);
 
-  const key = sceneKey(state, snap);
+  const key = sceneKey(state);
   useEffect(() => {
     const e = engineRef.current;
     if (!e) return;
-    const { state: s, snap: sn } = useGame.getState();
-    const scene = buildScene(s, sn, {
+    const s = useGame.getState().state;
+    const names: MapNames = {
       garage: (no) => t("garage.title", { no: String(no).padStart(2, "0") }),
       plant: (id) => plantName(s, id, t),
       market: t("market.title"),
@@ -232,13 +219,12 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
       level: (lv) => t("common.lv", { level: lv }),
       money: (v) => formatMoney(v),
       racing: t("racing.district"),
-    }, () => useGame.getState().state);
-    e.setScene(scene, unlockedAreas(s), trafficWorld(s, sn));
-    e.traffic.setShipments(shipViews(s));
+    };
+    e.setState(s, names);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, lang]);
+  }, [engine, key, lang]);
 
-  // Floating "+$" over everything that earns on its own.
+  // floating "+$" over everything that earns on its own
   useEffect(() => {
     const e = engineRef.current;
     if (!e) return;
@@ -246,21 +232,24 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
     for (const [id, st] of Object.entries(snap.city.garages)) list.push({ plotId: id, perSec: st.incomePerSec });
     for (const [id, inc] of Object.entries(snap.city.structureIncome)) list.push({ plotId: id, perSec: inc });
     e.setEarners(list);
-  }, [snap]);
+  }, [engine, snap]);
 
   useEffect(() => {
-    if (engineRef.current) engineRef.current.selected = plot;
-  }, [plot]);
+    const e = engineRef.current;
+    if (e) e.selected = plot;
+  }, [engine, plot]);
 
   const timeMode = useUi((u) => u.timeMode);
   const preview = useUi((u) => u.preview);
   const view = useUi((u) => u.view);
   useEffect(() => {
-    if (engineRef.current) engineRef.current.timeMode = timeMode;
-  }, [timeMode]);
+    const e = engineRef.current;
+    if (e) e.timeMode = timeMode;
+  }, [engine, timeMode]);
   useEffect(() => {
-    if (engineRef.current) engineRef.current.preview = preview;
-  }, [preview]);
+    const e = engineRef.current;
+    if (e) e.preview = preview;
+  }, [engine, preview]);
 
   // BUILD mode: every plot coloured by its status (available, owned, building, operational, locked)
   const buildKey = view === "build" ? `${state.city.zones.join()}|${Object.keys(state.city.buildings).length}|${state.city.land.length}|${Object.keys(state.city.sites).length}|${Ch.plantsOf(state).map(([, b]) => b.type).join()}` : "";
@@ -275,7 +264,7 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
     const info = new Map<string, PlotStatus>();
     for (const p of WORLD_MAP.plots) if (p.kind === "plot") info.set(p.id, plotStatus(s, p.id));
     e.buildInfo = info;
-  }, [view, buildKey]);
+  }, [engine, view, buildKey]);
 
   useEffect(() => {
     const e = engineRef.current;
@@ -284,8 +273,7 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
       // zoom -1: the default zoom (coming back out of a garage)
       const zoom = command.zoom === -1 ? e.defaultZoom() : command.zoom;
       e.focusPlot(command.id, command.zoom ? { x: 0, y: 0 } : offsetRef.current, zoom);
-    }
-    else if (command.kind === "zone") e.focusZone(command.id, offsetRef.current);
+    } else if (command.kind === "zone") e.focusZone(command.id, offsetRef.current);
     else if (command.kind === "home") e.home();
     else if (command.kind === "zoom") e.zoomBy(command.f);
     else if (command.kind === "look") e.lookAt(command.x, command.y);
@@ -296,8 +284,9 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
   const areas = unlockedAreas(state);
 
   return (
-    <div className="absolute inset-0">
+    <div className="absolute inset-0 bg-[#bfe3f7]">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none select-none" aria-label={t("map.nav.map")} />
+      <canvas ref={labelsRef} className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden />
       <div ref={overlayRef} className="pointer-events-none absolute inset-0 overflow-hidden">
         {locked.map((z) => (
           <ZoneCard key={z.id} id={z.id} full={z.id === nextLocked?.id} />
@@ -314,6 +303,13 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
           <AreaLabel key={x.id} id={`t:${x.id}`} name={`${x.emoji} ${t(`territory.${x.id}`)}`} engine={engineRef} />
         ))}
       </div>
+      {status !== "ready" && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div className="rounded-full bg-[#141a3f]/85 px-4 py-2 text-xs font-black uppercase tracking-wide text-white shadow-[0_3px_0_0_rgba(0,0,0,0.3)]">
+            {status === "failed" ? t("map.noWebgl") : t("map.loading")}
+          </div>
+        </div>
+      )}
       <div className="pointer-events-none absolute right-[calc(env(safe-area-inset-right)+0.5rem)] top-[9.25rem] z-20 md:right-[calc(env(safe-area-inset-right)+0.75rem)] md:top-[5.5rem]">
         <Minimap engine={engineRef} />
       </div>
@@ -323,7 +319,7 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
 }
 
 /** A district's name over the map at the region and districts zoom; a tap flies there. */
-function AreaLabel({ id, name, engine }: { id: ZoneId | `t:${TerritoryId}`; name: string; engine: React.RefObject<MapEngine | null> }) {
+function AreaLabel({ id, name, engine }: { id: MapArea; name: string; engine: React.RefObject<MapEngine | null> }) {
   return (
     <button
       data-zone={id}
@@ -414,7 +410,7 @@ function TerritoryCard({ id }: { id: TerritoryId }) {
   );
 }
 
-/** Over the fenced-off circuit: what it takes to build the Racing District. */
+/** Over the fenced-off paddock: what it takes to build the Racing District. */
 function RacingCard() {
   const blocker = useGame((g) => racingBlocker(g.state));
   const cost = useGame((g) => racingCost(g.state));

@@ -744,6 +744,8 @@ export const en = {
   "map.zoomOut": "Zoom out",
   "map.home": "Back to Small Town",
   "map.minimap": "Minimap",
+  "map.loading": "Loading the island…",
+  "map.noWebgl": "This browser can't show the 3D map (WebGL is turned off).",
   "map.tiers": "Zoom level",
   "map.tier.region": "Region",
   "map.tier.districts": "Districts",

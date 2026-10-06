@@ -5,10 +5,13 @@ one **Small Car Body Works** and grow it into a global car empire: body works,
 engine, interior, glass, tyre and paint factories feed a **Car Assembly
 Plant**, car transporters take the finished cars to your dealerships, and
 customers drive them home. Every dollar comes from that chain, and every link of
-it is visible on the isometric **Empire Map**: trucks drive real routes between
-the plants, the Materials Depot and the Parts Market. The map is an island with
-a river and eight districts to unlock. It has day and night lighting, plants
-that grow from Small to Mega Factory, and a live factory-floor view.
+it is visible on the 3D **Empire Map**: trucks drive the real roads between
+the plants, the Materials Depot and the Parts Market. The map is an island
+city with five more islands round it, joined by bridges: eight districts and
+eight territories to unlock, each a real part of the map (a downtown of
+towers, a Speedway, a red canyon, mountains, a port, an airport…). It has day
+and night lighting, plants that grow from Small to Mega Factory, and a live
+factory-floor view. It is made for phones first.
 
 Built with Next.js (App Router, static export), TypeScript, Tailwind CSS v4,
 shadcn/ui-style components, Lucide icons, Framer Motion and Zustand. Saves go
@@ -118,10 +121,16 @@ src/game/
 src/store/    Zustand stores: game loop + autosave (game-store), panels and
               camera requests (ui-store), UI events
 src/components/
-  map/        the Empire Map on a canvas: isometric painter, camera (pan,
-              zoom, inertia, fly-to), terrain (coastline), scene of
-              buildings and scenery, plants, props, vehicle models,
-              lighting (time of day), traffic and shipments, ships, minimap
+  map/        the Empire Map: empire-map.tsx (React side, cards over the
+              districts), minimap, showcase; world/ is the 3D map (Three.js,
+              loaded on demand): terrain and sea (terrain.ts), the island's
+              buildings, trees, bridges and landmarks (scenery.ts), the
+              player's lots (plots.ts, structures.ts), traffic and
+              shipments (traffic.ts), race cars (race.ts), labels, and the
+              engine with its camera and picking (engine.ts). iso.ts,
+              camera.ts, props.ts and vehicles.ts are the 2D painter still
+              used by the garage interior, the factory floor and the race
+              viewer
   three/      the 3D models (Three.js, loaded lazily): cars, trucks and
               transporters (car-models), plant buildings (building-models),
               factory machines and robots (industrial-models), and the sprite
@@ -135,10 +144,28 @@ src/components/
   views/      supply chain, dealers, research, cars, managers, missions…
 ```
 
+### The island map
+
+The world lives in `public/world/` (heights, six ground textures, the
+buildings, trees and roads of the island, the areas of the districts and a
+minimap picture) and in `src/game/city/world-data.json` (the road graph and
+the lots, read by the game engine too). Both are generated from the map's
+sources by the map pipeline; delivery times follow the real roads
+(`roadRoute` in `src/game/city/layout.ts`), so a truck on the map always
+drives the route the engine timed.
+
+The camera pans, pinches, twists (two fingers or right-drag) and flies; far
+out it looks straight down on the whole archipelago, close in it tilts over
+the streets. Locked districts and territories fade into a grey haze. On
+phones the map keeps to a few hundred draw calls; the battery-saver setting
+turns off shadows, halves the traffic and the ground textures, and draws at
+30 FPS.
+
 ### 3D graphics
 
-The map stays a fast 2D canvas, but cars, trucks, car transporters, plant
-buildings and factory machines are real 3D models. `three/sprites.ts` renders
+Cars, trucks, car transporters, plant buildings and factory machines are real
+3D models. On the map they are baked into a few meshes each and shared by
+every lot with the same look. For the 2D views, `three/sprites.ts` renders
 each model once, with an orthographic camera locked to the map's projection
 (30° elevation, 45° yaw), PBR materials (clear-coat paint, glass, rubber,
 metal), an environment map, a soft-shadowed sun and a contact shadow, and

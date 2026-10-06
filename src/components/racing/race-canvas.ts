@@ -10,8 +10,8 @@ import type { RaceRecord } from "@/game/types";
 import { applyLighting } from "../map/lighting";
 import { Painter, rand, sx, sy } from "../map/iso";
 import { billboard, lightPole, tireStack } from "../map/props";
-import { RaceReplay, drawRaceCar, type RaceCarView } from "../map/race-layer";
-import { podium } from "../map/racing-district";
+import { RaceReplay, drawRaceCar, type RaceCarView } from "./race-replay";
+import { podium } from "./podium";
 import { CAR_MODEL_FOR, drawModel } from "../map/vehicles";
 import { DEFAULT_LOOK, paintTrack, type TrackLook } from "./track-paint";
 
