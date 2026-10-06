@@ -24,8 +24,7 @@ export function PlantFloor({ plotId }: { plotId: string }) {
   const selectPlot = useUi((u) => u.selectPlot);
   const { t } = useT();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const engineRef = useRef<FloorEngine | null>(null);
-  const b = state.city.buildings[plotId];
+  const engineRef = useRef<FloorEngine | null>(null);\n  const [cinematic, setCinematic] = useState(false);\n  const b = state.city.buildings[plotId];
 
   useEffect(() => {
     const engine = new FloorEngine(canvasRef.current!);
@@ -59,8 +58,7 @@ export function PlantFloor({ plotId }: { plotId: string }) {
       item: cfg.item ?? "car",
       model: st.car ? CAR_MODEL_FOR[st.car.id] : undefined,
       paint: st.car?.color,
-      accent: cfg.roof,
-    });
+      accent: cfg.roof,\n      rawMaterial: cfg.raw,\n      cinematic,\n    });
   }, [p, st, b, t, cinematic]);
 
   if (!b?.plant || !st) return null;
@@ -82,7 +80,7 @@ export function PlantFloor({ plotId }: { plotId: string }) {
         </div>
         <Badge variant="gold">
           {t("common.lv", { level: b.level })} · {t(`plantLevel.${b.level}` as MessageKey)}
-        </Badge>
+        </Badge>\n        <Button size="sm" variant={cinematic ? "default" : "secondary"} onClick={() => setCinematic((v) => !v)} className="hidden sm:flex">\n          🎥 {cinematic ? "LIVE" : "Factory Cam"}\n        </Button>
       </header>
       <div className="relative min-h-0 flex-1">
         <canvas ref={canvasRef} className="absolute inset-0 size-full touch-none" />
@@ -94,7 +92,7 @@ export function PlantFloor({ plotId }: { plotId: string }) {
           </div>
         )}
       </div>
-      <footer className="grid gap-2 border-t border-white/10 bg-ink/90 p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur-xl sm:grid-cols-[1fr_auto]">\n        <Button size="sm" variant={cinematic ? "default" : "secondary"} className="sm:hidden" onClick={() => setCinematic((v) => !v)}>\n          🎥 {cinematic ? "LIVE FACTORY" : "Factory Cam"}\n        </Button>
+      <footer className="grid gap-2 border-t border-white/10 bg-ink/90 p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur-xl sm:grid-cols-[1fr_auto]">\n        <Button size="sm" variant={cinematic ? "default" : "secondary"} className="sm:hidden" onClick={() => setCinematic((v) => !v)}>\n          🎥 {cinematic ? "LIVE FACTORY" : "Factory Cam"}\n        </Button>\n        <Button size="sm" variant={cinematic ? "default" : "secondary"} className="sm:hidden" onClick={() => setCinematic((v) => !v)}>\n          🎥 {cinematic ? "LIVE FACTORY" : "Factory Cam"}\n        </Button>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
           {cfg.item && <StockBar label={t(`raw.${cfg.raw}` as MessageKey)} value={stockTotal(b.plant.stock)} cap={st.rawCap} color="#a8a29e" />}
           <StockBar label={`📦 ${itemName(item, t)}`} value={b.plant.out} cap={st.outCap} color="#38bdf8" />
