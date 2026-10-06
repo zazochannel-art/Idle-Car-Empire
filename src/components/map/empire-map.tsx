@@ -3,7 +3,7 @@
 import { BUYABLE_TERRITORIES, TERRITORIES, TERRITORY_BY_ID, type TerritoryId } from "@/game/config/city";
 import { territoryLock } from "@/game/engine/territory";
 import { unlockedAreas } from "@/game/engine/territory";
-import { Lock } from "lucide-react";
+import { Lock, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { CAR_BY_ID } from "@/game/config/cars";
 import { COMPONENT_BY_ID } from "@/game/config/chain";
@@ -84,6 +84,8 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
   /** Bumped when the engine is up (effects below re-run then). */
   const [engine, setEngine] = useState(0);
   const [status, setStatus] = useState<"loading" | "ready" | "failed">("loading");
+  /** The padlock whose card is open. */
+  const [lockOpen, setLockOpen] = useState<MapArea | null>(null);
   const state = useGame((g) => g.state);
   const snap = useGame((g) => g.snap);
   const plot = useUi((u) => u.plot);
@@ -111,6 +113,7 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
           labelsRef.current!,
           (target) => {
             const ui = useUi.getState();
+            setLockOpen(null);
             if (!target) ui.closeAll();
             else if (target.kind === "zone") ui.selectZone(target.id);
             else if (target.kind === "vehicle") ui.setShowcase(target.v);
@@ -279,22 +282,20 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
     else if (command.kind === "look") e.lookAt(command.x, command.y);
   }, [command]);
 
-  const nextLocked = ZONES.find((z) => !state.city.zones.includes(z.id));
-  const locked = ZONES.filter((z) => !state.city.zones.includes(z.id));
   const areas = unlockedAreas(state);
+  // one padlock on every district and territory still locked (and on the paddock)
+  const locks: { id: MapArea; ready: boolean; name: string }[] = [
+    ...ZONES.filter((z) => !state.city.zones.includes(z.id)).map((z) => ({ id: z.id as MapArea, ready: !zoneBlocker(state, z.id) && state.cash >= z.cost, name: t(`zone.${z.id}`) })),
+    ...BUYABLE_TERRITORIES.filter((x) => !areas.has(x.id)).map((x) => ({ id: `t:${x.id}` as MapArea, ready: territoryLock(state, x.id) === null && state.cash >= x.cost, name: t(`territory.${x.id}`) })),
+    ...(!state.racing.unlocked && state.chain.firstCar ? [{ id: "racing" as MapArea, ready: racingBlocker(state) === null && state.cash >= racingCost(state), name: t("racing.district") }] : []),
+  ];
+  const openLock = locks.some((l) => l.id === lockOpen) ? lockOpen : null;
 
   return (
     <div className="absolute inset-0 bg-[#bfe3f7]">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none select-none" aria-label={t("map.nav.map")} />
       <canvas ref={labelsRef} className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden />
       <div ref={overlayRef} className="pointer-events-none absolute inset-0 overflow-hidden">
-        {locked.map((z) => (
-          <ZoneCard key={z.id} id={z.id} full={z.id === nextLocked?.id} />
-        ))}
-        {!state.racing.unlocked && state.chain.firstCar && <RacingCard />}
-        {BUYABLE_TERRITORIES.filter((t) => !areas.has(t.id)).map((t) => (
-          <TerritoryCard key={t.id} id={t.id} />
-        ))}
         {/* from far away: the names of the districts and territories already open */}
         {ZONES.filter((z) => areas.has(z.id)).map((z) => (
           <AreaLabel key={z.id} id={z.id} name={t(`zone.${z.id}`)} engine={engineRef} />
@@ -302,6 +303,10 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
         {TERRITORIES.filter((x) => areas.has(x.id)).map((x) => (
           <AreaLabel key={x.id} id={`t:${x.id}`} name={`${x.emoji} ${t(`territory.${x.id}`)}`} engine={engineRef} />
         ))}
+        {locks.map((l) => (
+          <LockPin key={l.id} {...l} open={openLock === l.id} onToggle={() => setLockOpen((o) => (o === l.id ? null : l.id))} />
+        ))}
+        {openLock && <LockCard key={openLock} id={openLock} onClose={() => setLockOpen(null)} />}
       </div>
       {status !== "ready" && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
@@ -333,7 +338,50 @@ function AreaLabel({ id, name, engine }: { id: MapArea; name: string; engine: Re
   );
 }
 
-function ZoneCard({ id, full }: { id: ZoneId; full: boolean }) {
+/** A locked district, territory or the Racing District: one padlock, the same size at every zoom. */
+function LockPin({ id, ready, name, open, onToggle }: { id: MapArea; ready: boolean; name: string; open: boolean; onToggle: () => void }) {
+  const { t } = useT();
+  return (
+    <button
+      data-zone={id}
+      data-fixed=""
+      onClick={onToggle}
+      aria-label={`${t("map.locked")}: ${name}`}
+      aria-expanded={open}
+      className={cn(
+        "pointer-events-auto absolute left-0 top-0 flex size-8 items-center justify-center rounded-full shadow-[0_3px_0_0_rgba(0,0,0,0.35)] will-change-transform",
+        ready ? "bg-gold text-[#2a1d00] ring-2 ring-white/80" : "bg-[#2b2b2e]/90 text-white/85 ring-1 ring-white/25",
+        open && "ring-2 ring-gold",
+      )}
+      style={{ visibility: "hidden" }}
+    >
+      <Lock className="size-4" strokeWidth={2.5} />
+    </button>
+  );
+}
+
+const unlockBtn = (can: boolean) =>
+  cn(
+    "mt-1.5 w-full rounded-lg px-2 py-1.5 text-[11px] font-black uppercase tracking-wide transition",
+    can ? "bg-gold text-[#2a1d00] shadow-[0_2px_0_0_#c48300] hover:brightness-105" : "bg-white/10 text-white/70",
+  );
+
+/** What a padlock's area is, what it takes and its price; opens over the padlock. */
+function LockCard({ id, onClose }: { id: MapArea; onClose: () => void }) {
+  const { t } = useT();
+  return (
+    <div data-zone={id} data-anchor="above" className="pointer-events-auto absolute left-0 top-0 w-52 will-change-transform" style={{ visibility: "hidden" }}>
+      <div className="relative rounded-xl bg-[#2b2b2e]/95 px-2.5 pb-2.5 pt-2 text-center shadow-[0_12px_30px_-8px_rgba(0,0,0,.7)] ring-1 ring-white/15 backdrop-blur-md">
+        <button onClick={onClose} aria-label={t("map.close")} className="absolute right-1 top-1 flex size-6 items-center justify-center rounded-full text-white/55 hover:text-white">
+          <X className="size-3.5" />
+        </button>
+        {id === "racing" ? <RacingInfo /> : id.startsWith("t:") ? <TerritoryInfo id={id.slice(2) as TerritoryId} /> : <ZoneInfo id={id as ZoneId} />}
+      </div>
+    </div>
+  );
+}
+
+function ZoneInfo({ id }: { id: ZoneId }) {
   const cash = useGame((g) => g.state.cash);
   const blocker = useGame((g) => zoneBlocker(g.state, id));
   const unlockZone = useGame((g) => g.unlockZone);
@@ -341,46 +389,26 @@ function ZoneCard({ id, full }: { id: ZoneId; full: boolean }) {
   const { t } = useT();
   const z = ZONE_BY_ID[id];
   const can = !blocker && cash >= z.cost;
-
   return (
-    <div data-zone={id} className="pointer-events-auto absolute left-0 top-0 will-change-transform" style={{ visibility: "hidden" }}>
-      {full ? (
-        <div className="w-56 rounded-xl bg-[#2b2b2e]/95 ring-2 ring-gold p-3 text-center shadow-[0_20px_50px_-10px_rgba(0,0,0,.8)] backdrop-blur-md">
-          <div className="mx-auto mb-1 flex size-9 items-center justify-center rounded-full bg-gold/15 ring-1 ring-gold/40">
-            <Lock className="size-4 text-gold" />
-          </div>
-          <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-gold/80">{t("map.stage", { n: z.stage })}</div>
-          <div className="text-sm font-black uppercase tracking-wide">{t(`zone.${id}`)}</div>
-          <div className="mt-0.5 text-[11px] leading-snug text-white/55">{t(`zoneDesc.${id}`)}</div>
-          <button
-            onClick={() => (can ? unlockZone(id) : selectZone(id))}
-            className={cn(
-              "mt-2 w-full rounded-xl px-3 py-2 text-xs font-black uppercase tracking-wider transition",
-              can ? "bg-gold text-[#2a1d00] shadow-[0_3px_0_0_#c48300] hover:brightness-105" : "bg-white/10 text-white/70",
-            )}
-          >
-            🔓 {t("map.unlock")} · {formatMoney(z.cost)}
-          </button>
-          {blocker && <div className="mt-1 text-[10px] text-amber-300/80">{t("map.requires", { name: t(`zone.${blocker}`) })}</div>}
-        </div>
-      ) : (
-        <button onClick={() => selectZone(id)} className="flex items-center gap-1.5 rounded-full bg-[#2b2b2e]/90 px-3 py-1.5 text-[11px] font-bold backdrop-blur-md">
-          <Lock className="size-3 text-white/60" />
-          <span className="text-white/50">{t("map.stage", { n: z.stage })}</span>
-          <span>{t(`zone.${id}`)}</span>
-        </button>
-      )}
-    </div>
+    <>
+      <div className="text-[9px] font-bold uppercase tracking-[0.18em] text-gold/80">{t("map.stage", { n: z.stage })}</div>
+      <div className="px-5 text-xs font-black uppercase tracking-wide">{t(`zone.${id}`)}</div>
+      <div className="mt-0.5 text-[10px] leading-snug text-white/55">{t(`zoneDesc.${id}`)}</div>
+      <button onClick={() => (can ? unlockZone(id) : selectZone(id))} className={unlockBtn(can)}>
+        🔓 {t("map.unlock")} · {formatMoney(z.cost)}
+      </button>
+      {blocker && <div className="mt-1 text-[9px] leading-snug text-amber-300/80">{t("map.requires", { name: t(`zone.${blocker}`) })}</div>}
+    </>
   );
 }
 
-/** Over a territory not bought yet: what it is, what it takes, and its price. */
-function TerritoryCard({ id }: { id: TerritoryId }) {
+function TerritoryInfo({ id }: { id: TerritoryId }) {
   const state = useGame((g) => g.state);
   const lock = territoryLock(state, id);
   const unlock = useGame((g) => g.unlockTerritory);
   const { t } = useT();
   const cfg = TERRITORY_BY_ID[id];
+  const can = !lock && state.cash >= cfg.cost;
   const why =
     lock?.kind === "zone"
       ? t("map.requires", { name: t(`zone.${lock.zone}`) })
@@ -390,28 +418,20 @@ function TerritoryCard({ id }: { id: TerritoryId }) {
           ? t("territory.needEp", { n: lock.need })
           : null;
   return (
-    <div data-zone={`t:${id}`} className="pointer-events-auto absolute left-0 top-0 will-change-transform" style={{ visibility: "hidden" }}>
-      <button
-        onClick={() => !lock && unlock(id)}
-        className={cn(
-          "flex max-w-[15rem] flex-col items-center rounded-xl px-3 py-1.5 text-center backdrop-blur-md",
-          !lock ? "bg-[#2b2b2e]/95 ring-2 ring-gold shadow-[0_3px_0_0_rgba(0,0,0,0.4)]" : "bg-[#2b2b2e]/92",
-        )}
-      >
-        <span className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wide">
-          <Lock className="size-3 text-white/60" />
-          {cfg.emoji} {t(`territory.${id}`)}
-        </span>
-        <span className="text-[10px] leading-snug text-white/55">{t(`territoryDesc.${id}`)}</span>
-        <span className={cn("mt-0.5 text-[11px] font-black", !lock ? "text-gold" : "text-white/70")}>🔓 {formatMoney(cfg.cost)}</span>
-        {why && <span className="text-[10px] text-amber-300/80">{why}</span>}
+    <>
+      <div className="px-5 text-xs font-black uppercase tracking-wide">
+        {cfg.emoji} {t(`territory.${id}`)}
+      </div>
+      <div className="mt-0.5 text-[10px] leading-snug text-white/55">{t(`territoryDesc.${id}`)}</div>
+      <button onClick={() => can && unlock(id)} disabled={!can} className={unlockBtn(can)}>
+        🔓 {t("map.unlock")} · {formatMoney(cfg.cost)}
       </button>
-    </div>
+      {why && <div className="mt-1 text-[9px] leading-snug text-amber-300/80">{why}</div>}
+    </>
   );
 }
 
-/** Over the fenced-off paddock: what it takes to build the Racing District. */
-function RacingCard() {
+function RacingInfo() {
   const blocker = useGame((g) => racingBlocker(g.state));
   const cost = useGame((g) => racingCost(g.state));
   const unlock = useGame((g) => g.unlockRacing);
@@ -419,22 +439,13 @@ function RacingCard() {
   const { t } = useT();
   const can = blocker === null;
   return (
-    <div data-zone="racing" className="pointer-events-auto absolute left-0 top-0 will-change-transform" style={{ visibility: "hidden" }}>
-      <div className="w-56 rounded-xl bg-[#2b2b2e]/95 ring-2 ring-gold p-3 text-center shadow-[0_20px_50px_-10px_rgba(0,0,0,.8)] backdrop-blur-md">
-        <div className="text-2xl">🏁</div>
-        <div className="text-sm font-black uppercase tracking-wide">{t("racing.district")}</div>
-        <div className="mt-0.5 text-[11px] leading-snug text-white/55">{t("racing.districtDesc")}</div>
-        <button
-          onClick={() => (can ? unlock() : setView("racing"))}
-          className={cn(
-            "mt-2 w-full rounded-xl px-3 py-2 text-xs font-black uppercase tracking-wider transition",
-            can ? "bg-gold text-[#2a1d00] shadow-[0_3px_0_0_#c48300] hover:brightness-105" : "bg-white/10 text-white/70",
-          )}
-        >
-          🔓 {t("racing.build")} · {formatMoney(cost)}
-        </button>
-        {blocker === "firstCar" && <div className="mt-1 text-[10px] text-amber-300/80">{t("racing.blocker.firstCar")}</div>}
-      </div>
-    </div>
+    <>
+      <div className="px-5 text-xs font-black uppercase tracking-wide">🏁 {t("racing.district")}</div>
+      <div className="mt-0.5 text-[10px] leading-snug text-white/55">{t("racing.districtDesc")}</div>
+      <button onClick={() => (can ? unlock() : setView("racing"))} className={unlockBtn(can)}>
+        🔓 {t("racing.build")} · {formatMoney(cost)}
+      </button>
+      {blocker === "firstCar" && <div className="mt-1 text-[9px] leading-snug text-amber-300/80">{t("racing.blocker.firstCar")}</div>}
+    </>
   );
 }

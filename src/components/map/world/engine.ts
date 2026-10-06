@@ -727,7 +727,12 @@ export class MapEngine {
     this.banners = this.banners.filter((b) => b.age < 2.6);
   }
 
-  /** HTML cards over the areas follow the camera. */
+  /**
+   * HTML over the areas follows the camera: names (data-far: only from far
+   * away, shrinking with the zoom), padlocks (data-fixed: always the same
+   * size) and the card a padlock opens (data-anchor="above": over its
+   * padlock, kept on the screen).
+   */
   private placeCards() {
     const cards = this.overlay?.children ?? [];
     const k = Math.max(0.5, Math.min(1, this.cam.zoom * 2.4));
@@ -738,9 +743,20 @@ export class MapEngine {
       const c = this.areaCenter(id);
       const p = this.project(c.x, this.ground ? this.ground.at(c.x, c.y) + 0.5 : 0.5, c.y);
       const far = el.dataset.far !== undefined;
-      const off = !this.onScreen(p, 200) || (far && this.cam.zoom > LABEL_ZOOM);
-      if (p) el.style.transform = `translate(${Math.round(p[0])}px, ${Math.round(p[1])}px) translate(-50%, -50%) scale(${k.toFixed(2)})`;
+      const above = el.dataset.anchor === "above";
+      const off = !this.onScreen(p, above ? 0 : 200) || (far && this.cam.zoom > LABEL_ZOOM);
       el.style.visibility = off ? "hidden" : "visible";
+      if (!p || off) continue;
+      if (above) {
+        // the card sits over its padlock, or under it when there is no room above
+        const hw = el.offsetWidth / 2;
+        const x = Math.max(hw + 8, Math.min(this.w - hw - 8, p[0]));
+        const up = p[1] - el.offsetHeight - 26 > 8;
+        el.style.transform = `translate(${Math.round(x)}px, ${Math.round(p[1])}px) translate(-50%, ${up ? "calc(-100% - 22px)" : "22px"})`;
+      } else {
+        const s = el.dataset.fixed !== undefined ? 1 : k;
+        el.style.transform = `translate(${Math.round(p[0])}px, ${Math.round(p[1])}px) translate(-50%, -50%) scale(${s.toFixed(2)})`;
+      }
     }
   }
 
