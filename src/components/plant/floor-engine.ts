@@ -257,6 +257,13 @@ export class FloorEngine {
     }
     // a forklift shuttles finished goods to the dock
     forklift(p, gw - 2.6, 1.2, gw - 2.6, gd - 1.5, this.t * 0.25, 3);
+    // Loading animation: finished goods move onto the outbound dock before departure.
+    if (s.out > 0.02) {
+      const load = (Math.sin(this.t * 2.4) + 1) * 0.5;
+      forklift(p, gw - 2.7 + load * 0.5, gd - 2.2, gw + 0.3, gd - 1.5, this.t * 0.45, 3);
+      p.light(sx(gw - 1.7, gd - 1.1), sy(gw - 1.7, gd - 1.1, 8), 14, s.accent, 0.35);
+    }
+
     // trucks waiting at the dock outside the front wall
     for (let i = 0; i < Math.min(2, s.docked); i++) drawTruck(p, gw + 0.9, gd - 1.2 - i * 1.6, 1, s.color, 1);
 
