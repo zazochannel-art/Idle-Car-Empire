@@ -6,6 +6,7 @@ import { materialTrendMult } from "./market";
 import {
   AUTO_BUY,
   BULK_DISCOUNT,
+  DEBT,
   COMPONENT_RECIPE,
   DELIVERY_FEE,
   GRADE_MATERIAL,
@@ -98,9 +99,28 @@ export function payOrOwe(s: GameState, amount: number) {
   s.chain.owed += amount - now;
 }
 
-/** Whether a cost of `amount` may go on the company's account now. */
+/** The company account's limit (set each tick from what the plants cost to run). */
+export const debtLimit = (s: GameState) => Math.max(DEBT.min, s.chain.debtLimit ?? 0);
+
+/** Whether a cost of `amount` may go (partly) on the company's account now: not while suspended, never past the limit. */
 export function canOwe(s: GameState, amount: number): boolean {
-  return amount > 0 && Number.isFinite(amount);
+  if (!(amount > 0) || !Number.isFinite(amount) || s.chain.suspended) return false;
+  return s.chain.owed + Math.max(0, amount - Math.max(0, s.cash)) <= debtLimit(s);
+}
+
+/** What a SUSPENDED status line says: what is owed, the limit, and where production resumes (formatted by the caller). */
+export function debtVars(s: GameState, fmt: (n: number) => string) {
+  const limit = debtLimit(s);
+  return { owed: fmt(s.chain.owed), limit: fmt(limit), resume: fmt(limit * DEBT.resume) };
+}
+
+/** Pays `amount` of the account from the cash (as far as both go). */
+export function repay(s: GameState, amount: number) {
+  const pay = Math.min(s.chain.owed, Math.max(0, amount), Math.max(0, s.cash));
+  if (!(pay > 0)) return;
+  s.cash -= pay;
+  s.chain.owed -= pay;
+  if (s.chain.owed < 1e-6) s.chain.owed = 0;
 }
 
 /** A cash reward (missions, achievements, events, contracts…): paid in and booked below the line. */

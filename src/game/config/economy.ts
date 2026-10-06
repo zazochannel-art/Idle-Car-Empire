@@ -202,11 +202,19 @@ export const UPGRADE_SCALING = {
 };
 
 /**
- * Wages, energy and trip fees the cash cannot cover yet go on the company's
- * account and are paid first from the next sales. The debt stays small by
- * construction: materials are always paid up front, so a plant can only
- * work on account for as long as its warehouse has material.
+ * The company's account with its suppliers. Wages, energy, maintenance and
+ * truck trips the cash can't cover yet go on it (and, for bought-in tyres and
+ * drivetrain parts, the next batch; and the emergency supplier) — never
+ * materials: those are paid when ordered. It is paid back out of profit:
+ * `repay` of the chain's average net income, every second, from the cash —
+ * so the cash that buys the next materials is never swallowed by it — and
+ * cash that covers it twice over settles it. Its limit is `seconds` of what
+ * the plants cost to run, at least `min`: above it every plant is SUSPENDED
+ * until it is paid down to `resume` × the limit (cash that covers it settles
+ * it at once).
  */
+export const DEBT = { min: 10_000, seconds: 300, resume: 0.5, repay: 0.5 };
+
 
 /**
  * A company that is completely stuck (can't afford one unit of material

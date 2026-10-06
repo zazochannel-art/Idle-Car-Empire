@@ -11,7 +11,7 @@ import { DEALER_BY_ID, DEALER_SPECIALTY } from "@/game/config/dealerships";
 import { MANAGERS } from "@/game/config/managers";
 import { DEPOT, MARKET, plotOf } from "@/game/city/layout";
 import { MATERIALS } from "@/game/config/economy";
-import { marketPrice, usedMaterials } from "@/game/engine/materials";
+import { debtVars, marketPrice, usedMaterials } from "@/game/engine/materials";
 import { REGIONS } from "@/game/config/regions";
 import { AUTO_UPGRADE_FROM, plantNetValue, plantProfitPerMin, plantUnitCost, automationCost, bestGrade, carLock, carValue, componentValue, dealerStats, trucksOf, gradeCost, levelCost, hasPlant, plantNumber, plantsOf, recipe, speedCost, supplied, suppliedGrade, supplierPrice } from "@/game/engine/chain";
 import { isManagerUnlocked } from "@/game/engine/actions";
@@ -431,6 +431,9 @@ function StatusLine({ id }: { id: string }) {
   } else if (p.status === "noCash") {
     tone = "bad";
     text = t("status.noCash");
+  } else if (p.status === "suspended") {
+    tone = "bad";
+    text = t("status.suspended", debtVars(state, formatMoney));
   } else if (p.status === "full") {
     tone = "wait";
     text = t("status.full");

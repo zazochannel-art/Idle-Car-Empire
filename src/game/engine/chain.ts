@@ -40,7 +40,7 @@ import {
   isPlantType,
 } from "../config/chain";
 import { DEALERS, DEALER_BY_ID, DEALER_MARKUP_PER_LEVEL, DEALER_SPECIALTY } from "../config/dealerships";
-import { MATERIALS as MATERIALS_LIST, CAR_STORAGE, CLASS_DEMAND, DEALER_FEE, RESCUE, SALES_TAX, TRIP_FEE, UPGRADE_SCALING, WAREHOUSE_CAP, POWER_SYSTEM, type MaterialId } from "../config/economy";
+import { MATERIALS as MATERIALS_LIST, CAR_STORAGE, CLASS_DEMAND, DEALER_FEE, DEBT, RESCUE, SALES_TAX, TRIP_FEE, UPGRADE_SCALING, WAREHOUSE_CAP, POWER_SYSTEM, type MaterialId } from "../config/economy";
 import { assemblyTime, carListPrice, carStdCost, componentPrice, componentStdCost, componentTime, opRates, opTotal, type OpRates } from "./costs";
 import {
   addStock,
@@ -48,16 +48,17 @@ import {
   book,
   canOwe,
   depotTrip,
+  grantMaterials,
   migrateCostBasis,
   spendMaterials,
   createLedger,
-  grantMaterials,
   chainNet,
   migrateLedger,
   migrateStock,
   orderCost,
   payOrOwe,
   powerCost,
+  repay,
   settleLedger,
   shortfall,
   unitMaterials,
@@ -257,12 +258,22 @@ export function supplierPrice(c: ComponentId, grade = 1, emergency = false): num
 const partsComing = (s: GameState, plot: string, c: ComponentId) => s.chain.shipments.some((sh) => !sh.back && sh.to === plot && sh.item === c && sh.from === DEPOT);
 
 /**
+ * An assembly line stopped on a bought-in part it can't get (no cash, no
+ * credit, nothing on the way): parts made for it are sold at the Parts
+ * Market meanwhile, which brings the cash to buy the missing part.
+ */
+function lineWaitsOnSupplier(s: GameState, plot: string, p: PlantData): boolean {
+  const m = p.missing;
+  return p.status === "noParts" && !!m && OUTSOURCED_PARTS.includes(m) && supplied(s, m) && !partsComing(s, plot, m);
+}
+
+/**
  * Orders finished parts from the outside supplier for an assembly plant:
  * a few batches' worth (one batch for emergency parts), paid now as far as
  * the cash goes, and driven over from the depot. With no cash at all, the
- * supplier gives trade credit for the next batch only (on the company's
- * account, within its debt limit): the car it completes pays it back.
- * Emergency parts are never on credit. Returns what the order cost.
+ * supplier gives trade credit for the next batch only, on the company's
+ * account and within its limit. Emergency parts are never on credit.
+ * Returns what the order cost.
  */
 function orderParts(s: GameState, plot: string, p: PlantData, st: PlantStats, c: ComponentId): number {
   if (!st.car) return 0;
@@ -672,7 +683,7 @@ function destination(s: GameState, snap: ChainSnapshot, id: string, b: BuildingS
   for (const [id, other] of plantsOf(s)) {
     if (other.type !== "assemblyPlant") continue;
     const ost = snap.plants[id];
-    if (!ost?.car || !recipe(ost.car).includes(cfg.item)) continue;
+    if (!ost?.car || !recipe(ost.car).includes(cfg.item) || lineWaitsOnSupplier(s, id, other.plant)) continue;
     const room = ost.inCap - (other.plant.inputs[cfg.item] ?? 0) - incoming(s, id, cfg.item);
     if (room > 0 && (!best || room > best.room)) best = { to: id, room };
   }
@@ -702,12 +713,7 @@ export function chainTick(
   const out: ChainTickOut = { earned: 0, spent: 0, components: 0, cars: 0, deliveries: 0, rp: 0, wholesale: 0, carsSold: 0, materials: 0 };
   const lm = logisticsMods(s);
   s.market.t += dt;
-  // settle what the company owes for trips before anything else
-  if (s.chain.owed > 0 && s.cash > 0) {
-    const pay = Math.min(s.chain.owed, s.cash);
-    s.cash -= pay;
-    s.chain.owed -= pay;
-  }
+  accountTick(s, dt, snap, events);
   rescue(s);
   qualityTick(s, dt);
   const earn = (amount: number) => {
@@ -767,6 +773,9 @@ export function chainTick(
     const run = st.opPerSec * dt * speed;
     if (can.n <= 0) {
       p.status = can.why;
+    } else if (s.chain.suspended) {
+      // over the account's limit: the plant stands still until sales have paid it down
+      p.status = "suspended";
     } else {
       p.status = "ok";
       p.missing = undefined;
@@ -951,6 +960,37 @@ export function chainTick(
 
 /** Seconds the steady income averages over. */
 const STEADY_WINDOW = 600;
+
+/** Goods the company still has to sell: on the road, at a plant's dock, at a dealer or on a ship. */
+function goodsInPipeline(s: GameState): boolean {
+  if (s.chain.shipments.some((sh) => !sh.back && sh.item !== "raw" && sh.from !== DEPOT)) return true;
+  if (Object.values(s.chain.dealers).some((d) => (d?.cars ?? 0) >= 1)) return true;
+  if (plantsOf(s).some(([, b]) => b.plant.out >= 1)) return true;
+  return s.export.ships.length > 0 || Object.values(s.export.dock).some((d) => (d?.cars.length ?? 0) > 0);
+}
+
+/**
+ * The company's account (DEBT): its limit follows what the plants cost to
+ * run; it is paid out of profit (DEBT.repay of the average net income), and
+ * cash that covers it twice over (or at all, while suspended) settles it.
+ * Over the limit every plant is suspended until it is paid down to
+ * DEBT.resume × the limit — or until nothing is left to sell (then only
+ * producing again can pay it back).
+ */
+function accountTick(s: GameState, dt: number, snap: ChainSnapshot, events?: GameEvent[]) {
+  const C = s.chain;
+  const run = Object.values(snap.plants).reduce((a, st) => a + st.opPerSec, 0);
+  C.debtLimit = Math.max(DEBT.min, run * DEBT.seconds);
+  if (C.owed > 0) {
+    // cash that covers it settles it; otherwise it is paid out of profit
+    if (s.cash >= 2 * C.owed || (C.suspended && s.cash >= C.owed)) repay(s, C.owed);
+    else repay(s, DEBT.repay * Math.max(0, C.steady ?? C.rate) * dt);
+  }
+  const was = !!C.suspended;
+  if (C.owed >= C.debtLimit) C.suspended = true;
+  if (C.suspended && (C.owed <= C.debtLimit * DEBT.resume || !goodsInPipeline(s))) delete C.suspended;
+  if (C.suspended && !was) events?.push({ type: "suspended" });
+}
 
 /**
  * A company that is completely stuck — no plant can work, it can't afford one
@@ -1235,7 +1275,7 @@ export function migratePlant(type: PlantType, raw: unknown): PlantData {
   p.outValue = num(raw.outValue);
   p.made = num(raw.made);
   p.wait = num(raw.wait);
-  if (raw.status === "noRaw" || raw.status === "full" || raw.status === "noParts" || raw.status === "noModel" || raw.status === "noCash") p.status = raw.status;
+  if (raw.status === "noRaw" || raw.status === "full" || raw.status === "noParts" || raw.status === "noModel" || raw.status === "noCash" || raw.status === "suspended") p.status = raw.status;
   if (typeof raw.missing === "string" && raw.missing in COMPONENT_BY_ID) p.missing = raw.missing as ComponentId;
   p.car = typeof raw.car === "string" && raw.car in CAR_BY_ID ? (raw.car as CarId) : null;
   if (raw.mode === "fast" || raw.mode === "premium") p.mode = raw.mode;
@@ -1252,6 +1292,8 @@ export function migrateChain(raw: unknown, s: GameState): ChainState {
   chain.wholesale = 0;
   chain.ledger = migrateLedger(raw.ledger);
   chain.owed = num(raw.owed);
+  if (typeof raw.debtLimit === "number" && Number.isFinite(raw.debtLimit) && raw.debtLimit > 0) chain.debtLimit = raw.debtLimit;
+  if (raw.suspended === true) chain.suspended = true;
   if (typeof raw.steady === "number" && Number.isFinite(raw.steady)) chain.steady = raw.steady;
   if (typeof raw.rescueT === "number" && Number.isFinite(raw.rescueT)) chain.rescueT = raw.rescueT;
   chain.nextShip = int(raw.nextShip, 1, 1e12, 1);

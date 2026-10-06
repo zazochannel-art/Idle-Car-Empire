@@ -6,7 +6,7 @@
 import { MATERIALS, SUPPLIERS } from "@/game/config/economy";
 import { PLANT_BY_ID } from "@/game/config/chain";
 import { plantNetValue, plantProfitPerMin, plantsOf } from "@/game/engine/chain";
-import { COST_KEYS, ledgerCosts, ledgerNet, ledgerRevenue, marketPrice, supplierOf, usedMaterials } from "@/game/engine/materials";
+import { COST_KEYS, debtLimit, ledgerCosts, ledgerNet, ledgerRevenue, marketPrice, supplierOf, usedMaterials } from "@/game/engine/materials";
 import { formatMoney, formatNumber, formatPercent } from "@/game/format";
 import type { LedgerValues } from "@/game/types";
 import type { MessageKey } from "@/i18n";
@@ -45,7 +45,7 @@ export function EconomyView() {
         <Tile label={`📊 ${t("eco.margin")}`} value={formatPercent(margin)} />
         <Tile label={`🚘 ${t("eco.carsMin")}`} value={formatNumber(Math.round(carsMin * 100) / 100)} />
         <Tile label={`📅 ${t("eco.carsDay")}`} value={formatNumber(Math.round(carsMin * 60 * 24))} />
-        <Tile label={`🧾 ${t("eco.owed")}`} value={formatMoney(state.chain.owed)} tone={state.chain.owed > 0 ? "down" : undefined} />
+        <Tile label={`🧾 ${t("eco.owed")}`} value={`${formatMoney(state.chain.owed)} / ${formatMoney(debtLimit(state))}`} tone={state.chain.owed > 0 ? "down" : undefined} />
       </div>
 
       <div className="grid gap-2 sm:grid-cols-2">

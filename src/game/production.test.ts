@@ -3,7 +3,7 @@
 // no plant for them (tyres early, drivetrain), dearer, paid up front and
 // delivered by truck; bodies and engines are always made in-house.
 import { describe, expect, it } from "vitest";
-import { DEPOT, STARTER_PLOT } from "./city/layout";
+import { DEPOT, MARKET, STARTER_PLOT } from "./city/layout";
 import { CAR_BY_ID } from "./config/cars";
 import { OUTSOURCE, OUTSOURCED_PARTS } from "./config/chain";
 import * as C from "./engine/city";
@@ -101,6 +101,31 @@ describe("suppliers: raw materials, and finished parts only where there is no pl
     // one delivery at a time: no second order on credit while it drives
     tick(s, 0.5);
     expect(s.chain.shipments.filter((sh) => sh.item === "tires" && !sh.back).length).toBe(1);
+  });
+
+  it("no trade credit past the account's limit; meanwhile the line's parts are sold at the Parts Market", () => {
+    const s = createInitialState(T0);
+    build(s, "engineFactory");
+    const asm = build(s, "assemblyPlant");
+    const id = P("assemblyPlant");
+    tick(s, 0.5);
+    s.chain.shipments = [];
+    s.cash = 0;
+    s.chain.owed = M.debtLimit(s);
+    asm.inputs = { body: 3, engine: 3 };
+    tick(s, 0.5);
+    tick(s, 0.5);
+    expect(s.chain.shipments.some((sh) => sh.item === "tires")).toBe(false);
+    expect(asm.status).toBe("noParts");
+    expect(asm.missing).toBe("tires");
+    // a body made now goes to the market (it brings the cash for tyres), not to the stalled line
+    const body = s.city.buildings[STARTER_PLOT].plant!;
+    body.out = 9;
+    body.outValue = 9 * snapshot(s).chain.plants[STARTER_PLOT].unitValue;
+    body.wait = 100;
+    tick(s, 0.5);
+    const load = s.chain.shipments.find((sh) => sh.from === STARTER_PLOT && sh.item === "body");
+    expect(load?.to).toBe(MARKET);
   });
 
   it("emergency parts are never on credit", () => {

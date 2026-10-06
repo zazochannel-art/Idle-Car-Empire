@@ -6,10 +6,10 @@ import { useEffect, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { COMPONENT_BY_ID, PLANT_BY_ID } from "@/game/config/chain";
-import { formatDuration, formatNumber } from "@/game/format";
+import { formatDuration, formatMoney, formatNumber } from "@/game/format";
 import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
-import { stockTotal } from "@/game/engine/materials";
+import { debtVars, stockTotal } from "@/game/engine/materials";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { CAR_MODEL_FOR } from "../map/vehicles";
@@ -89,7 +89,7 @@ export function PlantFloor({ plotId }: { plotId: string }) {
         {b.plant.status !== "ok" && (
           <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center">
             <div className="rounded-xl bg-amber-500/90 px-3 py-1.5 text-xs font-black text-black shadow-lg">
-              ⚠️ {b.plant.status === "noParts" ? t("status.noParts", { item: itemName(b.plant.missing ?? "engine", t).toUpperCase() }) : t(`status.${b.plant.status}` as MessageKey, { raw: t(`raw.${cfg.raw}` as MessageKey) })} · {t("status.paused")}
+              ⚠️ {b.plant.status === "noParts" ? t("status.noParts", { item: itemName(b.plant.missing ?? "engine", t).toUpperCase() }) : t(`status.${b.plant.status}` as MessageKey, { ...debtVars(state, formatMoney), raw: t(`raw.${cfg.raw}` as MessageKey) })} · {t("status.paused")}
             </div>
           </div>
         )}

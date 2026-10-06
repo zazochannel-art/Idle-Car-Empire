@@ -258,7 +258,7 @@ export interface GarageData {
 export type Route = "use" | "sell" | "store";
 
 /** Why a plant is not producing right now. */
-export type PlantStatus = "ok" | "noRaw" | "full" | "noParts" | "noModel" | "noCash";
+export type PlantStatus = "ok" | "noRaw" | "full" | "noParts" | "noModel" | "noCash" | "suspended";
 
 /** Units of each raw material (see config/economy.ts). */
 export type MaterialStock = Partial<Record<import("./config/economy").MaterialId, number>>;
@@ -427,8 +427,12 @@ export interface ChainState {
   /** Smoothed cars per second sold wholesale because every dealer was full (no longer happens: cars wait). */
   wholesale: number;
   ledger: Ledger;
-  /** Trip fees not yet paid (the trucks left before the cash was there): paid from the next revenue. */
+  /** What the company owes on its account (wages, energy, trips… the cash didn't cover): paid back from sales. */
   owed: number;
+  /** The account's limit right now (DEBT: minutes of what the plants cost to run). */
+  debtLimit?: number;
+  /** Over the limit: every plant stops until sales pay the account down (DEBT.resume). */
+  suspended?: boolean;
   /** Net income per second averaged over ~10 minutes: sizes rewards, so a lucky moment doesn't. */
   steady?: number;
   /** Market time (s) of the last supplier rescue. */
@@ -551,7 +555,9 @@ export type GameEvent =
   | { type: "achievement"; id: string }
   | { type: "carUnlocked"; car: CarId }
   | { type: "raceFinished"; race: number }
-  | { type: "built"; plot: string; structure: StructureType; level: number; upgrade: boolean };
+  | { type: "built"; plot: string; structure: StructureType; level: number; upgrade: boolean }
+  /** The account went over its limit: every plant stops until sales pay it down. */
+  | { type: "suspended" };
 
 // ───────────────────────────── racing ─────────────────────────────
 
