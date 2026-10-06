@@ -102,7 +102,7 @@ describe("world layout", () => {
       const n = queue.shift()!;
       for (const r of WORLD_MAP.roads)
         for (const [x, y] of [[r.a, r.b], [r.b, r.a]])
-          if (x === n && !seen.has(y)) (seen.add(y), queue.push(y));
+          if (x === n && !seen.has(y)) {\n            seen.add(y);\n            queue.push(y);\n          }
     }
     const reached = WORLD_MAP.roads.filter((r) => seen.has(r.a) && seen.has(r.b));
     for (const id of [...ZONES.map((z) => z.id), ...TERRITORIES.map((t) => t.id)]) {
