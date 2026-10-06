@@ -1103,6 +1103,8 @@ function arrive(s: GameState, sh: Shipment, snap: ChainSnapshot, earn: (n: numbe
     stock.cars += sh.qty;
     stock.value += sh.value;
     stock.models.push(...(sh.models ?? []));
+    s.run.carsShipped = (s.run.carsShipped ?? 0) + sh.qty;
+    s.lifetime.carsShipped = (s.lifetime.carsShipped ?? 0) + sh.qty;
     return 0;
   }
   if (sh.item === "car" && sh.market) {

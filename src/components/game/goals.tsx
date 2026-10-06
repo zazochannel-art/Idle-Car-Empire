@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { MILESTONES } from "@/game/config/missions";
 import { nextGoals } from "@/game/engine/insights";
-import { dailyProgress, metric, openMilestones, rewardCash } from "@/game/engine/progress";
+import { dailyProgress, isMoneyMetric, metric, openMilestones, rewardCash } from "@/game/engine/progress";
 import { formatDuration, formatMoney, formatNumber, formatPercent } from "@/game/format";
 import { CAR_BY_ID } from "@/game/config/cars";
 import { MAKER } from "@/game/config/chain";
@@ -324,7 +324,7 @@ export function MissionStrip() {
           value={metric(state, milestone.metric, snap)}
           target={milestone.target}
           reward={milestone.reward}
-          money={milestone.metric === "moneyEarned"}
+          money={isMoneyMetric(milestone.metric)}
           onClaim={() => claimMilestone(milestone.id)}
         />
       ),
@@ -340,7 +340,7 @@ export function MissionStrip() {
           value={dailyProgress(state, firstDaily, snap)}
           target={firstDaily.target}
           reward={firstDaily.reward}
-          money={firstDaily.metric === "moneyEarned"}
+          money={isMoneyMetric(firstDaily.metric)}
           onClaim={() => claimDaily(firstDaily.id)}
         />
       ),

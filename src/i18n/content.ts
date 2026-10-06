@@ -5,7 +5,7 @@ import type { AchievementConfig } from "@/game/config/achievements";
 import type { CarConfig } from "@/game/config/cars";
 import type { DealerConfig } from "@/game/config/dealerships";
 import type { ManagerBonus, ManagerConfig } from "@/game/config/managers";
-import type { MilestoneMission } from "@/game/config/missions";
+import { isMoneyMetric, type MilestoneMission } from "@/game/config/missions";
 import type { EmpirePerk } from "@/game/config/prestige";
 import type { MarketEvent } from "@/game/config/events";
 import type { RegionConfig } from "@/game/config/regions";
@@ -72,7 +72,7 @@ export function contentFor(lang: Lang) {
     regionFlavor: (x: RegionConfig) => c(lang, `region.${x.id}.flavor`, x.flavor),
     /** Daily missions are stored with an English title; rebuild it per language. */
     daily: (m: MissionState) => {
-      const n = m.metric === "moneyEarned" ? formatMoney(m.target) : formatNumber(m.target);
+      const n = isMoneyMetric(m.metric) ? formatMoney(m.target) : formatNumber(m.target);
       return t(`daily.${m.metric}` as Parameters<typeof translate>[1], { n });
     },
   };

@@ -122,7 +122,13 @@ export type MetricId =
   | "carsSold"
   | "plantTypes"
   | "carRevenue"
-  | "sportUnlocked";
+  | "sportUnlocked"
+  /** Net profit of this run (the ledger: revenue − every cost). */
+  | "netProfit"
+  /** Cars delivered to a dealer's lot. */
+  | "carsShipped"
+  /** 1 once the company runs the whole chain itself: Body Works, Engine and Tire Factory, Assembly, a car made. */
+  | "fullChain";
 
 export interface MissionState {
   id: string;
@@ -153,6 +159,8 @@ export interface Stats {
   carsSold: number;
   /** Money from cars sold at dealerships. */
   carRevenue: number;
+  /** Cars delivered to dealers' lots. */
+  carsShipped?: number;
 }
 
 export interface OfflineReport {

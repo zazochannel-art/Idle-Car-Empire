@@ -80,6 +80,8 @@ export function eventMetric(s: GameState, m: EventMetric): number {
       return s.lifetime.carsSold;
     case "upgrades":
       return s.lifetime.upgradesBought + s.lifetime.levelsBought;
+    case "componentsBuilt":
+      return Object.values(s.lifetime.parts).reduce((a, n) => a + (n || 0), 0);
     case "premiumBuilt":
       return builtWhere(s, (c) => CAR_BY_ID[c].tier >= 3);
     case "research":
@@ -104,6 +106,8 @@ export function eventGoalOpen(s: GameState, m: EventMetric): boolean {
       return builtWhere(s, (c) => CAR_BY_ID[c].tier >= 3) > 0;
     case "topBuilt":
       return builtWhere(s, (c) => CAR_BY_ID[c].tier >= 8) > 0;
+    case "componentsBuilt":
+      return Object.keys(s.city.buildings).length > 0;
     default:
       return s.chain.firstCar;
   }

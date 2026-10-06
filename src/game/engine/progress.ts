@@ -9,10 +9,13 @@ import {
 import { CARS } from "../config/cars";
 import { RESEARCH } from "../config/research";
 import type { GameState, MetricId, MissionState, Reward } from "../types";
-import { plantsOf } from "./chain";
+import { hasPlant, plantsOf } from "./chain";
 import { passiveIncome, snapshot, unlockedCarIds, type EconomySnapshot } from "./economy";
 import { formatMoney, formatNumber } from "../format";
-import { payReward } from "./materials";
+import { ledgerNet, payReward } from "./materials";
+import { isMoneyMetric } from "../config/missions";
+
+export { isMoneyMetric };
 
 export function metric(s: GameState, id: MetricId, snap?: EconomySnapshot): number {
   switch (id) {
@@ -52,6 +55,12 @@ export function metric(s: GameState, id: MetricId, snap?: EconomySnapshot): numb
       return new Set(plantsOf(s).map(([, b]) => b.type)).size;
     case "carRevenue":
       return s.lifetime.carRevenue;
+    case "netProfit":
+      return ledgerNet(s.chain.ledger.run);
+    case "carsShipped":
+      return s.lifetime.carsShipped ?? 0;
+    case "fullChain":
+      return (["bodyWorks", "engineFactory", "tireFactory", "assemblyPlant"] as const).every((t) => hasPlant(s, t)) && s.lifetime.carsProduced > 0 ? 1 : 0;
     case "sportUnlocked": {
       const ids = unlockedCarIds(s, (snap ?? snapshot(s)).gm);
       return CARS.some((c) => c.class === "sport" && ids.has(c.id)) ? 1 : 0;
@@ -143,7 +152,7 @@ export function generateDaily(s: GameState, now: number, snap?: EconomySnapshot)
     let target: number;
     if ("seconds" in t) {
       const parts = Object.values(eco.chain.plants).reduce((a, p) => (p.type === "assemblyPlant" ? a : a + p.unitsPerSec), 0);
-      const rate = t.metric === "carsProduced" ? eco.carsPerSec : t.metric === "carsSold" ? eco.carsPerSec * 0.5 : t.metric === "moneyEarned" ? income : Math.max(parts, 0.05) * 0.6;
+      const rate = t.metric === "carsProduced" ? eco.carsPerSec : t.metric === "carsSold" ? eco.carsPerSec * 0.5 : t.metric === "moneyEarned" || t.metric === "netProfit" ? income : Math.max(parts, 0.05) * 0.6;
       target = niceNumber(Math.max(t.min, rate * t.seconds));
     } else if (t.metric === "levelsBought") {
       // a new player with one plant gets a reachable number of upgrades
@@ -151,7 +160,7 @@ export function generateDaily(s: GameState, now: number, snap?: EconomySnapshot)
     } else {
       target = t.amount;
     }
-    const title = t.title.replace("{n}", t.metric === "moneyEarned" ? formatMoney(target) : formatNumber(target));
+    const title = t.title.replace("{n}", isMoneyMetric(t.metric) ? formatMoney(target) : formatNumber(target));
     return {
       id: `daily_${key}_${i}`,
       title,
