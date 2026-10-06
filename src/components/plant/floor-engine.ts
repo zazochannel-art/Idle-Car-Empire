@@ -32,7 +32,10 @@ export interface FloorScene {
   /** Assembly: the model and its paint colour. */
   model?: CarModel;
   paint?: string;
-  accent: string;\n  rawMaterial?: string;\n  cinematic?: boolean;\n}
+  accent: string;
+  rawMaterial?: string;
+  cinematic?: boolean;
+}
 
 const MODEL_COLOR = "#cbd5e1";
 
@@ -117,7 +120,15 @@ export class FloorEngine {
 
   private render(dt: number) {
     this.t += dt;
-    const { ctx, p, cam } = this;\n    const s0 = this.scene;\n    if (s0?.cinematic) {\n      const pulse = (Math.sin(this.t * 0.22) + 1) * 0.5;\n      cam.x += (pulse * (this.size[0] - 2) - cam.x) * Math.min(1, dt * 0.35);\n      cam.y += (this.size[1] * 0.42 + Math.sin(this.t * 0.16) * 0.7 - cam.y) * Math.min(1, dt * 0.3);\n      cam.zoom += ((this.cam.minZoom * 1.35 + pulse * 0.25) - cam.zoom) * Math.min(1, dt * 0.25);\n    }\n    cam.update(dt);
+    const { ctx, p, cam } = this;
+    const s0 = this.scene;
+    if (s0?.cinematic) {
+      const pulse = (Math.sin(this.t * 0.22) + 1) * 0.5;
+      cam.x += (pulse * (this.size[0] - 2) - cam.x) * Math.min(1, dt * 0.35);
+      cam.y += (this.size[1] * 0.42 + Math.sin(this.t * 0.16) * 0.7 - cam.y) * Math.min(1, dt * 0.3);
+      cam.zoom += ((this.cam.minZoom * 1.35 + pulse * 0.25) - cam.zoom) * Math.min(1, dt * 0.25);
+    }
+    cam.update(dt);
     const W = this.canvas.width;
     const H = this.canvas.height;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -128,7 +139,9 @@ export class FloorEngine {
     p.t = this.t;
     p.zoom = cam.zoom;
     p.dpr = this.dpr;
-    // A complete factory shift lasts about 45 seconds: day → evening → night.\n    const shift = (this.t % 45) / 45;\n    p.night = shift > 0.68 || shift < 0.08 ? 0.82 : shift > 0.52 ? 0.35 : 0;
+    // A complete factory shift lasts about 45 seconds: day → evening → night.
+    const shift = (this.t % 45) / 45;
+    p.night = shift > 0.68 || shift < 0.08 ? 0.82 : shift > 0.52 ? 0.35 : 0;
     p.lights.length = 0;
     const s = this.scene;
     if (!s) return;
@@ -159,7 +172,14 @@ export class FloorEngine {
       }
     }
 
-    // Receiving warehouse: racks, pallets and material-specific visual language.\n    const rawColor = materialColor(s.rawMaterial, s.color);\n    for (let r = 0; r < 3; r++) {\n      p.box(0.15, 0.15 + r * 0.75, 1.05, 0.08, 6, 3, "#334155", "#64748b");\n      p.box(0.18, 0.15 + r * 0.75, 0.06, 0.55, 6, 3, "#475569");\n      p.box(1.1, 0.15 + r * 0.75, 0.06, 0.55, 6, 3, "#475569");\n    }\n    for (let i = 0; i < Math.round(s.raw * 8); i++) {
+    // Receiving warehouse: racks, pallets and material-specific visual language.
+    const rawColor = materialColor(s.rawMaterial, s.color);
+    for (let r = 0; r < 3; r++) {
+      p.box(0.15, 0.15 + r * 0.75, 1.05, 0.08, 6, 3, "#334155", "#64748b");
+      p.box(0.18, 0.15 + r * 0.75, 0.06, 0.55, 6, 3, "#475569");
+      p.box(1.1, 0.15 + r * 0.75, 0.06, 0.55, 6, 3, "#475569");
+    }
+    for (let i = 0; i < Math.round(s.raw * 8); i++) {
       const bx = 0.3 + (i % 2) * 0.6;
       const by = 0.4 + Math.floor(i / 2) * 0.55;
       p.box(bx, by, 0.5, 0.45, 0, 7, s.type === "tireFactory" ? "#57534e" : rawColor, "#d6d3d1");
@@ -409,7 +429,22 @@ export class FloorEngine {
   }
 }
 
-function materialColor(raw: string | undefined, fallback: string) {\n  switch (raw) {\n    case "steel": return "#94a3b8";\n    case "metal": return "#a8a29e";\n    case "rubber": return "#27272a";\n    case "fabric": return "#a16207";\n    case "alloy": return "#64748b";\n    case "sand": return "#d6b87c";\n    case "pigment": return "#ec4899";\n    case "chips": return "#22c55e";\n    case "lithium": return "#84cc16";\n    default: return fallback;\n  }\n}\n\nfunction mixCan(k: number) {
+function materialColor(raw: string | undefined, fallback: string) {
+  switch (raw) {
+    case "steel": return "#94a3b8";
+    case "metal": return "#a8a29e";
+    case "rubber": return "#27272a";
+    case "fabric": return "#a16207";
+    case "alloy": return "#64748b";
+    case "sand": return "#d6b87c";
+    case "pigment": return "#ec4899";
+    case "chips": return "#22c55e";
+    case "lithium": return "#84cc16";
+    default: return fallback;
+  }
+}
+
+function mixCan(k: number) {
   const colors = ["#e5e7eb", "#f472b6", "#a855f7", "#3b82f6"];
   return colors[Math.min(colors.length - 1, Math.floor(k * colors.length))];
 }
