@@ -24,7 +24,9 @@ export function PlantFloor({ plotId }: { plotId: string }) {
   const selectPlot = useUi((u) => u.selectPlot);
   const { t } = useT();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const engineRef = useRef<FloorEngine | null>(null);\n  const [cinematic, setCinematic] = useState(false);\n  const b = state.city.buildings[plotId];
+  const engineRef = useRef<FloorEngine | null>(null);
+  const [cinematic, setCinematic] = useState(false);
+  const b = state.city.buildings[plotId];
 
   useEffect(() => {
     const engine = new FloorEngine(canvasRef.current!);
@@ -58,7 +60,10 @@ export function PlantFloor({ plotId }: { plotId: string }) {
       item: cfg.item ?? "car",
       model: st.car ? CAR_MODEL_FOR[st.car.id] : undefined,
       paint: st.car?.color,
-      accent: cfg.roof,\n      rawMaterial: cfg.raw,\n      cinematic,\n    });
+      accent: cfg.roof,
+      rawMaterial: cfg.raw,
+      cinematic,
+    });
   }, [p, st, b, t, cinematic]);
 
   if (!b?.plant || !st) return null;
@@ -80,11 +85,25 @@ export function PlantFloor({ plotId }: { plotId: string }) {
         </div>
         <Badge variant="gold">
           {t("common.lv", { level: b.level })} · {t(`plantLevel.${b.level}` as MessageKey)}
-        </Badge>\n        <Button size="sm" variant={cinematic ? "default" : "secondary"} onClick={() => setCinematic((v) => !v)} className="hidden sm:flex">\n          🎥 {cinematic ? "LIVE" : "Factory Cam"}\n        </Button>
+        </Badge>
+        <Button size="sm" variant={cinematic ? "default" : "secondary"} onClick={() => setCinematic((v) => !v)} className="hidden sm:flex">
+          🎥 {cinematic ? "LIVE" : "Factory Cam"}
+        </Button>
       </header>
       <div className="relative min-h-0 flex-1">
         <canvas ref={canvasRef} className="absolute inset-0 size-full touch-none" />
-        <div className="pointer-events-none absolute left-3 top-3 flex flex-wrap gap-2">\n          <div className="rounded-xl bg-black/60 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-white backdrop-blur-md ring-1 ring-white/10">\n            {cinematic ? "🎥 LIVE FACTORY" : "🏭 LIVE PRODUCTION"}\n          </div>\n          <div className="rounded-xl bg-black/60 px-3 py-1.5 text-[10px] font-bold text-white/75 backdrop-blur-md ring-1 ring-white/10">\n            🤖 {p.automation >= 4 ? "AI Factory" : p.automation >= 2 ? "Automated" : "Human Shift"}\n          </div>\n          <div className="rounded-xl bg-black/60 px-3 py-1.5 text-[10px] font-bold text-white/75 backdrop-blur-md ring-1 ring-white/10">\n            📦 {formatNumber(b.plant.out)} / {formatNumber(st.outCap)}\n          </div>\n        </div>\n        {b.plant.status !== "ok" && (
+        <div className="pointer-events-none absolute left-3 top-3 flex flex-wrap gap-2">
+          <div className="rounded-xl bg-black/60 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-white backdrop-blur-md ring-1 ring-white/10">
+            {cinematic ? "🎥 LIVE FACTORY" : "🏭 LIVE PRODUCTION"}
+          </div>
+          <div className="rounded-xl bg-black/60 px-3 py-1.5 text-[10px] font-bold text-white/75 backdrop-blur-md ring-1 ring-white/10">
+            🤖 {p.automation >= 4 ? "AI Factory" : p.automation >= 2 ? "Automated" : "Human Shift"}
+          </div>
+          <div className="rounded-xl bg-black/60 px-3 py-1.5 text-[10px] font-bold text-white/75 backdrop-blur-md ring-1 ring-white/10">
+            📦 {formatNumber(b.plant.out)} / {formatNumber(st.outCap)}
+          </div>
+        </div>
+        {b.plant.status !== "ok" && (
           <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center">
             <div className="rounded-xl bg-amber-500/90 px-3 py-1.5 text-xs font-black text-black shadow-lg">
               ⚠️ {b.plant.status === "noParts" ? t("status.noParts", { item: itemName(b.plant.missing ?? "engine", t).toUpperCase() }) : t(`status.${b.plant.status}` as MessageKey, { ...debtVars(state, formatMoney), raw: t(`raw.${cfg.raw}` as MessageKey) })} · {t("status.paused")}
@@ -92,7 +111,10 @@ export function PlantFloor({ plotId }: { plotId: string }) {
           </div>
         )}
       </div>
-      <footer className="grid gap-2 border-t border-white/10 bg-ink/90 p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur-xl sm:grid-cols-[1fr_auto]">\n        <Button size="sm" variant={cinematic ? "default" : "secondary"} className="sm:hidden" onClick={() => setCinematic((v) => !v)}>\n          🎥 {cinematic ? "LIVE FACTORY" : "Factory Cam"}\n        </Button>\n        <Button size="sm" variant={cinematic ? "default" : "secondary"} className="sm:hidden" onClick={() => setCinematic((v) => !v)}>\n          🎥 {cinematic ? "LIVE FACTORY" : "Factory Cam"}\n        </Button>
+      <footer className="grid gap-2 border-t border-white/10 bg-ink/90 p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur-xl sm:grid-cols-[1fr_auto]">
+        <Button size="sm" variant={cinematic ? "default" : "secondary"} className="sm:hidden" onClick={() => setCinematic((v) => !v)}>
+          🎥 {cinematic ? "LIVE FACTORY" : "Factory Cam"}
+        </Button>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
           {cfg.item && <StockBar label={t(`raw.${cfg.raw}` as MessageKey)} value={stockTotal(b.plant.stock)} cap={st.rawCap} color="#a8a29e" />}
           <StockBar label={`📦 ${itemName(item, t)}`} value={b.plant.out} cap={st.outCap} color="#38bdf8" />
