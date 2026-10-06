@@ -615,6 +615,8 @@ export const ro: Record<MessageKey, string> = {
   "test.lap": "Timp pe tur",
   "toast.newCar": "Mașină nouă deblocată: {name}",
   "toast.daily": "Misiuni zilnice noi",
+  "toast.emergency": "Furnizor de urgență",
+  "toast.emergencyBody": "Nimic nu mai putea lucra: a venit material pentru câteva bucăți la prețul de urgență ({money}, +50%), pe contul companiei.",
   "toast.suspended": "Fabrici suspendate",
   "toast.suspendedBody": "Contul companiei a depășit limita. Producția se oprește până când vânzările îl plătesc.",
   "toast.dailyBody": "Te așteaptă trei obiective noi.",

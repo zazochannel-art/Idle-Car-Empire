@@ -217,11 +217,14 @@ export const DEBT = { min: 10_000, seconds: 300, resume: 0.5, repay: 0.5 };
 
 
 /**
- * A company that is completely stuck (can't afford one unit of material
- * anywhere, nothing made, nothing on the road or at a dealer) gets material
- * for a few units on supplier credit — never cash, at most once per cooldown.
+ * The emergency supplier: a company that is completely stuck (can't afford
+ * one unit of material anywhere, nothing made, nothing on the road or at a
+ * dealer) gets material for `units` units at `markup` × the market price, on
+ * its account (up to twice its limit) — never cash, nothing written off, at
+ * most once per cooldown.
+ * Bad planning costs money; it never leaves a company stuck for good.
  */
-export const RESCUE = { units: 2, cooldown: 15 * 60 };
+export const RESCUE = { units: 2, cooldown: 15 * 60, markup: 1.5 };
 
 /** Money every new company starts with. */
 export const START_CASH = 10_000;

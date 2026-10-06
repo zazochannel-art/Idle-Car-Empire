@@ -556,6 +556,8 @@ export type GameEvent =
   | { type: "carUnlocked"; car: CarId }
   | { type: "raceFinished"; race: number }
   | { type: "built"; plot: string; structure: StructureType; level: number; upgrade: boolean }
+  /** The emergency supplier sent material at its price, on the company's account. */
+  | { type: "emergency"; cost: number }
   /** The account went over its limit: every plant stops until sales pay it down. */
   | { type: "suspended" };
 

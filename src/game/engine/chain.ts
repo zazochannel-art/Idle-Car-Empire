@@ -47,8 +47,10 @@ import {
   autoRestock,
   book,
   canOwe,
+  debtLimit,
   depotTrip,
-  grantMaterials,
+  emergencyCost,
+  emergencyMaterials,
   migrateCostBasis,
   spendMaterials,
   createLedger,
@@ -714,7 +716,7 @@ export function chainTick(
   const lm = logisticsMods(s);
   s.market.t += dt;
   accountTick(s, dt, snap, events);
-  rescue(s);
+  rescue(s, events);
   qualityTick(s, dt);
   const earn = (amount: number) => {
     credit(amount);
@@ -993,13 +995,14 @@ function accountTick(s: GameState, dt: number, snap: ChainSnapshot, events?: Gam
 }
 
 /**
- * A company that is completely stuck — no plant can work, it can't afford one
- * unit of material anywhere, and nothing is made, on the road or at a dealer
- * — gets material for a couple of units on supplier credit, and what it owes
- * is written off. Material, never cash, and at most once per cooldown: it
- * can't be farmed into upgrades.
+ * The emergency supplier. A company that is completely stuck — no plant can
+ * work, it can't afford one unit of material anywhere, and nothing is made,
+ * on the road or at a dealer — gets material for a couple of units at the
+ * emergency price (RESCUE.markup), on its account. Nothing is written off,
+ * material never cash, at most once per cooldown: a way out that costs,
+ * never a free supply.
  */
-function rescue(s: GameState) {
+function rescue(s: GameState, events?: GameEvent[]) {
   if (s.chain.shipments.length) return;
   if (s.chain.rescueT !== undefined && s.market.t - s.chain.rescueT < RESCUE.cooldown) return;
   for (const d of Object.values(s.chain.dealers)) if ((d?.cars ?? 0) >= 1) return;
@@ -1015,9 +1018,16 @@ function rescue(s: GameState) {
     short.push([id, missing]);
   }
   if (!short.length) return;
-  s.chain.owed = 0;
+  // on the company's account, within an emergency line of twice its limit: never an endless hole
+  let cost = 0;
+  for (const [id, missing] of short) {
+    const c = emergencyCost(s, missing);
+    if (s.chain.owed + Math.max(0, c - Math.max(0, s.cash)) > 2 * debtLimit(s)) continue;
+    cost += emergencyMaterials(s, id, missing);
+  }
+  if (cost <= 0) return;
   s.chain.rescueT = s.market.t;
-  for (const [id, missing] of short) grantMaterials(s, id, missing);
+  events?.push({ type: "emergency", cost });
 }
 
 /** Unloads a truck; returns how many cars it sold wholesale. */

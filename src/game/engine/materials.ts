@@ -17,6 +17,7 @@ import {
   WAREHOUSE_CAP,
   WAREHOUSE_COST,
   POWER_SYSTEM,
+  RESCUE,
   type MaterialId,
   type SupplierConfig,
 } from "../config/economy";
@@ -243,11 +244,25 @@ export function depotTrip(to: string) {
   return DOCK_TIME + (tiles / ROAD_SPEED) * (1 + TRAFFIC_ALLOWANCE);
 }
 
-/** A free delivery (supplier credit): sent like an order, but nothing is paid or booked. */
-export function grantMaterials(s: GameState, plotId: string, stock: MaterialStock) {
+/** What the emergency supplier charges for a set of materials: the market price × RESCUE.markup, plus delivery. */
+export function emergencyCost(s: GameState, stock: MaterialStock): number {
+  let c = 0;
+  for (const [m, n] of Object.entries(stock) as [MaterialId, number][]) c += (n ?? 0) * (marketPrice(s, m) * RESCUE.markup + DELIVERY_FEE);
+  return c;
+}
+
+/**
+ * An emergency delivery: material sent like an order, charged at the
+ * emergency price to the company's account (the emergency line: allowed
+ * past the debt limit). It enters the warehouse at that cost. Returns it.
+ */
+export function emergencyMaterials(s: GameState, plotId: string, stock: MaterialStock): number {
   const qty = stockTotal(stock);
-  if (qty <= 0) return;
-  s.chain.shipments.push({ id: s.chain.nextShip++, from: DEPOT, to: plotId, item: "raw", qty, value: 0, t: 0, dur: depotTrip(plotId), back: false, vehicle: qty > 600 ? "semi" : "truck", materials: { ...stock } });
+  if (qty <= 0) return 0;
+  const cost = emergencyCost(s, stock);
+  payOrOwe(s, cost);
+  s.chain.shipments.push({ id: s.chain.nextShip++, from: DEPOT, to: plotId, item: "raw", qty, value: cost, t: 0, dur: depotTrip(plotId), back: false, vehicle: qty > 600 ? "semi" : "truck", materials: { ...stock } });
+  return cost;
 }
 
 export type BuyResult = { ok: true; cost: number; qty: number } | { ok: false; why: "plant" | "material" | "qty" | "room" | "cash" };

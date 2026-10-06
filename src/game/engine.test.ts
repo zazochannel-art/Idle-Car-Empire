@@ -1128,7 +1128,7 @@ describe("no money from nothing", () => {
     expect(net / cost).toBeLessThan(1.25);
   });
 
-  it("a stuck company gets material on supplier credit — never cash — and only then", () => {
+  it("a stuck company gets emergency material on its account — never cash — and only then", () => {
     const s = createInitialState(T0);
     const p = s.city.buildings[STARTER_PLOT].plant!;
     p.stock = {};

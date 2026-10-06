@@ -254,6 +254,7 @@ export const useGame = create<GameStore>((set, get) => {
           action: { label: tr("toast.open"), plot: e.plot },
         });
       }
+      else if (e.type === "emergency") uiEvents.emit({ type: "toast", tone: "warn", icon: "🆘", title: tr("toast.emergency"), body: tr("toast.emergencyBody", { money: formatMoney(e.cost) }) });
       else if (e.type === "suspended") uiEvents.emit({ type: "toast", tone: "warn", icon: "⛔", title: tr("toast.suspended"), body: tr("toast.suspendedBody") });
       else if (e.type === "raceFinished") {
         const rec = next.racing.last;

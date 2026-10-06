@@ -616,6 +616,8 @@ export const en = {
   "test.lap": "Lap time",
   "toast.newCar": "New car unlocked: {name}",
   "toast.daily": "New daily missions",
+  "toast.emergency": "Emergency supplier",
+  "toast.emergencyBody": "Nothing could work: material for a few units arrived at the emergency price ({money}, +50%), on the company's account.",
   "toast.suspended": "Plants suspended",
   "toast.suspendedBody": "The company's account is over its limit. Production stops until sales pay it down.",
   "toast.dailyBody": "Three fresh goals are waiting.",
