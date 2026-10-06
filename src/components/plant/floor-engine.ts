@@ -123,9 +123,16 @@ export class FloorEngine {
     const { ctx, p, cam } = this;
     const s0 = this.scene;
     if (s0?.cinematic) {
+      // Camera coordinates use the same isometric world units as the map, not
+      // the factory grid coordinates. Convert the cinematic sweep through sx/sy
+      // so the camera stays centered on the actual production floor.
       const pulse = (Math.sin(this.t * 0.22) + 1) * 0.5;
-      cam.x += (pulse * (this.size[0] - 2) - cam.x) * Math.min(1, dt * 0.35);
-      cam.y += (this.size[1] * 0.42 + Math.sin(this.t * 0.16) * 0.7 - cam.y) * Math.min(1, dt * 0.3);
+      const [gw, gd] = this.size;
+      const targetX = sx(1 + pulse * Math.max(0, gw - 2), gd / 2);
+      const targetY = sy(1 + pulse * Math.max(0, gw - 2), gd / 2, WALL_H * 0.35)
+        + Math.sin(this.t * 0.16) * 8;
+      cam.x += (targetX - cam.x) * Math.min(1, dt * 0.35);
+      cam.y += (targetY - cam.y) * Math.min(1, dt * 0.3);
       cam.zoom += ((this.cam.minZoom * 1.35 + pulse * 0.25) - cam.zoom) * Math.min(1, dt * 0.25);
     }
     cam.update(dt);
