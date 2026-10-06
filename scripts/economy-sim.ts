@@ -3,7 +3,6 @@
 // milestones, and income over time. Run: npx tsx scripts/economy-sim.ts [hours]
 import { PLANTS } from "../src/game/config/chain";
 import { ZONES } from "../src/game/config/city";
-import { WORLD_MAP } from "../src/game/city/layout";
 import * as Ch from "../src/game/engine/chain";
 import { buildStructure, unlockZone } from "../src/game/engine/city";
 import { freePlotFor } from "../src/game/engine/construction";
