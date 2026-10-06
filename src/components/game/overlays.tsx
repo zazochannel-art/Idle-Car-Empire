@@ -82,6 +82,11 @@ export function OfflineDialog() {
               <span>{t("offline.sold", { n: formatNumber(report.carsSold ?? 0) })}</span>
             </div>
             <LedgerTable values={report.ledger} compact />
+            {Math.abs(report.owed ?? 0) >= 0.5 && (
+              <div className={(report.owed ?? 0) > 0 ? "mt-1 text-[11px] text-rose-300" : "mt-1 text-[11px] text-emerald-300"}>
+                🧾 {(report.owed ?? 0) > 0 ? t("offline.owedUp", { money: formatMoney(report.owed!) }) : t("offline.owedDown", { money: formatMoney(-report.owed!) })}
+              </div>
+            )}
           </div>
         )}
         {report.racing && (

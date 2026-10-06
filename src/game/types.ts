@@ -175,6 +175,8 @@ export interface OfflineReport {
   racing?: OfflineRacing;
   /** Constructions finished while away (plot ids). */
   built?: string[];
+  /** How the company's account changed while away (+ owed more, − paid back). */
+  owed?: number;
 }
 
 export interface OfflineRacing {

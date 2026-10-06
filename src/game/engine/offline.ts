@@ -29,6 +29,7 @@ export function computeOffline(s: GameState, now: number): OfflineReport {
   if (built.length) report.built = built;
 
   const cash = s.cash;
+  const owed = s.chain.owed;
   // the absence is booked into the run totals; the $/s rates keep describing the session
   const rates = { ...s.chain.ledger.rate };
   const byType = { ...s.lifetime.carsByType };
@@ -67,6 +68,7 @@ export function computeOffline(s: GameState, now: number): OfflineReport {
   s.chain.ledger.rate = rates;
   s.chain.rate = chainNet(rates);
   report.carsSold = r.carsSold;
+  if (Math.abs(s.chain.owed - owed) >= 0.5) report.owed = s.chain.owed - owed;
   if (racing) report.racing = racing;
   report.materialsUsed = r.materials;
   return report;
@@ -106,6 +108,7 @@ export function settleOffline(s: GameState, now: number): OfflineReport | null {
     p.rp += report.rp;
     p.carsSold = (p.carsSold ?? 0) + (report.carsSold ?? 0);
     p.materialsUsed = (p.materialsUsed ?? 0) + (report.materialsUsed ?? 0);
+    if (report.owed) p.owed = (p.owed ?? 0) + report.owed;
     if (report.built?.length) p.built = [...(p.built ?? []), ...report.built];
     if (report.racing) {
       const a = (p.racing ??= { races: 0, wins: 0, podiums: 0, prize: 0, rep: 0, repairs: 0 });

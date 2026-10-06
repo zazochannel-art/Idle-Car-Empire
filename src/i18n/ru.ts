@@ -1474,6 +1474,8 @@ export const ru: Record<MessageKey, string> = {
   "ledger.margin": "Маржа прибыли {pct}",
   "ledger.rewards": "Награды и бонусы",
   "offline.breakdown": "Производство офлайн",
+  "offline.owedUp": "Счёт компании: +{money} долга (расходы, на которые не хватило денег)",
+  "offline.owedDown": "Счёт компании: погашено {money}",
   "offline.sold": "Продано машин: {n}",
   "mat.steel": "Сталь",
   "mat.aluminum": "Алюминий",

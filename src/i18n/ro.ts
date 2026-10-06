@@ -1474,6 +1474,8 @@ export const ro: Record<MessageKey, string> = {
   "ledger.margin": "Marjă de profit {pct}",
   "ledger.rewards": "Recompense și bonusuri",
   "offline.breakdown": "Producție offline",
+  "offline.owedUp": "Contul companiei: +{money} datorați (costuri pe care cash-ul nu le-a acoperit)",
+  "offline.owedDown": "Contul companiei: {money} plătiți",
   "offline.sold": "{n} mașini vândute",
   "mat.steel": "Oțel",
   "mat.aluminum": "Aluminiu",

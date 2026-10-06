@@ -1475,6 +1475,8 @@ export const en = {
   "ledger.margin": "Profit margin {pct}",
   "ledger.rewards": "Rewards & bonuses",
   "offline.breakdown": "Offline production",
+  "offline.owedUp": "Company account: +{money} owed (running costs the cash didn't cover)",
+  "offline.owedDown": "Company account: {money} paid back",
   "offline.sold": "{n} cars sold",
   "mat.steel": "Steel",
   "mat.aluminum": "Aluminium",
