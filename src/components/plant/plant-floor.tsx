@@ -97,7 +97,7 @@ export function PlantFloor({ plotId }: { plotId: string }) {
             {cinematic ? "🎥 LIVE FACTORY" : "🏭 LIVE PRODUCTION"}
           </div>
           <div className="rounded-xl bg-black/60 px-3 py-1.5 text-[10px] font-bold text-white/75 backdrop-blur-md ring-1 ring-white/10">
-            🤖 {b.plant.automation >= 4 ? "AI Factory" : b.plant.automation >= 2 ? "Automated" : "Human Shift"}
+            🤖 {(p?.automation ?? 0) >= 4 ? "AI Factory" : (p?.automation ?? 0) >= 2 ? "Automated" : "Human Shift"}
           </div>
           <div className="rounded-xl bg-black/60 px-3 py-1.5 text-[10px] font-bold text-white/75 backdrop-blur-md ring-1 ring-white/10">
             📦 {formatNumber(b.plant.out)} / {formatNumber(st.outCap)}
