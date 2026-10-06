@@ -15,8 +15,11 @@ import type { CarDesign, CarId, ComponentId, DealerId, DealerState, GameState, M
 
 /** v3: the supply-chain economy (older saves start a new company). */
 export const SAVE_VERSION = 3;
-/** The world map the plot ids refer to: 2 is the 24×24 automotive region. */
-export const MAP_VERSION = 2;
+/**
+ * The world map the plot ids refer to: 3 is the island map (lots along its
+ * roads). Saves from an older map start a new company (their lots are gone).
+ */
+export const MAP_VERSION = 3;
 
 export function createDealers(): Record<DealerId, DealerState> {
   return Object.fromEntries(DEALER_IDS.map((d) => [d, { owned: false, level: 1 }])) as Record<DealerId, DealerState>;

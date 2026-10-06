@@ -3,38 +3,54 @@
 import { unlockedAreas } from "@/game/engine/territory";
 import { Building2, Factory, Globe2, Home, Lock, MapPin, Minus, Plus, Map as MapIcon } from "lucide-react";
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { STRUCTURE_BY_ID, TERRITORIES, WORLD_BLOCKS, ZONES, ZONE_BY_ID } from "@/game/config/city";
-import { WAYS } from "@/game/city/network";
-import { RIVER, WORLD, WORLD_MAP, blockKind, territoryOfBlock, zoneCenterTile, zoneOfBlock } from "@/game/city/layout";
-
-/** Territory landmark colours on the minimap. */
-const MINI_LANDMARK: Record<string, string | null> = {
-  testFacility: "#64748b", port: "#94a3b8", railyard: "#78716c", raw: "#a16207", suburbs: "#86c06c", boulevard: "#f5c451",
-  skyline: "#cbd5e1", airport: "#e2e8f0", campus: "#a5b4fc", racing: "#ef4444", racingAnnex: "#f87171", road: "#4d7c3a",
-};
-import { coastline } from "./terrain";
+import { STRUCTURE_BY_ID, TERRITORIES, ZONES } from "@/game/config/city";
+import { WORLD_MAP, zoneCenterTile } from "@/game/city/layout";
 import { useT } from "@/i18n/use-t";
 import { useGame } from "@/store/game-store";
-import { ZOOM_TIERS, type MapEngine, type ZoomTier } from "./map-engine";
+import { ZOOM_TIERS, type MapArea, type ZoomTier } from "./map-types";
+import type { MapEngine } from "./world/engine";
 import { cn } from "@/lib/utils";
 
 const TIER_ICON: Record<ZoomTier, typeof Globe2> = { region: Globe2, districts: MapIcon, buildings: Building2, detail: Factory };
 
+/** The minimap is the island's own picture (3:2). */
 const W = 172;
-const H = 92;
-const PAD = 6;
+const H = 115;
+const [SX, SZ] = WORLD_MAP.size;
+/** Game area ids in the order of the areas raster (id = index + 1). */
+const AREA_IDS = ["town", "industrial", "downtown", "automotive", "luxury", "supercar", "mega", "global", "mountain", "port", "raw", "suburbs", "boulevard", "airport", "campus", "racing"];
 
-/** Tile → minimap pixel (same isometric projection, scaled to fit). */
-function mm(x: number, y: number): [number, number] {
-  const scale = (W - PAD * 2) / (WORLD * 2);
-  return [W / 2 + (x - y) * scale, PAD + (x + y) * scale * 0.5 * ((H - PAD * 2) / ((W - PAD * 2) / 2))];
+/** Map position → minimap pixel. */
+const mm = (x: number, y: number): [number, number] => [(x / SX + 0.5) * W, (y / SZ + 0.5) * H];
+
+function load(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
 }
 
-function fromMm(px: number, py: number) {
-  const scale = (W - PAD * 2) / (WORLD * 2);
-  const a = (px - W / 2) / scale;
-  const b = (py - PAD) / (scale * 0.5 * ((H - PAD * 2) / ((W - PAD * 2) / 2)));
-  return { x: (a + b) / 2, y: (b - a) / 2 };
+/** A grey veil over the areas still locked (redrawn when an area opens). */
+function veil(areas: HTMLImageElement, unlocked: ReadonlySet<string>): HTMLCanvasElement {
+  const cv = document.createElement("canvas");
+  cv.width = areas.width;
+  cv.height = areas.height;
+  const g = cv.getContext("2d", { willReadFrequently: true })!;
+  g.drawImage(areas, 0, 0);
+  const img = g.getImageData(0, 0, cv.width, cv.height);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const id = d[i];
+    const locked = id > 0 && !unlocked.has(AREA_IDS[id - 1]);
+    d[i] = 120;
+    d[i + 1] = 132;
+    d[i + 2] = 146;
+    d[i + 3] = locked ? 170 : 0;
+  }
+  g.putImageData(img, 0, 0);
+  return cv;
 }
 
 export function Minimap({ engine }: { engine: RefObject<MapEngine | null> }) {
@@ -54,6 +70,12 @@ export function Minimap({ engine }: { engine: RefObject<MapEngine | null> }) {
     canvas.width = W * dpr;
     canvas.height = H * dpr;
     const ctx = canvas.getContext("2d")!;
+    const base = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/world`;
+    let island: HTMLImageElement | null = null;
+    let areas: HTMLImageElement | null = null;
+    let fog: { key: string; cv: HTMLCanvasElement } | null = null;
+    load(`${base}/minimap.webp`).then((i) => (island = i), () => {});
+    load(`${base}/areas.png`).then((i) => (areas = i), () => {});
     let raf = 0;
     let frame = 0;
     const draw = () => {
@@ -62,71 +84,22 @@ export function Minimap({ engine }: { engine: RefObject<MapEngine | null> }) {
       const s = stateRef.current;
       const unlocked = unlockedAreas(s);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, W, H);
-      const poly = (pts: [number, number][], fill: string, stroke?: string) => {
-        ctx.beginPath();
-        pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
-        ctx.closePath();
-        ctx.fillStyle = fill;
-        ctx.fill();
-        if (stroke) {
-          ctx.strokeStyle = stroke;
-          ctx.lineWidth = 1;
-          ctx.stroke();
-        }
-      };
-      const rect = (x: number, y: number, w: number, d: number): [number, number][] => [mm(x, y), mm(x + w, y), mm(x + w, y + d), mm(x, y + d)];
-      ctx.fillStyle = "#2aa7e0";
+      ctx.fillStyle = "#3a9be0";
       ctx.fillRect(0, 0, W, H);
-      ctx.beginPath();
-      for (const loop of coastline()) {
-        loop.forEach(([x, y], i) => {
-          const [px, py] = mm(x, y);
-          if (i) ctx.lineTo(px, py);
-          else ctx.moveTo(px, py);
-        });
-        ctx.closePath();
+      if (island) ctx.drawImage(island, 0, 0, W, H);
+      if (areas) {
+        const key = [...unlocked].sort().join();
+        if (fog?.key !== key) fog = { key, cv: veil(areas, unlocked) };
+        ctx.drawImage(fog.cv, 0, 0, W, H);
       }
-      ctx.fillStyle = "#78c04c";
-      ctx.fill("evenodd");
-      for (let by = 0; by < WORLD_BLOCKS.length; by++)
-        for (let bx = 0; bx < WORLD_BLOCKS.length; bx++) {
-          const zone = zoneOfBlock(bx, by);
-          const kind = blockKind(bx, by);
-          if (!zone) {
-            const terr = territoryOfBlock(bx, by);
-            const col = terr ? MINI_LANDMARK[kind] : kind === "mountains" ? "#8b917c" : kind === "lake" ? "#1d6fa5" : null;
-            if (col) poly(rect(bx * 7, by * 7, 8, 8), terr && !unlocked.has(terr) ? "#aab4be" : col);
-            continue;
-          }
-          const open = unlocked.has(zone);
-          poly(rect(bx * 7, by * 7, 8, 8), open ? ZONE_BY_ID[zone].ground : "#9aa5b1");
-        }
+      ctx.font = "8px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
       for (const z of ZONES) {
         if (unlocked.has(z.id)) continue;
         const c = zoneCenterTile(z.id);
         const [cx, cy] = mm(c.x, c.y);
-        ctx.font = "8px sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
         ctx.fillText("🔒", cx, cy);
-      }
-      poly(rect(RIVER * 7 - 0.3, 0, 1.6, WORLD), "#2b8fd0");
-      // the motorway (orange) and the railway (dark, dashed)
-      for (const w of WAYS) {
-        const pts = w.loop ? [...w.pts, w.pts[0]] : w.pts;
-        ctx.beginPath();
-        pts.forEach(([x, y], i) => {
-          const [px, py] = mm(x, y);
-          if (i) ctx.lineTo(px, py);
-          else ctx.moveTo(px, py);
-        });
-        const lit = !w.area || unlocked.has(w.area);
-        ctx.strokeStyle = w.kind === "highway" ? (lit ? "#fb923c" : "#7c5a3e") : lit ? "#1f2937" : "#334155";
-        ctx.lineWidth = w.kind === "highway" ? 2 : 1;
-        ctx.setLineDash(w.kind === "rail" ? [2, 1.5] : []);
-        ctx.stroke();
-        ctx.setLineDash([]);
       }
       for (const p of WORLD_MAP.plots) {
         if (!unlocked.has(p.zone)) continue;
@@ -140,24 +113,27 @@ export function Minimap({ engine }: { engine: RefObject<MapEngine | null> }) {
         else if (b?.type === "garage") color = "#60a5fa";
         else if (b) color = STRUCTURE_BY_ID[b.type].roof;
         if (!color) continue;
-        const [x, y] = mm(p.x + p.w / 2, p.y + p.d / 2);
+        const [x, y] = mm(p.x, p.y);
         ctx.fillStyle = color;
+        ctx.strokeStyle = "rgba(0,0,0,0.5)";
+        ctx.lineWidth = 0.6;
         ctx.beginPath();
-        ctx.arc(x, y, p.w > 3 ? 3 : 2.2, 0, Math.PI * 2);
+        ctx.arc(x, y, p.big ? 2.6 : 2, 0, Math.PI * 2);
         ctx.fill();
+        ctx.stroke();
       }
       const e = engine.current;
       if (e) {
         const now = e.zoomTier();
         setTier((old) => (old === now ? old : now));
-        const v = e.viewTiles().map((p) => mm(p.x, p.y));
+        const v = e.viewQuad().map(([x, y]) => mm(x, y));
         ctx.beginPath();
         v.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
         ctx.closePath();
         ctx.strokeStyle = "#fff";
         ctx.lineWidth = 1.2;
         ctx.stroke();
-        ctx.fillStyle = "rgba(255,255,255,0.08)";
+        ctx.fillStyle = "rgba(255,255,255,0.1)";
         ctx.fill();
       }
     };
@@ -167,20 +143,21 @@ export function Minimap({ engine }: { engine: RefObject<MapEngine | null> }) {
 
   const onTap = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
-    const tile = fromMm(((e.clientX - r.left) / r.width) * W, ((e.clientY - r.top) / r.height) * H);
-    engine.current?.lookAt(Math.max(0, Math.min(WORLD, tile.x)), Math.max(0, Math.min(WORLD, tile.y)));
+    const x = ((e.clientX - r.left) / r.width - 0.5) * SX;
+    const y = ((e.clientY - r.top) / r.height - 0.5) * SZ;
+    engine.current?.lookAt(x, y);
   };
 
   const btn = "flex size-8 items-center justify-center rounded-lg hud-bar text-white transition hover:brightness-110";
   const areas = unlockedAreas(state);
-  const go = (id: Parameters<MapEngine["flyToArea"]>[0]) => {
+  const go = (id: MapArea) => {
     engine.current?.flyToArea(id);
     setList(false);
   };
   return (
     <div className="pointer-events-auto flex flex-col items-end gap-1.5">
       <div className="overflow-hidden rounded-xl bg-white p-1 shadow-[0_3px_0_0_rgba(0,0,0,0.3)]">
-        <canvas ref={ref} onPointerDown={onTap} style={{ aspectRatio: `${W} / ${H}` }} className="block w-[118px] cursor-pointer md:w-[172px]" aria-label={t("map.minimap")} />
+        <canvas ref={ref} onPointerDown={onTap} style={{ aspectRatio: `${W} / ${H}` }} className="block w-[118px] cursor-pointer rounded-lg md:w-[172px]" aria-label={t("map.minimap")} />
       </div>
       {/* zoom tiers: the whole region, districts, buildings, factory detail */}
       <div className="flex gap-0.5 rounded-lg hud-bar p-0.5" role="radiogroup" aria-label={t("map.tiers")}>

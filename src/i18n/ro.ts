@@ -743,6 +743,8 @@ export const ro: Record<MessageKey, string> = {
   "map.zoomOut": "Depărtează",
   "map.home": "Înapoi la Orășel",
   "map.minimap": "Minihartă",
+  "map.loading": "Se încarcă insula…",
+  "map.noWebgl": "Browserul acesta nu poate afișa harta 3D (WebGL este dezactivat).",
   "map.tiers": "Nivel de zoom",
   "map.tier.region": "Regiune",
   "map.tier.districts": "Districte",

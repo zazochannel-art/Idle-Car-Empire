@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import type { CarId, StructureType, ZoneId } from "@/game/types";
 import type { TimeMode } from "@/components/map/lighting";
-import type { VehiclePick } from "@/components/map/traffic";
+import type { VehiclePick } from "@/components/map/map-types";
 
 const TIME_KEY = "idle-car-empire:time";
 function savedTime(): TimeMode {

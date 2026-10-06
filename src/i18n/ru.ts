@@ -743,6 +743,8 @@ export const ru: Record<MessageKey, string> = {
   "map.zoomOut": "Отдалить",
   "map.home": "К Маленькому городу",
   "map.minimap": "Мини-карта",
+  "map.loading": "Загружаем остров…",
+  "map.noWebgl": "Этот браузер не может показать 3D-карту (WebGL отключён).",
   "map.tiers": "Масштаб",
   "map.tier.region": "Регион",
   "map.tier.districts": "Районы",

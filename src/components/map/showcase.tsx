@@ -14,7 +14,7 @@ import { useT } from "@/i18n/use-t";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { itemName } from "../panels/plant-panel";
-import type { VehiclePick } from "./traffic";
+import type { VehiclePick } from "./map-types";
 import { CAR_MODEL_FOR, type CarModel } from "./vehicles";
 
 const CAR_OF_MODEL = Object.fromEntries(Object.entries(CAR_MODEL_FOR).map(([id, m]) => [m, id])) as Record<CarModel, CarId>;
