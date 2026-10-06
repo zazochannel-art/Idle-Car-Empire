@@ -5,7 +5,7 @@
 // draped over the terrain and merged into a few meshes per terrain tile;
 // bridges keep their own decks (scenery.ts).
 import * as THREE from "three";
-import { hazed } from "./kit";
+import { hazed, noiseLayer } from "./kit";
 import { ROAD_LIFT, pointOn, type MapRoad } from "./scenery";
 import { NTX, NTY, type Ground, type WorldJson } from "./terrain";
 
@@ -97,35 +97,6 @@ function canvasTexture(px: number, draw: (g: CanvasRenderingContext2D, px: numbe
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = aniso;
   return t;
-}
-
-/** Tileable value noise on a px×px grid with `cells` lattice cells across. */
-function noiseLayer(px: number, cells: number, seed: number) {
-  let st = seed;
-  const rnd = () => ((st = (st * 16807) % 2147483647) / 2147483647);
-  const lat = new Float32Array(cells * cells).map(() => rnd());
-  const out = new Float32Array(px * px);
-  const k = cells / px;
-  for (let y = 0; y < px; y++) {
-    const fy = y * k;
-    const y0 = Math.floor(fy);
-    const ty = fy - y0;
-    const sy = ty * ty * (3 - 2 * ty);
-    const r0 = (y0 % cells) * cells;
-    const r1 = ((y0 + 1) % cells) * cells;
-    for (let x = 0; x < px; x++) {
-      const fx = x * k;
-      const x0 = Math.floor(fx);
-      const tx = fx - x0;
-      const sx = tx * tx * (3 - 2 * tx);
-      const c0 = x0 % cells;
-      const c1 = (x0 + 1) % cells;
-      const a = lat[r0 + c0] + (lat[r0 + c1] - lat[r0 + c0]) * sx;
-      const b = lat[r1 + c0] + (lat[r1 + c1] - lat[r1 + c0]) * sx;
-      out[y * px + x] = a + (b - a) * sy;
-    }
-  }
-  return out;
 }
 
 /** Asphalt: fine grain, darker patched and worn areas, a few sealed cracks (all computed, tiling). */

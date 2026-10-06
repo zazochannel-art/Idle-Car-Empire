@@ -6,7 +6,7 @@
 // hundred draw calls. A handful of parts move (rotors, pumps, cable cars).
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
-import { ALB, C, NEGRU, beam, box, cone, cylinder, facade, gableRoof, hipRoof, paint, plainUv, rnd, sphere, type FacadeKind, type MapMaterials } from "./kit";
+import { ALB, C, NEGRU, beam, box, cone, cylinder, facade, gableRoof, hipRoof, paint, plainUv, rnd, sphere, tiledGable, tiledHip, type FacadeKind, type MapMaterials } from "./kit";
 import { EXAG, NTX, NTY, type Building, type Ground, type RoadData, type WorldJson } from "./terrain";
 
 /** Buildings are drawn a little taller than to scale, so they read from above. */
@@ -158,7 +158,7 @@ export class Scenery {
     const trucks: [number, number, number][] = [];
     for (const b of this.data.cladiri) {
       const tile = this.tileOf(b.x, b.z);
-      const put = (mat: FacadeKind | "plain" | "metal", geo: THREE.BufferGeometry | null) => {
+      const put = (mat: FacadeKind | "plain" | "metal" | "roof", geo: THREE.BufferGeometry | null) => {
         if (geo) (B[`${tile}|${mat}`] ||= []).push(geo);
       };
       const plain = (geo: THREE.BufferGeometry | null) => put("plain", geo);
@@ -183,7 +183,7 @@ export class Scenery {
       (B[`${this.tileOf(x, z)}|plain`] ||= []).push(box(0.32, 0.26, 0.86, C("#f4f5f6"), x, y, z, rot), box(0.32, 0.24, 0.28, cab, x + Math.sin(rot) * 0.6, y, z + Math.cos(rot) * 0.6, rot));
     }
     for (const key in B) {
-      const mat = key.split("|")[1] as FacadeKind | "plain" | "metal";
+      const mat = key.split("|")[1] as FacadeKind | "plain" | "metal" | "roof";
       this.add(B[key], this.mats.byKind[mat]);
     }
   }
@@ -191,7 +191,7 @@ export class Scenery {
   private building(
     b: Building,
     k: {
-      put: (mat: FacadeKind | "plain" | "metal", geo: THREE.BufferGeometry | null) => void;
+      put: (mat: FacadeKind | "plain" | "metal" | "roof", geo: THREE.BufferGeometry | null) => void;
       plain: (geo: THREE.BufferGeometry | null) => void;
       metal: (geo: THREE.BufferGeometry | null) => void;
       r: () => number;
@@ -223,12 +223,17 @@ export class Scenery {
           const [fx, fz] = loc(-w * 0.3, d / 2 + 0.12);
           plain(box(Math.min(0.3, w * 0.25), 0.04, 0.2, C("#c9c2b6"), fx, y0 + 0.6, fz, b.r));
         }
-        if (med) plain(hipRoof(w * 1.1, d * 1.1, 0.24, roof, b.x, y0 + hw, b.z, b.r));
+        // tiled roofs over a thin eave board
+        plain(box(w * 1.06, 0.035, d * 1.06, roof.clone().lerp(NEGRU, 0.45), b.x, y0 + hw - 0.035, b.z, b.r));
+        if (med) put("roof", tiledHip(w * 1.1, d * 1.1, 0.24, roof, b.x, y0 + hw, b.z, b.r));
         else {
-          plain(gableRoof(w * 1.12, d * 1.16, 0.4, roof, b.x, y0 + hw, b.z, b.r));
+          const { roof: tiles, ends } = tiledGable(w * 1.12, d * 1.16, 0.4, roof, walls, w, d, b.x, y0 + hw, b.z, b.r);
+          put("roof", tiles);
+          put("casa", ends);
           plain(box(w * 1.13, 0.035, 0.05, roof.clone().lerp(NEGRU, 0.3), b.x, y0 + hw + 0.39, b.z, b.r));
           const [hx, hz] = loc(w * 0.28, -d * 0.12);
           plain(box(0.12, 0.52, 0.12, C("#a0654c"), hx, y0 + hw, hz, b.r));
+          plain(box(0.15, 0.03, 0.15, C("#5d4a40"), hx, y0 + hw + 0.52, hz, b.r));
         }
         if (b.alee) {
           const [ax, az] = loc(-w * 0.3, d / 2 + b.alee / 2);
@@ -340,7 +345,11 @@ export class Scenery {
       case "biserica": {
         const walls = C("#f4f1ea"), roof = C("#8a3b2e"), hN = 1.2;
         plain(box(w, hN, d, walls, b.x, y0, b.z, b.r));
-        plain(gableRoof(d * 1.06, w * 1.14, 0.42, roof, b.x, y0 + hN, b.z, b.r + Math.PI / 2));
+        {
+          const { roof: tiles, ends } = tiledGable(d * 1.06, w * 1.14, 0.42, roof, walls, d, w, b.x, y0 + hN, b.z, b.r + Math.PI / 2);
+          put("roof", tiles);
+          plain(ends);
+        }
         for (const sd of [-1, 1])
           for (let i = 0; i < 3; i++) {
             const [fx, fz] = loc(sd * (w / 2 + 0.005), -d * 0.3 + i * d * 0.25);
@@ -398,7 +407,12 @@ export class Scenery {
         put("lemn", facade("lemn", w, hw, d, c.clone().lerp(ALB, 0.55), b.x, y0, b.z, b.r, he));
         const snow = sol > 3.6 * EXAG;
         const roof = C(snow ? "#eef3f8" : "#4a3b33");
-        plain(gableRoof(w * 1.16, d * 1.22, big ? 0.7 : 0.48, roof, b.x, y0 + hw, b.z, b.r));
+        if (snow) plain(gableRoof(w * 1.16, d * 1.22, big ? 0.7 : 0.48, roof, b.x, y0 + hw, b.z, b.r));
+        else {
+          const { roof: tiles, ends } = tiledGable(w * 1.16, d * 1.22, big ? 0.7 : 0.48, roof, C("#8a5a36"), w, d, b.x, y0 + hw, b.z, b.r);
+          put("roof", tiles);
+          plain(ends);
+        }
         if (snow) plain(box(w * 1.17, 0.05, d * 0.06, C("#4a3b33"), b.x, y0 + hw - 0.02, b.z, b.r));
         for (let e = 0; e < floors; e++) {
           const [bx, bz] = loc(0, d / 2 + 0.1);
@@ -516,8 +530,8 @@ export class Scenery {
         const [ux, uz] = loc(-w * 0.18, -d * 0.12);
         put("casa", facade("casa", w * 0.58, 0.36, d * 0.62, walls, ux, y0 + hw, uz, b.r, 0.36));
         if (b.v === 1) {
-          plain(hipRoof(w * 0.64, d * 0.68, 0.22, C("#c8643c"), ux, y0 + hw + 0.36, uz, b.r));
-          plain(hipRoof(w * 1.06, d * 1.06, 0.2, C("#c0603a"), b.x, y0 + hw, b.z, b.r));
+          put("roof", tiledHip(w * 0.64, d * 0.68, 0.22, C("#c8643c"), ux, y0 + hw + 0.36, uz, b.r));
+          put("roof", tiledHip(w * 1.06, d * 1.06, 0.2, C("#c0603a"), b.x, y0 + hw, b.z, b.r));
         } else {
           plain(box(w * 0.6, 0.05, d * 0.64, C("#e9e2d6"), ux, y0 + hw + 0.36, uz, b.r));
           for (const [sx, sz, lw, ld] of [[0, -1, w, 0.04], [0, 1, w, 0.04], [-1, 0, 0.04, d], [1, 0, 0.04, d]]) {
@@ -802,14 +816,87 @@ export class Scenery {
       g.setAttribute("color", new THREE.BufferAttribute(col, 3));
       return g;
     };
-    const fir = () => [new THREE.ConeGeometry(0.46, 0.7, 7).translate(0, 0.6, 0), new THREE.ConeGeometry(0.36, 0.6, 7).translate(0, 0.95, 0), new THREE.ConeGeometry(0.24, 0.5, 7).translate(0, 1.27, 0)];
+    // Soft, lumpy canopies: every lobe is dented by a noise of its own vertex positions (the same
+    // position always moves the same way, so lobes stay closed), shaded with normals that lean out
+    // from the crown's centre, and darker underneath and inside than at the sunlit top.
+    const hash = (x: number, y: number, z: number, sd: number) => {
+      const v = Math.sin(x * 127.1 + y * 311.7 + z * 74.7 + sd * 19.19) * 43758.5453;
+      return (v - Math.floor(v)) * 2 - 1;
+    };
+    const lobe = (r: number, detail: number, amp: number, sd: number, x: number, y: number, z: number, sy = 1) => {
+      const g = new THREE.IcosahedronGeometry(r, detail);
+      const pos = g.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        const px = pos.getX(i), py = pos.getY(i), pz = pos.getZ(i);
+        const k = 1 + amp * hash(Math.round(px * 1e3), Math.round(py * 1e3), Math.round(pz * 1e3), sd);
+        pos.setXYZ(i, px * k, py * k * sy, pz * k);
+      }
+      g.translate(x, y, z);
+      return g as THREE.BufferGeometry;
+    };
+    /** Merged crown with normals leaning out from (cx, cy, cz) and an ambient-occlusion tint. */
+    const crown = (parts: THREE.BufferGeometry[], cx: number, cy: number, cz: number, lean: number, tint: (x: number, y: number, z: number) => [number, number, number]) => {
+      const g = mergeGeometries(parts.map((p) => {
+        const q = p.index ? p.toNonIndexed() : p;
+        q.deleteAttribute("uv");
+        q.computeVertexNormals();
+        return q;
+      }));
+      const pos = g.attributes.position, nor = g.attributes.normal;
+      const col = new Float32Array(pos.count * 3);
+      const n = new THREE.Vector3(), r = new THREE.Vector3();
+      for (let i = 0; i < pos.count; i++) {
+        r.set(pos.getX(i) - cx, pos.getY(i) - cy, pos.getZ(i) - cz).normalize();
+        n.set(nor.getX(i), nor.getY(i), nor.getZ(i)).multiplyScalar(1 - lean).addScaledVector(r, lean).normalize();
+        nor.setXYZ(i, n.x, n.y, n.z);
+        const c = tint(pos.getX(i), pos.getY(i), pos.getZ(i));
+        col[3 * i] = c[0];
+        col[3 * i + 1] = c[1];
+        col[3 * i + 2] = c[2];
+      }
+      g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+      return g;
+    };
+    /** Top-lit tint: dark at y0, bright and a little warm at y1. */
+    const ao = (y0: number, y1: number, lo = 0.56, hi = 1.08) => (_x: number, y: number): [number, number, number] => {
+      const f = THREE.MathUtils.smoothstep(y, y0, y1);
+      const v = lo + (hi - lo) * f;
+      return [v * (1 + 0.04 * f), v * (1 + 0.03 * f), v * (1 - 0.06 * f)];
+    };
+    /** A fir tier: a star of branch tips drooping round a cone. */
+    const firTier = (r: number, h: number, y: number, sd: number) => {
+      const N = 10, p: number[] = [];
+      const rim = Array.from({ length: N }, (_, k) => {
+        const a = (k / N) * Math.PI * 2 + sd;
+        const rr = r * (k % 2 ? 0.72 : 1) * (1 + 0.08 * hash(k, sd, 1, 3));
+        return [Math.cos(a) * rr, y - (k % 2 ? 0.02 : 0.08), Math.sin(a) * rr];
+      });
+      for (let k = 0; k < N; k++) {
+        const a = rim[k], b = rim[(k + 1) % N];
+        p.push(0, y + h, 0, b[0], b[1], b[2], a[0], a[1], a[2]);
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.Float32BufferAttribute(p, 3));
+      return g;
+    };
+    const firTiers = () => [firTier(0.5, 0.5, 0.36, 0.3), firTier(0.41, 0.46, 0.62, 1.1), firTier(0.31, 0.42, 0.88, 2.0), firTier(0.2, 0.4, 1.12, 2.7)];
+    const firTint = (x: number, y: number, z: number): [number, number, number] => {
+      // branch tips catch the light, the inside of each tier is in shade; the top is brightest
+      const out = Math.min(1, Math.hypot(x, z) / 0.35);
+      const v = (0.5 + 0.3 * out) * (0.78 + 0.32 * THREE.MathUtils.smoothstep(y, 0.3, 1.5));
+      return [v, v * 1.02, v * 0.96];
+    };
+    const deciduous = this.opt.low
+      ? [lobe(0.42, 0, 0.1, 1, 0, 0.92, 0, 0.9), lobe(0.31, 0, 0.12, 2, 0.24, 1.06, 0.08), lobe(0.29, 0, 0.12, 3, -0.22, 1.0, -0.1), lobe(0.25, 0, 0.12, 4, 0.03, 1.25, -0.05)]
+      : [lobe(0.44, 1, 0.13, 1, 0, 0.95, 0, 0.88), lobe(0.3, 0, 0.14, 2, 0.28, 0.88, 0.1), lobe(0.28, 0, 0.14, 3, -0.25, 0.92, -0.13), lobe(0.24, 0, 0.14, 4, 0.05, 1.22, -0.06)];
     const SPECIES: { f: THREE.BufferGeometry; t: THREE.BufferGeometry; cols: string[]; trunk: string }[] = [
-      { f: leaves(fir()), t: new THREE.CylinderGeometry(0.05, 0.08, 0.35, 5).translate(0, 0.17, 0), cols: ["#3f8a3a", "#2c6e33", "#4a9a44", "#2a6230"], trunk: "#6e4a31" },
+      // (trunks are open tubes: their ends are never seen)
+      { f: crown(firTiers(), 0, 0.85, 0, 0.45, firTint), t: new THREE.CylinderGeometry(0.04, 0.08, 0.4, 6, 1, true).translate(0, 0.2, 0), cols: ["#3d7d3a", "#2d6634", "#467f3f", "#2a5b30"], trunk: "#5b3f2a" },
       {
-        f: leaves([new THREE.IcosahedronGeometry(0.42, 0).translate(0, 0.9, 0), new THREE.IcosahedronGeometry(0.32, 0).translate(0.22, 1.08, 0.08), new THREE.IcosahedronGeometry(0.3, 0).translate(-0.2, 1.02, -0.1), new THREE.IcosahedronGeometry(0.26, 0).translate(0.02, 1.26, -0.04)]),
-        t: new THREE.CylinderGeometry(0.05, 0.07, 0.62, 5).translate(0, 0.31, 0),
-        cols: ["#6cb84c", "#5aa843", "#7cc657", "#8fc24a", "#d9a63a", "#4f9a3f"],
-        trunk: "#7a5434",
+        f: crown(deciduous, 0, 0.98, 0, 0.7, ao(0.55, 1.4)),
+        t: new THREE.CylinderGeometry(0.04, 0.075, 0.7, 6, 1, true).translate(0, 0.35, 0),
+        cols: ["#5f9e45", "#4f8f3d", "#6aa84c", "#7fa543", "#c99a3a", "#477f3a"],
+        trunk: "#5e4330",
       },
       {
         f: leaves(
@@ -828,9 +915,11 @@ export class Scenery {
         trunk: "#a07b52",
       },
       {
-        f: leaves(fir(), (x, y) => {
-          const f = THREE.MathUtils.smoothstep(y, 0.62, 0.95);
-          return [0.24 + 0.72 * f, 0.43 + 0.53 * f, 0.26 + 0.72 * f];
+        f: crown(firTiers(), 0, 0.85, 0, 0.45, (x, y, z) => {
+          // snow on the tiers' upper faces, dark green under them
+          const out = Math.min(1, Math.hypot(x, z) / 0.35);
+          const snow = out < 0.6 || y > 1.3 ? 1 : 0.35;
+          return [0.3 + 0.66 * snow, 0.42 + 0.56 * snow, 0.3 + 0.68 * snow];
         }),
         t: new THREE.CylinderGeometry(0.05, 0.08, 0.35, 5).translate(0, 0.17, 0),
         cols: ["#ffffff", "#f2f6f2", "#e8efe9"],
@@ -887,7 +976,7 @@ export class Scenery {
       this.root.add(f, t);
     }
     // bushes: one rounded shape, tinted per bush
-    const bush = leaves([new THREE.IcosahedronGeometry(0.2, 0).scale(1.2, 0.75, 1.2).translate(0, 0.1, 0)]);
+    const bush = crown([lobe(0.2, 0, 0.16, 9, 0, 0.1, 0, 0.75), lobe(0.13, 0, 0.18, 10, 0.12, 0.08, 0.05)], 0, 0.06, 0, 0.65, ao(-0.02, 0.24, 0.58, 1.06));
     const PAL = [["#5aa843", "#4b9640", "#6cb84c", "#7aa83f"], ["#8a8a4a", "#7d7a45", "#9a9055", "#6f7a43"], ["#46693a", "#3e6034", "#527542", "#5a6e3a"]];
     const list = this.data.tufe;
     const m = new THREE.InstancedMesh(bush, this.mats.leaves, Math.max(1, list.length));

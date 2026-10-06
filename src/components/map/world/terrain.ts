@@ -3,7 +3,7 @@
 // the sea floor beyond the map. Heights are in metres; the scene draws them
 // 1.5× taller than life (EXAG) so the relief reads from far away.
 import * as THREE from "three";
-import { hazed } from "./kit";
+import { hazed, noiseLayer } from "./kit";
 
 export const EXAG = 1.5;
 /** Terrain tiles across and down (one 2048 px texture each). */
@@ -162,6 +162,91 @@ function waveTexture(px = 256) {
   return t;
 }
 
+/**
+ * Ground detail at close range, tiling in world space: R is grass (blades
+ * and clumps), G a medium mottle, B large patches. Data, not colour.
+ */
+function detailTexture(px = 256) {
+  let seed = 41;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const blades = new Float32Array(px * px).fill(0);
+  // thousands of short strokes, mostly upright, light and dark, wrapping round the edges
+  for (let i = 0; i < 9000; i++) {
+    let x = rnd() * px;
+    let y = rnd() * px;
+    const a = -Math.PI / 2 + (rnd() - 0.5) * 1.1;
+    const len = 2 + rnd() * 5;
+    const v = (rnd() - 0.45) * 1.3;
+    for (let k = 0; k < len; k++) {
+      const xi = ((Math.round(x) % px) + px) % px;
+      const yi = ((Math.round(y) % px) + px) % px;
+      blades[yi * px + xi] += v * (1 - k / len);
+      x += Math.cos(a);
+      y += Math.sin(a);
+    }
+  }
+  const clumps = noiseLayer(px, 24, 43);
+  const mottle = noiseLayer(px, 8, 47);
+  const mottle2 = noiseLayer(px, 16, 51);
+  const patches = noiseLayer(px, 3, 53);
+  const data = new Uint8Array(px * px * 4);
+  for (let i = 0; i < px * px; i++) {
+    const r = 0.5 + blades[i] * 0.6 + (clumps[i] - 0.5) * 0.45;
+    data[4 * i] = Math.max(0, Math.min(255, r * 255));
+    data[4 * i + 1] = Math.max(0, Math.min(255, (mottle[i] * 0.65 + mottle2[i] * 0.35) * 255));
+    data[4 * i + 2] = Math.max(0, Math.min(255, patches[i] * 255));
+    data[4 * i + 3] = 255;
+  }
+  const t = new THREE.DataTexture(data, px, px, THREE.RGBAFormat, THREE.UnsignedByteType);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.magFilter = THREE.LinearFilter;
+  t.minFilter = THREE.LinearMipmapLinearFilter;
+  t.generateMipmaps = true;
+  t.anisotropy = 4;
+  t.needsUpdate = true;
+  return t;
+}
+
+/**
+ * Adds the close-range ground detail to a (hazed) terrain material: grass
+ * gets blades, clumps and drier or lusher patches; sand, rock and paving a
+ * finer grain. Far away the detail averages out to the painted colour.
+ */
+function withDetail(m: THREE.MeshStandardMaterial, detail: THREE.Texture) {
+  const prev = m.onBeforeCompile;
+  m.onBeforeCompile = (sh, r) => {
+    prev.call(m, sh, r);
+    sh.uniforms.uDetail = { value: detail };
+    sh.vertexShader = sh.vertexShader
+      .replace("#include <common>", "#include <common>\nvarying vec2 vDetXZ;")
+      .replace("#include <project_vertex>", "#include <project_vertex>\nvDetXZ = (modelMatrix * vec4(transformed, 1.0)).xz;");
+    sh.fragmentShader = sh.fragmentShader
+      .replace("#include <common>", "#include <common>\nvarying vec2 vDetXZ;\nuniform sampler2D uDetail;")
+      .replace(
+        "#include <map_fragment>",
+        `#include <map_fragment>
+{
+  vec3 c0 = diffuseColor.rgb;
+  // one repeat: 3 units of blades, 8 of clumps, 26 of mottle, 130 of drier and lusher patches
+  float fine = texture2D(uDetail, vDetXZ * 0.333).r;
+  float fine2 = texture2D(uDetail, vDetXZ * 0.125 + vec2(0.37, 0.11)).r;
+  float mid = texture2D(uDetail, vDetXZ * 0.0385 + vec2(0.13, 0.71)).g;
+  float big = texture2D(uDetail, vDetXZ * 0.0077).b;
+  float green = clamp((c0.g - max(c0.r, c0.b)) * 8.0, 0.0, 1.0);
+  // a little richer than the painted pastel, then blades (dark gaps, light tips) and clumps
+  float luma = dot(c0, vec3(0.299, 0.587, 0.114));
+  vec3 rich = mix(vec3(luma), c0, 1.18) * 0.9;
+  vec3 grass = rich * (0.5 + 0.42 * fine + 0.3 * fine2) * (0.84 + 0.32 * mid);
+  grass *= mix(vec3(0.84, 0.97, 0.82), vec3(1.12, 1.04, 0.78), smoothstep(0.25, 0.8, big));
+  vec3 other = c0 * (0.9 + 0.12 * fine2 + 0.08 * mid);
+  diffuseColor.rgb = mix(other, grass, green);
+}`,
+      );
+  };
+  m.customProgramCacheKey = () => "hazed-detail";
+  return m;
+}
+
 export interface TerrainParts {
   tiles: THREE.Mesh[];
   sea: THREE.Mesh;
@@ -173,9 +258,10 @@ export interface TerrainParts {
 export function buildTerrain(ground: Ground, textures: THREE.Texture[]): TerrainParts {
   const tiles: THREE.Mesh[] = [];
   const segX = (ground.GW - 1) / NTX, segY = (ground.GH - 1) / NTY;
+  const detail = detailTexture();
   for (let ty = 0; ty < NTY; ty++)
     for (let tx = 0; tx < NTX; tx++) {
-      const mat = hazed(new THREE.MeshStandardMaterial({ map: textures[ty * NTX + tx], roughness: 0.92, metalness: 0, envMapIntensity: 0.45 }));
+      const mat = withDetail(hazed(new THREE.MeshStandardMaterial({ map: textures[ty * NTX + tx], roughness: 0.92, metalness: 0, envMapIntensity: 0.45 })), detail);
       const m = ground.tile(tx * segX, ty * segY, segX, segY, mat);
       m.receiveShadow = true;
       m.castShadow = true;
