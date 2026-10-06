@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { WORLD_MAP } from "./city/layout";
+import { DEPOT, WORLD_MAP } from "./city/layout";
 import { CAR_BY_ID } from "./config/cars";
 import { RACE_EVENTS } from "./config/racing";
 import { RESEARCH_BY_ID } from "./config/research";
@@ -459,7 +459,7 @@ describe("events with objectives and sponsor contracts", () => {
 });
 
 describe("the supplier as a backup", () => {
-  it("a drivetrain plant that delivers nothing doesn't stall the assembly line", () => {
+  it("emergency parts are off by default; switched on, they are bought at the emergency price and come by truck", () => {
     const s = createInitialState(T0);
     s.cash = 1e6;
     s.chain.firstCar = true;
@@ -472,7 +472,23 @@ describe("the supplier as a backup", () => {
     // the line builds Sedans; the brake plant has nothing to give
     asm.car = "sedan";
     expect(Ch.supplied(s, "brakes")).toBe(false); // the company has a brake plant
+    // off by default: the supplier never steps in on its own
     for (let i = 0; i < 20; i++) tick(s, 0.5);
+    expect(asm.inputs.brakes ?? 0).toBe(0);
+    expect(s.chain.shipments.some((sh) => sh.item === "brakes")).toBe(false);
+    // switched on: one batch, paid now at the emergency price, on a truck from the depot
+    const asmId = free[3];
+    expect(Ch.setBackupParts(s, asmId, true)).toBe(true);
+    const cash = s.cash;
+    tick(s, 0.5);
+    const order = s.chain.shipments.find((sh) => sh.item === "brakes" && sh.to === asmId);
+    expect(order).toBeDefined();
+    expect(order!.from).toBe(DEPOT);
+    expect(order!.value).toBeCloseTo(order!.qty * Ch.supplierPrice("brakes", CAR_BY_ID.sedan.grade, true), 6);
+    expect(cash - s.cash).toBeGreaterThanOrEqual(order!.value - 1e-6);
+    expect(s.chain.owed).toBe(0);
+    expect(asm.inputs.brakes ?? 0).toBe(0);
+    for (let i = 0; i < 400 && !(asm.inputs.brakes ?? 0); i++) tick(s, 0.5);
     expect(asm.inputs.brakes ?? 0).toBeGreaterThan(0);
   });
 });

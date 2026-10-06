@@ -10,7 +10,8 @@ import { CARS, CAR_BY_ID, CAR_MODEL, type CarConfig } from "../config/cars";
 import {
   AUTOMATION,
   BASE_RECIPE,
-  SUPPLIER_MARKUP,
+  OUTSOURCE,
+  OUTSOURCED_PARTS,
   SUPPLIED_PARTS,
   CHASSIS_BONUS,
   CARRIER_CAPACITY,
@@ -45,6 +46,8 @@ import {
   addStock,
   autoRestock,
   book,
+  canOwe,
+  depotTrip,
   migrateCostBasis,
   spendMaterials,
   createLedger,
@@ -64,7 +67,7 @@ import {
 } from "./materials";
 import { MANAGERS } from "../config/managers";
 import { OFFLINE } from "../config/prestige";
-import { MARKET, RACING, plotOf, roadRoute } from "../city/layout";
+import { DEPOT, MARKET, RACING, plotOf, roadRoute } from "../city/layout";
 import type {
   BuildingState,
   CarId,
@@ -217,9 +220,13 @@ export function recipe(car: CarConfig): ComponentId[] {
   return [...BASE_RECIPE, ...car.extras];
 }
 
-/** A base part the company doesn't make yet: an outside supplier delivers it to the assembly line. */
+/**
+ * A part the company doesn't make yet that an outside supplier sells (tyres,
+ * drivetrain): ordered and paid by the assembly plant, delivered by truck.
+ * Bodies and engines never come from a supplier.
+ */
 export function supplied(s: GameState, c: ComponentId): boolean {
-  return (BASE_RECIPE.includes(c) || SUPPLIED_PARTS.includes(c)) && !hasPlant(s, MAKER[c]);
+  return OUTSOURCED_PARTS.includes(c) && !hasPlant(s, MAKER[c]);
 }
 
 /** The grade the supplier delivers for a model: base parts at grade 1, drivetrain parts at whatever the model needs. */
@@ -228,22 +235,55 @@ export function suppliedGrade(c: ComponentId, car: CarConfig): number {
 }
 
 /**
- * A drivetrain part the company makes, but its own plants deliver nothing
- * (out of materials, stopped): rather than stalling the line for hours, the
- * outside supplier steps in at its price until the company's parts flow again.
+ * Emergency parts: a part the supplier sells, which the company makes itself
+ * but whose own plants deliver nothing (out of materials, stopped). Only when
+ * the player switched emergency parts on for this assembly plant, and at the
+ * emergency price: a way through a bad hour, never a way around the plants.
  */
-function backupSupply(s: GameState, plot: string, c: ComponentId, p: PlantData): boolean {
-  if (!SUPPLIED_PARTS.includes(c) || (p.inputs[c] ?? 0) >= 1) return false;
-  if (s.chain.shipments.some((sh) => !sh.back && sh.to === plot && sh.item === c)) return false;
+export function backupSupply(s: GameState, c: ComponentId, p: PlantData): boolean {
+  if (!p.backup || !OUTSOURCED_PARTS.includes(c) || supplied(s, c) || (p.inputs[c] ?? 0) >= 1) return false;
   return plantsOf(s).every(([, b]) => b.type !== MAKER[c] || (b.plant.out < 1 && b.plant.status !== "ok"));
 }
 
 /** Whether the supplier covers this part for this model. */
 const supplierCovers = (s: GameState, c: ComponentId, car: CarConfig) => supplied(s, c) && suppliedGrade(c, car) >= car.grade;
 
-/** What the supplier charges for one unit. */
-export function supplierPrice(c: ComponentId, grade = 1): number {
-  return componentStdCost(c, grade) * SUPPLIER_MARKUP;
+/** What the supplier charges for one unit (emergency parts cost more). */
+export function supplierPrice(c: ComponentId, grade = 1, emergency = false): number {
+  return componentStdCost(c, grade) * (emergency ? OUTSOURCE.emergency : OUTSOURCE.markup);
+}
+
+/** Parts from the outside supplier on their way to an assembly plant. */
+const partsComing = (s: GameState, plot: string, c: ComponentId) => s.chain.shipments.some((sh) => !sh.back && sh.to === plot && sh.item === c && sh.from === DEPOT);
+
+/**
+ * Orders finished parts from the outside supplier for an assembly plant:
+ * a few batches' worth (one batch for emergency parts), paid now as far as
+ * the cash goes, and driven over from the depot. With no cash at all, the
+ * supplier gives trade credit for the next batch only (on the company's
+ * account, within its debt limit): the car it completes pays it back.
+ * Emergency parts are never on credit. Returns what the order cost.
+ */
+function orderParts(s: GameState, plot: string, p: PlantData, st: PlantStats, c: ComponentId): number {
+  if (!st.car) return 0;
+  const regular = supplied(s, c);
+  const emergency = !regular && backupSupply(s, c, p);
+  if ((!regular && !emergency) || partsComing(s, plot, c)) return 0;
+  const have = p.inputs[c] ?? 0;
+  // reorder while a batch is still on hand, so the line rarely waits for the truck
+  if (have >= (emergency ? 1 : st.lines * 2)) return 0;
+  const want = emergency ? st.lines : Math.min(st.inCap, st.lines * OUTSOURCE.cover);
+  const price = supplierPrice(c, suppliedGrade(c, st.car), emergency);
+  const affordable = Math.floor(Math.max(0, s.cash) / price);
+  let qty = Math.min(Math.floor(want - have), affordable);
+  const credit = qty < 1 && regular;
+  if (credit) qty = Math.ceil(st.lines - have);
+  if (qty < 1 || (credit && !canOwe(s, qty * price))) return 0;
+  const cost = qty * price;
+  payOrOwe(s, cost);
+  book(s, "materials", cost);
+  ship(s, { from: DEPOT, to: plot, item: c, qty, value: cost, dur: depotTrip(plot), vehicle: qty > VEHICLE_CAPACITY.truck ? "semi" : "truck" });
+  return cost;
 }
 
 /** Best grade available for a component across all plants that make it. */
@@ -684,19 +724,9 @@ export function chainTick(
     // 1. materials: restock automatically when the plant is set to (Wholesale supplier and up)
     if (cfg.item && p.autoBuy) autoRestock(s, id, st.unitsPerSec);
 
-    // 1b. parts the company doesn't make yet come from the supplier
-    if (!cfg.item && st.car)
-      for (const c of recipe(st.car)) {
-        if (!supplied(s, c) && !backupSupply(s, id, c, p)) continue;
-        // only what the next car needs, on account when cash is short (the car pays it back)
-        const n = Math.floor(st.lines - (p.inputs[c] ?? 0));
-        if (n <= 0) continue;
-        const price = supplierPrice(c, suppliedGrade(c, st.car));
-        payOrOwe(s, n * price);
-        out.spent += n * price;
-        book(s, "materials", n * price);
-        p.inputs[c] = (p.inputs[c] ?? 0) + n;
-      }
+    // 1b. finished parts the company doesn't make yet come from an outside supplier:
+    // ordered and paid up front, delivered by truck (see orderParts)
+    if (!cfg.item && st.car) for (const c of recipe(st.car)) out.spent += orderParts(s, id, p, st, c);
 
     // 2. production
     const canMake = () => {
@@ -1118,6 +1148,15 @@ export function upgradePower(s: GameState, plotId: string, gm: GlobalMods): bool
   return true;
 }
 
+/** Switches emergency parts for an assembly plant (bought at the emergency price when the company's own plants stop). */
+export function setBackupParts(s: GameState, plotId: string, on: boolean): boolean {
+  const b = plantAt(s, plotId);
+  if (!b || b.type !== "assemblyPlant") return false;
+  if (on) b.plant.backup = true;
+  else delete b.plant.backup;
+  return true;
+}
+
 /** Switches automatic restocking (it only runs once a supplier allows it). */
 export function setAutoBuy(s: GameState, plotId: string, on: boolean): boolean {
   const b = plantAt(s, plotId);
@@ -1184,6 +1223,7 @@ export function migratePlant(type: PlantType, raw: unknown): PlantData {
   p.warehouse = int(raw.warehouse, 1, WAREHOUSE_CAP.length, 1);
   p.power = int(raw.power, 0, POWER_SYSTEM.max, 0);
   if (raw.autoBuy === true) p.autoBuy = true;
+  if (raw.backup === true) p.backup = true;
   if (typeof raw.short === "string") p.short = raw.short as MaterialId;
   // saves from before the materials market: the old raw yard becomes a starter stock
   if (raw.stock === undefined && PLANT_BY_ID[type].item) p.stock = starterStock(type, p.grade, 6);

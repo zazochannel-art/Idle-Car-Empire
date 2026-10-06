@@ -36,18 +36,30 @@ export const COMPONENT_BY_ID = Object.fromEntries(COMPONENTS.map((c) => [c.id, c
 export const BASE_RECIPE: ComponentId[] = ["body", "engine", "tires"];
 
 /**
- * Until the company builds a plant for a base part, an outside supplier
- * delivers it to the assembly line at its standard cost × this: the first
- * cars come early, and building the plant later doubles their margin.
- */
-export const SUPPLIER_MARKUP = 1.08;
-
-/**
  * Drivetrain and running gear the supplier delivers at whatever grade the
  * model needs (so no model waits on these plants); building the plant saves
  * the markup and lets better grades make better cars.
  */
 export const SUPPLIED_PARTS: ComponentId[] = ["transmission", "wheels", "brakes"];
+
+/**
+ * The only finished parts an outside supplier sells: tyres for the first cars
+ * (until the Tire Factory) and the drivetrain parts above (until their
+ * plants). Bodies and engines are always made in-house; every other part
+ * needs its own plant before a model can use it.
+ */
+export const OUTSOURCED_PARTS: ComponentId[] = ["tires", ...SUPPLIED_PARTS];
+
+/**
+ * Buying finished parts is the expensive, slow way: standard cost × `markup`,
+ * paid when ordered (never on account), delivered by truck from the depot.
+ * An assembly plant keeps `cover` batches' worth on hand or on the way.
+ * Emergency parts — for a part the company makes but whose plants have
+ * stopped — are off unless the player switches them on, and cost `emergency`.
+ */
+export const OUTSOURCE = { markup: 1.35, emergency: 1.5, cover: 3 };
+/** (Older name of OUTSOURCE.markup.) */
+export const SUPPLIER_MARKUP = OUTSOURCE.markup;
 
 export interface PlantConfig {
   id: PlantType;

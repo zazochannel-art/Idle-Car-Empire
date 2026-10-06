@@ -308,6 +308,8 @@ export interface PlantData {
   power: number;
   /** Restock materials automatically (from the Wholesale supplier on). */
   autoBuy?: boolean;
+  /** Assembly: buy emergency parts (at the emergency price) when the company's own plants for them stop. Off unless set. */
+  backup?: boolean;
   /** With status noRaw: the material that ran out. */
   short?: import("./config/economy").MaterialId;
   /** Components waiting at an assembly plant. */

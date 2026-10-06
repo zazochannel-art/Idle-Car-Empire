@@ -82,6 +82,7 @@ interface GameStore {
   upgradeWarehouse: (plot: string) => boolean;
   upgradePower: (plot: string) => boolean;
   setAutoBuy: (plot: string, on: boolean) => void;
+  setBackupParts: (plot: string, on: boolean) => void;
   setAutoUpgrade: (plot: string, on: boolean) => void;
   hireManager: (id: ManagerId, assignTo?: string) => boolean;
   upgradeManager: (id: ManagerId) => boolean;
@@ -376,6 +377,9 @@ export const useGame = create<GameStore>((set, get) => {
     upgradePower: (plot) => act((s) => Ch.upgradePower(s, plot, get().snap.gm)),
     setAutoBuy: (plot, on) => {
       act((s) => Ch.setAutoBuy(s, plot, on));
+    },
+    setBackupParts: (plot, on) => {
+      act((s) => Ch.setBackupParts(s, plot, on));
     },
     setPlantCar: (plot, car) => {
       act((s) => Ch.setPlantCar(s, plot, car, get().snap.gm));

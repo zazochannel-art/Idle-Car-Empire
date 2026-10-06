@@ -98,6 +98,11 @@ export function payOrOwe(s: GameState, amount: number) {
   s.chain.owed += amount - now;
 }
 
+/** Whether a cost of `amount` may go on the company's account now. */
+export function canOwe(s: GameState, amount: number): boolean {
+  return amount > 0 && Number.isFinite(amount);
+}
+
 /** A cash reward (missions, achievements, events, contracts…): paid in and booked below the line. */
 export function payReward(s: GameState, amount: number) {
   if (!(amount > 0) || !Number.isFinite(amount)) return;
@@ -210,7 +215,8 @@ export function unitsInStock(p: PlantData, need: MaterialStock): { n: number; sh
 
 // ───────────────────────────── buying ─────────────────────────────
 
-function depotTrip(to: string) {
+/** Seconds a delivery from the depot takes to reach a plant. */
+export function depotTrip(to: string) {
   const a = plotOf(DEPOT)?.entry;
   const b = plotOf(to)?.entry;
   const tiles = a && b ? roadRoute(a, b).length : 20;

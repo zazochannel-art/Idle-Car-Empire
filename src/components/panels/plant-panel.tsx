@@ -6,14 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { CARS, CAR_BY_ID } from "@/game/config/cars";
-import { AUTOMATION, BASE_MAX_LEVEL, CHASSIS_BONUS, COMPONENTS, COMPONENT_BY_ID, GRADES, MAKER, PLANT_BY_ID, PLANT_LEVELS, PLANT_TRUCKS, SPEED } from "@/game/config/chain";
+import { AUTOMATION, BASE_MAX_LEVEL, CHASSIS_BONUS, COMPONENTS, COMPONENT_BY_ID, GRADES, MAKER, OUTSOURCE, OUTSOURCED_PARTS, PLANT_BY_ID, PLANT_LEVELS, PLANT_TRUCKS, SPEED } from "@/game/config/chain";
 import { DEALER_BY_ID, DEALER_SPECIALTY } from "@/game/config/dealerships";
 import { MANAGERS } from "@/game/config/managers";
 import { DEPOT, MARKET, plotOf } from "@/game/city/layout";
 import { MATERIALS } from "@/game/config/economy";
 import { marketPrice, usedMaterials } from "@/game/engine/materials";
 import { REGIONS } from "@/game/config/regions";
-import { AUTO_UPGRADE_FROM, plantNetValue, plantProfitPerMin, plantUnitCost, automationCost, bestGrade, carLock, carValue, componentValue, dealerStats, trucksOf, gradeCost, levelCost, plantNumber, plantsOf, recipe, speedCost, supplied, suppliedGrade, supplierPrice } from "@/game/engine/chain";
+import { AUTO_UPGRADE_FROM, plantNetValue, plantProfitPerMin, plantUnitCost, automationCost, bestGrade, carLock, carValue, componentValue, dealerStats, trucksOf, gradeCost, levelCost, hasPlant, plantNumber, plantsOf, recipe, speedCost, supplied, suppliedGrade, supplierPrice } from "@/game/engine/chain";
 import { isManagerUnlocked } from "@/game/engine/actions";
 import { dealerUpgradeCost, managerUpgradeCost } from "@/game/engine/economy";
 import { dealerRequirement } from "@/game/engine/insights";
@@ -162,6 +162,7 @@ export function PlantPanel({ id }: { id: string }) {
                 🚚 {t("supplier.note", { item: itemName(c, t), price: formatMoney(supplierPrice(c, suppliedGrade(c, st.car!))), plant: t(`structure.${PLANT_BY_ID[MAKER[c]].id}` as MessageKey) })}
               </p>
             ))}
+        {!cfg.item && st.car && <EmergencyParts id={id} parts={recipe(st.car).filter((c) => OUTSOURCED_PARTS.includes(c) && hasPlant(state, MAKER[c]))} />}
       </div>
 
       {/* transport */}
@@ -384,6 +385,30 @@ function ManagerSlot({ id }: { id: string }) {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Emergency parts: off unless switched on; bought at the emergency price when the company's own plants for them stop. */
+function EmergencyParts({ id, parts }: { id: string; parts: ComponentId[] }) {
+  const on = useGame((g) => !!g.state.city.buildings[id]?.plant?.backup);
+  const setBackup = useGame((g) => g.setBackupParts);
+  const { t } = useT();
+  if (!parts.length) return null;
+  return (
+    <div className="mt-2 flex items-center justify-between gap-2 rounded-xl bg-white/[0.04] p-2 ring-1 ring-white/[0.06]">
+      <div className="min-w-0 text-[11px]">
+        <div className="font-semibold">🆘 {t("supplier.backup")}</div>
+        <div className="text-white/45">{t("supplier.backupHint", { items: parts.map((c) => itemName(c, t)).join(", "), pct: formatPercent(OUTSOURCE.emergency - 1) })}</div>
+      </div>
+      <button
+        role="switch"
+        aria-checked={on}
+        onClick={() => setBackup(id, !on)}
+        className={cn("relative h-6 w-11 shrink-0 rounded-full transition-colors", on ? "bg-amber-500" : "bg-white/15")}
+      >
+        <span className={cn("absolute top-0.5 size-5 rounded-full bg-white shadow transition-all", on ? "left-[1.4rem]" : "left-0.5")} />
+      </button>
     </div>
   );
 }
