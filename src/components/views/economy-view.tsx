@@ -5,10 +5,10 @@
 // what each plant earns, what materials cost today, and what is owed.
 import { MATERIALS, SUPPLIERS } from "@/game/config/economy";
 import { PLANT_BY_ID } from "@/game/config/chain";
-import { plantNetValue, plantProfitPerMin, plantsOf } from "@/game/engine/chain";
+import { partsPriceMult, plantNetValue, plantProfitPerMin, plantsOf } from "@/game/engine/chain";
 import { COST_KEYS, debtLimit, ledgerCosts, ledgerNet, ledgerRevenue, marketPrice, supplierOf, usedMaterials } from "@/game/engine/materials";
 import { formatMoney, formatNumber, formatPercent } from "@/game/format";
-import type { LedgerValues } from "@/game/types";
+import type { ItemId, LedgerValues } from "@/game/types";
 import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
@@ -16,7 +16,7 @@ import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { materialName } from "../panels/materials-panel";
 import { MarketNewsCard, ReputationCard } from "../panels/market-controls";
-import { plantName } from "../panels/plant-panel";
+import { itemName, plantName } from "../panels/plant-panel";
 import { LEDGER_ICON, LedgerTable } from "./ledger-table";
 import { SectionTitle } from "./section-title";
 
@@ -111,6 +111,15 @@ export function EconomyView() {
           })}
         </div>
         <p className="mt-2 text-[10px] text-white/40">{t("eco.bought", { n: formatNumber(state.market.bought) })}</p>
+        {/* the Parts Market's appetite: items sold beyond it fetch less */}
+        {(Object.keys(state.chain.demand ?? {}) as ItemId[])
+          .map((item) => [item, partsPriceMult(state, item)] as const)
+          .filter(([, m]) => m < 0.995)
+          .map(([item, m]) => (
+            <p key={item} className="mt-1 text-[10px] text-amber-300">
+              ⚠️ {t("eco.partsDemand", { item: itemName(item, t), pct: formatPercent(m) })}
+            </p>
+          ))}
       </div>
 
       <SectionTitle title={t("eco.run")} />

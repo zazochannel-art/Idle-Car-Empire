@@ -433,6 +433,8 @@ export interface ChainState {
   debtLimit?: number;
   /** Over the limit: every plant stops until sales pay the account down (DEBT.resume). */
   suspended?: boolean;
+  /** Parts Market: units of each item sold recently (decays over PARTS_DEMAND.window). */
+  demand?: Partial<Record<ItemId, number>>;
   /** Net income per second averaged over ~10 minutes: sizes rewards, so a lucky moment doesn't. */
   steady?: number;
   /** Market time (s) of the last supplier rescue. */

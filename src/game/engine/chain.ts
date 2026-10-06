@@ -18,6 +18,7 @@ import {
   COMPONENT_BY_ID,
   DEALER_SALE,
   WHOLESALE,
+  PARTS_DEMAND,
   DOCK_TIME,
   MAKER,
   MAX_GRADE,
@@ -957,11 +958,39 @@ export function chainTick(
   // the chain's income rate is read off the ledger, never smoothed on its own
   s.chain.rate = chainNet(s.chain.ledger.rate);
   s.chain.wholesale += (out.wholesale / dt - s.chain.wholesale) * Math.min(1, dt / 120);
+  // the Parts Market forgets what it bought, over its window
+  if (s.chain.demand) {
+    const k = Math.exp(-dt / PARTS_DEMAND.window);
+    for (const key of Object.keys(s.chain.demand) as ItemId[]) {
+      const v = (s.chain.demand[key] ?? 0) * k;
+      if (v < 0.01) delete s.chain.demand[key];
+      else s.chain.demand[key] = v;
+    }
+  }
   return out;
 }
 
 /** Seconds the steady income averages over. */
 const STEADY_WINDOW = 600;
+
+/** Units of an item the Parts Market takes at full price per window: PARTS_DEMAND.depth per level of the plants making it (+1). */
+export function partsDepth(s: GameState, item: ItemId): number {
+  const maker = item === "chassis" ? "engineFactory" : item === "car" ? null : MAKER[item];
+  let levels = 0;
+  for (const [, b] of plantsOf(s)) if (b.type === maker) levels += b.level;
+  return PARTS_DEMAND.depth * (1 + levels);
+}
+
+/**
+ * What share of the price the Parts Market pays for `qty` more units of an
+ * item now: 1 while recent sales stay within its depth, then depth ÷ volume
+ * (at the middle of the load), never below PARTS_DEMAND.floor.
+ */
+export function partsPriceMult(s: GameState, item: ItemId, qty = 1): number {
+  const v = (s.chain.demand?.[item] ?? 0) + qty / 2;
+  const d = partsDepth(s, item);
+  return v <= d ? 1 : Math.max(PARTS_DEMAND.floor, d / v);
+}
 
 /** Goods the company still has to sell: on the road, at a plant's dock, at a dealer or on a ship. */
 function goodsInPipeline(s: GameState): boolean {
@@ -1054,8 +1083,11 @@ function arrive(s: GameState, sh: Shipment, snap: ChainSnapshot, earn: (n: numbe
       events?.push({ type: "sale", plot: MARKET, item: "car", count: sh.qty, amount });
       return sh.qty;
     }
-    // a port sells components for more abroad; tax is due on every sale
-    const amount = sh.value * (1 + logisticsMods(s).market);
+    // a port sells components for more abroad; the market's appetite is limited; tax is due on every sale
+    const item = sh.item as ItemId;
+    const amount = sh.value * (1 + logisticsMods(s).market) * partsPriceMult(s, item, sh.qty);
+    const sold = (s.chain.demand ??= {});
+    sold[item] = (sold[item] ?? 0) + sh.qty;
     earn(amount);
     book(s, "partSales", amount);
     const tax = amount * SALES_TAX;
@@ -1304,6 +1336,9 @@ export function migrateChain(raw: unknown, s: GameState): ChainState {
   chain.owed = num(raw.owed);
   if (typeof raw.debtLimit === "number" && Number.isFinite(raw.debtLimit) && raw.debtLimit > 0) chain.debtLimit = raw.debtLimit;
   if (raw.suspended === true) chain.suspended = true;
+  if (isObj(raw.demand))
+    for (const [k, v] of Object.entries(raw.demand))
+      if ((k in COMPONENT_BY_ID || k === "chassis") && typeof v === "number" && Number.isFinite(v) && v > 0) (chain.demand ??= {})[k as ItemId] = v;
   if (typeof raw.steady === "number" && Number.isFinite(raw.steady)) chain.steady = raw.steady;
   if (typeof raw.rescueT === "number" && Number.isFinite(raw.rescueT)) chain.rescueT = raw.rescueT;
   chain.nextShip = int(raw.nextShip, 1, 1e12, 1);

@@ -1458,6 +1458,7 @@ export const en = {
   "eco.status.noModel": "no model",
   "eco.status.noCash": "no cash",
   "eco.status.suspended": "suspended",
+  "eco.partsDemand": "{item}: the Parts Market is saturated — it pays {pct} of the price now",
   "ledger.carSales": "Car sales",
   "ledger.partSales": "Parts sold",
   "ledger.racing": "Racing prizes",

@@ -232,5 +232,15 @@ export const DEALER_SALE = { interval: 30, stock: 10, perLevelSpeed: 0.2, perLev
  */
 export const WHOLESALE = 0.7;
 
+/**
+ * The Parts Market is the wholesale outlet for components: a thin margin and
+ * a limited appetite. Per item it pays full price for up to `depth` units per
+ * `window` seconds for every level of the company's plants making it (+1);
+ * beyond that each extra unit fetches less — depth ÷ volume of the price —
+ * down to `floor` (a wholesale price). Cars are the business; parts are the
+ * overflow.
+ */
+export const PARTS_DEMAND = { window: 300, depth: 25, floor: 0.6 };
+
 /** Smoothing of the HUD income rate (seconds). */
 export const RATE_WINDOW = 120;

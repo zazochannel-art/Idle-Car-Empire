@@ -1457,6 +1457,7 @@ export const ro: Record<MessageKey, string> = {
   "eco.status.noModel": "fără model",
   "eco.status.noCash": "fără bani",
   "eco.status.suspended": "suspendată",
+  "eco.partsDemand": "{item}: Piața de piese e saturată — plătește acum {pct} din preț",
   "ledger.carSales": "Vânzări mașini",
   "ledger.partSales": "Piese vândute",
   "ledger.racing": "Premii la curse",

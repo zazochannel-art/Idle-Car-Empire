@@ -1457,6 +1457,7 @@ export const ru: Record<MessageKey, string> = {
   "eco.status.noModel": "нет модели",
   "eco.status.noCash": "нет денег",
   "eco.status.suspended": "приостановлен",
+  "eco.partsDemand": "{item}: рынок деталей насыщен — сейчас платит {pct} цены",
   "ledger.carSales": "Продажи машин",
   "ledger.partSales": "Продажа деталей",
   "ledger.racing": "Призы гонок",
