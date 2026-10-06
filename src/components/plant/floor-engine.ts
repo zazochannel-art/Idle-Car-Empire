@@ -149,6 +149,18 @@ export class FloorEngine {
     const span = gw - 4;
     const stationX = (i: number) => x0 + (i + 0.5) * (span / n);
 
+    // Live logistics: pallets enter from the receiving dock, move toward the line,
+    // while completed goods are staged and loaded for the next trip.
+    const logisticsPhase = (this.t * 0.32) % 1;
+    if (s.raw > 0.08) {
+      for (let i = 0; i < 3; i++) {
+        const u = (logisticsPhase + i / 3) % 1;
+        const px = 0.7 + u * 2.2;
+        const py = 0.55 + (i % 2) * 0.45;
+        forklift(p, px, py, px + 0.8, py + 0.15, this.t * 0.7 + i, 2);
+      }
+    }
+
     // raw material bay at the back left, finished goods by the dock (front right)
     for (let i = 0; i < Math.round(s.raw * 8); i++) {
       const bx = 0.3 + (i % 2) * 0.6;
