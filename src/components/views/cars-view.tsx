@@ -1,6 +1,7 @@
 "use client";
 
 import { PrototypeLab } from "./expansion-cards";
+import { ClassicsPanel, ShowCard } from "./live-cards";
 import { MyCars } from "./my-cars";
 import { BrandStudio } from "./brand-studio";
 import { netOfSale } from "@/game/engine/costs";
@@ -49,7 +50,13 @@ export function CarsView() {
           </button>
         ))}
       </div>
-      {tab === "mine" && <MyCars />}
+      {tab === "mine" && <>
+        <MyCars />
+        <div className="mt-4 space-y-2">
+          <ShowCard />
+          <ClassicsPanel />
+        </div>
+      </>}
       {tab === "dev" && <PrototypeLab />}
       {tab === "brand" && <BrandStudio />}
       {tab === "models" && (
