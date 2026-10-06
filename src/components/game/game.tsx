@@ -148,12 +148,7 @@ function Shell() {
     key = `zone:${zone}`;
   } else if (view) {
     title = viewTitle(view, t);
-    body = (
-      <>
-        <PillarTabs view={view} />
-        <ViewSwitch view={view} onSettings={() => setSettings(true)} />
-      </>
-    );
+    body = <ViewSwitch view={view} onSettings={() => setSettings(true)} />;
     key = `view:${view}`;
   }
 
@@ -257,9 +252,9 @@ function ViewSwitch({ view, onSettings }: { view: View; onSettings: () => void }
 }
 
 /**
- * The four pillars of the game. Every screen belongs to one; the left rail
- * opens a pillar and the screen shows its siblings as tabs, so nothing is
- * more than two taps away and nothing is lost from the old menus.
+ * The four high-level navigation groups. Individual action buttons open
+ * their own dedicated screen; no secondary navigation tabs are injected
+ * into the opened sheet.
  */
 export type PillarId = "empire" | "cars" | "racing" | "business";
 export const PILLARS: { id: PillarId; icon: Icon; views: View[] }[] = [
@@ -316,31 +311,6 @@ function LeftRail() {
         );
       })}
     </nav>
-  );
-}
-
-/** The screens of the pillar the open screen belongs to. */
-function PillarTabs({ view }: { view: View }) {
-  const setView = useUi((u) => u.setView);
-  const { t } = useT();
-  const pillar = PILLARS.find((p) => p.views.includes(view));
-  if (!pillar || pillar.views.length < 2) return null;
-  return (
-    <div className="scrollbar-none -mx-1 mb-3 flex gap-1 overflow-x-auto px-1">
-      <span className="flex shrink-0 items-center gap-1 pr-1 text-[10px] font-black uppercase tracking-[0.18em] text-white/35">
-        <pillar.icon className="size-3.5" />
-        {t(`pillar.${pillar.id}`)}
-      </span>
-      {pillar.views.map((v) => (
-        <button
-          key={v}
-          onClick={() => setView(v)}
-          className={cn("race-type shrink-0 rounded-md px-3 py-1.5 text-[13px] leading-none transition", v === view ? "bg-electric text-white shadow-[0_2px_0_0_#1747b8]" : "bg-[#4b4b50] text-white/80 hover:text-white")}
-        >
-          {viewTitle(v, t)}
-        </button>
-      ))}
-    </div>
   );
 }
 
