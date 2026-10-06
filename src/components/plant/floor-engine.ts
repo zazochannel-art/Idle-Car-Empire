@@ -32,8 +32,7 @@ export interface FloorScene {
   /** Assembly: the model and its paint colour. */
   model?: CarModel;
   paint?: string;
-  accent: string;
-}
+  accent: string;\n  rawMaterial?: string;\n  cinematic?: boolean;\n}
 
 const MODEL_COLOR = "#cbd5e1";
 
@@ -118,8 +117,7 @@ export class FloorEngine {
 
   private render(dt: number) {
     this.t += dt;
-    const { ctx, p, cam } = this;
-    cam.update(dt);
+    const { ctx, p, cam } = this;\n    const s0 = this.scene;\n    if (s0?.cinematic) {\n      const pulse = (Math.sin(this.t * 0.22) + 1) * 0.5;\n      cam.x += (pulse * (this.size[0] - 2) - cam.x) * Math.min(1, dt * 0.35);\n      cam.y += (this.size[1] * 0.42 + Math.sin(this.t * 0.16) * 0.7 - cam.y) * Math.min(1, dt * 0.3);\n      cam.zoom += ((this.cam.minZoom * 1.35 + pulse * 0.25) - cam.zoom) * Math.min(1, dt * 0.25);\n    }\n    cam.update(dt);
     const W = this.canvas.width;
     const H = this.canvas.height;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -161,8 +159,7 @@ export class FloorEngine {
       }
     }
 
-    // raw material bay at the back left, finished goods by the dock (front right)
-    for (let i = 0; i < Math.round(s.raw * 8); i++) {
+    // Receiving warehouse: racks, pallets and material-specific visual language.\n    const rawColor = materialColor(s.rawMaterial, s.color);\n    for (let r = 0; r < 3; r++) {\n      p.box(0.15, 0.15 + r * 0.75, 1.05, 0.08, 6, 3, "#334155", "#64748b");\n      p.box(0.18, 0.15 + r * 0.75, 0.06, 0.55, 6, 3, "#475569");\n      p.box(1.1, 0.15 + r * 0.75, 0.06, 0.55, 6, 3, "#475569");\n    }\n    for (let i = 0; i < Math.round(s.raw * 8); i++) {
       const bx = 0.3 + (i % 2) * 0.6;
       const by = 0.4 + Math.floor(i / 2) * 0.55;
       p.box(bx, by, 0.5, 0.45, 0, 7, s.type === "tireFactory" ? "#57534e" : rawColor, "#d6d3d1");
