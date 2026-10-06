@@ -104,19 +104,184 @@ export function hipRoof(w: number, d: number, hr: number, c: THREE.Color, x: num
   return paint(g, c);
 }
 
+// ───────────────────────────── tiled roofs ─────────────────────────────
+
+/** One roof-tile texture repeat covers this much roof (world units): 8 columns × 8 rows of tiles. */
+const TILE_U = 0.42;
+const TILE_V = 0.5;
+
+/** Flat-shaded triangles with their own uvs and one colour. */
+function tris(p: number[], uv: number[], c: THREE.Color) {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(p, 3));
+  g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+  g.computeVertexNormals();
+  return paint(g, c);
+}
+
+/** A slope (triangle or quad as two triangles) with uvs running along its eave and up the slope. */
+function slope(pts: THREE.Vector3[], eaveA: THREE.Vector3, eaveB: THREE.Vector3, p: number[], uv: number[]) {
+  const along = new THREE.Vector3().subVectors(eaveB, eaveA).normalize();
+  const tri = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3) => {
+    for (const v of [a, b, c]) {
+      p.push(v.x, v.y, v.z);
+      const d = new THREE.Vector3().subVectors(v, eaveA);
+      const u = d.dot(along);
+      const up = d.sub(along.clone().multiplyScalar(u)).length();
+      uv.push(u / TILE_U, up / TILE_V);
+    }
+  };
+  if (pts.length === 3) tri(pts[0], pts[1], pts[2]);
+  else {
+    tri(pts[0], pts[1], pts[2]);
+    tri(pts[0], pts[2], pts[3]);
+  }
+}
+
+/**
+ * A gable roof of tiles: ridge along the local x, slopes facing ±z. The two
+ * gable ends are wall (wallW × wallD is the house under it), so they come
+ * back separately in the walls' colour.
+ */
+export function tiledGable(w: number, d: number, hr: number, roofC: THREE.Color, wallC: THREE.Color, wallW: number, wallD: number, x: number, y: number, z: number, rot: number) {
+  const P = (a: number, b: number, c: number) => new THREE.Vector3(a, b, c);
+  const p: number[] = [];
+  const uv: number[] = [];
+  // front slope (+z), back slope (−z), counter-clockwise seen from outside
+  slope([P(-w / 2, 0, d / 2), P(w / 2, 0, d / 2), P(w / 2, hr, 0), P(-w / 2, hr, 0)], P(-w / 2, 0, d / 2), P(w / 2, 0, d / 2), p, uv);
+  slope([P(w / 2, 0, -d / 2), P(-w / 2, 0, -d / 2), P(-w / 2, hr, 0), P(w / 2, hr, 0)], P(w / 2, 0, -d / 2), P(-w / 2, 0, -d / 2), p, uv);
+  const roof = tris(p, uv, roofC);
+  const eh = hr * (wallD / d);
+  const e: number[] = [];
+  for (const sx of [-1, 1]) {
+    const xx = (sx * wallW) / 2;
+    if (sx > 0) e.push(xx, 0, wallD / 2, xx, 0, -wallD / 2, xx, eh, 0);
+    else e.push(xx, 0, -wallD / 2, xx, 0, wallD / 2, xx, eh, 0);
+  }
+  const ends = plainUv(tris(e, new Array((e.length / 3) * 2).fill(0), wallC));
+  const m = M4.compose(V.set(x, y, z), Q.setFromAxisAngle(YAX, rot), SC.set(1, 1, 1));
+  roof.applyMatrix4(m);
+  ends.applyMatrix4(m);
+  return { roof, ends };
+}
+
+/** A hipped roof of tiles (four slopes to one peak). */
+export function tiledHip(w: number, d: number, hr: number, c: THREE.Color, x: number, y: number, z: number, rot: number) {
+  const P = (a: number, b: number, cc: number) => new THREE.Vector3(a, b, cc);
+  const top = P(0, hr, 0);
+  const A = P(-w / 2, 0, d / 2);
+  const B = P(w / 2, 0, d / 2);
+  const Cc = P(w / 2, 0, -d / 2);
+  const D = P(-w / 2, 0, -d / 2);
+  const p: number[] = [];
+  const uv: number[] = [];
+  for (const [a, b] of [
+    [A, B],
+    [B, Cc],
+    [Cc, D],
+    [D, A],
+  ])
+    slope([a, b, top], a, b, p, uv);
+  const g = tris(p, uv, c);
+  g.applyMatrix4(M4.compose(V.set(x, y, z), Q.setFromAxisAngle(YAX, rot), SC.set(1, 1, 1)));
+  return g;
+}
+
+/** Clay or slate tiles in rows, light grey (the roof's colour comes from its vertices). */
+function roofTexture(anisotropy: number) {
+  const px = 256;
+  const cv = document.createElement("canvas");
+  cv.width = cv.height = px;
+  const g = cv.getContext("2d")!;
+  let seed = 5;
+  const rr = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const n = 8;
+  const s = px / n;
+  g.fillStyle = "#7d7d7d";
+  g.fillRect(0, 0, px, px);
+  for (let row = 0; row < n; row++) {
+    const off = row % 2 ? s / 2 : 0;
+    for (let col = -1; col < n; col++) {
+      const x = col * s + off;
+      const y = px - (row + 1) * s;
+      const v = 205 + Math.floor((rr() - 0.5) * 34);
+      const gr = g.createLinearGradient(0, y, 0, y + s);
+      // each tile catches the light at its lower, rounded edge and sits in the shadow of the row above
+      gr.addColorStop(0, `rgb(${v - 48},${v - 48},${v - 48})`);
+      gr.addColorStop(0.3, `rgb(${v - 8},${v - 8},${v - 8})`);
+      gr.addColorStop(0.85, `rgb(${v},${v},${v})`);
+      gr.addColorStop(1, `rgb(${v - 62},${v - 62},${v - 62})`);
+      g.fillStyle = gr;
+      g.beginPath();
+      g.roundRect(x + 1, y, s - 2, s, [0, 0, s * 0.4, s * 0.4]);
+      g.fill();
+    }
+  }
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = anisotropy;
+  return t;
+}
+
+/** Tileable value noise on a px×px grid with `cells` lattice cells across. */
+export function noiseLayer(px: number, cells: number, seed: number) {
+  let st = seed;
+  const rnd = () => ((st = (st * 16807) % 2147483647) / 2147483647);
+  const lat = new Float32Array(cells * cells).map(() => rnd());
+  const out = new Float32Array(px * px);
+  const k = cells / px;
+  for (let y = 0; y < px; y++) {
+    const fy = y * k;
+    const y0 = Math.floor(fy);
+    const ty = fy - y0;
+    const sy = ty * ty * (3 - 2 * ty);
+    const r0 = (y0 % cells) * cells;
+    const r1 = ((y0 + 1) % cells) * cells;
+    for (let x = 0; x < px; x++) {
+      const fx = x * k;
+      const x0 = Math.floor(fx);
+      const tx = fx - x0;
+      const sx = tx * tx * (3 - 2 * tx);
+      const c0 = x0 % cells;
+      const c1 = (x0 + 1) % cells;
+      const a = lat[r0 + c0] + (lat[r0 + c1] - lat[r0 + c0]) * sx;
+      const b = lat[r1 + c0] + (lat[r1 + c1] - lat[r1 + c0]) * sx;
+      out[y * px + x] = a + (b - a) * sy;
+    }
+  }
+  return out;
+}
+
 // ───────────────────────────── facades ─────────────────────────────
 
 /** Every facade texture holds 4×4 bays; white walls take the building's colour from its vertices. */
 const TN = 4;
 type BayPainter = (g: CanvasRenderingContext2D, T: number, rr: () => number, ix: number, iy: number) => void;
 
-function facadeTexture(draw: BayPainter, px = 512, ground = "#ffffff", anisotropy = 4) {
+function facadeTexture(draw: BayPainter, px = 512, ground = "#ffffff", anisotropy = 4, plaster = 0) {
   const cv = document.createElement("canvas");
   cv.width = cv.height = px;
   const g = cv.getContext("2d")!;
   const T = px / TN;
   g.fillStyle = ground;
   g.fillRect(0, 0, px, px);
+  if (plaster > 0) {
+    // rendered walls: soft stains and a fine sand grain (stays light, so the wall colour shows true)
+    const big = noiseLayer(px, 6, 21);
+    const fine = noiseLayer(px, 96, 23);
+    // (written, never read back: a canvas readback can stall the GPU for seconds)
+    const img = g.createImageData(px, px);
+    const d = img.data;
+    for (let i = 0; i < px * px; i++) {
+      const v = 255 - plaster * (big[i] * 10 + fine[i] * 14);
+      d[4 * i] = v;
+      d[4 * i + 1] = v - plaster;
+      d[4 * i + 2] = v - plaster * 3;
+      d[4 * i + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+  }
   let seed = 11;
   const rr = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   for (let iy = 0; iy < TN; iy++)
@@ -171,7 +336,11 @@ function makeFacades(anisotropy: number): Record<FacadeKind, THREE.CanvasTexture
       g.fillRect(x + w + 5, y - 2, 10, h + 4);
       g.fillStyle = "#cfc8bc";
       g.fillRect(x - 6, y + h + 4, w + 12, 5);
-    }, 512, "#ffffff", anisotropy),
+      // shadow under the sill and the lintel
+      g.fillStyle = "rgba(60,50,40,0.18)";
+      g.fillRect(x - 6, y + h + 9, w + 12, 3);
+      g.fillRect(x - 4, y - 7, w + 8, 3);
+    }, 512, "#ffffff", anisotropy, 1),
     bloc: facadeTexture((g, T, rr) => {
       g.fillStyle = "#ebe7e1";
       g.fillRect(0, T - 3, T, 3);
@@ -382,7 +551,7 @@ export function hazeAll(o: THREE.Object3D) {
 
 export interface MapMaterials {
   facades: Record<FacadeKind, THREE.CanvasTexture>;
-  byKind: Record<FacadeKind | "plain" | "metal", THREE.MeshStandardMaterial>;
+  byKind: Record<FacadeKind | "plain" | "metal" | "roof", THREE.MeshStandardMaterial>;
   leaves: THREE.MeshStandardMaterial;
   car: THREE.MeshStandardMaterial;
 }
@@ -403,8 +572,9 @@ export function mapMaterials(anisotropy: number): MapMaterials {
       clasic: std({ map: facades.clasic, roughness: 0.6, envMapIntensity: 0.7 }),
       plain: std({ roughness: 0.78, metalness: 0.02, envMapIntensity: 0.6 }),
       metal: std({ roughness: 0.32, metalness: 0.55, envMapIntensity: 1.1 }),
+      roof: std({ map: roofTexture(anisotropy), roughness: 0.78, envMapIntensity: 0.6, side: THREE.DoubleSide }),
     },
-    leaves: std({ roughness: 0.82, flatShading: true, envMapIntensity: 0.5 }),
+    leaves: std({ roughness: 0.86, envMapIntensity: 0.45 }),
     car: std({ roughness: 0.35, metalness: 0.35, envMapIntensity: 1.0 }),
   };
 }
