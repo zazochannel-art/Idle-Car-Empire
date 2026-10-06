@@ -159,7 +159,7 @@ export const BASE_MAX_LEVEL = 10;
 export const PLANT_MAX_LEVEL = PLANT_LEVELS.length;
 
 /** Speed upgrades: each makes production this much faster. */
-export const SPEED = { mult: 1.06, firstCost: 0.06, growth: 1.5, max: 40 };
+export const SPEED = { mult: 1.06, firstCost: 0.08, growth: 1.5, max: 40 };
 
 /** Manual → Semi-Automated → Automated → Advanced Automation → AI Factory. */
 export const AUTOMATION = [

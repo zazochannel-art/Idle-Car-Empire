@@ -188,10 +188,13 @@ export const CAR_STORAGE = 6;
 /**
  * Upgrade prices scale from the plant's build cost:
  *   level n → cost × level.base × level.growth^(n-2)
+ * A level adds a whole production line, so it is priced to be a decision
+ * (Level 2 of the Body Works ≈ 10 minutes of its profit), not a reflex —
+ * see docs/ECONOMY_BALANCE.md for the model and the old values.
  */
 export const UPGRADE_SCALING = {
-  level: { base: 0.15, growth: 1.8 },
-  speed: { base: 0.06, growth: 1.5 },
+  level: { base: 0.3, growth: 1.8 },
+  speed: { base: 0.08, growth: 1.5 },
   /** Automation tiers, × plant cost. */
   automation: [0, 1.5, 5, 15, 45],
   /** Component grades, × plant cost. */
