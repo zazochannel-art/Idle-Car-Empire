@@ -20,6 +20,7 @@ import { LOCK, mapMaterials, type MapMaterials } from "./kit";
 import { banner, pop, tag } from "./labels";
 import { PlotLayer, plotViews, type PlotView } from "./plots";
 import { RaceCars } from "./race";
+import { buildRoads } from "./roads";
 import { Scenery } from "./scenery";
 import { Ground, NTX, NTY, buildTerrain, type TerrainParts, type WorldJson } from "./terrain";
 import { Traffic3D } from "./traffic";
@@ -182,6 +183,7 @@ export class MapEngine {
   private race: RaceCars | null = null;
   private mats: MapMaterials | null = null;
   private glows: THREE.Points | null = null;
+  private roadMarks: THREE.Group | null = null;
   private areaIds: Uint8Array | null = null;
   private areaSize: [number, number] = [1, 1];
   private lockTex: THREE.DataTexture | null = null;
@@ -295,6 +297,9 @@ export class MapEngine {
     this.scene.add(...this.terrain.tiles, this.terrain.sea, this.terrain.floor);
     this.scenery = new Scenery(data, ground, this.mats, { low: this.low, lots: WORLD_MAP.plots.map((p) => ({ x: p.x, y: p.y, w: p.w, d: p.d, rot: p.rot })) });
     this.scene.add(this.scenery.root);
+    const roads = buildRoads(data, ground, this.scenery.roads, aniso);
+    this.roadMarks = roads.markings;
+    this.scene.add(roads.root);
     this.glows = lampGlows(this.scenery.lamps);
     this.scene.add(this.glows);
     this.plots = new PlotLayer(ground);
@@ -514,6 +519,8 @@ export class MapEngine {
     // the shadow box follows the view; far out (a whole region in view) shadows fade
     // away and stop being redrawn, which saves the most work on phones
     const near = d < 110;
+    // road lines only shimmer from far away
+    if (this.roadMarks) this.roadMarks.visible = d < 150;
     this.renderer.shadowMap.autoUpdate = near;
     this.sun.shadow.intensity = smoothstep(110, 80, d);
     const ext = Math.max(10, Math.min(110, d * 1.1));

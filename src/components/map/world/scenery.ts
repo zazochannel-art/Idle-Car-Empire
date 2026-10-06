@@ -58,6 +58,15 @@ export function pointOn(r: MapRoad, s: number, out: { x: number; z: number; tx: 
   return out;
 }
 
+/** The 3D road surface lies this far over the ground (roads.ts). */
+export const ROAD_LIFT = 0.03;
+
+/** Where wheels touch the road: the deck on a bridge, else the road surface over the ground. */
+export function roadSurface(ground: Ground, r: MapRoad, s: number, x: number, z: number) {
+  for (const [s0, s1] of r.decks) if (s >= s0 && s <= s1) return roadHeight(ground, r, s, x, z);
+  return ground.at(x, z) + ROAD_LIFT;
+}
+
 /** Height of the carriageway: the ground, or the deck on a bridge (sea bridges arch gently). */
 export function roadHeight(ground: Ground, r: MapRoad, s: number, x: number, z: number) {
   for (const [s0, s1, , h0, h1, arch] of r.decks)

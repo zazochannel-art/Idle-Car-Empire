@@ -9,7 +9,7 @@ import { buildCarrier, buildTruck, materialKit, type MaterialKit } from "../../t
 import type { ShipView, Site, VehiclePick } from "../map-types";
 import { CAR_COLORS, CAR_MODELS, type CarModel } from "../vehicles";
 import { hazed } from "./kit";
-import { carGeometry, roadHeight, type MapRoad } from "./scenery";
+import { ROAD_LIFT, carGeometry, roadSurface, type MapRoad } from "./scenery";
 import { bake } from "./structures";
 import type { Ground } from "./terrain";
 
@@ -203,7 +203,7 @@ export class Traffic3D {
     c.x = p.x - dz * lane;
     c.z = p.y + dx * lane;
     const mr = this.mapRoads[c.road];
-    c.y = (mr ? roadHeight(this.ground, mr, (c.s * mr.L) / r.len, c.x, c.z) : this.ground.at(c.x, c.z)) + 0.01;
+    c.y = (mr ? roadSurface(this.ground, mr, (c.s * mr.L) / r.len, c.x, c.z) : this.ground.at(c.x, c.z) + ROAD_LIFT) + 0.005;
     const yaw = Math.atan2(-dz, dx);
     c.yaw = k >= 1 ? yaw : c.yaw + angle(yaw - c.yaw) * k;
   }
@@ -255,7 +255,7 @@ export class Traffic3D {
         const d = fwd ? 1 : -1;
         const x = p.x - p.ty * d * lane;
         const z = p.y + p.tx * d * lane;
-        push(x, z, (mr ? roadHeight(this.ground, mr, (s * mr.L) / rd.len, x, z) : this.ground.at(x, z)) + 0.01);
+        push(x, z, (mr ? roadSurface(this.ground, mr, (s * mr.L) / rd.len, x, z) : this.ground.at(x, z) + ROAD_LIFT) + 0.005);
       }
     };
     const [yax, yaz] = yard(a);
