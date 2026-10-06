@@ -130,7 +130,7 @@ export class FloorEngine {
     p.t = this.t;
     p.zoom = cam.zoom;
     p.dpr = this.dpr;
-    p.night = 0;
+    // A complete factory shift lasts about 45 seconds: day → evening → night.\n    const shift = (this.t % 45) / 45;\n    p.night = shift > 0.68 || shift < 0.08 ? 0.82 : shift > 0.52 ? 0.35 : 0;
     p.lights.length = 0;
     const s = this.scene;
     if (!s) return;
@@ -165,7 +165,7 @@ export class FloorEngine {
     for (let i = 0; i < Math.round(s.raw * 8); i++) {
       const bx = 0.3 + (i % 2) * 0.6;
       const by = 0.4 + Math.floor(i / 2) * 0.55;
-      p.box(bx, by, 0.5, 0.45, 0, 7, s.type === "tireFactory" ? "#57534e" : "#a8a29e");
+      p.box(bx, by, 0.5, 0.45, 0, 7, s.type === "tireFactory" ? "#57534e" : rawColor, "#d6d3d1");
     }
     // the floor grows with the plant's level: 1 worker at a workbench, 2 workers,
     // a conveyor belt (3), more machines (4), automation (5), robots (6),
@@ -412,7 +412,7 @@ export class FloorEngine {
   }
 }
 
-function mixCan(k: number) {
+function materialColor(raw: string | undefined, fallback: string) {\n  switch (raw) {\n    case "steel": return "#94a3b8";\n    case "metal": return "#a8a29e";\n    case "rubber": return "#27272a";\n    case "fabric": return "#a16207";\n    case "alloy": return "#64748b";\n    case "sand": return "#d6b87c";\n    case "pigment": return "#ec4899";\n    case "chips": return "#22c55e";\n    case "lithium": return "#84cc16";\n    default: return fallback;\n  }\n}\n\nfunction mixCan(k: number) {
   const colors = ["#e5e7eb", "#f472b6", "#a855f7", "#3b82f6"];
   return colors[Math.min(colors.length - 1, Math.floor(k * colors.length))];
 }
