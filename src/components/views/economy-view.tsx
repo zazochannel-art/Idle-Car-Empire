@@ -6,7 +6,8 @@
 import { MATERIALS, SUPPLIERS } from "@/game/config/economy";
 import { PLANT_BY_ID } from "@/game/config/chain";
 import { partsPriceMult, plantNetValue, plantProfitPerMin, plantsOf } from "@/game/engine/chain";
-import { COST_KEYS, debtLimit, ledgerCosts, ledgerNet, ledgerRevenue, marketPrice, supplierOf, usedMaterials } from "@/game/engine/materials";
+import { COST_KEYS, marketPrice, supplierOf, usedMaterials } from "@/game/engine/materials";
+import { economyReport } from "@/game/engine/report";
 import { formatMoney, formatNumber, formatPercent } from "@/game/format";
 import type { ItemId, LedgerValues } from "@/game/types";
 import type { MessageKey } from "@/i18n";
@@ -27,10 +28,9 @@ export function EconomyView() {
   const { t } = useT();
   const rate = state.chain.ledger.rate;
   const perMin = (v: number) => `${formatMoney(v * 60)}${t("unit.perMin")}`;
-  const revenue = ledgerRevenue(rate);
-  const costs = ledgerCosts(rate);
-  const net = ledgerNet(rate);
-  const margin = revenue > 0 ? net / revenue : 0;
+  // every figure from one place (the ledger), the same the HUD profit reads
+  const r = economyReport(state);
+  const net = r.netPerSec;
   const carsMin = snap.carsPerSec * 60;
   const sp = supplierOf(state);
   return (
@@ -38,14 +38,19 @@ export function EconomyView() {
       <p className="text-sm text-white/60">{t("eco.desc")}</p>
       {/* the headline numbers */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Tile label={`💰 ${t("eco.money")}`} value={formatMoney(state.cash)} gold />
-        <Tile label={`📈 ${t("eco.revenue")}`} value={perMin(revenue)} tone="up" />
-        <Tile label={`🏭 ${t("eco.costs")}`} value={perMin(costs)} tone="down" />
+        <Tile label={`💰 ${t("eco.money")}`} value={formatMoney(r.cash)} gold />
+        <Tile label={`📈 ${t("eco.revenue")}`} value={perMin(r.revenuePerSec)} tone="up" />
+        <Tile label={`🏭 ${t("eco.costs")}`} value={perMin(r.costsPerSec)} tone="down" />
         <Tile label={`💵 ${t("eco.net")}`} value={`${net < 0 ? "−" : ""}${perMin(Math.abs(net))}`} gold={net >= 0} tone={net < 0 ? "down" : undefined} />
-        <Tile label={`📊 ${t("eco.margin")}`} value={formatPercent(margin)} />
+        <Tile label={`⏱️ ${t("eco.netHour")}`} value={`${net < 0 ? "−" : ""}${formatMoney(Math.abs(net) * 3600)}${t("unit.perHour")}`} gold={net >= 0} tone={net < 0 ? "down" : undefined} />
+        <Tile label={`📊 ${t("eco.margin")}`} value={formatPercent(r.margin)} />
+        <Tile label={`🧾 ${t("eco.owed")}`} value={`${formatMoney(r.owed)} / ${formatMoney(r.debtLimit)}`} tone={r.owed > 0 ? "down" : undefined} />
+        <Tile label={`📦 ${t("eco.inventory")}`} value={formatMoney(r.inventoryValue)} />
+        <Tile label={`🏭 ${t("eco.carsProduced")}`} value={formatNumber(r.carsProduced)} />
+        <Tile label={`🤝 ${t("eco.carsSold")}`} value={formatNumber(r.carsSold)} />
+        <Tile label={`🅿️ ${t("eco.carsStored")}`} value={formatNumber(r.carsInStorage)} />
         <Tile label={`🚘 ${t("eco.carsMin")}`} value={formatNumber(Math.round(carsMin * 100) / 100)} />
         <Tile label={`📅 ${t("eco.carsDay")}`} value={formatNumber(Math.round(carsMin * 60 * 24))} />
-        <Tile label={`🧾 ${t("eco.owed")}`} value={`${formatMoney(state.chain.owed)} / ${formatMoney(debtLimit(state))}`} tone={state.chain.owed > 0 ? "down" : undefined} />
       </div>
 
       <div className="grid gap-2 sm:grid-cols-2">
@@ -111,6 +116,7 @@ export function EconomyView() {
           })}
         </div>
         <p className="mt-2 text-[10px] text-white/40">{t("eco.bought", { n: formatNumber(state.market.bought) })}</p>
+        {r.inventoryIncoming > 0 && <p className="mt-1 text-[10px] text-white/40">🚚 {t("eco.inventoryComing", { v: formatMoney(r.inventoryIncoming) })}</p>}
         {/* the Parts Market's appetite: items sold beyond it fetch less */}
         {(Object.keys(state.chain.demand ?? {}) as ItemId[])
           .map((item) => [item, partsPriceMult(state, item)] as const)
