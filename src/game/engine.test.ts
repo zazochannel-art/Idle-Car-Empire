@@ -1217,7 +1217,7 @@ describe("economy audit fixes", () => {
 
   it("rewards are sized on the steady income, not a lucky second", () => {
     const s = createInitialState(T0);
-    s.chain.rate = 5_000;
+    s.chain.ledger.rate.carSales = 5_000;
     s.chain.steady = 50;
     const snap = snapshot(s);
     expect(snap.incomePerSec).toBeGreaterThan(4_000);

@@ -51,6 +51,7 @@ import {
   migrateLedger,
   migrateStock,
   orderCost,
+  payOrOwe,
   powerCost,
   settleLedger,
   shortfall,
@@ -905,25 +906,18 @@ export function chainTick(
   }
 
   s.rp += out.rp;
-  const k = Math.min(1, dt / RATE_WINDOW);
   // net income: revenue minus every cost (materials count when a plant uses them)
   const net = chainNet(s.chain.ledger.pending); // garages and racing are counted on their own
-  s.chain.rate += (net / dt - s.chain.rate) * k;
   s.chain.steady = (s.chain.steady ?? s.chain.rate) + (net / dt - (s.chain.steady ?? s.chain.rate)) * Math.min(1, dt / STEADY_WINDOW);
   settleLedger(s, dt, RATE_WINDOW);
+  // the chain's income rate is read off the ledger, never smoothed on its own
+  s.chain.rate = chainNet(s.chain.ledger.rate);
   s.chain.wholesale += (out.wholesale / dt - s.chain.wholesale) * Math.min(1, dt / 120);
   return out;
 }
 
 /** Seconds the steady income averages over. */
 const STEADY_WINDOW = 600;
-
-/** Pays a cost now, or puts it on the company's account (paid from the next revenue). */
-function payOrOwe(s: GameState, amount: number) {
-  const now = Math.min(amount, Math.max(0, s.cash));
-  s.cash -= now;
-  s.chain.owed += amount - now;
-}
 
 /**
  * A company that is completely stuck — no plant can work, it can't afford one
@@ -1029,7 +1023,8 @@ export function simulateChain(s: GameState, seconds: number, snap: ChainSnapshot
   if (seconds <= 0 || Object.keys(snap.plants).length === 0) return total;
   const steps = Math.max(1, Math.min(Math.ceil(seconds), 20_000));
   const dt = seconds / steps;
-  const rate = s.chain.rate;
+  // the HUD and dashboard rates describe the session, not the absence: keep them
+  const rates = { ...s.chain.ledger.rate };
   const steady = s.chain.steady;
   for (let i = 0; i < steps; i++) {
     const r = chainTick(s, dt, snap, credit, undefined, true);
@@ -1043,7 +1038,8 @@ export function simulateChain(s: GameState, seconds: number, snap: ChainSnapshot
     total.carsSold += r.carsSold;
     total.materials += r.materials;
   }
-  s.chain.rate = rate;
+  s.chain.ledger.rate = rates;
+  s.chain.rate = chainNet(rates);
   s.chain.steady = steady;
   return total;
 }

@@ -4,6 +4,7 @@ import { MANAGER_BY_ID } from "../config/managers";
 import type { CarId, DealerId, GameState, ManagerId } from "../types";
 import { availableCars, carValue, chainSnapshot, type ChainSnapshot } from "./chain";
 import { citySnapshot, type CitySnapshot } from "./city";
+import { ledgerNet } from "./materials";
 import { computeGlobalMods, type GlobalMods } from "./modifiers";
 
 // ───────────────────────────── costs ─────────────────────────────
@@ -53,9 +54,13 @@ export interface EconomySnapshot {
   gm: GlobalMods;
   chain: ChainSnapshot;
   carsPerSec: number;
-  /** Net income per second: chain sales minus materials (measured), plus the Empire Map. */
+  /**
+   * Operating profit per second, measured: the ledger's revenue minus its
+   * costs (plants, trucks, dealers, garages, racing). The HUD, the stats and
+   * the Economy dashboard all show this one figure; it can be negative.
+   */
   incomePerSec: number;
-  /** The same, averaged over ~10 minutes (rewards are sized on it). */
+  /** Passive income: the chain's net averaged over ~10 minutes plus the garages (rewards are sized on it, never below 0). */
   steadyIncomePerSec: number;
   rpPerSec: number;
   city: CitySnapshot;
@@ -72,7 +77,7 @@ export function snapshot(s: GameState): EconomySnapshot {
     gm,
     chain,
     carsPerSec: chain.carsPerSec,
-    incomePerSec: Math.max(0, s.chain.rate) + city.incomePerSec,
+    incomePerSec: ledgerNet(s.chain.ledger.rate),
     steadyIncomePerSec: Math.max(0, s.chain.steady ?? s.chain.rate) + city.incomePerSec,
     rpPerSec,
     city,

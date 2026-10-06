@@ -264,7 +264,7 @@ export type PlantStatus = "ok" | "noRaw" | "full" | "noParts" | "noModel" | "noC
 export type MaterialStock = Partial<Record<import("./config/economy").MaterialId, number>>;
 
 /** Where the money went: revenue and every kind of cost. */
-export type LedgerKey = "carSales" | "partSales" | "services" | "racing" | "materials" | "labor" | "energy" | "maintenance" | "logistics" | "dealerFees" | "tax" | "repairs";
+export type LedgerKey = "carSales" | "partSales" | "services" | "racing" | "materials" | "labor" | "energy" | "maintenance" | "logistics" | "dealerFees" | "tax" | "repairs" | "rewards";
 export type LedgerValues = Record<LedgerKey, number>;
 export interface Ledger {
   /** Smoothed $/s per category (for the dashboard). */

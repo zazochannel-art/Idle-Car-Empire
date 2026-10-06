@@ -25,21 +25,46 @@ import type { BuildingState, GameState, Ledger, LedgerKey, LedgerValues, Materia
 
 // ───────────────────────────── ledger ─────────────────────────────
 
-export const LEDGER_KEYS: LedgerKey[] = ["carSales", "partSales", "services", "racing", "materials", "labor", "energy", "maintenance", "logistics", "dealerFees", "tax", "repairs"];
-export const REVENUE_KEYS: LedgerKey[] = ["carSales", "partSales", "services", "racing"];
+// Every dollar is booked once, under one key, and every key belongs to exactly
+// one group. Each figure the game shows (HUD profit, dashboard, stats, the
+// Welcome Back report) is a sum over these groups — never a formula that adds
+// a category and takes it out again.
+
+/** The manufacturing business: plants, trucks, dealers, the Parts Market, export and the truck & bus line. */
+export const CHAIN_REVENUE_KEYS: LedgerKey[] = ["carSales", "partSales"];
+export const CHAIN_COST_KEYS: LedgerKey[] = ["materials", "labor", "energy", "maintenance", "logistics", "dealerFees", "tax"];
+/** The side businesses: garages (services) earn, the racing team earns prizes and pays entry fees and repairs. */
+export const SIDE_REVENUE_KEYS: LedgerKey[] = ["services", "racing"];
+export const SIDE_COST_KEYS: LedgerKey[] = ["repairs"];
+/** Not earned by running the business: mission, achievement, event and contract rewards. Below the line. */
+export const OTHER_KEYS: LedgerKey[] = ["rewards"];
+
+export const REVENUE_KEYS: LedgerKey[] = [...CHAIN_REVENUE_KEYS, ...SIDE_REVENUE_KEYS];
+export const COST_KEYS: LedgerKey[] = [...CHAIN_COST_KEYS, ...SIDE_COST_KEYS];
+export const LEDGER_KEYS: LedgerKey[] = [...REVENUE_KEYS, ...COST_KEYS, ...OTHER_KEYS];
 export const emptyLedgerValues = (): LedgerValues => Object.fromEntries(LEDGER_KEYS.map((k) => [k, 0])) as LedgerValues;
 export const createLedger = (): Ledger => ({ rate: emptyLedgerValues(), run: emptyLedgerValues(), pending: emptyLedgerValues() });
 
-/** Net of a set of ledger values: revenue minus every cost. */
+const sumOf = (v: LedgerValues, keys: LedgerKey[]) => keys.reduce((a, k) => a + (v[k] ?? 0), 0);
+
+/** Operating revenue: car and part sales, services, racing. */
+export const ledgerRevenue = (v: LedgerValues) => sumOf(v, REVENUE_KEYS);
+/** Operating costs: everything the plants, trucks, dealers and the racing team cost. */
+export const ledgerCosts = (v: LedgerValues) => sumOf(v, COST_KEYS);
+
+/** Operating net profit: revenue minus costs (the manufacturing chain plus the side businesses). */
 export function ledgerNet(v: LedgerValues): number {
-  let n = 0;
-  for (const k of LEDGER_KEYS) n += REVENUE_KEYS.includes(k) ? v[k] : -v[k];
-  return n;
+  return ledgerRevenue(v) - ledgerCosts(v);
 }
 
-/** Net of the production chain alone: garages (services) and racing are counted on their own. */
+/** Net of the manufacturing chain alone. */
 export function chainNet(v: LedgerValues): number {
-  return ledgerNet(v) - v.services - v.racing + v.repairs;
+  return sumOf(v, CHAIN_REVENUE_KEYS) - sumOf(v, CHAIN_COST_KEYS);
+}
+
+/** Net of the side businesses (garages and racing). ledgerNet = chainNet + sideNet. */
+export function sideNet(v: LedgerValues): number {
+  return sumOf(v, SIDE_REVENUE_KEYS) - sumOf(v, SIDE_COST_KEYS);
 }
 
 /** Books revenue or a cost; the next tick folds it into the rates and run totals. */
@@ -58,6 +83,26 @@ export function settleLedger(s: GameState, dt: number, window = 60) {
     L.rate[key] += (v / dt - L.rate[key]) * k;
     L.pending[key] = 0;
   }
+}
+
+/**
+ * Pays a running cost now, or puts what the cash can't cover on the
+ * company's account (paid first from the next revenue). Every cost that may
+ * run on account goes through here, so a cost is never booked without being
+ * either paid or owed.
+ */
+export function payOrOwe(s: GameState, amount: number) {
+  if (!(amount > 0) || !Number.isFinite(amount)) return;
+  const now = Math.min(amount, Math.max(0, s.cash));
+  s.cash -= now;
+  s.chain.owed += amount - now;
+}
+
+/** A cash reward (missions, achievements, events, contracts…): paid in and booked below the line. */
+export function payReward(s: GameState, amount: number) {
+  if (!(amount > 0) || !Number.isFinite(amount)) return;
+  s.cash += amount;
+  book(s, "rewards", amount);
 }
 
 // ───────────────────────────── prices ─────────────────────────────

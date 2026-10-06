@@ -26,7 +26,7 @@ import {
 } from "../config/expansion";
 import type { CarId, ComponentId, GameState } from "../types";
 import { componentPrice } from "./costs";
-import { book } from "./materials";
+import { book, payOrOwe } from "./materials";
 
 function rng(seed: number) {
   let a = seed >>> 0;
@@ -192,7 +192,8 @@ export function exportTick(s: GameState, dt: number): number {
       d.value -= value;
       d.wait = 0;
       E.ships.push({ id: E.nextShip++, market, cars, value, t: 0, dur: EXPORT_BY_ID[market].voyage });
-      s.cash -= Math.min(Math.max(0, s.cash), EXPORT.shipFee);
+      // paid, or on the company's account: never booked without being paid
+      payOrOwe(s, EXPORT.shipFee);
       book(s, "logistics", EXPORT.shipFee);
     }
   }
@@ -268,7 +269,7 @@ export function fleetTick(s: GameState, dt: number, speed = 1): number {
     const o = F.order;
     const forOrder = !!o && o.deadline !== undefined && o.product === F.product && o.made < o.n;
     const sale = price * (forOrder ? 1 + FLEET.orderBonus : 1);
-    s.cash -= Math.min(Math.max(0, s.cash), cost);
+    payOrOwe(s, cost);
     book(s, "materials", cost);
     credit(s, sale, "carSales");
     if (forOrder) o!.made += 1;
@@ -365,7 +366,7 @@ export function engineersTick(s: GameState, now: number, dt: number): EngineerEv
   const E = s.engineers;
   const pay = salaries(s) * dt;
   if (pay > 0) {
-    s.cash -= Math.min(Math.max(0, s.cash), pay);
+    payOrOwe(s, pay);
     book(s, "labor", pay);
   }
   if (E.poach && now > E.poach.until) {

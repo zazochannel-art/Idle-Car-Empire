@@ -1,6 +1,7 @@
 import { CAR_BY_ID } from "../config/cars";
 import { EVENTS, EVENT_BLOCK_MS, EVENT_LENGTH_MS, EVENT_OFFSET_MS, type EventMetric, type MarketEvent } from "../config/events";
 import type { CarId, GameState } from "../types";
+import { payReward } from "./materials";
 
 export interface EventWindow {
   event: MarketEvent;
@@ -139,7 +140,7 @@ export function claimEventGoal(s: GameState, now: number): number | null {
   if (!st || !st.done || st.claimed) return null;
   const g = st.window.event.goal;
   const cash = Math.max(1_000, Math.max(0, s.chain.steady ?? s.chain.rate) * g.incomeSeconds);
-  s.cash += cash;
+  payReward(s, cash);
   s.run.moneyEarned += cash;
   s.lifetime.moneyEarned += cash;
   if (g.parts) s.racing.parts += g.parts;

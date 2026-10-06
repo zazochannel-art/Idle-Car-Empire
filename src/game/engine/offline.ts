@@ -6,7 +6,7 @@ import { showroomTick } from "./showroom";
 import { snapshot } from "./economy";
 import { credit } from "./tick";
 import { constructionTick } from "./construction";
-import { book, LEDGER_KEYS, settleLedger } from "./materials";
+import { book, chainNet, LEDGER_KEYS, settleLedger } from "./materials";
 
 /**
  * Plays out the time between `lastActiveAt` and `now`: plants keep producing
@@ -29,6 +29,8 @@ export function computeOffline(s: GameState, now: number): OfflineReport {
   if (built.length) report.built = built;
 
   const cash = s.cash;
+  // the absence is booked into the run totals; the $/s rates keep describing the session
+  const rates = { ...s.chain.ledger.rate };
   const byType = { ...s.lifetime.carsByType };
   const rp = s.rp;
   const before = { ...s.chain.ledger.run };
@@ -37,7 +39,6 @@ export function computeOffline(s: GameState, now: number): OfflineReport {
   const racing = offlineRacing(s, capped);
   // buyers kept walking into the showroom
   showroomTick(s, capped);
-  if (racing) settleLedger(s, capped);
   // Hold the net earnings back for the COLLECT button (they already count as earned).
   const net = s.cash - cash;
   if (net > 0) s.cash = cash;
@@ -59,12 +60,12 @@ export function computeOffline(s: GameState, now: number): OfflineReport {
   s.cash -= city;
   report.money += city;
   report.serviced = Math.floor(snap.city.carsPerSec * capped * eff);
-  if (city > 0) {
-    book(s, "services", city);
-    settleLedger(s, capped);
-  }
+  book(s, "services", city);
+  settleLedger(s, capped);
   // where the money came from and where it went while away
   report.ledger = Object.fromEntries(LEDGER_KEYS.map((k) => [k, Math.max(0, s.chain.ledger.run[k] - before[k])])) as OfflineReport["ledger"];
+  s.chain.ledger.rate = rates;
+  s.chain.rate = chainNet(rates);
   report.carsSold = r.carsSold;
   if (racing) report.racing = racing;
   report.materialsUsed = r.materials;

@@ -1463,6 +1463,7 @@ export const ru: Record<MessageKey, string> = {
   "ledger.tax": "Налоги и операции",
   "ledger.net": "ЧИСТАЯ ПРИБЫЛЬ",
   "ledger.margin": "Маржа прибыли {pct}",
+  "ledger.rewards": "Награды и бонусы",
   "offline.breakdown": "Производство офлайн",
   "offline.sold": "Продано машин: {n}",
   "mat.steel": "Сталь",

@@ -6,7 +6,7 @@
 import { MATERIALS, SUPPLIERS } from "@/game/config/economy";
 import { PLANT_BY_ID } from "@/game/config/chain";
 import { plantNetValue, plantProfitPerMin, plantsOf } from "@/game/engine/chain";
-import { LEDGER_KEYS, REVENUE_KEYS, ledgerNet, marketPrice, supplierOf, usedMaterials } from "@/game/engine/materials";
+import { COST_KEYS, ledgerCosts, ledgerNet, ledgerRevenue, marketPrice, supplierOf, usedMaterials } from "@/game/engine/materials";
 import { formatMoney, formatNumber, formatPercent } from "@/game/format";
 import type { LedgerValues } from "@/game/types";
 import type { MessageKey } from "@/i18n";
@@ -27,8 +27,8 @@ export function EconomyView() {
   const { t } = useT();
   const rate = state.chain.ledger.rate;
   const perMin = (v: number) => `${formatMoney(v * 60)}${t("unit.perMin")}`;
-  const revenue = REVENUE_KEYS.reduce((a, k) => a + rate[k], 0);
-  const costs = LEDGER_KEYS.filter((k) => !REVENUE_KEYS.includes(k)).reduce((a, k) => a + rate[k], 0);
+  const revenue = ledgerRevenue(rate);
+  const costs = ledgerCosts(rate);
   const net = ledgerNet(rate);
   const margin = revenue > 0 ? net / revenue : 0;
   const carsMin = snap.carsPerSec * 60;
@@ -131,7 +131,7 @@ function Tile({ label, value, gold, tone }: { label: string; value: string; gold
 /** Where every dollar of cost goes, as one bar. */
 function CostBar({ values }: { values: LedgerValues }) {
   const { t } = useT();
-  const keys = LEDGER_KEYS.filter((k) => !REVENUE_KEYS.includes(k) && values[k] > 0);
+  const keys = COST_KEYS.filter((k) => values[k] > 0);
   const total = keys.reduce((a, k) => a + values[k], 0);
   if (total <= 0) return null;
   const colors: Record<string, string> = { materials: "#f59e0b", labor: "#38bdf8", energy: "#facc15", maintenance: "#a78bfa", logistics: "#22c55e", dealerFees: "#f472b6", tax: "#94a3b8" };

@@ -1464,6 +1464,7 @@ export const en = {
   "ledger.tax": "Tax & operating",
   "ledger.net": "NET PROFIT",
   "ledger.margin": "Profit margin {pct}",
+  "ledger.rewards": "Rewards & bonuses",
   "offline.breakdown": "Offline production",
   "offline.sold": "{n} cars sold",
   "mat.steel": "Steel",

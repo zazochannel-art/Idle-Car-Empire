@@ -12,6 +12,7 @@ import type { GameState, MetricId, MissionState, Reward } from "../types";
 import { plantsOf } from "./chain";
 import { passiveIncome, snapshot, unlockedCarIds, type EconomySnapshot } from "./economy";
 import { formatMoney, formatNumber } from "../format";
+import { payReward } from "./materials";
 
 export function metric(s: GameState, id: MetricId, snap?: EconomySnapshot): number {
   switch (id) {
@@ -79,7 +80,7 @@ export function rewardCash(r: Reward, snap: EconomySnapshot): number {
 
 /** Rewards go straight to the wallet; they are not "earned" (no prestige credit). */
 export function grantReward(s: GameState, r: Reward, snap: EconomySnapshot) {
-  s.cash += rewardCash(r, snap);
+  payReward(s, rewardCash(r, snap));
   if (r.rp) s.rp += r.rp;
   if (r.boost) s.boost += r.boost;
   if (r.stars) s.stars += r.stars;

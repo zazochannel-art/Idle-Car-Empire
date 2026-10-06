@@ -8,6 +8,7 @@ import { carValue, modelStats } from "./chain";
 import { designStats } from "./design";
 import { unlockedCarIds, type EconomySnapshot } from "./economy";
 import { dateKey } from "./progress";
+import { payReward } from "./materials";
 
 const DAY = 86_400_000;
 
@@ -130,7 +131,7 @@ export function vipBuilt(s: GameState, car: CarId, n: number, mode: QualityMode)
 export function claimVip(s: GameState, now: number): boolean {
   const a = s.vip.active;
   if (!a || (a.made ?? 0) < a.n) return false;
-  s.cash += a.pay;
+  payReward(s, a.pay);
   s.run.moneyEarned += a.pay;
   s.lifetime.moneyEarned += a.pay;
   s.stars += a.stars;
@@ -221,7 +222,7 @@ export function claimSeason(s: GameState): boolean {
   if (!l || l.claimed) return false;
   const rw = seasonReward(l.rank);
   const cash = steady(s) * rw.incomeSeconds;
-  s.cash += cash;
+  payReward(s, cash);
   s.stars += rw.stars;
   s.racing.parts += rw.parts;
   l.claimed = true;
@@ -289,7 +290,7 @@ export function claimShow(s: GameState): boolean {
   const sh = s.show;
   if (!sh.car || sh.claimed || sh.rank < 0) return false;
   const rw = showReward(sh.rank);
-  s.cash += steady(s) * rw.incomeSeconds;
+  payReward(s, steady(s) * rw.incomeSeconds);
   s.stars += rw.stars;
   s.quality.rep = Math.min(100, s.quality.rep + rw.rep);
   sh.claimed = true;

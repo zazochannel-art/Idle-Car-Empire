@@ -1463,6 +1463,7 @@ export const ro: Record<MessageKey, string> = {
   "ledger.tax": "Taxe și operare",
   "ledger.net": "PROFIT NET",
   "ledger.margin": "Marjă de profit {pct}",
+  "ledger.rewards": "Recompense și bonusuri",
   "offline.breakdown": "Producție offline",
   "offline.sold": "{n} mașini vândute",
   "mat.steel": "Oțel",
