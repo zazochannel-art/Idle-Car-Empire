@@ -143,4 +143,17 @@ describe("debt: the company's account", () => {
     s.cash = 200;
     expect(M.canOwe(s, 100)).toBe(true); // the cash covers it
   });
+
+  it("while suspended, What's next says so first and suggests nothing that spends money", async () => {
+    const { nextGoals } = await import("./engine/insights");
+    const { s } = broke();
+    run(s, 2);
+    s.chain.dealers.local = { cars: 3, value: 15_000, models: ["city", "city", "city"], next: 1e9, sold: 0 };
+    s.chain.owed = M.debtLimit(s) + 500;
+    s.cash = 1e6; // even with cash on hand (it settles the account next tick anyway)
+    s.chain.suspended = true;
+    const goals = nextGoals(s, snapshot(s), 5);
+    expect(goals[0].kind).toBe("debt");
+    for (const g of goals) expect(["plant", "upgrade", "warehouse", "dealer", "zone", "manager"]).not.toContain(g.kind);
+  });
 });

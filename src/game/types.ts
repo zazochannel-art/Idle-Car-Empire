@@ -449,6 +449,8 @@ export interface ChainState {
   steady?: number;
   /** Market time (s) of the last supplier rescue. */
   rescueT?: number;
+  /** Market time (s) of the last restructuring (the last resort of a stuck company). */
+  restructuredT?: number;
 }
 
 export interface CityState {
@@ -571,7 +573,9 @@ export type GameEvent =
   /** The emergency supplier sent material at its price, on the company's account. */
   | { type: "emergency"; cost: number }
   /** The account went over its limit: every plant stops until sales pay it down. */
-  | { type: "suspended" };
+  | { type: "suspended" }
+  /** A stuck company's account was cut back to its limit (the creditors took `amount`); reputation fell. */
+  | { type: "restructured"; amount: number };
 
 // ───────────────────────────── racing ─────────────────────────────
 

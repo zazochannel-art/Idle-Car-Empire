@@ -89,8 +89,37 @@ describe("emergency supplier (instead of a free rescue)", () => {
 
   it("never more than an emergency line of twice the account's limit", () => {
     const { s } = stuck();
+    s.chain.restructuredT = 0; // the last resort was used a moment ago
     s.chain.owed = 2 * M.debtLimit(s) - 100;
+    const owed = s.chain.owed;
     run(s, 1);
     expect(s.chain.shipments.some((sh) => sh.materials)).toBe(false);
+    expect(s.chain.owed).toBeGreaterThanOrEqual(owed - 1);
+  });
+
+  it("last resort: stuck with the emergency line full, the account is cut to its limit — paid with reputation, once an hour", () => {
+    const { s } = stuck();
+    s.cash = 0;
+    const limit = (() => {
+      tick(s, 0.5);
+      return M.debtLimit(s);
+    })();
+    s.chain.shipments = [];
+    s.chain.rescueT = undefined;
+    s.chain.owed = 2 * limit + 5_000;
+    const rep = s.quality.rep;
+    const events = run(s, 1);
+    expect(events.some((e) => e.type === "restructured")).toBe(true);
+    expect(s.quality.rep).toBeCloseTo(Math.max(0, rep - RESCUE.restructure.rep), 1);
+    // the account was cut to its limit, then the emergency delivery went on it
+    const order = s.chain.shipments.find((sh) => sh.materials)!;
+    expect(order).toBeDefined();
+    expect(s.chain.owed).toBeCloseTo(limit + order.value, 6);
+    // not again within the hour, even stuck again
+    s.chain.shipments = [];
+    s.chain.rescueT = undefined;
+    s.chain.owed = 2 * limit + 5_000;
+    const again = run(s, 1);
+    expect(again.some((e) => e.type === "restructured")).toBe(false);
   });
 });

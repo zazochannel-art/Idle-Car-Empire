@@ -42,7 +42,7 @@ import {
 } from "../config/chain";
 import { DEALERS, DEALER_BY_ID, DEALER_MARKUP_PER_LEVEL, DEALER_SPECIALTY } from "../config/dealerships";
 import { MATERIALS as MATERIALS_LIST, CAR_STORAGE, CLASS_DEMAND, DEALER_FEE, DEBT, RESCUE, SALES_TAX, TRIP_FEE, UPGRADE_SCALING, WAREHOUSE_CAP, POWER_SYSTEM, type MaterialId } from "../config/economy";
-import { assemblyTime, carListPrice, carStdCost, componentPrice, componentStdCost, componentTime, opRates, opTotal, type OpRates } from "./costs";
+import { assemblyTime, carListPrice, carStdCost, componentPrice, componentStdCost, componentTime, netOfSale, opRates, opTotal, type OpRates } from "./costs";
 import {
   addStock,
   autoRestock,
@@ -539,7 +539,7 @@ export function chainSnapshot(s: GameState, gm: GlobalMods): ChainSnapshot {
     if (!st) continue;
     plants[id] = st;
     if (st.type === "assemblyPlant") carsPerSec += st.unitsPerSec;
-    else potential += st.unitsPerSec * (st.unitValue * (1 - SALES_TAX) - st.unitCost);
+    else potential += st.unitsPerSec * (netOfSale(st.unitValue, false) - st.unitCost);
   }
   const dealers: Partial<Record<DealerId, DealerStats>> = {};
   for (const d of DEALERS) if (s.dealers[d.id].owned) dealers[d.id] = dealerStats(s, d.id, gm);
@@ -1048,11 +1048,26 @@ function rescue(s: GameState, events?: GameEvent[]) {
   }
   if (!short.length) return;
   // on the company's account, within an emergency line of twice its limit: never an endless hole
-  let cost = 0;
-  for (const [id, missing] of short) {
-    const c = emergencyCost(s, missing);
-    if (s.chain.owed + Math.max(0, c - Math.max(0, s.cash)) > 2 * debtLimit(s)) continue;
-    cost += emergencyMaterials(s, id, missing);
+  const deliver = () => {
+    let cost = 0;
+    for (const [id, missing] of short) {
+      const c = emergencyCost(s, missing);
+      if (s.chain.owed + Math.max(0, c - Math.max(0, s.cash)) > 2 * debtLimit(s)) continue;
+      cost += emergencyMaterials(s, id, missing);
+    }
+    return cost;
+  };
+  let cost = deliver();
+  // the last resort: stuck with the emergency line full too, the creditors cut the account back
+  // to its limit and the company pays with its reputation (never more than once an hour)
+  const R = RESCUE.restructure;
+  if (cost <= 0 && s.chain.owed > debtLimit(s) && (s.chain.restructuredT === undefined || s.market.t - s.chain.restructuredT >= R.cooldown)) {
+    const cut = s.chain.owed - debtLimit(s);
+    s.chain.owed = debtLimit(s);
+    s.chain.restructuredT = s.market.t;
+    s.quality.rep = Math.max(0, s.quality.rep - R.rep);
+    events?.push({ type: "restructured", amount: cut });
+    cost = deliver();
   }
   if (cost <= 0) return;
   s.chain.rescueT = s.market.t;
@@ -1343,6 +1358,7 @@ export function migrateChain(raw: unknown, s: GameState): ChainState {
       if ((k in COMPONENT_BY_ID || k === "chassis") && typeof v === "number" && Number.isFinite(v) && v > 0) (chain.demand ??= {})[k as ItemId] = v;
   if (typeof raw.steady === "number" && Number.isFinite(raw.steady)) chain.steady = raw.steady;
   if (typeof raw.rescueT === "number" && Number.isFinite(raw.rescueT)) chain.rescueT = raw.rescueT;
+  if (typeof raw.restructuredT === "number" && Number.isFinite(raw.restructuredT)) chain.restructuredT = raw.restructuredT;
   chain.nextShip = int(raw.nextShip, 1, 1e12, 1);
   if (Array.isArray(raw.shipments)) {
     for (const sh of raw.shipments) {
@@ -1413,7 +1429,7 @@ export function plantUnitCost(st: PlantStats, gm: GlobalMods): number {
 
 /** What one unit brings in after the dealer's fee and tax (components: tax only). */
 export function plantNetValue(st: PlantStats): number {
-  return st.unitValue * (1 - SALES_TAX - (PLANT_BY_ID[st.type].item ? 0 : DEALER_FEE));
+  return netOfSale(st.unitValue, !PLANT_BY_ID[st.type].item);
 }
 
 /** Profit per minute at full speed: units made × (net sale value − cost). */

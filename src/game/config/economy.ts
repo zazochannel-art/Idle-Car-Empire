@@ -222,9 +222,13 @@ export const DEBT = { min: 10_000, seconds: 300, resume: 0.5, repay: 0.5 };
  * dealer) gets material for `units` units at `markup` × the market price, on
  * its account (up to twice its limit) — never cash, nothing written off, at
  * most once per cooldown.
- * Bad planning costs money; it never leaves a company stuck for good.
+ * Bad planning costs money; it never leaves a company stuck for good: the
+ * last resort, when the stuck company's emergency line is full too, is a
+ * restructuring — the creditors cut the account back to its limit, and the
+ * company pays with `restructure.rep` points of reputation (lower car prices
+ * until it recovers), at most once per `restructure.cooldown` seconds.
  */
-export const RESCUE = { units: 2, cooldown: 15 * 60, markup: 1.5 };
+export const RESCUE = { units: 2, cooldown: 15 * 60, markup: 1.5, restructure: { cooldown: 60 * 60, rep: 25 } };
 
 /** Money every new company starts with. */
 export const START_CASH = 10_000;

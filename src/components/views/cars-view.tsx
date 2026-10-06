@@ -3,7 +3,7 @@
 import { PrototypeLab } from "./expansion-cards";
 import { MyCars } from "./my-cars";
 import { BrandStudio } from "./brand-studio";
-import { DEALER_FEE, SALES_TAX } from "@/game/config/economy";
+import { netOfSale } from "@/game/engine/costs";
 import { Lock, Palette } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -117,7 +117,7 @@ function ModelCard({ car, unlocked, open, onToggle }: { car: CarConfig; unlocked
       <div className="relative mt-3 grid grid-cols-3 gap-1.5 text-center">
         <Spec label={t("cars.cost")} value={formatMoney(cost)} />
         <Spec label={t("cars.price")} value={formatMoney(value)} />
-        <Spec label={t("cars.profit")} value={formatMoney(value * (1 - DEALER_FEE - SALES_TAX) - cost)} accent />
+        <Spec label={t("cars.profit")} value={formatMoney(netOfSale(value, true) - cost)} accent />
       </div>
       <div className="relative mt-2 flex flex-wrap gap-1 text-[10px] text-white/55">
         {recipe(car).map((c) => (

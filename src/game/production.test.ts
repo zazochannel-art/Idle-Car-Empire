@@ -107,7 +107,6 @@ describe("suppliers: raw materials, and finished parts only where there is no pl
     const s = createInitialState(T0);
     build(s, "engineFactory");
     const asm = build(s, "assemblyPlant");
-    const id = P("assemblyPlant");
     tick(s, 0.5);
     s.chain.shipments = [];
     s.cash = 0;

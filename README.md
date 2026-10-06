@@ -32,11 +32,12 @@ npm run simulate -- 3   # balance bot: plays 3 hours and logs milestones
 
 ## How to play
 
-1. **Car bodies.** You start with $250 and a Small Car Body Works that turns
-   steel into a car body every 20 s. A truck takes the bodies to the **Parts
-   Market** ($150 each). When the steel runs low, a supply truck brings more
-   from the **Materials Depot**, paid when it leaves. With no cash for steel,
-   production stops.
+1. **Car bodies.** You start with $10,000 and a Small Car Body Works with
+   steel and plastic for three bodies. Buy more material at the **Materials
+   Depot** (paid when you order it; a truck brings it) — each material keeps
+   its own cost in the warehouse, and using it books exactly that. A truck
+   takes the bodies to the **Parts Market**, which pays full price up to its
+   appetite and less when you flood it. No material, no bodies.
 2. **Upgrade the plant.** Each plant has four upgrades:
    - **Levels** (Small → Basic → Industrial → … → Mega Factory) add
      production lines, storage and trucks, and change the building.
@@ -44,16 +45,23 @@ npm run simulate -- 3   # balance bot: plays 3 hours and logs milestones
    - **Automation** (Manual → AI Factory) raises speed and offline output.
    - **Grades** (Standard → Lightweight → … → Carbon) raise the value of
      each part and unlock better cars.
-3. **Engines and the first choice.** After 25 bodies the Engine Factory
-   ($3K) unlocks. Until you have an assembly plant it can sell engines, or
-   fit each engine into a body and sell **motorized chassis** (+30% value,
-   but it stops when bodies run out); the panel recommends one from your
-   body and engine output.
-4. **Your first car needs three parts.** Build the Engine Factory ($3K), the
-   Tyre Factory ($60K) and the **Car Assembly Plant** ($600K), on any plot in
-   an unlocked district. Industrial lots (a whole block) double a plant's
-   output and storage. Deliveries are automatic: parts go to the assembly
-   plant when it needs them, and the rest is sold at the market.
+3. **Engines and the first choice.** After 12 bodies the Engine Factory
+   ($6K) unlocks. Until you have an assembly plant it can sell engines, or
+   fit each engine into a body and sell **motorized chassis**; the panel
+   recommends one from your body and engine output.
+4. **Your first car needs three parts.** Build the **Car Assembly Plant**
+   ($6K for the first) on any plot in an unlocked district. Bodies and
+   engines always come from your own plants. Tyres come from an outside
+   supplier until you build the Tire Factory ($15K): +35% over what they cost
+   to make, paid when ordered, brought by truck. Deliveries are automatic:
+   parts go to the assembly plant when it needs them, and the rest is sold at
+   the market. Industrial lots (a whole block) double a plant's output and
+   storage.
+   - **The company account.** Wages, energy and upkeep the cash can't cover go
+     on the account (never materials), up to about five minutes of running
+     costs. Over the limit every plant is **suspended** until the account is
+     paid down; it is paid out of profit. A company that is completely stuck
+     gets material from the **emergency supplier** at +50%, on the account.
 5. **Assemble cars.** The assembly line has nine stations: body, engine,
    suspension, interior, glass, wheels, paint, final assembly and quality
    control. When a part is missing, the line stops (⚠️ NOT ENOUGH ENGINES).
