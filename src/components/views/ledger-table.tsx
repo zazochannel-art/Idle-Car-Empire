@@ -32,7 +32,8 @@ export function LedgerTable({ values, scale = 1, suffix = "", compact }: { value
   const revenue = ledgerRevenue(values) * scale;
   // operating revenue and costs; rewards are shown below the net (they are not earned by the business)
   const rows = [...REVENUE_KEYS, ...COST_KEYS];
-  const rewards = (values.rewards ?? 0) * scale;
+  // rewards are one-offs: shown in totals, not as a per-minute rate
+  const rewards = scale === 1 ? (values.rewards ?? 0) : 0;
   return (
     <div className={cn("rounded-2xl bg-white/[0.04] ring-1 ring-white/[0.07]", compact ? "p-2.5" : "p-3")}>
       {rows.map((k) => {

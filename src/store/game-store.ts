@@ -13,7 +13,7 @@ import { RESEARCH_BY_ID } from "@/game/config/research";
 import * as A from "@/game/engine/actions";
 import * as Ch from "@/game/engine/chain";
 import * as Mat from "@/game/engine/materials";
-import type { MaterialId } from "@/game/config/economy";
+import { RESCUE, type MaterialId } from "@/game/config/economy";
 import * as K from "@/game/engine/contracts";
 import * as R from "@/game/engine/retention";
 import * as D from "@/game/engine/design";
@@ -255,6 +255,7 @@ export const useGame = create<GameStore>((set, get) => {
         });
       }
       else if (e.type === "emergency") uiEvents.emit({ type: "toast", tone: "warn", icon: "🆘", title: tr("toast.emergency"), body: tr("toast.emergencyBody", { money: formatMoney(e.cost) }) });
+      else if (e.type === "restructured") uiEvents.emit({ type: "toast", tone: "warn", icon: "🏦", title: tr("toast.restructured"), body: tr("toast.restructuredBody", { money: formatMoney(e.amount), rep: RESCUE.restructure.rep }) });
       else if (e.type === "suspended") uiEvents.emit({ type: "toast", tone: "warn", icon: "⛔", title: tr("toast.suspended"), body: tr("toast.suspendedBody") });
       else if (e.type === "raceFinished") {
         const rec = next.racing.last;

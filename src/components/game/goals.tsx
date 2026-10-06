@@ -83,6 +83,8 @@ export function goalText(g: Goal, t: (k: MessageKey, v?: Vars) => string, n: Con
       return { title: t("goal.territory", { name: t(`territory.${g.territory}`) }), detail: t(`territoryDesc.${g.territory}`) };
     case "made":
       return { title: t("goal.made", { n: g.n, item: t(`item.${g.item}`) }), detail: t("goal.madeDetail", { have: Math.min(g.have, g.n), n: g.n, name: t(`structure.${g.plant}`) }) };
+    case "debt":
+      return { title: t("goal.debt"), detail: t("goal.debtDetail", { owed: formatMoney(g.owed), limit: formatMoney(g.limit), resume: formatMoney(g.resume) }) };
   }
 }
 
@@ -182,6 +184,9 @@ export function runGoal(g: Goal, ready: boolean) {
     }
     case "made":
       if (g.plot) ui.selectPlot(g.plot);
+      break;
+    case "debt":
+      ui.setView("economy");
       break;
   }
 }

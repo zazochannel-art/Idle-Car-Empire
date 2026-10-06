@@ -95,6 +95,11 @@ export function componentPrice(c: ComponentId, grade: number, marginMult = 1): n
   return (componentStdCost(c, grade) * (1 + PARTS_MARGIN * marginMult)) / (1 - SALES_TAX);
 }
 
+/** What a sale leaves the company: the price minus the tax, and minus the dealer's fee for a car. */
+export function netOfSale(price: number, car: boolean): number {
+  return price * (1 - SALES_TAX - (car ? DEALER_FEE : 0));
+}
+
 /** Standard cost of a car: its parts, final assembly and QC, and the trip to the dealer. */
 export function carStdCost(car: CarConfig, parts: ComponentId[]): number {
   const comps = parts.reduce((a, c) => a + componentStdCost(c, car.grade), 0);

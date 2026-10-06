@@ -5,8 +5,8 @@ import { constructionCost, freePlotFor, landCost, ownsLand, progressOf, remainin
 import { atTrack, racingCost } from "./racing";
 import { nextTerritory, territoryLock } from "./territory";
 import type { TerritoryId } from "../config/city";
-import { LOW_STOCK_UNITS, MATERIAL_BY_ID, RESERVE_UNITS, RESTOCK_UNITS, WAREHOUSE_MINUTES, type MaterialId } from "../config/economy";
-import { buyPlan, plantMaterials, restockPlan, stockTotal, supplierOf, unitsInStock, warehouseCap, warehouseCost } from "./materials";
+import { DEBT, LOW_STOCK_UNITS, MATERIAL_BY_ID, RESERVE_UNITS, RESTOCK_UNITS, WAREHOUSE_MINUTES, type MaterialId } from "../config/economy";
+import { buyPlan, debtLimit, plantMaterials, restockPlan, stockTotal, supplierOf, unitsInStock, warehouseCap, warehouseCost } from "./materials";
 import { CARS } from "../config/cars";
 import { MAKER, PLANTS, PLANT_BY_ID } from "../config/chain";
 import { DEALERS } from "../config/dealerships";
@@ -57,7 +57,9 @@ export type Goal =
   | { kind: "worker"; icon: string; plot: string; idle: number }
   | { kind: "zone"; icon: string; cost: number; zone: ZoneId }
   | { kind: "territory"; icon: string; cost: number; territory: TerritoryId }
-  | { kind: "made"; icon: string; plant: PlantType; item: ComponentId; n: number; have: number; plot: string | null };
+  | { kind: "made"; icon: string; plant: PlantType; item: ComponentId; n: number; have: number; plot: string | null }
+  /** The company's account is over its limit: every plant is suspended until sales pay it down. */
+  | { kind: "debt"; icon: string; owed: number; limit: number; resume: number };
 
 export function dealerRequirement(s: GameState, id: DealerId): Requirement | null {
   if (!canOpenDealers(s)) return { kind: "firstCar" };
@@ -306,6 +308,13 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
   if (firstSite) {
     const st = s.city.sites[firstSite];
     goals.push({ kind: "site", icon: "🏗️", plot: firstSite, type: st.type, progress: progressOf(s, firstSite) ?? 0, left: remainingOf(s, firstSite) });
+  }
+  // over the account's limit: say so first, and suggest nothing that spends money it doesn't have
+  if (s.chain.suspended) {
+    const limit = debtLimit(s);
+    const spending: Goal["kind"][] = ["plant", "upgrade", "warehouse", "dealer", "dealerFull", "zone", "territory", "manager", "car", "racing", "prestige"];
+    const keep = goals.filter((g) => !spending.includes(g.kind) && !(g.kind === "shortage" && g.what));
+    return [{ kind: "debt" as const, icon: "⛔", owed: s.chain.owed, limit, resume: limit * DEBT.resume }, ...keep].slice(0, max);
   }
   return goals.slice(0, max);
 }
