@@ -290,19 +290,76 @@ export class FloorEngine {
     return true;
   }
 
-  /** One unit on the line, drawn as it looks after `stage` of `n` steps. */
+  /** One unit on the line, with station-by-station visual assembly detail. */
   private drawUnit(s: FloorScene, x: number, y: number, stage: number, n: number) {
     const p = this.p;
-    const k = stage / (n - 1);
+    const k = n <= 1 ? 1 : stage / (n - 1);
+    const z = 5;
+
     if (s.type === "assemblyPlant") {
-      // primer shell → painted car (station 7 of 9 is the paint shop)
+      const model = s.model ?? "sedan";
       const painted = stage >= 6;
-      // the 3D model shows exactly what is fitted at this station
-      drawModel(p, x, y, 0, s.model ?? "sedan", painted ? (s.paint ?? "#ef4444") : MODEL_COLOR, 1, { lift: 5, noShadow: true, stage, odo: x });
-      if (stage >= 8) p.light(sx(x, y), sy(x, y, 10), 22, "#facc15", 0.5);
+      drawModel(
+        p,
+        x,
+        y,
+        0,
+        model,
+        painted ? (s.paint ?? "#ef4444") : MODEL_COLOR,
+        1,
+        { lift: 5, noShadow: true, stage, odo: x },
+      );
+
+      // Stage-specific work happening on the actual car.
+      if (stage === 0) {
+        // Bare body: welding points and a moving welding torch.
+        p.light(sx(x - 0.35, y), sy(x - 0.35, y, 14), 13, "#fde68a", 0.75);
+        p.light(sx(x + 0.28, y + 0.08), sy(x + 0.28, y + 0.08, 12), 9, "#fbbf24", 0.55);
+        if (Math.sin(this.t * 28 + x) > 0.15) {
+          p.light(sx(x + 0.15, y - 0.1), sy(x + 0.15, y - 0.1, 18), 20, "#fff7ed", 0.95);
+        }
+      } else if (stage === 1) {
+        // Engine installation: animated lift beam above the engine bay.
+        const lift = 13 + Math.sin(this.t * 3) * 2;
+        p.box(x - 0.05, y - 0.15, 0.1, 0.1, lift, 3, "#f59e0b");
+        p.light(sx(x, y), sy(x, y, lift), 12, "#fbbf24", 0.45);
+      } else if (stage === 2) {
+        // Suspension: visible hubs/struts.
+        p.ellipse(x - 0.42, y + 0.22, 8, 3.2, "#475569", 0.75);
+        p.ellipse(x + 0.42, y + 0.22, 8, 3.2, "#475569", 0.75);
+      } else if (stage === 3) {
+        // Interior: seats appear as two warm blocks.
+        p.box(x - 0.24, y - 0.04, 0.2, 0.24, 9, 5, "#78350f", "#a16207");
+        p.box(x + 0.04, y - 0.04, 0.2, 0.24, 9, 5, "#78350f", "#a16207");
+      } else if (stage === 4) {
+        // Glass installation: blue panes slide into position.
+        p.box(x - 0.3, y - 0.32, 0.6, 0.08, 12, 5, "#7dd3fc", "#e0f2fe", false);
+        p.light(sx(x, y), sy(x, y, 12), 16, "#7dd3fc", 0.3);
+      } else if (stage === 5) {
+        // Wheels: four rotating wheel silhouettes.
+        const spin = Math.sin(this.t * 8) * 0.08;
+        p.ellipse(x - 0.48, y + 0.22, 7, 2.8 + spin, "#111827", 0.8);
+        p.ellipse(x + 0.48, y + 0.22, 7, 2.8 - spin, "#111827", 0.8);
+      } else if (stage === 6) {
+        // Paint booth: spray mist follows the car.
+        for (let i = 0; i < 5; i++) {
+          const a = this.t * 2 + i * 1.2;
+          p.light(sx(x + Math.sin(a) * 0.35, y - 0.15), sy(x + Math.sin(a) * 0.35, y - 0.15, 11 + i), 7, s.paint ?? s.color, 0.28);
+        }
+        p.light(sx(x, y), sy(x, y, 13), 18, s.paint ?? s.color, 0.35);
+      } else if (stage === 7) {
+        // Final assembly: headlights/taillights come alive.
+        p.light(sx(x - 0.36, y - 0.03), sy(x - 0.36, y - 0.03, 11), 8, "#fef3c7", 0.8);
+        p.light(sx(x + 0.36, y - 0.03), sy(x + 0.36, y - 0.03, 11), 8, "#fef3c7", 0.8);
+      } else {
+        // Quality control: scanning beam and green confirmation.
+        const scan = (Math.sin(this.t * 4) + 1) * 0.5;
+        p.light(sx(x - 0.45 + scan * 0.9, y), sy(x - 0.45 + scan * 0.9, y, 16), 12, "#22c55e", 0.7);
+        p.light(sx(x, y), sy(x, y, 13), 10, "#4ade80", 0.45);
+      }
       return;
     }
-    const z = 5;
+
     switch (s.type) {
       case "bodyWorks":
         if (stage === 0) p.box(x - 0.35, y - 0.3, 0.7, 0.6, z, 1.5, "#9ca3af");
