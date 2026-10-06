@@ -132,7 +132,11 @@ export const WAREHOUSE_MINUTES = 3;
 export const WAREHOUSE_CAP = [500, 1_000, 2_500, 5_000, 10_000, 20_000, 40_000, 80_000, 160_000, 320_000];
 /** Warehouse upgrade price: plant cost × base × growth^(level-1). */
 export const WAREHOUSE_COST = { base: 0.2, growth: 1.7 };
-/** Seconds a material delivery takes to arrive is the depot truck's drive; a delivery fee per unit. */
+/**
+ * A material delivery takes the depot truck's drive and costs this per unit
+ * delivered. The fee is part of that unit's cost: each material on a truck
+ * carries its own units' fee into its cost basis (nothing is shared out).
+ */
 export const DELIVERY_FEE = 0.5;
 
 // ───────────────────────────── running a plant ─────────────────────────────

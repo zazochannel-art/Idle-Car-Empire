@@ -411,6 +411,8 @@ export interface Shipment {
   models?: CarId[];
   /** A materials delivery from the depot: what it carries. */
   materials?: MaterialStock;
+  /** What each material on board cost, in dollars, exactly as paid (delivery included): it becomes that material's cost basis. */
+  costs?: MaterialStock;
   /** Cars for export: the market their ship sails to. */
   market?: import("./config/expansion").ExportMarketId;
   /** My Cars moved between the factory lot and the paddock (car ids). */

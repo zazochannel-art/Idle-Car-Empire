@@ -1136,7 +1136,7 @@ function arrive(s: GameState, sh: Shipment, snap: ChainSnapshot, earn: (n: numbe
   if (!p) return 0;
   if (sh.item === "raw") {
     // a materials delivery: into the warehouse, each material at what it cost
-    addStock(p, sh.materials ?? {}, sh.value);
+    addStock(p, sh.materials ?? {}, sh.value, sh.costs);
   }
   else if (sh.item !== "car" && sh.item !== "chassis") p.inputs[sh.item] = (p.inputs[sh.item] ?? 0) + sh.qty;
   return 0;
@@ -1377,6 +1377,7 @@ export function migrateChain(raw: unknown, s: GameState): ChainState {
         vehicle: (["van", "truck", "semi", "trailer", "carrier"].includes(sh.vehicle as string) ? sh.vehicle : "truck") as Shipment["vehicle"],
         models: Array.isArray(sh.models) ? (sh.models.filter((m) => typeof m === "string" && m in CAR_BY_ID) as CarId[]) : undefined,
         materials: isObj(sh.materials) ? migrateStock(sh.materials) : undefined,
+        ...(isObj(sh.costs) ? { costs: migrateStock(sh.costs) } : {}),
         ...(typeof sh.market === "string" && sh.market in EXPORT_BY_ID ? { market: sh.market as ExportMarketId } : {}),
         ...(Array.isArray(sh.fleet) ? { fleet: sh.fleet.filter((n): n is number => typeof n === "number") } : {}),
       });
