@@ -30,6 +30,12 @@ export function checkInvariants(s: GameState): string[] {
     if (p.out < -1e-6) out.push(`${id} out ${p.out}`);
     if (p.outValue < -1e-3) out.push(`${id} outValue ${p.outValue}`);
     if ((p.stockCost ?? 0) < -1e-3) out.push(`${id} stockCost ${p.stockCost}`);
+    // the warehouse's value is the sum of each material's cost basis, and only stocked materials carry one
+    if (p.stockCostBy) {
+      const sum = Object.values(p.stockCostBy).reduce<number>((x, v) => x + (v ?? 0), 0);
+      if (Math.abs(sum - (p.stockCost ?? 0)) > 1e-3 * Math.max(1, sum)) out.push(`${id} stockCostBy ${sum} vs stockCost ${p.stockCost}`);
+      for (const [m, v] of Object.entries(p.stockCostBy)) if ((v ?? 0) < -1e-6 || ((v ?? 0) > 1e-6 && !((p.stock as Record<string, number>)[m] > 0))) out.push(`${id} stockCostBy.${m} ${v} with stock ${(p.stock as Record<string, number>)[m]}`);
+    }
     for (const [m, n] of Object.entries(p.stock)) if ((n ?? 0) < -1e-6) out.push(`${id} stock.${m} ${n}`);
     for (const [c, n] of Object.entries(p.inputs)) if ((n ?? 0) < -1e-6) out.push(`${id} inputs.${c} ${n}`);
   }

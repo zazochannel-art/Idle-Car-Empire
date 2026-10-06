@@ -294,8 +294,14 @@ export interface PlantData {
   progress: number;
   /** Materials in the plant's warehouse. */
   stock: MaterialStock;
-  /** What the materials in the warehouse cost (booked as a cost when they are used). */
+  /** What the materials in the warehouse cost in all (the sum of `stockCostBy`; kept for older saves). */
   stockCost?: number;
+  /**
+   * What each material in the warehouse cost, in dollars (its cost basis):
+   * the unit cost of a material is stockCostBy[m] / stock[m] — a weighted
+   * average of what was paid for it. Using a unit books exactly that.
+   */
+  stockCostBy?: MaterialStock;
   /** Warehouse level (capacity, see WAREHOUSE_CAP). */
   warehouse: number;
   /** ⚡ Power System upgrades (cheaper energy). */

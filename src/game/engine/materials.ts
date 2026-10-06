@@ -345,27 +345,91 @@ export function autoRestock(s: GameState, plotId: string, unitsPerSec: number) {
   }
 }
 
-/**
- * Takes the materials for `units` finished units out of the warehouse and
- * books what they cost (their share of what was paid for the stock).
- */
-export function spendMaterials(s: GameState, p: PlantData, need: MaterialStock, units: number): number {
-  const before = stockTotal(p.stock);
-  const used = consume(p, need, units);
-  const paid = Math.max(0, p.stockCost ?? 0);
-  const cost = before > 0 ? (paid * Math.min(used, before)) / before : 0;
-  p.stockCost = paid - cost;
-  if (cost > 0) book(s, "materials", cost);
-  return used;
+// ───────────────────────────── cost basis ─────────────────────────────
+
+/** List-price weight of a set of materials (how a delivery's price is shared out when it carries several). */
+function listValue(st: MaterialStock): number {
+  let v = 0;
+  for (const [m, n] of Object.entries(st) as [MaterialId, number][]) v += (n ?? 0) * MATERIAL_BY_ID[m].price;
+  return v;
 }
 
-/** Takes the materials for `units` finished units out of the warehouse. */
-export function consume(p: PlantData, need: MaterialStock, units: number): number {
-  let used = 0;
-  for (const [m, per] of Object.entries(need) as [MaterialId, number][]) {
-    p.stock[m] = Math.max(0, (p.stock[m] ?? 0) - per * units);
-    used += per * units;
+/**
+ * Each material's cost basis, for plants whose state has only the total
+ * (saves from before per-material costs): the total is shared out by list
+ * price × quantity, so the stock keeps exactly what was paid for it.
+ */
+function basisOf(p: PlantData): MaterialStock {
+  if (p.stockCostBy) return p.stockCostBy;
+  const total = Math.max(0, p.stockCost ?? 0);
+  const weight = listValue(p.stock);
+  const by: MaterialStock = {};
+  if (total > 0 && weight > 0) for (const [m, n] of Object.entries(p.stock) as [MaterialId, number][]) if ((n ?? 0) > 0) by[m] = (total * n * MATERIAL_BY_ID[m].price) / weight;
+  return by;
+}
+
+/** The plant's cost basis, created from its total the first time it is changed. */
+function costBasis(p: PlantData): MaterialStock {
+  return (p.stockCostBy ??= basisOf(p));
+}
+
+/** Only materials that cost something carry a basis (a free or used-up one has none). */
+function setBasis(by: MaterialStock, m: MaterialId, v: number) {
+  if (v > 1e-9 && Number.isFinite(v)) by[m] = v;
+  else delete by[m];
+}
+
+const sumStock = (st: MaterialStock) => Object.values(st).reduce<number>((a, v) => a + (v ?? 0), 0);
+
+/** Puts a delivery into the warehouse: `value` is what it cost (shared by list price when it carries several materials). */
+export function addStock(p: PlantData, materials: MaterialStock, value: number) {
+  const by = costBasis(p);
+  const weight = listValue(materials);
+  const paid = Number.isFinite(value) && value > 0 ? value : 0;
+  for (const [m, n] of Object.entries(materials) as [MaterialId, number][]) {
+    if (!((n ?? 0) > 0)) continue;
+    p.stock[m] = (p.stock[m] ?? 0) + n;
+    setBasis(by, m, (by[m] ?? 0) + (weight > 0 ? (paid * n * MATERIAL_BY_ID[m].price) / weight : 0));
   }
+  p.stockCost = sumStock(by);
+}
+
+/** What one unit of a material in this warehouse cost (its weighted average), or null with none in stock. */
+export function unitCostOf(p: PlantData, m: MaterialId): number | null {
+  const n = p.stock[m] ?? 0;
+  return n > 0 ? (basisOf(p)[m] ?? 0) / n : null;
+}
+
+/** What the materials in a warehouse cost (their cost basis). */
+export function inventoryValue(p: PlantData): number {
+  return sumStock(basisOf(p));
+}
+
+
+/**
+ * Takes the materials for `units` finished units out of the warehouse and
+ * books what they cost: for each material, the quantity used × that
+ * material's own unit cost (never an average over the whole warehouse).
+ * Returns the material units used.
+ */
+export function spendMaterials(s: GameState, p: PlantData, need: MaterialStock, units: number): number {
+  const by = costBasis(p);
+  let used = 0;
+  let cost = 0;
+  for (const [m, per] of Object.entries(need) as [MaterialId, number][]) {
+    const have = p.stock[m] ?? 0;
+    const q = Math.min(have, per * units);
+    if (!(q > 0)) continue;
+    const basis = by[m] ?? 0;
+    const c = q >= have ? basis : (basis * q) / have;
+    cost += c;
+    used += q;
+    const left = have - q > 1e-9 ? have - q : 0;
+    p.stock[m] = left;
+    setBasis(by, m, left > 0 ? basis - c : 0);
+  }
+  p.stockCost = sumStock(by);
+  if (cost > 0) book(s, "materials", cost);
   return used;
 }
 
@@ -379,6 +443,29 @@ export function migrateStock(raw: unknown): MaterialStock {
     if (typeof v === "number" && Number.isFinite(v) && v > 0) out[m] = v;
   }
   return out;
+}
+
+/** A save's per-material cost basis; missing or broken values fall back to the plant's total, shared by list price. */
+export function migrateCostBasis(raw: unknown, p: PlantData): MaterialStock {
+  if (typeof raw === "object" && raw !== null) {
+    // kept when every value is a valid amount and together they add up to the plant's total
+    // (a material missing from it cost nothing: a free delivery)
+    const by: MaterialStock = {};
+    let ok = true;
+    for (const m of Object.keys(p.stock) as MaterialId[]) {
+      const v = (raw as Record<string, unknown>)[m];
+      if (typeof v === "number" && Number.isFinite(v) && v >= 0) {
+        if (v > 0) by[m] = v;
+      } else if (v !== undefined) ok = false;
+    }
+    const total = Math.max(0, p.stockCost ?? 0);
+    if (ok && Math.abs(sumStock(by) - total) <= 0.01 * Math.max(1, total)) {
+      p.stockCost = sumStock(by);
+      return by;
+    }
+  }
+  delete p.stockCostBy;
+  return basisOf(p);
 }
 
 export function migrateLedger(raw: unknown): Ledger {

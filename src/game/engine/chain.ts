@@ -42,8 +42,10 @@ import { DEALERS, DEALER_BY_ID, DEALER_MARKUP_PER_LEVEL, DEALER_SPECIALTY } from
 import { MATERIALS as MATERIALS_LIST, CAR_STORAGE, CLASS_DEMAND, DEALER_FEE, RESCUE, SALES_TAX, TRIP_FEE, UPGRADE_SCALING, WAREHOUSE_CAP, POWER_SYSTEM, type MaterialId } from "../config/economy";
 import { assemblyTime, carListPrice, carStdCost, componentPrice, componentStdCost, componentTime, opRates, opTotal, type OpRates } from "./costs";
 import {
+  addStock,
   autoRestock,
   book,
+  migrateCostBasis,
   spendMaterials,
   createLedger,
   grantMaterials,
@@ -105,6 +107,7 @@ export function newPlant(): PlantData {
     // the warehouse starts empty: materials are bought at the market
     stock: {},
     stockCost: 0,
+    stockCostBy: {},
     warehouse: 1,
     power: 0,
     inputs: {},
@@ -1003,9 +1006,8 @@ function arrive(s: GameState, sh: Shipment, snap: ChainSnapshot, earn: (n: numbe
   const p = s.city.buildings[sh.to]?.plant;
   if (!p) return 0;
   if (sh.item === "raw") {
-    // a materials delivery: into the warehouse
-    for (const [m, n] of Object.entries(sh.materials ?? {}) as [MaterialId, number][]) p.stock[m] = (p.stock[m] ?? 0) + n;
-    p.stockCost = (p.stockCost ?? 0) + sh.value;
+    // a materials delivery: into the warehouse, each material at what it cost
+    addStock(p, sh.materials ?? {}, sh.value);
   }
   else if (sh.item !== "car" && sh.item !== "chassis") p.inputs[sh.item] = (p.inputs[sh.item] ?? 0) + sh.qty;
   return 0;
@@ -1187,6 +1189,8 @@ export function migratePlant(type: PlantType, raw: unknown): PlantData {
   if (raw.stock === undefined && PLANT_BY_ID[type].item) p.stock = starterStock(type, p.grade, 6);
   // saves from before materials were costed on use: value the stock at list price
   p.stockCost = typeof raw.stockCost === "number" && Number.isFinite(raw.stockCost) && raw.stockCost >= 0 ? raw.stockCost : stockValue(p.stock);
+  // each material's own cost; saves from before it split their total by list price
+  p.stockCostBy = migrateCostBasis(raw.stockCostBy, p);
   p.out = num(raw.out);
   p.outValue = num(raw.outValue);
   p.made = num(raw.made);
