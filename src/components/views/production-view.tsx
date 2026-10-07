@@ -16,7 +16,7 @@ import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
-import { MissionStrip, NextGoals } from "../game/goals";
+import { NextGoals } from "../game/goals";
 import { itemName, plantName } from "../panels/plant-panel";
 import { SectionTitle } from "./section-title";
 
@@ -120,7 +120,6 @@ export function ProductionView() {
           </div>
         </div>
       </section>
-      <MissionStrip />
       <p className="px-1 text-[11px] text-white/40">{t("chain.footer", { name: t(`structure.${PLANT_BY_ID.assemblyPlant.id}`) })}</p>
     </div>
   );
