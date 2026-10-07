@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   title: "Idle Car Empire",
   description: "Build a global car empire — from a tiny garage to hypercars and future cars.",
   applicationName: "Idle Car Empire",
-  appleWebApp: { capable: true, title: "Car Empire", statusBarStyle: "black-translucent" },
+  appleWebApp: { capable: true, title: "Car Empire", statusBarStyle: "black" },
   // metadata icons are not prefixed with basePath, so add it here
   icons: { icon: `${base}/icon-192.png`, apple: `${base}/apple-touch-icon.png` },
 };
