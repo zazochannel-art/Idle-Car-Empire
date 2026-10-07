@@ -30,7 +30,7 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
   const { t } = useT();
 
   return (
-    <header className="pointer-events-none absolute inset-x-0 top-0 z-30 pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
+    <header className="pointer-events-none absolute inset-x-0 top-0 z-30 pt-1 pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] md:pt-[env(safe-area-inset-top)]">
       <div className="flex items-start gap-2 p-2 sm:p-3">
         <div className="pointer-events-auto flex min-w-0 flex-1 flex-wrap items-center gap-1.5 rounded-2xl bg-[rgba(36,104,214,0.82)] p-1.5 shadow-[0_3px_0_0_rgba(10,40,110,0.35)] md:flex-nowrap md:gap-2 md:bg-[rgba(36,104,214,0.62)] md:p-2 md:hud-bar">
           <div className="relative flex min-w-0 items-center gap-2 pl-1 pr-2">
