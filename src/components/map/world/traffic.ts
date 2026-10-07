@@ -351,7 +351,9 @@ export class Traffic3D {
     const empty = v.back;
     const cabColors = ["#e11d48", "#2563eb", "#f59e0b", "#f2f4f7", "#334155", "#16a34a"];
     const cabColor = cabColors[Math.abs(v.id) % cabColors.length];
-    const key = v.vehicle === "carrier"\n      ? `carrier|${cabColor}|${empty ? "" : (v.models ?? []).join(",")}`\n      : `${v.vehicle}|${v.color}|${cabColor}|${empty}`;
+    const key = v.vehicle === "carrier"
+      ? `carrier|${cabColor}|${empty ? "" : (v.models ?? []).join(",")}`
+      : `${v.vehicle}|${v.color}|${cabColor}|${empty}`;
     let m = this.models.get(key);
     if (!m) {
       if (v.vehicle === "carrier") {
