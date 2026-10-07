@@ -515,3 +515,9 @@ body {
   font-weight: 800;
   letter-spacing: 0.02em;
 }
+
+
+/* Extend the game canvas through the iPhone bottom safe-area instead of leaving a body-colored strip. */
+.game-shell {
+  bottom: calc(-1 * env(safe-area-inset-bottom));
+}
