@@ -5,7 +5,7 @@
 // the car they just bought, and the first car rolling out of its plant.
 import * as THREE from "three";
 import { WORLD_MAP, along, plotOf, roadOpen, roadRoute, roadsBetween, type Entry, type Plot } from "@/game/city/layout";
-import { buildCarrier, buildTruck, materialKit, type MaterialKit } from "../../three/car-models";
+import { buildCar, buildCarrier, buildTruck, loadHeroes, materialKit, type MaterialKit } from "../../three/car-models";
 import type { ShipView, Site, VehiclePick } from "../map-types";
 import { CAR_COLORS, type CarModel } from "../vehicles";
 
@@ -37,7 +37,7 @@ const VSCALE = 0.12;
 /** Town cars keep about the trucks' pace (the engine times trucks at ROAD_SPEED tiles/s, with stops). */
 const TOWN_SPEED = 1.9;
 const COUNTRY_SPEED = 3.6;
-const MAX_CARS = 180;
+const MAX_CARS = 90;
 
 type P3 = [number, number, number];
 
@@ -58,6 +58,7 @@ interface RoadCar {
   /** Seconds left before it drives off the map (buyers and the first car). */
   life: number;
   scale: number;
+  visual: THREE.Group;
   hero?: boolean;
 }
 
@@ -145,7 +146,11 @@ export class Traffic3D {
     this.inst.count = 0;
     this.inst.castShadow = true;
     this.inst.frustumCulled = false;
-    this.root.add(this.inst);
+    this.inst.count = 0;
+    this.inst.visible = false;
+    void loadHeroes(THREE).then(() => {
+      for (const car of this.cars) this.refreshCarVisual(car);
+    });
     const N = WORLD_MAP.nodes.length;
     this.exits = Array.from({ length: N }, () => []);
     WORLD_MAP.roads.forEach((r, i) => {
@@ -181,7 +186,15 @@ export class Traffic3D {
   private newCar(road: number, s: number, dir: 1 | -1, hex: string, model: CarModel, life = 0, scale = 1): RoadCar {
     const r = WORLD_MAP.roads[road];
     if (r.oneway) dir = 1;
-    const c: RoadCar = { road, s, dir, speed: (r.fast ? COUNTRY_SPEED : TOWN_SPEED) * (0.85 + Math.random() * 0.3), color: new THREE.Color(hex), hex, model, x: 0, y: 0, z: 0, yaw: 0, alpha: life ? 0 : 1, life, scale };
+    const c: RoadCar = {
+      road, s, dir,
+      speed: (r.fast ? COUNTRY_SPEED : TOWN_SPEED) * (0.85 + Math.random() * 0.3),
+      color: new THREE.Color(hex), hex, model, x: 0, y: 0, z: 0, yaw: 0,
+      alpha: life ? 0 : 1, life, scale, visual: new THREE.Group(),
+    };
+    c.visual.name = `traffic-car-${model}`;
+    this.root.add(c.visual);
+    this.refreshCarVisual(c);
     this.place(c, 1);
     return c;
   }
@@ -212,6 +225,16 @@ export class Traffic3D {
     this.hero = c;
   }
 
+  /** Replace the generic traffic silhouette with the actual GLB-backed model. */
+  private refreshCarVisual(c: RoadCar) {
+    const model = buildCar(THREE, { model: c.model, color: c.hex, finish: "gloss" });
+    if (!model.children.length) return;
+    c.visual.clear();
+    model.scale.setScalar(0.118 * c.scale);
+    c.visual.add(model);
+    c.visual.visible = c.alpha > 0.01;
+  }
+
   /** Sets a car's position from its road and distance; `k` eases the heading. */
   private place(c: RoadCar, k: number) {
     const r = WORLD_MAP.roads[c.road];
@@ -225,6 +248,9 @@ export class Traffic3D {
     c.y = (mr ? roadSurface(this.ground, mr, (c.s * mr.L) / r.len, c.x, c.z) : this.ground.at(c.x, c.z) + ROAD_LIFT) + 0.005;
     const yaw = Math.atan2(-dz, dx);
     c.yaw = k >= 1 ? yaw : c.yaw + angle(yaw - c.yaw) * k;
+    c.visual.position.set(c.x, c.y, c.z);
+    c.visual.rotation.y = c.yaw;
+    c.visual.visible = c.alpha > 0.01;
   }
 
   private drive(c: RoadCar, dt: number) {
@@ -411,22 +437,19 @@ export class Traffic3D {
       } else c.alpha = Math.min(1, c.alpha + dt);
       this.drive(c, dt);
     }
-    this.cars = this.cars.filter((c) => !(c.life < 0 || (c.life > 0 && c.alpha <= 0 && c.life < 1)));
+    this.cars = this.cars.filter((c) => {
+      const keep = !(c.life < 0 || (c.life > 0 && c.alpha <= 0 && c.life < 1));
+      if (!keep) this.root.remove(c.visual);
+      return keep;
+    });
     if (this.hero && !this.cars.includes(this.hero)) this.hero = null;
 
-    // instanced cars (fading ones shrink away)
-    const n = Math.min(this.cars.length, this.inst.instanceMatrix.count);
-    for (let i = 0; i < n; i++) {
-      const c = this.cars[i];
-      const k = c.scale * Math.max(0.05, c.alpha);
-      this.q.setFromAxisAngle(this.yAxis, c.yaw);
-      this.m4.compose(this.v.set(c.x, c.y, c.z), this.q, this.sc.set(k, k, k));
-      this.inst.setMatrixAt(i, this.m4);
-      this.inst.setColorAt(i, c.color);
+    // Real traffic models are individual cached GLB clones.
+    for (const car of this.cars) {
+      car.visual.visible = car.alpha > 0.01;
+      const fade = car.life > 0 ? Math.max(0.05, car.alpha) : 1;
+      car.visual.scale.setScalar(fade);
     }
-    this.inst.count = n;
-    this.inst.instanceMatrix.needsUpdate = true;
-    if (this.inst.instanceColor) this.inst.instanceColor.needsUpdate = true;
 
     for (const [id, tr] of this.trucks) {
       if (tr.gone > 0) {
