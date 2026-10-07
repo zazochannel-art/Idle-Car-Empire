@@ -60,6 +60,8 @@ interface RoadCar {
   scale: number;
   visual: THREE.Group;
   hero?: boolean;
+  /** Cached road segment to avoid a binary search every rendered frame. */
+  seg: number;
 }
 
 interface Truck {
@@ -111,6 +113,25 @@ function at3(path: P3[], acc: number[], s: number) {
 }
 
 const angle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+
+/** Same interpolation as along(), but reuses the current segment while a car moves. */
+function alongCached(pts: [number, number][], acc: number[], s: number, hint: number, dir: 1 | -1) {
+  const n = pts.length;
+  s = Math.max(0, Math.min(acc[n - 1], s));
+  let i = Math.max(0, Math.min(n - 2, hint));
+  if (dir > 0) {
+    while (i < n - 2 && acc[i + 1] < s) i++;
+    while (i > 0 && acc[i] > s) i--;
+  } else {
+    while (i > 0 && acc[i] > s) i--;
+    while (i < n - 2 && acc[i + 1] < s) i++;
+  }
+  const a = pts[i];
+  const b = pts[i + 1];
+  const seg = acc[i + 1] - acc[i] || 1;
+  const f = (s - acc[i]) / seg;
+  return { x: a[0] + (b[0] - a[0]) * f, y: a[1] + (b[1] - a[1]) * f, tx: (b[0] - a[0]) / seg, ty: (b[1] - a[1]) / seg, seg: i };
+}
 
 export class Traffic3D {
   readonly root = new THREE.Group();
@@ -190,7 +211,7 @@ export class Traffic3D {
       road, s, dir,
       speed: (r.fast ? COUNTRY_SPEED : TOWN_SPEED) * (0.85 + Math.random() * 0.3),
       color: new THREE.Color(hex), hex, model, x: 0, y: 0, z: 0, yaw: 0,
-      alpha: life ? 0 : 1, life, scale, visual: new THREE.Group(),
+      alpha: life ? 0 : 1, life, scale, visual: new THREE.Group(), seg: 0,
     };
     c.visual.name = `traffic-car-${model}`;
     this.root.add(c.visual);
@@ -238,7 +259,8 @@ export class Traffic3D {
   /** Sets a car's position from its road and distance; `k` eases the heading. */
   private place(c: RoadCar, k: number) {
     const r = WORLD_MAP.roads[c.road];
-    const p = along(r.pts, r.acc, c.s);
+    const p = alongCached(r.pts, r.acc, c.s, c.seg, c.dir);
+    c.seg = p.seg;
     const dx = p.tx * c.dir;
     const dz = p.ty * c.dir;
     const lane = r.oneway ? 0 : r.w * 0.25;
@@ -271,6 +293,7 @@ export class Traffic3D {
       c.road = pick[0];
       r = WORLD_MAP.roads[c.road];
       c.dir = pick[1] ? 1 : -1;
+      c.seg = c.dir > 0 ? 0 : Math.max(0, r.pts.length - 2);
       c.s = pick[1] ? over : r.len - over;
       c.speed = (r.fast ? COUNTRY_SPEED : TOWN_SPEED) * (0.85 + Math.random() * 0.3) * (c.hero ? 0.6 : 1);
     }
