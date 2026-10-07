@@ -167,7 +167,7 @@ export function Toasts() {
   );
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top)+7.5rem)] z-[45] flex flex-col items-center gap-2 px-3 md:top-20 md:items-end md:pr-6">
+    <div className="pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top)+8.75rem)] z-[45] flex flex-col items-center gap-1.5 px-5 md:top-20 md:items-end md:pr-6">
       <AnimatePresence initial={false}>
         {(celebrating ? [] : toasts).map((t) => (
           <motion.div
@@ -177,17 +177,17 @@ export function Toasts() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, x: 40, transition: { duration: 0.18 } }}
             className={cn(
-              "glass-strong pointer-events-auto flex w-full max-w-sm items-center gap-3 rounded-2xl p-3",
+              "glass-strong pointer-events-auto flex w-full max-w-[320px] items-center gap-2.5 rounded-xl p-2.5 md:max-w-sm md:gap-3 md:rounded-2xl md:p-3",
               t.tone === "gold" && "ring-1 ring-gold/40",
               t.tone === "success" && "ring-1 ring-emerald-400/30",
               t.tone === "info" && "ring-1 ring-electric/30",
               t.tone === "warn" && "ring-1 ring-amber-400/50",
             )}
           >
-            {t.icon && <span className="text-2xl">{t.icon}</span>}
+            {t.icon && <span className="shrink-0 text-xl md:text-2xl">{t.icon}</span>}
             <div className="min-w-0 flex-1">
-              <div className={cn("text-sm font-semibold", t.tone === "gold" && "text-gold")}>{t.title}</div>
-              {t.body && <div className="truncate text-xs text-white/55">{t.body}</div>}
+              <div className={cn("text-[13px] leading-tight font-semibold md:text-sm", t.tone === "gold" && "text-gold")}>{t.title}</div>
+              {t.body && <div className="truncate text-[11px] leading-tight text-white/55 md:text-xs">{t.body}</div>}
             </div>
             {t.action && (
               <button
