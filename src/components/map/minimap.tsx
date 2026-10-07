@@ -159,8 +159,7 @@ export function Minimap({ engine }: { engine: RefObject<MapEngine | null> }) {
       <div className="overflow-hidden rounded-xl bg-white p-1 shadow-[0_3px_0_0_rgba(0,0,0,0.3)]">
         <canvas ref={ref} onPointerDown={onTap} style={{ aspectRatio: `${W} / ${H}` }} className="block w-[118px] cursor-pointer rounded-lg md:w-[172px]" aria-label={t("map.minimap")} />
       </div>
-      {/* zoom tiers: the whole region, districts, buildings, factory detail */}
-      <div className="flex gap-0.5 rounded-lg hud-bar p-0.5" role="radiogroup" aria-label={t("map.tiers")}>
+      <div className="hidden gap-0.5 rounded-lg hud-bar p-0.5 md:flex" role="radiogroup" aria-label={t("map.tiers")}>
         {ZOOM_TIERS.map((k) => {
           const Icon = TIER_ICON[k];
           return (
@@ -179,7 +178,7 @@ export function Minimap({ engine }: { engine: RefObject<MapEngine | null> }) {
         })}
       </div>
       <div className="flex gap-1.5">
-        <button className={cn(btn, list && "bg-gold text-[#2a1d00]")} onClick={() => setList((v) => !v)} aria-label={t("map.districts")} aria-expanded={list}>
+        <button className={cn(btn, "hidden md:flex", list && "bg-gold text-[#2a1d00]")} onClick={() => setList((v) => !v)} aria-label={t("map.districts")} aria-expanded={list}>
           <MapPin className="size-4" />
         </button>
         <button className={btn} onClick={() => engine.current?.zoomBy(1.35)} aria-label={t("map.zoomIn")}>
