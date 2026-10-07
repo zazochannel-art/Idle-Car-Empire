@@ -58,7 +58,7 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
         </div>
         <div className="pointer-events-auto flex shrink-0 flex-col gap-1.5 md:flex-row">
           <TimeButton />
-          <LanguageSwitch />
+          <div className="hidden md:block"><LanguageSwitch /></div>
           <button
             onClick={onSettings}
             className="flex size-10 items-center justify-center rounded-full bg-[#5b5b60]/85 text-white shadow-[0_3px_0_0_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:brightness-110"
