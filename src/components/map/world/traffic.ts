@@ -7,7 +7,26 @@ import * as THREE from "three";
 import { WORLD_MAP, along, plotOf, roadOpen, roadRoute, roadsBetween, type Entry, type Plot } from "@/game/city/layout";
 import { buildCarrier, buildTruck, materialKit, type MaterialKit } from "../../three/car-models";
 import type { ShipView, Site, VehiclePick } from "../map-types";
-import { CAR_COLORS, CAR_MODELS, type CarModel } from "../vehicles";
+import { CAR_COLORS, type CarModel } from "../vehicles";
+
+/** Simple unbranded commuter traffic only. Hero/special cars stay reserved for the player, showroom and events. */
+const TRAFFIC_MODELS: readonly CarModel[] = ["city", "compact", "sedan", "wagon", "minivan"];
+const TRAFFIC_SCALE: Record<CarModel, number> = {
+  city: 0.9,
+  compact: 0.86,
+  sedan: 1,
+  wagon: 1.03,
+  minivan: 1.12,
+  suv: 1,
+  sports: 1,
+  muscle: 1,
+  luxury: 1,
+  supercar: 1,
+  hypercar: 1,
+  electric: 1,
+  offroad: 1,
+  pickup: 1,
+};
 import { hazed } from "./kit";
 import { ROAD_LIFT, carGeometry, roadSurface, type MapRoad } from "./scenery";
 import { bake } from "./structures";
@@ -172,8 +191,8 @@ export class Traffic3D {
     if (road < 0) return;
     const r = WORLD_MAP.roads[road];
     const hex = CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)];
-    const model = CAR_MODELS[Math.floor(Math.random() * 9)];
-    const c = this.newCar(road, Math.random() * r.len, Math.random() < 0.5 ? 1 : -1, hex, model);
+    const model = TRAFFIC_MODELS[Math.floor(Math.random() * TRAFFIC_MODELS.length)];
+    const c = this.newCar(road, Math.random() * r.len, Math.random() < 0.5 ? 1 : -1, hex, model, 0, TRAFFIC_SCALE[model]);
     c.alpha = 0;
     this.cars.push(c);
   }
