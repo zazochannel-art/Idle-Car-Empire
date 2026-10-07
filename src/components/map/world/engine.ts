@@ -318,7 +318,8 @@ export class MapEngine {
     this.plots.setPreview(this._preview);
     // compile everything once, before the first frame
     this.place(0);
-    this.renderer.compile(this.scene, this.camera);
+    if (this.renderer.compileAsync) await this.renderer.compileAsync(this.scene, this.camera);
+    else this.renderer.compile(this.scene, this.camera);
     if (!this.running) this.render(0);
   }
 
@@ -589,10 +590,17 @@ export class MapEngine {
   }
 
   private skyCol = new THREE.Color();
+  private readonly skyDay = new THREE.Color("#bfe3f7");
+  private readonly skyDusk = new THREE.Color("#f3c39b");
+  private readonly skyNight = new THREE.Color("#0d1a33");
+  private readonly sunWarm = new THREE.Color("#fff3df");
+  private readonly sunNight = new THREE.Color("#ffb070");
+  private readonly hemiDay = new THREE.Color("#d6ecff");
+  private readonly hemiNight = new THREE.Color("#5d6fae");
   private applySky(dark: number) {
-    const day = new THREE.Color("#bfe3f7");
-    const dusk = new THREE.Color("#f3c39b");
-    const night = new THREE.Color("#0d1a33");
+    const day = this.skyDay;
+    const dusk = this.skyDusk;
+    const night = this.skyNight;
     const c = this.skyCol;
     if (dark <= 0.5) c.copy(day).lerp(dusk, dark / 0.5);
     else c.copy(dusk).lerp(night, (dark - 0.5) / 0.5);
@@ -603,9 +611,9 @@ export class MapEngine {
     fog.near = d * 2.2 + 60;
     fog.far = d * 6 + 400;
     this.sun.intensity = 2.6 * (1 - dark * 0.9);
-    this.sun.color.set(dark < 0.5 ? "#fff3df" : "#ffd2a8").lerp(new THREE.Color("#ffb070"), Math.min(1, dark * 1.4) * 0.6);
+    this.sun.color.copy(this.sunWarm).lerp(this.sunNight, Math.min(1, dark * 1.4) * 0.6);
     this.hemi.intensity = 1.15 - dark * 0.8;
-    this.hemi.color.set("#d6ecff").lerp(new THREE.Color("#5d6fae"), dark);
+    this.hemi.color.copy(this.hemiDay).lerp(this.hemiNight, dark);
     this.scene.environmentIntensity = 0.55 * (1 - dark * 0.6);
     if (this.glows) {
       const k = smoothstep(0.55, 0.9, dark);
