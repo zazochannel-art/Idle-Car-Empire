@@ -340,7 +340,7 @@ export class Traffic3D {
         ];
         if (!empty)
           (v.models ?? []).slice(0, 4).forEach((model, i) => {
-            const car = new THREE.Mesh(this.carGeo, this.carMat(CAR_COLORS[(CAR_MODELS.indexOf(model) * 3 + i) % CAR_COLORS.length]));
+            const car = new THREE.Mesh(this.carGeo, this.carMat(CAR_COLORS[(model.length * 3 + i) % CAR_COLORS.length]));
             car.scale.setScalar(10 * VSCALE * 0.75);
             car.position.set(slots[i][0] * VSCALE + 1.4 * VSCALE, slots[i][1] * VSCALE, 0);
             m!.add(car);
