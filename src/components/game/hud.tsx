@@ -43,17 +43,21 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
           </div>
           <Pill icon={<TrendingUp className="size-4 stroke-[3] text-lime" />} label={t("hud.profit")} value={`${formatMoney(income)}${t("unit.perSec")}`} />
           <Pill icon={<Car className="size-4 stroke-[2.5] text-white" />} label={carsRate > 0 ? t("hud.carsRate") : t("hud.partsRate")} value={`${formatNumber(carsRate > 0 ? carsRate : partsRate)}${t("unit.perMin")}`} />
-          <div className="hidden sm:block">
+          <div className="hidden md:block">
             <Pill icon={<Factory className="size-3.5 text-cyan-300" />} label={t("hud.factories")} value={`${owned} · 🚚${trucks}`} />
           </div>
-          <button onClick={() => setView("prestige")} className="text-left">
-            <Pill icon={<Globe2 className="size-4 stroke-[2.5] text-gold" />} label={t("hud.prestige")} value={formatNumber(ep)} gold />
-          </button>
-          <EventChip />
-          {stars > 0 && (
+          <div className="hidden md:block">
             <button onClick={() => setView("prestige")} className="text-left">
-              <Pill icon={<Star className="size-3.5 fill-gold text-gold" />} label={t("imperium.stars")} value={formatNumber(stars)} gold />
+              <Pill icon={<Globe2 className="size-4 stroke-[2.5] text-gold" />} label={t("hud.prestige")} value={formatNumber(ep)} gold />
             </button>
+          </div>
+          <div className="hidden md:block"><EventChip /></div>
+          {stars > 0 && (
+            <div className="hidden md:block">
+              <button onClick={() => setView("prestige")} className="text-left">
+                <Pill icon={<Star className="size-3.5 fill-gold text-gold" />} label={t("imperium.stars")} value={formatNumber(stars)} gold />
+              </button>
+            </div>
           )}
         </div>
         <div className="pointer-events-auto flex shrink-0 flex-col gap-1.5 md:flex-row">
