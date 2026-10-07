@@ -326,11 +326,11 @@ export class Traffic3D {
 
   private truckModel(v: ShipView) {
     const empty = v.back;
-    const key = v.vehicle === "carrier" ? `carrier|${empty ? "" : (v.models ?? []).join(",")}` : `${v.vehicle}|${v.color}|${empty}`;
+    const cabColors = ["#e11d48", "#2563eb", "#f59e0b", "#f2f4f7", "#334155", "#16a34a"];\n    const cabColor = cabColors[Math.abs(v.id) % cabColors.length];\n    const key = v.vehicle === "carrier"\n      ? `carrier|${cabColor}|${empty ? "" : (v.models ?? []).join(",")}`\n      : `${v.vehicle}|${v.color}|${cabColor}|${empty}`;
     let m = this.models.get(key);
     if (!m) {
       if (v.vehicle === "carrier") {
-        m = bake(buildCarrier(THREE, this.kit, []), VSCALE);
+        m = bake(buildCarrier(THREE, this.kit, [], 0, cabColor), VSCALE);
         // the cars on its decks (simple shapes, in the models' colours)
         const slots: [number, number][] = [
           [-2.4, 0.95],
