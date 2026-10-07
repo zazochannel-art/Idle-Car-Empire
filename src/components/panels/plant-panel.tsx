@@ -458,6 +458,87 @@ function StatusLine({ id }: { id: string }) {
   );
 }
 
+const CAR_THUMB_CACHE = new Map<string, string>();
+let carThumbRenderer: THREE.WebGLRenderer | null = null;
+let carThumbCanvas: HTMLCanvasElement | null = null;
+let carThumbReady: Promise<void> | null = null;
+
+async function renderCarThumbnail(model: (typeof CARS)[number]["id"], color: string): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+  const key = `${model}|${color}`;
+  const cached = CAR_THUMB_CACHE.get(key);
+  if (cached) return cached;
+
+  carThumbReady ??= loadHeroes(THREE);
+  await carThumbReady;
+
+  carThumbCanvas ??= document.createElement("canvas");
+  carThumbCanvas.width = 192;
+  carThumbCanvas.height = 108;
+
+  carThumbRenderer ??= new THREE.WebGLRenderer({
+    canvas: carThumbCanvas,
+    alpha: true,
+    antialias: true,
+    preserveDrawingBuffer: true,
+  });
+  carThumbRenderer.setPixelRatio(1);
+  carThumbRenderer.setSize(192, 108, false);
+  carThumbRenderer.setClearColor(0x000000, 0);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(25, 192 / 108, 0.01, 100);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x223044, 2.2));
+  const light = new THREE.DirectionalLight(0xffffff, 2.5);
+  light.position.set(4, 6, 5);
+  scene.add(light);
+
+  const car = buildCar(THREE, { model, color, finish: "gloss" });
+  if (!car.children.length) return null;
+  car.rotation.y = -0.2;
+  scene.add(car);
+
+  const box = new THREE.Box3().setFromObject(car);
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const radius = Math.max(size.x, size.y, size.z);
+  camera.position.set(center.x + radius * 1.45, center.y + radius * 0.7, center.z + radius * 1.45);
+  camera.lookAt(center.x, center.y * 0.9, center.z);
+  carThumbRenderer.render(scene, camera);
+
+  const data = carThumbCanvas.toDataURL("image/png");
+  CAR_THUMB_CACHE.set(key, data);
+  return data;
+}
+
+function CarThumbnail({ model, color }: { model: (typeof CARS)[number]["id"]; color: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    const key = `${model}|${color}`;
+    const cached = CAR_THUMB_CACHE.get(key);
+    if (cached) {
+      setSrc(cached);
+      return () => {
+        alive = false;
+      };
+    }
+    void renderCarThumbnail(model, color).then((data) => {
+      if (alive && data) setSrc(data);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [model, color]);
+
+  return src ? (
+    <img src={src} alt="" className="absolute inset-0 h-full w-full object-contain p-1" draggable={false} />
+  ) : (
+    <div className="absolute inset-4 animate-pulse rounded-lg bg-white/[0.06]" />
+  );
+}
+
 function ModelPicker({ id }: { id: string }) {
   const state = useGame((g) => g.state);
   const snap = useGame((g) => g.snap);
