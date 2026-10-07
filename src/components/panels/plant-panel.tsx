@@ -25,7 +25,7 @@ import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import * as THREE from "three";
-import { buildCar, loadHeroes } from "@/components/three/car-models";
+import { buildCar, loadHeroes, type BodyModel } from "@/components/three/car-models";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { CostButton } from "../game/cost-button";
@@ -493,7 +493,7 @@ async function renderCarThumbnail(model: (typeof CARS)[number]["id"], color: str
   light.position.set(4, 6, 5);
   scene.add(light);
 
-  const car = buildCar(THREE, { model, color, finish: "gloss" });
+  const bodyModel: BodyModel = model === "perfSuv" ? "muscle" : (model as BodyModel);\n  const car = buildCar(THREE, { model: bodyModel, color, finish: "gloss" });
   if (!car.children.length) return null;
   car.rotation.y = -0.2;
   scene.add(car);
