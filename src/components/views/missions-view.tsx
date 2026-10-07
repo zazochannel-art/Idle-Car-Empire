@@ -35,8 +35,8 @@ export function MissionsView() {
         {ready > 0 ? (
           <div className="flex items-center justify-between gap-3 rounded-lg bg-emerald-500/10 p-2.5 ring-1 ring-emerald-400/25">
             <div className="min-w-0">
-              <div className="text-sm font-bold text-emerald-300">{ready} {t("mission.claim")}</div>
-              <div className="text-[11px] text-white/55">Recompensele sunt gata de revendicat</div>
+              <div className="text-sm font-bold text-emerald-300">{ready} misiuni gata de revendicat</div>
+              <div className="text-[11px] text-white/55">Recompensele pot fi revendicate acum</div>
             </div>
             <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-red-500 text-sm font-black text-white">{ready}</span>
           </div>
