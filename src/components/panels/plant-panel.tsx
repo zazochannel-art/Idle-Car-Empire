@@ -23,6 +23,9 @@ import type { MessageKey, Vars } from "@/i18n";
 import { useContent } from "@/i18n/content";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
+import { useEffect, useState } from "react";
+import * as THREE from "three";
+import { buildCar, loadHeroes } from "@/components/three/car-models";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { CostButton } from "../game/cost-button";
@@ -480,9 +483,9 @@ function ModelPicker({ id }: { id: string }) {
               onClick={() => setPlantCar(id, c.id)}
               className={cn("group overflow-hidden rounded-xl text-left text-xs ring-1 disabled:opacity-40", chosen === c.id ? "bg-electric/20 ring-electric/50" : "bg-white/[0.03] ring-white/10")}
             >
-              <div className="relative flex h-20 items-end justify-center overflow-hidden bg-gradient-to-b from-white/[0.07] to-black/20 px-2 pb-1">
+              <div className="relative h-20 overflow-hidden bg-gradient-to-b from-white/[0.07] to-black/20 px-2">
                 <div className="absolute inset-x-3 bottom-1 h-5 rounded-full bg-black/30 blur-md" />
-                <div className="relative mb-0.5 text-[42px] leading-none drop-shadow-[0_4px_5px_rgba(0,0,0,0.55)] transition-transform duration-200 group-hover:scale-105">{c.emoji}</div>
+                <CarThumbnail model={c.id} color={c.color} />
                 <span className="absolute right-1.5 top-1 rounded-md bg-black/45 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white/60">{c.body}</span>
               </div>
               <div className="p-2">
