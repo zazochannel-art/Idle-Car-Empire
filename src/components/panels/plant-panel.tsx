@@ -478,12 +478,17 @@ function ModelPicker({ id }: { id: string }) {
               key={c.id}
               disabled={!!lock}
               onClick={() => setPlantCar(id, c.id)}
-              className={cn("rounded-xl p-2 text-left text-xs ring-1 disabled:opacity-40", chosen === c.id ? "bg-electric/20 ring-electric/50" : "bg-white/[0.03] ring-white/10")}
+              className={cn("group overflow-hidden rounded-xl text-left text-xs ring-1 disabled:opacity-40", chosen === c.id ? "bg-electric/20 ring-electric/50" : "bg-white/[0.03] ring-white/10")}
             >
-              <div className="truncate font-bold">
-                {c.emoji} {state.designs[c.id].name}
+              <div className="relative flex h-20 items-end justify-center overflow-hidden bg-gradient-to-b from-white/[0.07] to-black/20 px-2 pb-1">
+                <div className="absolute inset-x-3 bottom-1 h-5 rounded-full bg-black/30 blur-md" />
+                <div className="relative mb-0.5 text-[42px] leading-none drop-shadow-[0_4px_5px_rgba(0,0,0,0.55)] transition-transform duration-200 group-hover:scale-105">{c.emoji}</div>
+                <span className="absolute right-1.5 top-1 rounded-md bg-black/45 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white/60">{c.body}</span>
               </div>
-              <div className="text-[10px] tabular-nums text-white/50">{lock ? `🔒 ${n.carLock(lock)}` : formatMoney(carValue(state, c, snap.gm))}</div>
+              <div className="p-2">
+                <div className="truncate font-bold">{state.designs[c.id].name}</div>
+                <div className="text-[10px] tabular-nums text-white/50">{lock ? `🔒 ${n.carLock(lock)}` : formatMoney(carValue(state, c, snap.gm))}</div>
+              </div>
             </button>
           );
         })}
