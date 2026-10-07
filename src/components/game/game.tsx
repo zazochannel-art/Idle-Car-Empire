@@ -280,7 +280,7 @@ function LeftRail() {
     ...PILLARS.map((p) => ({ id: p.id, icon: p.icon, badge: p.id === "empire" ? badges.research : p.id === "business" ? badges.missions : 0 })),
   ];
   return (
-    <nav className="absolute left-[calc(env(safe-area-inset-left)+0.5rem)] top-[6.75rem] z-20 flex flex-col gap-1 rounded-xl hud-bar p-1 md:left-[calc(env(safe-area-inset-left)+0.75rem)] md:top-[5.5rem]">
+    <nav className="hidden absolute left-[calc(env(safe-area-inset-left)+0.5rem)] top-[6.75rem] md:flex z-20 flex flex-col gap-1 rounded-xl hud-bar p-1 md:left-[calc(env(safe-area-inset-left)+0.75rem)] md:top-[5.5rem]">
       {items.map((r) => {
         const active = r.id === "map" ? nothing : current === r.id;
         const label = r.id === "map" ? t("map.nav.map") : t(`pillar.${r.id}`);
