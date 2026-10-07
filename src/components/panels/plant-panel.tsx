@@ -513,25 +513,19 @@ async function renderCarThumbnail(model: (typeof CARS)[number]["id"], color: str
 }
 
 function CarThumbnail({ model, color }: { model: (typeof CARS)[number]["id"]; color: string }) {
-  const [src, setSrc] = useState<string | null>(null);
+  const key = `${model}|${color}`;
+  const [src, setSrc] = useState<string | null>(() => CAR_THUMB_CACHE.get(key) ?? null);
 
   useEffect(() => {
+    if (src) return;
     let alive = true;
-    const key = `${model}|${color}`;
-    const cached = CAR_THUMB_CACHE.get(key);
-    if (cached) {
-      setSrc(cached);
-      return () => {
-        alive = false;
-      };
-    }
     void renderCarThumbnail(model, color).then((data) => {
       if (alive && data) setSrc(data);
     });
     return () => {
       alive = false;
     };
-  }, [model, color]);
+  }, [model, color, src]);
 
   return src ? (
     <img src={src} alt="" className="absolute inset-0 h-full w-full object-contain p-1" draggable={false} />
