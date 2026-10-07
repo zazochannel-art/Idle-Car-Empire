@@ -153,7 +153,7 @@ function Shell() {
   }
 
   return (
-    <div className="fixed inset-0 overflow-hidden bg-ink">
+    <div className="game-shell fixed inset-0 overflow-hidden bg-ink">
       <EmpireMap active={!garage && !floor} panelOffset={panelOffset} />
       <Hud onSettings={() => setSettings(true)} />
       <LeftRail />
