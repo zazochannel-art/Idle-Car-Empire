@@ -748,11 +748,11 @@ export function buildTruck(T: Three, kit: MaterialKit, look: TruckLook): THREE_N
 }
 
 /** A car transporter with two decks, loaded with real cars. */
-export function buildCarrier(T: Three, kit: MaterialKit, cars: CarLook[], spin = 0): THREE_NS.Group {
+export function buildCarrier(T: Three, kit: MaterialKit, cars: CarLook[], spin = 0, cabColor = "#f59e0b"): THREE_NS.Group {
   const g = new T.Group();
   const L = 12;
   const W = 2.5;
-  const c = cab(T, kit, "#f59e0b", 2.2, 2.0, W);
+  const c = cab(T, kit, cabColor, 2.2, 2.0, W);
   c.position.x = L / 2 - 1.1;
   g.add(c);
   g.add(box(T, L * 0.95, 0.2, W * 0.8, kit.trim, 0, 0.55, 0));
