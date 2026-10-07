@@ -345,7 +345,16 @@ export class Traffic3D {
             car.position.set(slots[i][0] * VSCALE + 1.4 * VSCALE, slots[i][1] * VSCALE, 0);
             m!.add(car);
           });
-      } else m = bake(buildTruck(THREE, this.kit, { kind: v.vehicle, cargo: v.color, empty }), VSCALE);
+      } else {
+        const cabColors = ["#e11d48", "#2563eb", "#f59e0b", "#f2f4f7", "#334155", "#16a34a"];
+        const cabColor = cabColors[Math.abs(v.id) % cabColors.length];
+        m = bake(buildTruck(THREE, this.kit, {
+          kind: v.vehicle,
+          cargo: v.color,
+          empty,
+          cabColor,
+        }), VSCALE);
+      }
       this.models.set(key, m);
     }
     return m.clone();
