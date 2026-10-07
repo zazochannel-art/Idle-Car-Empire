@@ -493,7 +493,8 @@ async function renderCarThumbnail(model: (typeof CARS)[number]["id"], color: str
   light.position.set(4, 6, 5);
   scene.add(light);
 
-  const bodyModel: BodyModel = model === "perfSuv" ? "muscle" : (model as BodyModel);\n  const car = buildCar(THREE, { model: bodyModel, color, finish: "gloss" });
+  const bodyModel: BodyModel = model === "perfSuv" ? "muscle" : (model as BodyModel);
+  const car = buildCar(THREE, { model: bodyModel, color, finish: "gloss" });
   if (!car.children.length) return null;
   car.rotation.y = -0.2;
   scene.add(car);
