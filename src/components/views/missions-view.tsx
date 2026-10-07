@@ -6,7 +6,7 @@ import { formatDuration } from "@/game/format";
 import { useContent } from "@/i18n/content";
 import { useT } from "@/i18n/use-t";
 import { useGame } from "@/store/game-store";
-import { MissionRow } from "../game/goals";
+import { MissionRow, MissionStrip } from "../game/goals";
 import { EventCard, EventGoalCard } from "../game/event-chip";
 import { ContractCard } from "./contract-card";
 import { VipCard } from "./live-cards";
@@ -31,6 +31,7 @@ export function MissionsView() {
     <div className="space-y-5">
       <ViewHeader icon="📋" title={t("nav.missions")} subtitle={t("missions.subtitle")} />
       <EventCard />
+      <MissionStrip />
       <EventGoalCard />
 
       <section className="space-y-2">
