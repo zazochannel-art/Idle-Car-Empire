@@ -567,6 +567,8 @@ export interface TruckLook {
   kind: "van" | "truck" | "semi" | "trailer";
   cargo: string;
   empty: boolean;
+  /** Paint of the tractor cab, independent from the cargo body. */
+  cabColor?: string;
   spin?: number;
 }
 
@@ -650,7 +652,7 @@ export function buildTruck(T: Three, kit: MaterialKit, look: TruckLook): THREE_N
   const tractor = look.kind !== "truck";
   const cabLen = 2.0;
   const cabH = 2.05;
-  const c = cab(T, kit, tractor ? "#e9edf2" : "#f2f4f7", cabLen, cabH, W, tractor);
+  const c = cab(T, kit, look.cabColor ?? (tractor ? "#e9edf2" : "#f2f4f7"), cabLen, cabH, W, tractor);
   c.position.x = L / 2 - cabLen / 2;
   g.add(c);
   const steel = kit.trim;
@@ -721,6 +723,17 @@ export function buildTruck(T: Three, kit: MaterialKit, look: TruckLook): THREE_N
         g.add(wg);
       }
   }
+  // Side marker lamps make the trailer read like a road-going commercial vehicle.
+  if (tractor) {
+    const markerX = Math.min(L / 2 - cabLen - 0.2, L / 2 - 0.5);
+    const rearX = -L / 2 + 0.45;
+    const markerCount = Math.max(2, Math.floor((markerX - rearX) / 1.5));
+    for (let i = 0; i <= markerCount; i++) {
+      const x = rearX + ((markerX - rearX) * i) / markerCount;
+      for (const sd of [-1, 1]) g.add(rbox(T, 0.035, 0.055, 0.025, kit.amber, x, 0.82, sd * (W / 2 + 0.012), 0.015));
+    }
+  }
+
   // mud flaps, rear bumper bar and tail light clusters
   const lastX = Math.min(...axles.map((a) => a.x));
   for (const sd of [-1, 1]) {
