@@ -86,8 +86,17 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
   const [status, setStatus] = useState<"loading" | "ready" | "failed">("loading");
   /** The padlock whose card is open. */
   const [lockOpen, setLockOpen] = useState<MapArea | null>(null);
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  // Subscribe only to changes that can affect the map. The simulation still ticks at
+  // 100ms, but money/progress changes no longer rerender this entire 3D map shell.
+  const mapKey = useGame((g) => sceneKey(g.state));
+  const earnersKey = useGame((g) => {
+    const s = g.snap.city;
+    return [
+      ...Object.entries(s.garages).map(([id, x]) => `g:${id}:${x.incomePerSec}`),
+      ...Object.entries(s.structureIncome).map(([id, x]) => `s:${id}:${x}`),
+    ].join("|");
+  });
+  const state = useGame.getState().state;
   const plot = useUi((u) => u.plot);
   const command = useUi((u) => u.command);
   const showcase = useUi((u) => u.showcase);
@@ -207,7 +216,7 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
     else e.stop();
   }, [engine, active]);
 
-  const key = sceneKey(state);
+  const key = mapKey;
   useEffect(() => {
     const e = engineRef.current;
     if (!e) return;
@@ -235,7 +244,7 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
     for (const [id, st] of Object.entries(snap.city.garages)) list.push({ plotId: id, perSec: st.incomePerSec });
     for (const [id, inc] of Object.entries(snap.city.structureIncome)) list.push({ plotId: id, perSec: inc });
     e.setEarners(list);
-  }, [engine, snap]);
+  }, [engine, earnersKey]);
 
   useEffect(() => {
     const e = engineRef.current;
