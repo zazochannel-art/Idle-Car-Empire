@@ -140,6 +140,7 @@ function Shell() {
       titleLang: s.settings.lang,
     });
   });
+  void plotTitleKey;
   const state = plot ? useGame.getState().state : null;
   const [settings, setSettings] = useState(false);
   const openSettings = useCallback(() => setSettings(true), []);
