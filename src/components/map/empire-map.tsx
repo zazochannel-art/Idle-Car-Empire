@@ -73,7 +73,7 @@ function enterFactory(engine: MapEngine, plotId: string, schedule: (fn: () => vo
   ui.closeAll();
   returnView.current = { x: engine.cam.x, y: engine.cam.y, zoom: engine.cam.zoom };
   engine.focusPlot(plotId, { x: 0, y: 0 }, engine.cam.maxZoom * 0.8, 0.55);
-  schedule(() => useUi.getState().openFloor(plotId), 480);
+  return schedule(() => useUi.getState().openFloor(plotId), 480);
 }
 
 export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffset: { x: number; y: number } }) {
