@@ -62,6 +62,8 @@ interface RoadCar {
   hero?: boolean;
   /** Cached road segment to avoid a binary search every rendered frame. */
   seg: number;
+  /** Last visual alpha scale applied; avoids redundant matrix updates every frame. */
+  visualScale: number;
 }
 
 interface Truck {
@@ -211,7 +213,7 @@ export class Traffic3D {
       road, s, dir,
       speed: (r.fast ? COUNTRY_SPEED : TOWN_SPEED) * (0.85 + Math.random() * 0.3),
       color: new THREE.Color(hex), hex, model, x: 0, y: 0, z: 0, yaw: 0,
-      alpha: life ? 0 : 1, life, scale, visual: new THREE.Group(), seg: 0,
+      alpha: life ? 0 : 1, life, scale, visual: new THREE.Group(), seg: 0, visualScale: -1,
     };
     c.visual.name = `traffic-car-${model}`;
     this.root.add(c.visual);
@@ -482,9 +484,13 @@ export class Traffic3D {
 
     // Real traffic models are individual cached GLB clones.
     for (const car of this.cars) {
-      car.visual.visible = car.alpha > 0.01;
+      const visible = car.alpha > 0.01;
+      if (car.visual.visible !== visible) car.visual.visible = visible;
       const fade = car.life > 0 ? Math.max(0.05, car.alpha) : 1;
-      car.visual.scale.setScalar(fade);
+      if (Math.abs(fade - car.visualScale) > 0.001) {
+        car.visualScale = fade;
+        car.visual.scale.setScalar(fade);
+      }
     }
 
     for (const [id, tr] of this.trucks) {
