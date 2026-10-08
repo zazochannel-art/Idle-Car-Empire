@@ -507,6 +507,33 @@ export class Traffic3D {
     }
   }
 
+  /** Releases GPU resources owned by this traffic layer when the map is unmounted. */
+  dispose() {
+    this.root.clear();
+    const geometries = new Set<THREE.BufferGeometry>();
+    const materials = new Set<THREE.Material>();
+    for (const model of this.models.values()) {
+      model.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (!m.isMesh) return;
+        geometries.add(m.geometry);
+        for (const mat of Array.isArray(m.material) ? m.material : [m.material]) materials.add(mat);
+      });
+    }
+    for (const g of geometries) g.dispose();
+    for (const m of materials) m.dispose();
+    this.models.clear();
+    for (const m of this.carMats.values()) m.dispose();
+    this.carMats.clear();
+    this.carGeo.dispose();
+    for (const value of Object.values(this.kit)) {
+      if (typeof value !== "function") value.dispose();
+    }
+    this.cars = [];
+    this.trucks.clear();
+    this.hero = null;
+  }
+
   /** Everything that can be tapped: [world position, what it is]. */
   *pickables(): Generator<[number, number, number, VehiclePick]> {
     for (const tr of this.trucks.values()) {
