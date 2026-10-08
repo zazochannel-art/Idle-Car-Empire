@@ -68,12 +68,12 @@ function hasInterior(plotId: string) {
 const returnView: { current: { x: number; y: number; zoom: number } | null } = { current: null };
 
 /** Map → factory: the camera dives onto the building, then the interior opens. */
-function enterFactory(engine: MapEngine, plotId: string) {
+function enterFactory(engine: MapEngine, plotId: string, schedule: (fn: () => void, delay: number) => ReturnType<typeof setTimeout>) {
   const ui = useUi.getState();
   ui.closeAll();
   returnView.current = { x: engine.cam.x, y: engine.cam.y, zoom: engine.cam.zoom };
   engine.focusPlot(plotId, { x: 0, y: 0 }, engine.cam.maxZoom * 0.8, 0.55);
-  setTimeout(() => useUi.getState().openFloor(plotId), 480);
+  schedule(() => useUi.getState().openFloor(plotId), 480);
 }
 
 export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffset: { x: number; y: number } }) {
@@ -122,6 +122,7 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
     let alive = true;
     let made: MapEngine | null = null;
     const offs: (() => void)[] = [];
+    let enterTimer: ReturnType<typeof setTimeout> | null = null;
     import("./world/engine")
       .then(({ MapEngine }) => {
         if (!alive) return;
@@ -135,7 +136,13 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
             else if (target.kind === "zone") ui.selectZone(target.id);
             else if (target.kind === "vehicle") ui.setShowcase(target.v);
             else if (target.id === RACING) ui.setView("racing");
-            else if (hasInterior(target.id)) enterFactory(e, target.id);
+            else if (hasInterior(target.id)) {
+              if (enterTimer) clearTimeout(enterTimer);
+              enterTimer = enterFactory(e, target.id, (fn, delay) => {
+                enterTimer = setTimeout(fn, delay);
+                return enterTimer;
+              });
+            }
             else ui.selectPlot(target.id);
           },
           { base: process.env.NEXT_PUBLIC_BASE_PATH ?? "", low: useGame.getState().state.settings.lowGraphics },
@@ -193,6 +200,8 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
       });
     return () => {
       alive = false;
+      if (enterTimer) clearTimeout(enterTimer);
+      enterTimer = null;
       offs.forEach((f) => f());
       made?.destroy();
       engineRef.current = null;
