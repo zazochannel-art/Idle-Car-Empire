@@ -19,7 +19,6 @@ import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { useGame } from "@/store/game-store";
 import { useUi, type View } from "@/store/ui-store";
-import { useShallow } from "zustand/react/shallow";
 import { GarageView } from "../garage/garage-view";
 import { EmpireMap } from "../map/empire-map";
 import { BuildPanel, GaragesView, MechanicsSummary, MenuPanel, PlotPanel, UpgradePanel, ZonePanel, plotTitle } from "../panels/map-panels";
@@ -67,7 +66,8 @@ function useDesktop() {
 }
 
 function useBadges() {
-  const { state, snap } = useGame(useShallow((g) => ({ state: g.state, snap: g.snap })));
+  const state = useGame((g) => g.state);
+  const snap = useGame((g) => g.snap);
   const idle = Object.values(snap.city.garages).reduce((a, g) => a + Math.max(0, g.workstations - g.staffed), 0);
   const upgrades = Object.entries(state.city.buildings).filter(([id, b]) => {
     const c = b.plant ? levelCost(b, snap.gm) : buildingUpgradeCost(state, id);
