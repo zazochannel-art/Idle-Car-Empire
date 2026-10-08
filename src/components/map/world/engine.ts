@@ -468,6 +468,8 @@ export class MapEngine {
     this.stop();
     this.detach();
     this.ro.disconnect();
+    this.trafficLayer?.dispose();
+    this.trafficLayer = null;
     this.renderer.dispose();
   }
 
