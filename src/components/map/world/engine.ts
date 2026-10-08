@@ -470,6 +470,8 @@ export class MapEngine {
     this.ro.disconnect();
     this.trafficLayer?.dispose();
     this.trafficLayer = null;
+    this.race?.dispose();
+    this.race = null;
     this.renderer.dispose();
   }
 
