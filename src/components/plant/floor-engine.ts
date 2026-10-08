@@ -122,9 +122,16 @@ export class FloorEngine {
         this.perfFrames = 0;
         this.perfTime = 0;
         const nowDpr = this.dpr;
-        if (avg > 1 / 42 && nowDpr > 1 && performance.now() - this.lastAdaptiveDpr > 5000) {
+        const elapsed = performance.now() - this.lastAdaptiveDpr;
+        if (avg > 1 / 42 && nowDpr > 1 && elapsed > 5000) {
           this.lastAdaptiveDpr = performance.now();
           this.maxDpr = Math.max(1, nowDpr - 0.25);
+          this.resize();
+        } else if (avg < 1 / 58 && nowDpr < (window.devicePixelRatio || 1) && elapsed > 12000) {
+          // Restore detail only after sustained headroom, so quality can recover
+          // when the factory becomes lighter without oscillating frame-to-frame.
+          this.lastAdaptiveDpr = performance.now();
+          this.maxDpr = Math.min(window.devicePixelRatio || 1, nowDpr + 0.25);
           this.resize();
         }
       }
