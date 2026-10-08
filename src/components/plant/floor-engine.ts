@@ -54,6 +54,9 @@ export class FloorEngine {
   private size: [number, number] = [12, 8];
   private detach: () => void;
   private ro: ResizeObserver;
+  private perfFrames = 0;
+  private perfTime = 0;
+  private lastAdaptiveDpr = 0;
 
   constructor(private canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext("2d", { alpha: false })!;
@@ -103,10 +106,27 @@ export class FloorEngine {
     this.last = performance.now();
     const loop = (now: number) => {
       if (!this.running) return;
+      this.raf = requestAnimationFrame(loop);
+      if (document.hidden) {
+        this.last = now;
+        return;
+      }
       const dt = Math.min(0.1, (now - this.last) / 1000);
       this.last = now;
       this.render(dt);
-      this.raf = requestAnimationFrame(loop);
+      this.perfFrames++;
+      this.perfTime += dt;
+      if (this.perfFrames >= 90) {
+        const avg = this.perfTime / this.perfFrames;
+        this.perfFrames = 0;
+        this.perfTime = 0;
+        const nowDpr = this.dpr;
+        if (avg > 1 / 42 && nowDpr > 1 && performance.now() - this.lastAdaptiveDpr > 5000) {
+          this.lastAdaptiveDpr = performance.now();
+          this.dpr = Math.max(1, nowDpr - 0.25);
+          this.resize();
+        }
+      }
     };
     this.raf = requestAnimationFrame(loop);
   }
