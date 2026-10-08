@@ -616,7 +616,11 @@ export class MapEngine {
       waves.offset.y = (waves.offset.y + dt * 0.0025) % 1;
     }
     this.renderer.render(this.scene, this.camera);
-    this.drawLabels(dt, live);
+    // HTML cards remain frame-accurate; the heavier canvas labels only need ~30 FPS.
+    if (this.t - this.lastLabelsAt >= 1 / 30) {
+      this.lastLabelsAt = this.t;
+      this.drawLabels(dt, live);
+    }
     this.placeCards();
   }
 
