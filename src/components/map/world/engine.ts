@@ -206,6 +206,8 @@ export class MapEngine {
   private running = false;
   private ro: ResizeObserver;
   private ty = 0;
+  private cameraDirty = true;
+  private lastCamera = { x: NaN, z: NaN, zoom: NaN, az: NaN, ty: NaN };
   private detach: () => void;
   private destroyed = false;
 
@@ -424,6 +426,12 @@ export class MapEngine {
     const loop = (now: number) => {
       if (!this.running) return;
       this.raf = requestAnimationFrame(loop);
+      // Browsers already throttle hidden tabs, but skipping the work entirely avoids
+      // simulation, label projection and WebGL submission while the game is backgrounded.
+      if (document.hidden) {
+        this.last = now;
+        return;
+      }
       // battery saver: draw every other frame (~30 FPS)
       if (this.low && (this.skip ^= 1)) return;
       const dt = Math.min(0.1, (now - this.last) / 1000);
@@ -476,6 +484,7 @@ export class MapEngine {
     const fit = Math.max(WORLD_MAP.size[0] / (span * this.camera.aspect), WORLD_MAP.size[1] / span) * 0.92;
     this.cam.minZoom = DIST1 / fit;
     this.cam.clamp();
+    this.cameraDirty = true;
     if (!this.running) this.render(0);
   }
 
@@ -504,7 +513,13 @@ export class MapEngine {
     const c = this.cam;
     const g = this.ground;
     const want = g ? g.at(c.x, c.z) : 0;
-    if (dt >= 0) this.ty += (want - this.ty) * (dt > 0 ? Math.min(1, dt * 4) : 1);
+    const nextTy = dt >= 0 ? this.ty + (want - this.ty) * (dt > 0 ? Math.min(1, dt * 4) : 1) : this.ty;
+    if (Math.abs(nextTy - this.ty) > 1e-5) {
+      this.ty = nextTy;
+      this.cameraDirty = true;
+    }
+    const changed = this.cameraDirty || c.x !== this.lastCamera.x || c.z !== this.lastCamera.z || c.zoom !== this.lastCamera.zoom || c.az !== this.lastCamera.az || this.ty !== this.lastCamera.ty;
+    if (!changed) return;
     const d = c.dist;
     const p = c.polar;
     const cx = c.x + Math.sin(p) * Math.sin(c.az) * d;
@@ -533,6 +548,12 @@ export class MapEngine {
     sh.updateProjectionMatrix();
     this.sun.target.position.set(c.x, this.ty, c.z);
     this.sun.position.set(c.x - 0.45 * (ext * 2 + 60), this.ty + ext * 2 + 60, c.z - 0.3 * (ext * 2 + 60));
+    this.lastCamera.x = c.x;
+    this.lastCamera.z = c.z;
+    this.lastCamera.zoom = c.zoom;
+    this.lastCamera.az = c.az;
+    this.lastCamera.ty = this.ty;
+    this.cameraDirty = false;
   }
 
   private render(dt: number) {
