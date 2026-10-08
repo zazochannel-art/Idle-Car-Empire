@@ -45,6 +45,7 @@ import { goalText, runGoal } from "./goals";
 import { Hud } from "./hud";
 import { OfflineDialog, PrestigeOverlay, SettingsDialog, Toasts } from "./overlays";
 import { FirstCarOverlay } from "./first-car";
+import { Onboarding } from "./onboarding";
 import { UnlockCard } from "./unlock-card";
 import { RecallDialog } from "./recall-dialog";
 import { PoachDialog } from "../views/expansion-cards";
@@ -204,6 +205,7 @@ function Shell() {
         {floor && (HAS_INTERIOR.has(useGame.getState().state.city.buildings[floor]?.type ?? "") ? <FactoryInterior key={floor} plotId={floor} /> : <PlantFloor key={floor} plotId={floor} />)}
       </AnimatePresence>
       <FirstCarOverlay />
+      <Onboarding />
       <UnlockCard />
       <RecallDialog />
       <PoachDialog />
