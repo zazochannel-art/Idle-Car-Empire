@@ -65,13 +65,11 @@ function useDesktop() {
   );
 }
 
-function useBadges() {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+function badgeCounts(state: ReturnType<typeof useGame.getState>["state"], snap: ReturnType<typeof useGame.getState>["snap"]) {
   const idle = Object.values(snap.city.garages).reduce((a, g) => a + Math.max(0, g.workstations - g.staffed), 0);
   const upgrades = Object.entries(state.city.buildings).filter(([id, b]) => {
-    const c = b.plant ? levelCost(b, snap.gm) : buildingUpgradeCost(state, id);
-    return c !== null && c <= state.cash;
+    const cost = b.plant ? levelCost(b, snap.gm) : buildingUpgradeCost(state, id);
+    return cost !== null && cost <= state.cash;
   }).length;
   return {
     research: RESEARCH.filter((r) => canResearch(state, r.id) && state.rp >= r.cost).length,
@@ -80,6 +78,17 @@ function useBadges() {
     prestige: canPrestige(state) ? 1 : 0,
     upgrade: upgrades,
   };
+}
+
+function useBadges() {
+  // The selector still evaluates cheaply on each simulation commit, but the
+  // component rerenders only when one of the five visible badge counts changes.
+  const badgeKey = useGame((g) => {
+    const b = badgeCounts(g.state, g.snap);
+    return `${b.research}|${b.managers}|${b.missions}|${b.prestige}|${b.upgrade}`;
+  });
+  void badgeKey;
+  return badgeCounts(useGame.getState().state, useGame.getState().snap);
 }
 
 export function Game() {
