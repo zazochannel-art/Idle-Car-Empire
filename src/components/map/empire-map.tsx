@@ -89,6 +89,14 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
   // Subscribe only to changes that can affect the map. The simulation still ticks at
   // 100ms, but money/progress changes no longer rerender this entire 3D map shell.
   const mapKey = useGame((g) => sceneKey(g.state));
+  const unlockReadyKey = useGame((g) => {
+    const s = g.state;
+    const zones = ZONES.filter((z) => !s.city.zones.includes(z.id)).map((z) => `z:${z.id}:${!zoneBlocker(s, z.id) && s.cash >= z.cost ? 1 : 0}`);
+    const areas = unlockedAreas(s);
+    const territories = BUYABLE_TERRITORIES.filter((x) => !areas.has(x.id)).map((x) => `t:${x.id}:${territoryLock(s, x.id) === null && s.cash >= x.cost ? 1 : 0}`);
+    const racing = !s.racing.unlocked && s.chain.firstCar ? `r:${racingBlocker(s) === null && s.cash >= racingCost(s) ? 1 : 0}` : "";
+    return [...zones, ...territories, racing].join("|");
+  });
   const earnersKey = useGame((g) => {
     const s = g.snap.city;
     return [
@@ -298,6 +306,8 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
     ...BUYABLE_TERRITORIES.filter((x) => !areas.has(x.id)).map((x) => ({ id: `t:${x.id}` as MapArea, ready: territoryLock(state, x.id) === null && state.cash >= x.cost, name: t(`territory.${x.id}`) })),
     ...(!state.racing.unlocked && state.chain.firstCar ? [{ id: "racing" as MapArea, ready: racingBlocker(state) === null && state.cash >= racingCost(state), name: t("racing.district") }] : []),
   ];
+  // Keep the selector above responsible for lock readiness; this render only occurs when it changes.
+  void unlockReadyKey;
   const openLock = locks.some((l) => l.id === lockOpen) ? lockOpen : null;
 
   return (
