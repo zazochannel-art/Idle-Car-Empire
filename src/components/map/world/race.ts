@@ -43,6 +43,11 @@ export class RaceCars {
     this.mesh.frustumCulled = false;
   }
 
+  /** Releases the instanced race mesh geometry when the map is unmounted. */
+  dispose() {
+    this.mesh.geometry.dispose();
+  }
+
   /** A point on the circuit at a share of the lap, `lat` across the track. */
   private on(frac: number, lat: number) {
     const s = (((frac % 1) + 1) % 1) * this.len;
