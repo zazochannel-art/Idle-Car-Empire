@@ -173,6 +173,7 @@ export class MapEngine {
   private low: boolean;
   private skip = 0;
   private slow = { frames: 0, time: 0 };
+  private lastAdaptiveAt = 0;
 
   private ground: Ground | null = null;
   private terrain: TerrainParts | null = null;
@@ -203,6 +204,7 @@ export class MapEngine {
   private raf = 0;
   private last = 0;
   private t = 0;
+  private lastLabelsAt = -Infinity;
   private running = false;
   private ro: ResizeObserver;
   private ty = 0;
@@ -498,8 +500,16 @@ export class MapEngine {
     const avg = s.time / s.frames;
     s.frames = 0;
     s.time = 0;
-    if (avg > 1 / 45) {
+    const elapsed = performance.now() - this.lastAdaptiveAt;
+    const deviceDpr = window.devicePixelRatio || 1;
+    if (avg > 1 / 45 && this.dpr > 1 && elapsed > 5000) {
+      this.lastAdaptiveAt = performance.now();
       this.maxDpr = Math.max(1, this.dpr - 0.25);
+      this.resize();
+    } else if (avg < 1 / 58 && this.dpr < deviceDpr && elapsed > 12000) {
+      // Recover one step only after sustained headroom; this prevents quality oscillation.
+      this.lastAdaptiveAt = performance.now();
+      this.maxDpr = Math.min(deviceDpr, this.dpr + 0.25);
       this.resize();
     }
   }
