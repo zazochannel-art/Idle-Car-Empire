@@ -44,6 +44,7 @@ export class FloorEngine {
   private ctx: CanvasRenderingContext2D;
   private p: Painter;
   private dpr = 1;
+  private maxDpr = 2;
   private raf = 0;
   private running = false;
   private last = 0;
@@ -69,7 +70,7 @@ export class FloorEngine {
 
   resize() {
     const r = this.canvas.getBoundingClientRect();
-    this.dpr = Math.min(2, window.devicePixelRatio || 1);
+    this.dpr = Math.min(this.maxDpr, window.devicePixelRatio || 1);
     this.cam.w = Math.max(1, r.width);
     this.cam.h = Math.max(1, r.height);
     this.canvas.width = Math.round(this.cam.w * this.dpr);
@@ -123,7 +124,7 @@ export class FloorEngine {
         const nowDpr = this.dpr;
         if (avg > 1 / 42 && nowDpr > 1 && performance.now() - this.lastAdaptiveDpr > 5000) {
           this.lastAdaptiveDpr = performance.now();
-          this.dpr = Math.max(1, nowDpr - 0.25);
+          this.maxDpr = Math.max(1, nowDpr - 0.25);
           this.resize();
         }
       }
