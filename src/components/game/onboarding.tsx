@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowRight, Check, Factory, Flag, Hammer, MapPin, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { cn } from "@/lib/utils";
@@ -84,7 +84,6 @@ export function Onboarding() {
   const lang = useGame((g) => g.state.settings.lang);
   const [dismissed, setDismissed] = useState(true);
   const [step, setStep] = useState(0);
-  const ui = useUi();
 
   useEffect(() => {
     try {
@@ -94,12 +93,7 @@ export function Onboarding() {
     }
   }, []);
 
-  const firstRun = useMemo(
-    () => state.run.playTime < 45 && state.lifetime.playTime < 45 && state.prestigeCount === 0,
-    [state.run.playTime, state.lifetime.playTime, state.prestigeCount],
-  );
-
-  if (!ready || dismissed || !firstRun) return null;
+  if (!ready || dismissed) return null;
 
   const l = languageOf(lang);
   const text = STEPS[step];
@@ -107,6 +101,7 @@ export function Onboarding() {
   const c = copy[l];
 
   const go = () => {
+    const ui = useUi.getState();
     if (step === 0) {
       const starter = Object.keys(state.city.buildings).find((id) => state.city.buildings[id]?.type === "bodyWorks");
       if (starter) ui.selectPlot(starter);
