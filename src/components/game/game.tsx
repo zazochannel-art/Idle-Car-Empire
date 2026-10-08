@@ -113,8 +113,24 @@ function Shell() {
   const floor = useUi((u) => u.floor);
   const showcase = useUi((u) => !!u.showcase);
   const closeAll = useUi((u) => u.closeAll);
-  // Shell does not need the 100ms game-tick subscription. Read state imperatively
-  // only while a plot title is actually being built; the heavy panels subscribe themselves.
+  // Subscribe only to the selected plot's title-relevant structure. This keeps the
+  // shell off the 100ms tick while still updating a title after a build/upgrade.
+  const plotTitleKey = useGame((g) => {
+    if (!plot) return "";
+    const s = g.state;
+    const b = s.city.buildings[plot];
+    const site = s.city.sites[plot];
+    return JSON.stringify({
+      type: b?.type ?? null,
+      level: b?.level ?? null,
+      garage: b?.garage?.no ?? null,
+      spec: b?.garage?.spec ?? null,
+      plant: b?.plant ? { name: b.plant.name, spec: b.plant.spec, level: b.plant.level } : null,
+      site: site?.type ?? null,
+      land: s.city.land.includes(plot),
+      titleLang: s.settings.lang,
+    });
+  });
   const state = plot ? useGame.getState().state : null;
   const [settings, setSettings] = useState(false);
   const openSettings = useCallback(() => setSettings(true), []);
