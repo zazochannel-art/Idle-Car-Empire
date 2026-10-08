@@ -139,8 +139,7 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
             else if (hasInterior(target.id)) {
               if (enterTimer) clearTimeout(enterTimer);
               enterTimer = enterFactory(e, target.id, (fn, delay) => {
-                enterTimer = setTimeout(fn, delay);
-                return enterTimer;
+                return (enterTimer = setTimeout(fn, delay));
               });
             }
             else ui.selectPlot(target.id);
