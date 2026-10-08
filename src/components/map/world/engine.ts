@@ -204,7 +204,7 @@ export class MapEngine {
   private raf = 0;
   private last = 0;
   private t = 0;
-  private lastLabelsAt = -Infinity;
+  private lastLabelsAt = 0;
   private running = false;
   private ro: ResizeObserver;
   private ty = 0;
@@ -617,9 +617,10 @@ export class MapEngine {
     }
     this.renderer.render(this.scene, this.camera);
     // HTML cards remain frame-accurate; the heavier canvas labels only need ~30 FPS.
-    if (this.t - this.lastLabelsAt >= 1 / 30) {
+    const labelDt = this.t - this.lastLabelsAt;
+    if (labelDt >= 1 / 30) {
       this.lastLabelsAt = this.t;
-      this.drawLabels(dt, live);
+      this.drawLabels(labelDt, live);
     }
     this.placeCards();
   }
