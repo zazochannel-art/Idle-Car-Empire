@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, Briefcase, Car, Crown, Factory, Flag, Hammer, ListChecks, Map as MapIcon, TrendingUp, Users } from "lucide-react";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { memo, useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { Progress } from "@/components/ui/progress";
 import { MANAGERS } from "@/game/config/managers";
 import { RESEARCH } from "@/game/config/research";
@@ -113,8 +113,11 @@ function Shell() {
   const floor = useUi((u) => u.floor);
   const showcase = useUi((u) => !!u.showcase);
   const closeAll = useUi((u) => u.closeAll);
-  const state = useGame((g) => g.state);
+  // Shell does not need the 100ms game-tick subscription. Read state imperatively
+  // only while a plot title is actually being built; the heavy panels subscribe themselves.
+  const state = plot ? useGame.getState().state : null;
   const [settings, setSettings] = useState(false);
+  const openSettings = useCallback(() => setSettings(true), []);
   const desktop = useDesktop();
   const { t, lang } = useT();
   const n = useContent(lang);
@@ -136,7 +139,7 @@ function Shell() {
   let body: React.ReactNode = null;
   let key = "none";
   if (plot) {
-    const h = plotTitle(plot, t, n, state);
+    const h = plotTitle(plot, t, n, state!);
     title = h.title;
     icon = h.icon;
     body = <PlotPanel id={plot} />;
@@ -148,7 +151,7 @@ function Shell() {
     key = `zone:${zone}`;
   } else if (view) {
     title = viewTitle(view, t);
-    body = <ViewSwitch view={view} onSettings={() => setSettings(true)} />;
+    body = <ViewSwitch view={view} onSettings={openSettings} />;
     key = `view:${view}`;
   }
 
@@ -209,7 +212,7 @@ function viewTitle(v: View, t: ReturnType<typeof useT>["t"]): string {
   }
 }
 
-function ViewSwitch({ view, onSettings }: { view: View; onSettings: () => void }) {
+const ViewSwitch = memo(function ViewSwitch({ view, onSettings }: { view: View; onSettings: () => void }) {
   switch (view) {
     case "garages":
       return <GaragesView />;
@@ -249,7 +252,7 @@ function ViewSwitch({ view, onSettings }: { view: View; onSettings: () => void }
     case "prestige":
       return <PrestigeView />;
   }
-}
+});
 
 /**
  * The four high-level navigation groups. Individual action buttons open
