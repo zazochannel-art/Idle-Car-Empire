@@ -135,7 +135,7 @@ function Shell() {
       level: b?.level ?? null,
       garage: b?.garage?.no ?? null,
       spec: b?.garage?.spec ?? null,
-      plant: b?.plant ? { name: b.plant.name, spec: b.plant.spec, level: b.plant.level } : null,
+      plant: !!b?.plant,
       site: site?.type ?? null,
       land: s.city.land.includes(plot),
       titleLang: s.settings.lang,
