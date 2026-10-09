@@ -82,7 +82,24 @@ export function PlantFloor({ plotId }: { plotId: string }) {
   const selectedKind = STATION_MACHINES.bodyWorks[selectedMachine] ?? "coils";
   const selectedHasWorker = selectedMachine < workshop.workers;
   const isNextHireSlot = selectedMachine === workshop.workers && selectedMachine < workshop.machines;
-  const machineLabel = selectedKind === "coils" ? (state.settings.lang === "ro" ? "Masă de lucru" : state.settings.lang === "ru" ? "Рабочий стол" : "Work bench") : selectedKind === "press" ? (state.settings.lang === "ro" ? "Presă hidraulică" : state.settings.lang === "ru" ? "Гидравлический пресс" : "Hydraulic press") : selectedKind === "welder" ? (state.settings.lang === "ro" ? "Stație de sudură" : state.settings.lang === "ru" ? "Сварочная станция" : "Welding station") : (state.settings.lang === "ro" ? "Stație de finisare" : state.settings.lang === "ru" ? "Финишная станция" : "Finishing station");
+  const machineLabelFor = (kind: string) => {
+    if (kind === "coils") return lang === "ro" ? "Masă de lucru" : lang === "ru" ? "Рабочий стол" : "Work bench";
+    if (kind === "press") return lang === "ro" ? "Presă hidraulică" : lang === "ru" ? "Гидравлический пресс" : "Hydraulic press";
+    if (kind === "welder") return lang === "ro" ? "Stație de sudură" : lang === "ru" ? "Сварочная станция" : "Welding station";
+    if (kind === "paintBooth") return lang === "ro" ? "Cabină de vopsire" : lang === "ru" ? "Покрасочная камера" : "Paint booth";
+    if (kind === "qcTunnel") return lang === "ro" ? "Controlul calității" : lang === "ru" ? "Контроль качества" : "Quality inspection";
+    return lang === "ro" ? "Stație de finisare" : lang === "ru" ? "Финишная станция" : "Finishing station";
+  };
+  const machineOperationFor = (kind: string) => {
+    if (kind === "coils") return lang === "ro" ? "Pregătește tabla metalică" : lang === "ru" ? "Подготовка листового металла" : "Prepare sheet metal";
+    if (kind === "press") return lang === "ro" ? "Formează panourile caroseriei" : lang === "ru" ? "Формовка панелей кузова" : "Form body panels";
+    if (kind === "welder") return lang === "ro" ? "Sudează panourile caroseriei" : lang === "ru" ? "Сварка панелей кузова" : "Weld body panels";
+    if (kind === "paintBooth") return lang === "ro" ? "Aplică stratul de vopsea" : lang === "ru" ? "Нанесение краски" : "Apply paint finish";
+    if (kind === "qcTunnel") return lang === "ro" ? "Verifică defectele caroseriei" : lang === "ru" ? "Проверка кузова на дефекты" : "Inspect body for defects";
+    return lang === "ro" ? "Finisează piesa" : lang === "ru" ? "Финишная обработка детали" : "Finish the part";
+  };
+  const machineLabel = machineLabelFor(selectedKind);
+  const selectedOperation = machineOperationFor(selectedKind);
   const lang = state.settings.lang;
   const workshopText = lang === "ro"
     ? { title: "Atelier caroserii", machine: "Utilaj", worker: "Muncitor", build: "Construiește utilaj", hire: "Angajează muncitor", selected: "Utilaj selectat", idle: "Loc pregătit pentru următorul utilaj", limit: "Limită atinsă", needMachine: "Construiește mai întâi un utilaj pentru a angaja încă un muncitor.", effect: "Productivitate", hint: "Atinge utilajul din hală pentru a-l selecta.", assigned: "Muncitor repartizat", vacant: "Fără muncitor", hireSelected: "Angajează muncitor", selectNext: "Selectează următorul utilaj liber", operation: "Operațiune" }
@@ -138,7 +155,7 @@ export function PlantFloor({ plotId }: { plotId: string }) {
             <div className="mb-3 grid grid-cols-2 gap-2">
               {Array.from({ length: workshop.machines }, (_, index) => (
                 <button key={index} type="button" onClick={() => setSelectedMachine(index)} className={`rounded-xl border p-2 text-left transition ${selectedMachine === index ? "border-amber-300 bg-amber-300/15" : "border-white/10 bg-white/5"}`}>
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold"><Wrench className="size-3" /> {workshopText.machine} {index + 1}</div>
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold"><Wrench className="size-3 shrink-0" /> <span>{index + 1}. {machineLabelFor(STATION_MACHINES.bodyWorks[index] ?? "coils")}</span></div>
                   <div className="mt-1 text-[10px] text-white/50">{index < workshop.workers ? workshopText.worker + " " + (index + 1) : lang === "ro" ? "Fără muncitor" : lang === "ru" ? "Без рабочего" : "Unstaffed"}</div>
                 </button>
               ))}
@@ -147,7 +164,7 @@ export function PlantFloor({ plotId }: { plotId: string }) {
             <div className="mb-3 rounded-xl bg-white/5 px-3 py-2">
               <div className="text-[10px] uppercase tracking-wider text-white/45">{workshopText.selected}</div>
               <div className="mt-0.5 text-xs font-bold">{machineLabel}</div>
-              <div className="mt-1 text-[10px] text-white/55">{workshopText.operation}: {selectedMachine + 1} · {selectedHasWorker ? workshopText.assigned : workshopText.vacant}</div>
+              <div className="mt-1 text-[10px] text-white/55">{workshopText.operation}: {selectedOperation} · {selectedHasWorker ? workshopText.assigned : workshopText.vacant}</div>
               <div className="mt-1 text-[10px] text-emerald-300">{workshopText.effect}: {Math.round((1 + Math.max(0, Math.min(workshop.machines, workshop.workers) - 1) * 0.15) * 100)}%</div>
             </div>
             <div className="grid grid-cols-2 gap-2">
