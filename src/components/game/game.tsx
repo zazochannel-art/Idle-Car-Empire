@@ -142,6 +142,8 @@ function Shell() {
     });
   });
   void plotTitleKey;
+  // plotTitleKey subscribes to every field consumed by plotTitle; read the matching snapshot after it changes.
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const state = plot ? useGame.getState().state : null;
   const [settings, setSettings] = useState(false);
   const openSettings = useCallback(() => setSettings(true), []);
