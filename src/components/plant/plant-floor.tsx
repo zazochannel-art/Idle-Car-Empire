@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { COMPONENT_BY_ID, PLANT_BY_ID } from "@/game/config/chain";
+import { STATION_MACHINES } from "@/components/three/industrial-models";
 import { formatDuration, formatMoney, formatNumber } from "@/game/format";
 import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
@@ -78,12 +79,16 @@ export function PlantFloor({ plotId }: { plotId: string }) {
   const workshop = b.plant.workshop ?? { machines: 1, workers: 1 };
   const machineCost = st.type === "bodyWorks" ? bodyMachineCost(state, plotId) : null;
   const workerCost = st.type === "bodyWorks" ? bodyWorkerCost(state, plotId) : null;
+  const selectedKind = STATION_MACHINES.bodyWorks[selectedMachine] ?? "coils";
+  const selectedHasWorker = selectedMachine < workshop.workers;
+  const isNextHireSlot = selectedMachine === workshop.workers && selectedMachine < workshop.machines;
+  const machineLabel = selectedKind === "coils" ? (state.settings.lang === "ro" ? "Masă de lucru" : state.settings.lang === "ru" ? "Рабочий стол" : "Work bench") : selectedKind === "press" ? (state.settings.lang === "ro" ? "Presă hidraulică" : state.settings.lang === "ru" ? "Гидравлический пресс" : "Hydraulic press") : selectedKind === "welder" ? (state.settings.lang === "ro" ? "Stație de sudură" : state.settings.lang === "ru" ? "Сварочная stație" : "Welding station") : (state.settings.lang === "ro" ? "Stație de finisare" : state.settings.lang === "ru" ? "Финишная станция" : "Finishing station");
   const lang = state.settings.lang;
   const workshopText = lang === "ro"
-    ? { title: "Atelier caroserii", machine: "Utilaj", worker: "Muncitor", build: "Construiește utilaj", hire: "Angajează muncitor", selected: "Utilaj selectat", idle: "Loc pregătit pentru următorul utilaj", limit: "Limită atinsă", needMachine: "Construiește mai întâi un utilaj pentru a angaja încă un muncitor.", effect: "Productivitate", hint: "Atinge utilajul din hală pentru a-l selecta." }
+    ? { title: "Atelier caroserii", machine: "Utilaj", worker: "Muncitor", build: "Construiește utilaj", hire: "Angajează muncitor", selected: "Utilaj selectat", idle: "Loc pregătit pentru următorul utilaj", limit: "Limită atinsă", needMachine: "Construiește mai întâi un utilaj pentru a angaja încă un muncitor.", effect: "Productivitate", hint: "Atinge utilajul din hală pentru a-l selecta.", assigned: "Muncitor repartizat", vacant: "Fără muncitor", hireSelected: "Angajează muncitor", selectNext: "Selectează următorul utilaj liber", operation: "Operațiune" }
     : lang === "ru"
-      ? { title: "Цех кузовов", machine: "Станок", worker: "Рабочий", build: "Построить станок", hire: "Нанять рабочего", selected: "Выбранный станок", idle: "Место для следующего станка", limit: "Достигнут лимит", needMachine: "Сначала постройте станок, чтобы нанять рабочего.", effect: "Производительность", hint: "Нажмите на станок в цехе, чтобы выбрать его." }
-      : { title: "Body Works workshop", machine: "Machine", worker: "Worker", build: "Build machine", hire: "Hire worker", selected: "Selected machine", idle: "Space reserved for the next machine", limit: "Limit reached", needMachine: "Build another machine before hiring another worker.", effect: "Productivity", hint: "Tap a machine in the hall to select it." };
+      ? { title: "Цех кузовов", machine: "Станок", worker: "Рабочий", build: "Построить станок", hire: "Нанять рабочего", selected: "Выбранный станок", idle: "Место для следующего станка", limit: "Достигнут лимит", needMachine: "Сначала постройте станок, чтобы нанять рабочего.", effect: "Производительность", hint: "Нажмите на станок в цехе, чтобы выбрать его.", assigned: "Рабочий назначен", vacant: "Нет рабочего", hireSelected: "Нанять рабочего", selectNext: "Выберите следующий свободный станок", operation: "Операция" }
+      : { title: "Body Works workshop", machine: "Machine", worker: "Worker", build: "Build machine", hire: "Hire worker", selected: "Selected machine", idle: "Space reserved for the next machine", limit: "Limit reached", needMachine: "Build another machine before hiring another worker.", effect: "Productivity", hint: "Tap a machine in the hall to select it.", assigned: "Worker assigned", vacant: "Unstaffed", hireSelected: "Hire worker", selectNext: "Select the next unstaffed machine", operation: "Operation" };
   return (
     <motion.div className="fixed inset-0 z-40 flex flex-col bg-ink" initial={{ opacity: 0, scale: 1.04 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.04 }} transition={{ duration: 0.25 }}>
       <header className="flex items-center gap-2 border-b border-white/10 bg-ink/90 p-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] backdrop-blur-xl">
@@ -141,7 +146,8 @@ export function PlantFloor({ plotId }: { plotId: string }) {
             </div>
             <div className="mb-3 rounded-xl bg-white/5 px-3 py-2">
               <div className="text-[10px] uppercase tracking-wider text-white/45">{workshopText.selected}</div>
-              <div className="mt-0.5 text-xs font-bold">{workshopText.machine} {Math.min(selectedMachine + 1, workshop.machines)}</div>
+              <div className="mt-0.5 text-xs font-bold">{machineLabel}</div>
+              <div className="mt-1 text-[10px] text-white/55">{workshopText.operation}: {selectedMachine + 1} · {selectedHasWorker ? workshopText.assigned : workshopText.vacant}</div>
               <div className="mt-1 text-[10px] text-emerald-300">{workshopText.effect}: {Math.round((1 + Math.max(0, Math.min(workshop.machines, workshop.workers) - 1) * 0.15) * 100)}%</div>
             </div>
             <div className="grid grid-cols-2 gap-2">
