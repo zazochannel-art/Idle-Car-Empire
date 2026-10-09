@@ -148,8 +148,8 @@ export function PlantFloor({ plotId }: { plotId: string }) {
               <Button size="sm" className="h-auto min-h-10 whitespace-normal px-2 py-2 text-[11px]" disabled={machineCost === null || state.cash < machineCost} onClick={() => buyMachine(plotId)}>
                 <Plus className="size-3 shrink-0" /> <span>{workshopText.build}{machineCost === null ? ` · ${workshopText.limit}` : ` · ${formatMoney(machineCost)}`}</span>
               </Button>
-              <Button size="sm" variant="secondary" className="h-auto min-h-10 whitespace-normal px-2 py-2 text-[11px]" disabled={workerCost === null || state.cash < (workerCost ?? Infinity)} onClick={() => hireWorker(plotId)}>
-                <HardHat className="size-3 shrink-0" /> <span>{workshopText.hire}{workerCost === null ? (workshop.workers >= workshop.machines ? ` · ${workshopText.needMachine}` : ` · ${workshopText.limit}`) : ` · ${formatMoney(workerCost)}`}</span>
+              <Button size="sm" variant="secondary" className="h-auto min-h-10 whitespace-normal px-2 py-2 text-[11px]" disabled={!isNextHireSlot || workerCost === null || state.cash < (workerCost ?? Infinity)} onClick={() => hireWorker(plotId)}>
+                <HardHat className="size-3 shrink-0" /> <span>{isNextHireSlot ? workshopText.hireSelected : selectedHasWorker ? workshopText.assigned : workshopText.selectNext}{workerCost !== null && isNextHireSlot ? " · " + formatMoney(workerCost) : ""}</span>
               </Button>
             </div>
           </section>
