@@ -69,6 +69,8 @@ export function PlantFloor({ plotId }: { plotId: string }) {
       rawMaterial: cfg.raw,
       machineCount: st.type === "bodyWorks" ? (p.workshop?.machines ?? 1) : undefined,
       workers: st.type === "bodyWorks" ? (p.workshop?.workers ?? 1) : undefined,
+      staffedLabel: state.settings.lang === "ro" ? "OCUPAT" : state.settings.lang === "ru" ? "ЗАНЯТ" : "STAFFED",
+      vacantLabel: state.settings.lang === "ro" ? "LIBER" : state.settings.lang === "ru" ? "СВОБОДНО" : "HIRE",
       cinematic,
     });
   }, [p, st, b, t, cinematic]);
