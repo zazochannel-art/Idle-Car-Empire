@@ -264,6 +264,12 @@ export class FloorEngine {
           p.box(x - 0.45, y0 - 1.25, 0.9, 0.8, 0, 16, "#475569", "#64748b");
         }
         if (active) p.light(sx(x, y0 - 0.45), sy(x, y0 - 0.45, 10), 18, "#7dd3fc", 0.6);
+        // Show staffing at the station itself so hiring has a visible, local effect.
+        const staffed = i < Math.min(s.workers ?? 1, s.machineCount ?? 1);
+        p.tag(staffed ? "WORKER" : "HIRE", x, y0 - 1.55, 34, {
+          size: 7,
+          bg: staffed ? "rgba(22,163,74,0.92)" : "rgba(180,83,9,0.9)",
+        });
         continue;
       }
       if (L < 4 && i % 2 === 1) {
