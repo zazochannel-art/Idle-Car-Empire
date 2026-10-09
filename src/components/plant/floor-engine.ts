@@ -263,12 +263,28 @@ export class FloorEngine {
         continue;
       }
       if (s.type === "bodyWorks") {
-        if (!kind || !this.machine(kind, x, y0 - 0.85, active ? Math.floor(this.t * 5) % 4 : 0, s.accent)) {
+        // Each installed machine runs its own animation cycle instead of moving
+        // only when the batch reaches that station. Staffing increases its cycle rate.
+        const staffed = i < Math.min(s.workers ?? 1, s.machineCount ?? 1);
+        const machineRate = staffed ? 5 : 2;
+        const pose = s.running ? Math.floor(this.t * machineRate + i * 1.7) % 4 : 0;
+        if (!kind || !this.machine(kind, x, y0 - 0.85, pose, s.accent)) {
           p.box(x - 0.45, y0 - 1.25, 0.9, 0.8, 0, 16, "#475569", "#64748b");
         }
+
+        // A compact live cycle meter makes each station's independent activity
+        // readable. It is a visual machine cycle, not the plant's economic timer.
+        const cycleProgress = s.running ? (this.t * (staffed ? 0.18 : 0.07) + i * 0.23) % 1 : 0;
+        p.box(x - 0.32, y0 - 0.2, 0.64, 0.1, 8, 1, "#111827", "#475569");
+        if (cycleProgress > 0.01) {
+          p.box(x - 0.31, y0 - 0.19, 0.62 * cycleProgress, 0.08, 9, 1,
+            staffed ? "#22c55e" : "#f59e0b");
+        }
         if (active) p.light(sx(x, y0 - 0.45), sy(x, y0 - 0.45, 10), 18, "#7dd3fc", 0.6);
+        if (s.running && staffed && Math.sin(this.t * 9 + i) > 0.65) {
+          p.light(sx(x, y0 - 0.55), sy(x, y0 - 0.55, 12), 10, "#4ade80", 0.35);
+        }
         // Show staffing at the station itself so hiring has a visible, local effect.
-        const staffed = i < Math.min(s.workers ?? 1, s.machineCount ?? 1);
         p.tag(staffed ? (s.staffedLabel ?? "STAFFED") : (s.vacantLabel ?? "HIRE"), x, y0 - 1.55, 34, {
           size: 7,
           bg: staffed ? "rgba(22,163,74,0.92)" : "rgba(180,83,9,0.9)",
