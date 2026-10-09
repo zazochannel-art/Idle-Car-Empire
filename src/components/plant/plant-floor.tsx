@@ -82,6 +82,7 @@ export function PlantFloor({ plotId }: { plotId: string }) {
   const selectedKind = STATION_MACHINES.bodyWorks[selectedMachine] ?? "coils";
   const selectedHasWorker = selectedMachine < workshop.workers;
   const isNextHireSlot = selectedMachine === workshop.workers && selectedMachine < workshop.machines;
+  const lang = state.settings.lang;
   const machineLabelFor = (kind: string) => {
     if (kind === "coils") return lang === "ro" ? "Masă de lucru" : lang === "ru" ? "Рабочий стол" : "Work bench";
     if (kind === "press") return lang === "ro" ? "Presă hidraulică" : lang === "ru" ? "Гидравлический пресс" : "Hydraulic press";
@@ -100,7 +101,6 @@ export function PlantFloor({ plotId }: { plotId: string }) {
   };
   const machineLabel = machineLabelFor(selectedKind);
   const selectedOperation = machineOperationFor(selectedKind);
-  const lang = state.settings.lang;
   const workshopText = lang === "ro"
     ? { title: "Atelier caroserii", machine: "Utilaj", worker: "Muncitor", build: "Construiește utilaj", hire: "Angajează muncitor", selected: "Utilaj selectat", idle: "Loc pregătit pentru următorul utilaj", limit: "Limită atinsă", needMachine: "Construiește mai întâi un utilaj pentru a angaja încă un muncitor.", effect: "Productivitate", hint: "Atinge utilajul din hală pentru a-l selecta.", assigned: "Muncitor repartizat", vacant: "Fără muncitor", hireSelected: "Angajează muncitor", selectNext: "Selectează următorul utilaj liber", operation: "Operațiune" }
     : lang === "ru"
