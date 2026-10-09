@@ -105,6 +105,7 @@ import { managerMult, type GlobalMods } from "./modifiers";
 /** A new plant: no upgrades, an empty warehouse (materials are bought at the market). */
 export function newPlant(): PlantData {
   return {
+    workshop: { machines: 1, workers: 1 },
     speed: 0,
     automation: 0,
     fleet: 1,
@@ -172,6 +173,45 @@ export function plantLock(s: GameState, type: PlantType): PlantLock {
     return { kind: "made", item: cfg.unlockMade.item, n: cfg.unlockMade.n, have: Math.floor(s.lifetime.parts[cfg.unlockMade.item]) };
   if (cfg.research && !s.research.includes(cfg.research)) return { kind: "research", research: cfg.research };
   return null;
+}
+
+/** The first interactive production-floor slice is Body Works: one basic machine and one worker. */
+export function bodyMachineCost(s: GameState, plotId: string): number | null {
+  const b = s.city.buildings[plotId];
+  if (b?.type !== "bodyWorks" || !b.plant) return null;
+  const machines = b.plant.workshop?.machines ?? 1;
+  if (machines >= 5) return null;
+  return Math.round(350 * Math.pow(1.75, machines - 1));
+}
+
+export function bodyWorkerCost(s: GameState, plotId: string): number | null {
+  const b = s.city.buildings[plotId];
+  if (b?.type !== "bodyWorks" || !b.plant) return null;
+  const workshop = b.plant.workshop ?? { machines: 1, workers: 1 };
+  if (workshop.workers >= workshop.machines || workshop.workers >= 5) return null;
+  return Math.round(180 * Math.pow(1.65, workshop.workers - 1));
+}
+
+export function buyBodyMachine(s: GameState, plotId: string): boolean {
+  const b = s.city.buildings[plotId];
+  const cost = bodyMachineCost(s, plotId);
+  if (!b?.plant || cost === null || s.cash < cost) return false;
+  const workshop = b.plant.workshop ?? { machines: 1, workers: 1 };
+  s.cash -= cost;
+  book(s, "maintenance", cost);
+  b.plant.workshop = { ...workshop, machines: workshop.machines + 1 };
+  return true;
+}
+
+export function hireBodyWorker(s: GameState, plotId: string): boolean {
+  const b = s.city.buildings[plotId];
+  const cost = bodyWorkerCost(s, plotId);
+  if (!b?.plant || cost === null || s.cash < cost) return false;
+  const workshop = b.plant.workshop ?? { machines: 1, workers: 1 };
+  s.cash -= cost;
+  book(s, "labor", cost);
+  b.plant.workshop = { ...workshop, workers: workshop.workers + 1 };
+  return true;
 }
 
 export function plantBuildCost(s: GameState, type: PlantType): number {
@@ -456,7 +496,11 @@ export function plantStats(s: GameState, plotId: string, gm: GlobalMods, cars: C
   const speed = Math.pow(SPEED.mult, p.speed) * AUTOMATION[p.automation].speed * gm.speed * mm.speed * big * qm.speed;
   const car = cfg.item ? null : activeCar(s, p, cars);
   const baseTime = cfg.item ? componentTime(cfg.item, p.grade) : car ? assemblyTime(car) * modelStats(s, car).timeMult : assemblyTime(CAR_BY_ID.city);
-  const cycle = baseTime / speed;
+  const workshop = p.workshop ?? { machines: 1, workers: 1 };
+  // Body Works throughput is earned by actually staffing the machines the player builds.
+  const staffedMachines = b.type === "bodyWorks" ? Math.min(workshop.machines, workshop.workers) : 1;
+  const workshopSpeed = b.type === "bodyWorks" ? 1 + Math.max(0, staffedMachines - 1) * 0.15 : 1;
+  const cycle = baseTime / (speed * workshopSpeed);
   const lines = lv.lines;
   const itemValue = cfg.item ? componentValue(cfg.item, p.grade, gm, mm.value * qm.value) : car ? carValue(s, car, gm, mm.value * qm.value) : 0;
   // engine + the best body you make, worth a little more together

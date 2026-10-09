@@ -286,6 +286,8 @@ export interface Ledger {
 }
 
 export interface PlantData {
+  /** Small, individually built machines and workers on the shop floor. Optional for older saves. */
+  workshop?: { machines: number; workers: number };
   /** Speed upgrade level. */
   speed: number;
   /** Automation tier: 0 Manual … 4 AI Factory. */

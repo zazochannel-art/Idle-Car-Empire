@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowLeft, SlidersHorizontal } from "lucide-react";
+import { ArrowLeft, HardHat, Plus, SlidersHorizontal, Wrench } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { formatDuration, formatMoney, formatNumber } from "@/game/format";
 import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
 import { debtVars, stockTotal } from "@/game/engine/materials";
+import { bodyMachineCost, bodyWorkerCost } from "@/game/engine/chain";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { CAR_MODEL_FOR } from "../map/vehicles";
@@ -26,10 +27,13 @@ export function PlantFloor({ plotId }: { plotId: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<FloorEngine | null>(null);
   const [cinematic, setCinematic] = useState(false);
+  const [selectedMachine, setSelectedMachine] = useState(0);
+  const buyMachine = useGame((g) => g.buyBodyMachine);
+  const hireWorker = useGame((g) => g.hireBodyWorker);
   const b = state.city.buildings[plotId];
 
   useEffect(() => {
-    const engine = new FloorEngine(canvasRef.current!);
+    const engine = new FloorEngine(canvasRef.current!, (index) => setSelectedMachine(index));
     engineRef.current = engine;
     engine.start();
     return () => engine.destroy();
@@ -62,6 +66,8 @@ export function PlantFloor({ plotId }: { plotId: string }) {
       paint: st.car?.color,
       accent: cfg.roof,
       rawMaterial: cfg.raw,
+      machineCount: st.type === "bodyWorks" ? (p.workshop?.machines ?? 1) : undefined,
+      workers: st.type === "bodyWorks" ? (p.workshop?.workers ?? 1) : undefined,
       cinematic,
     });
   }, [p, st, b, t, cinematic]);
@@ -69,6 +75,15 @@ export function PlantFloor({ plotId }: { plotId: string }) {
   if (!b?.plant || !st) return null;
   const cfg = PLANT_BY_ID[st.type];
   const item = cfg.item ?? "car";
+  const workshop = b.plant.workshop ?? { machines: 1, workers: 1 };
+  const machineCost = st.type === "bodyWorks" ? bodyMachineCost(state, plotId) : null;
+  const workerCost = st.type === "bodyWorks" ? bodyWorkerCost(state, plotId) : null;
+  const lang = state.settings.lang;
+  const workshopText = lang === "ro"
+    ? { title: "Atelier caroserii", machine: "Utilaj", worker: "Muncitor", build: "Construiește utilaj", hire: "Angajează muncitor", selected: "Utilaj selectat", idle: "Loc pregătit pentru următorul utilaj", limit: "Limită atinsă", needMachine: "Construiește mai întâi un utilaj pentru a angaja încă un muncitor.", effect: "Productivitate", hint: "Atinge utilajul din hală pentru a-l selecta." }
+    : lang === "ru"
+      ? { title: "Цех кузовов", machine: "Станок", worker: "Рабочий", build: "Построить станок", hire: "Нанять рабочего", selected: "Выбранный станок", idle: "Место для следующего станка", limit: "Достигнут лимит", needMachine: "Сначала постройте станок, чтобы нанять рабочего.", effect: "Производительность", hint: "Нажмите на станок в цехе, чтобы выбрать его." }
+      : { title: "Body Works workshop", machine: "Machine", worker: "Worker", build: "Build machine", hire: "Hire worker", selected: "Selected machine", idle: "Space reserved for the next machine", limit: "Limit reached", needMachine: "Build another machine before hiring another worker.", effect: "Productivity", hint: "Tap a machine in the hall to select it." };
   return (
     <motion.div className="fixed inset-0 z-40 flex flex-col bg-ink" initial={{ opacity: 0, scale: 1.04 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.04 }} transition={{ duration: 0.25 }}>
       <header className="flex items-center gap-2 border-b border-white/10 bg-ink/90 p-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] backdrop-blur-xl">
@@ -103,6 +118,42 @@ export function PlantFloor({ plotId }: { plotId: string }) {
             📦 {formatNumber(b.plant.out)} / {formatNumber(st.outCap)}
           </div>
         </div>
+        {st.type === "bodyWorks" && (
+          <section className="absolute bottom-3 right-3 z-10 w-[min(88vw,320px)] rounded-2xl border border-white/15 bg-slate-950/90 p-3 text-white shadow-2xl backdrop-blur-xl sm:bottom-4 sm:right-4">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="rounded-lg bg-amber-400/15 p-2 text-amber-300"><Wrench className="size-4" /></div>
+                <div className="min-w-0">
+                  <div className="truncate text-xs font-black">{workshopText.title}</div>
+                  <div className="text-[10px] text-white/55">{workshopText.hint}</div>
+                </div>
+              </div>
+              <Badge variant="gold">{workshop.machines}/5</Badge>
+            </div>
+            <div className="mb-3 grid grid-cols-2 gap-2">
+              {Array.from({ length: workshop.machines }, (_, index) => (
+                <button key={index} type="button" onClick={() => setSelectedMachine(index)} className={`rounded-xl border p-2 text-left transition ${selectedMachine === index ? "border-amber-300 bg-amber-300/15" : "border-white/10 bg-white/5"}`}>
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold"><Wrench className="size-3" /> {workshopText.machine} {index + 1}</div>
+                  <div className="mt-1 text-[10px] text-white/50">{index < workshop.workers ? workshopText.worker + " " + (index + 1) : lang === "ro" ? "Fără muncitor" : lang === "ru" ? "Без рабочего" : "Unstaffed"}</div>
+                </button>
+              ))}
+              {workshop.machines < 5 && <div className="flex items-center justify-center rounded-xl border border-dashed border-white/15 p-2 text-[10px] text-white/40">{workshopText.idle}</div>}
+            </div>
+            <div className="mb-3 rounded-xl bg-white/5 px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wider text-white/45">{workshopText.selected}</div>
+              <div className="mt-0.5 text-xs font-bold">{workshopText.machine} {Math.min(selectedMachine + 1, workshop.machines)}</div>
+              <div className="mt-1 text-[10px] text-emerald-300">{workshopText.effect}: {Math.round((1 + Math.max(0, Math.min(workshop.machines, workshop.workers) - 1) * 0.15) * 100)}%</div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Button size="sm" className="h-auto min-h-10 whitespace-normal px-2 py-2 text-[11px]" disabled={machineCost === null || state.cash < machineCost} onClick={() => buyMachine(plotId)}>
+                <Plus className="size-3 shrink-0" /> <span>{workshopText.build}{machineCost === null ? ` · ${workshopText.limit}` : ` · ${formatMoney(machineCost)}`}</span>
+              </Button>
+              <Button size="sm" variant="secondary" className="h-auto min-h-10 whitespace-normal px-2 py-2 text-[11px]" disabled={workerCost === null || state.cash < (workerCost ?? Infinity)} onClick={() => hireWorker(plotId)}>
+                <HardHat className="size-3 shrink-0" /> <span>{workshopText.hire}{workerCost === null ? (workshop.workers >= workshop.machines ? ` · ${workshopText.needMachine}` : ` · ${workshopText.limit}`) : ` · ${formatMoney(workerCost)}`}</span>
+              </Button>
+            </div>
+          </section>
+        )}
         {b.plant.status !== "ok" && (
           <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center">
             <div className="rounded-xl bg-amber-500/90 px-3 py-1.5 text-xs font-black text-black shadow-lg">

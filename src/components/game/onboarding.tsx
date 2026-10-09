@@ -86,11 +86,14 @@ export function Onboarding() {
   const [step, setStep] = useState(0);
 
   useEffect(() => {
-    try {
-      setDismissed(localStorage.getItem(STORAGE_KEY) === "1");
-    } catch {
-      setDismissed(false);
-    }
+    const timer = window.setTimeout(() => {
+      try {
+        setDismissed(localStorage.getItem(STORAGE_KEY) === "1");
+      } catch {
+        setDismissed(false);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   if (!ready || dismissed) return null;

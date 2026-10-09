@@ -34,6 +34,9 @@ export interface FloorScene {
   paint?: string;
   accent: string;
   rawMaterial?: string;
+  /** Interactive Body Works workshop inventory. */
+  machineCount?: number;
+  workers?: number;
   cinematic?: boolean;
 }
 
@@ -58,13 +61,15 @@ export class FloorEngine {
   private perfFrames = 0;
   private perfTime = 0;
   private lastAdaptiveDpr = 0;
+  private onMachineTap?: (index: number) => void;
 
-  constructor(private canvas: HTMLCanvasElement) {
+  constructor(private canvas: HTMLCanvasElement, onMachineTap?: (index: number) => void) {
+    this.onMachineTap = onMachineTap;
     this.ctx = canvas.getContext("2d", { alpha: false })!;
     this.p = new Painter(this.ctx);
     this.ro = new ResizeObserver(() => this.resize());
     this.ro.observe(canvas);
-    this.detach = attachControls(canvas, this.cam, { onTap: () => {} });
+    this.detach = attachControls(canvas, this.cam, { onTap: (x, y) => this.selectMachineAt(x, y) });
     this.resize();
   }
 
@@ -99,6 +104,24 @@ export class FloorEngine {
     if (!this.scene) this.belt = s.progress;
     this.scene = s;
     if (grew) this.fit();
+  }
+
+  private selectMachineAt(px: number, py: number) {
+    const s = this.scene;
+    if (!s || s.type !== "bodyWorks" || !s.machineCount || !this.onMachineTap) return;
+    const n = s.steps.length;
+    const [gw, gd] = this.size;
+    const y0 = gd / 2 - 0.5;
+    const span = gw - 4;
+    const stationX = (i: number) => 2 + (i + 0.5) * (span / n);
+    for (let i = 0; i < Math.min(s.machineCount, n); i++) {
+      const x = stationX(i);
+      const [sx0, sy0] = this.cam.toScreen(sx(x, y0 - 0.85), sy(x, y0 - 0.85) - 29);
+      if (Math.abs(px - sx0) <= 42 * this.cam.zoom && Math.abs(py - sy0) <= 52 * this.cam.zoom) {
+        this.onMachineTap(i);
+        return;
+      }
+    }
   }
 
   start() {
@@ -231,6 +254,18 @@ export class FloorEngine {
       const x = stationX(i);
       const active = s.running && Math.floor(this.belt * n) === i;
       const kind = kinds[i % Math.max(1, kinds.length)];
+      if (s.type === "bodyWorks" && i >= (s.machineCount ?? 1)) {
+        p.box(x - 0.42, y0 - 1.0, 0.84, 0.55, 0, 6, "#374151", "#64748b");
+        p.tag("BUILD", x, y0 - 0.9, 34, { size: 8, bg: "rgba(15,23,42,0.9)" });
+        continue;
+      }
+      if (s.type === "bodyWorks") {
+        if (!kind || !this.machine(kind, x, y0 - 0.85, active ? Math.floor(this.t * 5) % 4 : 0, s.accent)) {
+          p.box(x - 0.45, y0 - 1.25, 0.9, 0.8, 0, 16, "#475569", "#64748b");
+        }
+        if (active) p.light(sx(x, y0 - 0.45), sy(x, y0 - 0.45, 10), 18, "#7dd3fc", 0.6);
+        continue;
+      }
       if (L < 4 && i % 2 === 1) {
         // a simple workbench where a machine will stand later
         p.box(x - 0.35, y0 - 1.0, 0.7, 0.5, 0, 6, "#7c5a3a", "#5b4129");
@@ -247,7 +282,7 @@ export class FloorEngine {
     // robots: one per automation tier (every other station), on every other station from Level 6
     const robots = L >= 6 ? n : s.automation * 2;
     // workers: 1 at Level 1, 2 at Level 2, then one per station without a robot
-    const crew = L === 1 ? 1 : L === 2 ? 2 : n;
+    const crew = s.type === "bodyWorks" ? Math.min(s.workers ?? 1, s.machineCount ?? 1) : L === 1 ? 1 : L === 2 ? 2 : n;
     belts.forEach((by, line) => {
       if (L >= 3) {
         // conveyor belt with moving slats
