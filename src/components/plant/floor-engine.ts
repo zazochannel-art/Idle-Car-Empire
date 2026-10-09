@@ -480,12 +480,39 @@ export class FloorEngine {
     }
 
     switch (s.type) {
-      case "bodyWorks":
-        if (stage === 0) p.box(x - 0.35, y - 0.3, 0.7, 0.6, z, 1.5, "#9ca3af");
-        else if (stage < n - 1) p.box(x - 0.4, y - 0.3, 0.8, 0.6, z, 2 + stage * 2, "#b6bec9", "#d1d5db");
-        else drawModel(p, x, y, 0, "sedan", "#9aa4b2", 0.8, { lift: z, noShadow: true, stage: 1 });
-        if (stage === 2 && Math.sin(this.t * 20) > 0.3) p.light(sx(x, y), sy(x, y, 10), 14, "#fde68a", 0.9);
+      case "bodyWorks": {
+        // The body advances through five visibly different manufacturing stages.
+        if (stage === 0) {
+          // Incoming flat steel sheet on a pallet.
+          p.box(x - 0.42, y - 0.28, 0.84, 0.56, z, 1.2, "#94a3b8", "#e2e8f0");
+          p.box(x - 0.32, y - 0.2, 0.64, 0.4, z + 1.3, 0.35, "#cbd5e1", "#f1f5f9");
+        } else if (stage === 1) {
+          // Pressed floor pan and two stamped side panels.
+          p.box(x - 0.42, y - 0.28, 0.84, 0.56, z, 1.8, "#9ca3af", "#d1d5db");
+          p.box(x - 0.35, y - 0.24, 0.14, 0.48, z + 2, 2.2, "#cbd5e1", "#f8fafc");
+          p.box(x + 0.21, y - 0.24, 0.14, 0.48, z + 2, 2.2, "#cbd5e1", "#f8fafc");
+          p.light(sx(x, y), sy(x, y, 12 + Math.sin(this.t * 5) * 2), 10, "#fbbf24", 0.35);
+        } else if (stage === 2) {
+          // The shell takes shape while robotic welders join the panels.
+          p.box(x - 0.4, y - 0.26, 0.8, 0.52, z, 3.2, "#9ca3af", "#d1d5db");
+          p.box(x - 0.27, y - 0.18, 0.54, 0.36, z + 3.3, 1.2, "#64748b", "#cbd5e1", false);
+          const spark = Math.sin(this.t * 20 + x) > 0.05;
+          if (spark) {
+            p.light(sx(x - 0.26, y), sy(x - 0.26, y, 12), 15, "#fde68a", 0.9);
+            p.light(sx(x + 0.25, y + 0.08), sy(x + 0.25, y + 0.08, 11), 10, "#fb923c", 0.8);
+          }
+        } else if (stage === 3) {
+          // Quality-control scan sweeps over the completed bare shell.
+          drawModel(p, x, y, 0, "sedan", "#9aa4b2", 0.8, { lift: z, noShadow: true, stage: 1 });
+          const scan = (Math.sin(this.t * 4) + 1) * 0.5;
+          p.light(sx(x - 0.38 + scan * 0.76, y), sy(x - 0.38 + scan * 0.76, y, 17), 12, "#22d3ee", 0.85);
+        } else {
+          // Finished unpainted body shell, ready for storage and transport.
+          drawModel(p, x, y, 0, "sedan", "#a8b3c2", 0.82, { lift: z, noShadow: true, stage: 1 });
+          p.light(sx(x, y), sy(x, y, 13), 9, "#4ade80", 0.35);
+        }
         break;
+      }
       case "engineFactory":
         p.box(x - 0.3, y - 0.25, 0.6, 0.5, z, 4 + k * 5, stage === n - 1 ? "#b91c1c" : "#78716c", "#a8a29e");
         if (stage >= 2) for (let c = 0; c < 3; c++) p.box(x - 0.2 + c * 0.17, y - 0.1, 0.1, 0.2, z + 9, 2, "#d6d3d1");
