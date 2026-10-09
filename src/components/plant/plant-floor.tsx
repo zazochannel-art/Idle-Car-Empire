@@ -86,19 +86,21 @@ export function PlantFloor({ plotId }: { plotId: string }) {
   const isNextHireSlot = selectedMachine === workshop.workers && selectedMachine < workshop.machines;
   const lang = state.settings.lang;
   const machineLabelFor = (kind: string) => {
-    if (kind === "coils") return lang === "ro" ? "Masă de lucru" : lang === "ru" ? "Рабочий стол" : "Work bench";
+    if (kind === "coils") return lang === "ro" ? "Alimentator de tablă" : lang === "ru" ? "Подача листового металла" : "Sheet metal feeder";
     if (kind === "press") return lang === "ro" ? "Presă hidraulică" : lang === "ru" ? "Гидравлический пресс" : "Hydraulic press";
     if (kind === "welder") return lang === "ro" ? "Stație de sudură" : lang === "ru" ? "Сварочная станция" : "Welding station";
     if (kind === "paintBooth") return lang === "ro" ? "Cabină de vopsire" : lang === "ru" ? "Покрасочная камера" : "Paint booth";
     if (kind === "qcTunnel") return lang === "ro" ? "Controlul calității" : lang === "ru" ? "Контроль качества" : "Quality inspection";
+    if (kind === "packer") return lang === "ro" ? "Stație de ambalare" : lang === "ru" ? "Упаковочная станция" : "Packing station";
     return lang === "ro" ? "Stație de finisare" : lang === "ru" ? "Финишная станция" : "Finishing station";
   };
   const machineOperationFor = (kind: string) => {
-    if (kind === "coils") return lang === "ro" ? "Pregătește tabla metalică" : lang === "ru" ? "Подготовка листового металла" : "Prepare sheet metal";
+    if (kind === "coils") return lang === "ro" ? "Pregătește și alimentează tabla" : lang === "ru" ? "Подготовка и подача листового металла" : "Prepare and feed sheet metal";
     if (kind === "press") return lang === "ro" ? "Formează panourile caroseriei" : lang === "ru" ? "Формовка панелей кузова" : "Form body panels";
     if (kind === "welder") return lang === "ro" ? "Sudează panourile caroseriei" : lang === "ru" ? "Сварка панелей кузова" : "Weld body panels";
     if (kind === "paintBooth") return lang === "ro" ? "Aplică stratul de vopsea" : lang === "ru" ? "Нанесение краски" : "Apply paint finish";
     if (kind === "qcTunnel") return lang === "ro" ? "Verifică defectele caroseriei" : lang === "ru" ? "Проверка кузова на дефекты" : "Inspect body for defects";
+    if (kind === "packer") return lang === "ro" ? "Pregătește caroseria pentru transport" : lang === "ru" ? "Подготовка кузова к перевозке" : "Prepare body for shipping";
     return lang === "ro" ? "Finisează piesa" : lang === "ru" ? "Финишная обработка детали" : "Finish the part";
   };
   const machineLabel = machineLabelFor(selectedKind);
