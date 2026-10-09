@@ -28,7 +28,7 @@ export type MachineKind =
 
 /** The machine at each step of each plant's process. */
 export const STATION_MACHINES: Record<string, MachineKind[]> = {
-  bodyWorks: ["coils", "press", "welder", "paintBooth", "qcTunnel"],
+  bodyWorks: ["coils", "press", "welder", "qcTunnel", "packer"],
   engineFactory: ["furnace", "furnace", "cnc", "welder", "packer"],
   interiorFactory: ["coils", "cnc", "seatRobot", "seatRobot", "packer"],
   glassFactory: ["mixer", "furnace", "press", "furnace", "glassRobot"],
