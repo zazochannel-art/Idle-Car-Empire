@@ -169,7 +169,7 @@ export function PlantFloor({ plotId }: { plotId: string }) {
               <div className="text-[10px] uppercase tracking-wider text-white/45">{workshopText.selected}</div>
               <div className="mt-0.5 text-xs font-bold">{machineLabel}</div>
               <div className="mt-1 text-[10px] text-white/55">{workshopText.operation}: {selectedOperation} · {selectedHasWorker ? workshopText.assigned : workshopText.vacant}</div>
-              <div className="mt-1 text-[10px] text-emerald-300">{workshopText.effect}: {Math.round((1 + Math.max(0, Math.min(workshop.machines, workshop.workers) - 1) * 0.15) * 100)}%</div>
+              <div className="mt-1 text-[10px] text-emerald-300">{workshopText.effect}: {Math.round((1 + Math.max(0, workshop.machines - 1) * 0.05 + Math.max(0, Math.min(workshop.machines, workshop.workers) - 1) * 0.15) * 100)}%</div>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <Button size="sm" className="h-auto min-h-10 whitespace-normal px-2 py-2 text-[11px]" disabled={machineCost === null || state.cash < machineCost} onClick={() => buyMachine(plotId)}>
