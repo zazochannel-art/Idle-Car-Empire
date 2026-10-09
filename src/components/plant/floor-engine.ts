@@ -323,7 +323,11 @@ export class FloorEngine {
       for (let i = 0; i < n; i++) {
         const x = stationX(i);
         const active = s.running && Math.floor(phase * n) === i;
-        if (i < robots && i % 2 === 0) {
+        if (s.type === "bodyWorks") {
+          // In Body Works, each hired worker belongs to the matching numbered station.
+          // Keep the on-floor worker aligned with the staffing badge shown above.
+          if (i < crew) p.person(x + 0.1, by + 1.5, i % 3 ? "#f59e0b" : "#3b82f6", this.t * 3 + i + line);
+        } else if (i < robots && i % 2 === 0) {
           if (!this.robot(x - 0.3, by + 1.3, active ? Math.floor(this.t * 5 + i) % 4 : 0, i)) robotArm(p, x - 0.3, by + 1.3, this.t + i, active);
         } else if (staffed < crew) {
           staffed++;
