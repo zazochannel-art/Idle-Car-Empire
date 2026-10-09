@@ -497,9 +497,12 @@ export function plantStats(s: GameState, plotId: string, gm: GlobalMods, cars: C
   const car = cfg.item ? null : activeCar(s, p, cars);
   const baseTime = cfg.item ? componentTime(cfg.item, p.grade) : car ? assemblyTime(car) * modelStats(s, car).timeMult : assemblyTime(CAR_BY_ID.city);
   const workshop = p.workshop ?? { machines: 1, workers: 1 };
-  // Body Works throughput is earned by actually staffing the machines the player builds.
+  // Extra machines add a small capacity bonus; staffing additional stations
+  // adds the larger throughput bonus. A machine alone never replaces a worker.
   const staffedMachines = b.type === "bodyWorks" ? Math.min(workshop.machines, workshop.workers) : 1;
-  const workshopSpeed = b.type === "bodyWorks" ? 1 + Math.max(0, staffedMachines - 1) * 0.15 : 1;
+  const machineBonus = b.type === "bodyWorks" ? Math.max(0, workshop.machines - 1) * 0.05 : 0;
+  const staffingBonus = b.type === "bodyWorks" ? Math.max(0, staffedMachines - 1) * 0.15 : 0;
+  const workshopSpeed = 1 + machineBonus + staffingBonus;
   const cycle = baseTime / (speed * workshopSpeed);
   const lines = lv.lines;
   const itemValue = cfg.item ? componentValue(cfg.item, p.grade, gm, mm.value * qm.value) : car ? carValue(s, car, gm, mm.value * qm.value) : 0;
