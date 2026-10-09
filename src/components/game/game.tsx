@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, Briefcase, Car, Crown, Factory, Flag, Hammer, ListChecks, Map as MapIcon, TrendingUp, Users } from "lucide-react";
-import { memo, useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { memo, useEffect, useState, useSyncExternalStore } from "react";
 import { Progress } from "@/components/ui/progress";
 import { MANAGERS } from "@/game/config/managers";
 import { RESEARCH } from "@/game/config/research";
@@ -143,10 +143,9 @@ function Shell() {
   });
   void plotTitleKey;
   // plotTitleKey subscribes to every field consumed by plotTitle; read the matching snapshot after it changes.
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const state = plot ? useGame.getState().state : null;
   const [settings, setSettings] = useState(false);
-  const openSettings = useCallback(() => setSettings(true), []);
+  const openSettings = () => setSettings(true);
   const desktop = useDesktop();
   const { t, lang } = useT();
   const n = useContent(lang);
