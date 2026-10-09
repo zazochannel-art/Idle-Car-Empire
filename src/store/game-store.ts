@@ -66,6 +66,8 @@ interface GameStore {
   act: <T>(fn: (s: GameState) => T) => T;
 
   plantLevel: (plot: string) => boolean;
+  buyBodyMachine: (plot: string) => boolean;
+  hireBodyWorker: (plot: string) => boolean;
   plantSpeed: (plot: string) => boolean;
   plantAutomation: (plot: string) => boolean;
   plantGrade: (plot: string) => boolean;
@@ -341,6 +343,16 @@ export const useGame = create<GameStore>((set, get) => {
         const b = get().state.city.buildings[plot];
         uiEvents.emit({ type: "toast", tone: "gold", icon: "🏗️", title: tr("toast.plantLevel", { name: tr(`structure.${b.type}`), level: tr(`plantLevel.${b.level}` as MessageKey) }), body: tr("toast.plantLevelBody", { lines: PLANT_LEVELS[b.level - 1].lines }) });
       }
+      return ok;
+    },
+    buyBodyMachine: (plot) => {
+      const ok = act((s) => Ch.buyBodyMachine(s, plot));
+      if (ok) persist(true);
+      return ok;
+    },
+    hireBodyWorker: (plot) => {
+      const ok = act((s) => Ch.hireBodyWorker(s, plot));
+      if (ok) persist(true);
       return ok;
     },
     plantSpeed: (plot) => act((s) => Ch.upgradePlantSpeed(s, plot, get().snap.gm)),
