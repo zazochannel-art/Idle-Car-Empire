@@ -256,6 +256,7 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
   useEffect(() => {
     const e = engineRef.current;
     if (!e) return;
+    const snap = useGame.getState().snap;
     const list: { plotId: string; perSec: number }[] = [];
     for (const [id, st] of Object.entries(snap.city.garages)) list.push({ plotId: id, perSec: st.incomePerSec });
     for (const [id, inc] of Object.entries(snap.city.structureIncome)) list.push({ plotId: id, perSec: inc });
