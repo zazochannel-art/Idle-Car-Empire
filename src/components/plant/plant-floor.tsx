@@ -11,7 +11,8 @@ import { formatDuration, formatMoney, formatNumber } from "@/game/format";
 import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
 import { debtVars, stockTotal } from "@/game/engine/materials";
-import { bodyMachineCost, bodyWorkerCost } from "@/game/engine/chain";
+import { bodyMachineCost, bodyWorkerCost, workshopOf } from "@/game/engine/chain";
+import { BODY_WORKSHOP } from "@/game/config/chain";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { CAR_MODEL_FOR } from "../map/vehicles";
@@ -78,7 +79,7 @@ export function PlantFloor({ plotId }: { plotId: string }) {
   if (!b?.plant || !st) return null;
   const cfg = PLANT_BY_ID[st.type];
   const item = cfg.item ?? "car";
-  const workshop = b.plant.workshop ?? { machines: 1, workers: 1 };
+  const workshop = workshopOf(b.plant);
   const machineCost = st.type === "bodyWorks" ? bodyMachineCost(state, plotId) : null;
   const workerCost = st.type === "bodyWorks" ? bodyWorkerCost(state, plotId) : null;
   const selectedKind = STATION_MACHINES.bodyWorks[selectedMachine] ?? "coils";
@@ -154,7 +155,7 @@ export function PlantFloor({ plotId }: { plotId: string }) {
                   <div className="text-[10px] text-white/55">{workshopText.hint}</div>
                 </div>
               </div>
-              <Badge variant="gold">{workshop.machines}/5</Badge>
+              <Badge variant="gold">{workshop.machines}/{BODY_WORKSHOP.max}</Badge>
             </div>
             <div className="mb-3 grid grid-cols-2 gap-2">
               {Array.from({ length: workshop.machines }, (_, index) => (
@@ -163,13 +164,13 @@ export function PlantFloor({ plotId }: { plotId: string }) {
                   <div className="mt-1 text-[10px] text-white/50">{index < workshop.workers ? workshopText.worker + " " + (index + 1) : lang === "ro" ? "Fără muncitor" : lang === "ru" ? "Без рабочего" : "Unstaffed"}</div>
                 </button>
               ))}
-              {workshop.machines < 5 && <div className="flex items-center justify-center rounded-xl border border-dashed border-white/15 p-2 text-[10px] text-white/40">{workshopText.idle}</div>}
+              {workshop.machines < BODY_WORKSHOP.max && <div className="flex items-center justify-center rounded-xl border border-dashed border-white/15 p-2 text-[10px] text-white/40">{workshopText.idle}</div>}
             </div>
             <div className="mb-3 rounded-xl bg-white/5 px-3 py-2">
               <div className="text-[10px] uppercase tracking-wider text-white/45">{workshopText.selected}</div>
               <div className="mt-0.5 text-xs font-bold">{machineLabel}</div>
               <div className="mt-1 text-[10px] text-white/55">{workshopText.operation}: {selectedOperation} · {selectedHasWorker ? workshopText.assigned : workshopText.vacant}</div>
-              <div className="mt-1 text-[10px] text-emerald-300">{workshopText.effect}: {Math.round((1 + Math.max(0, workshop.machines - 1) * 0.05 + Math.max(0, Math.min(workshop.machines, workshop.workers) - 1) * 0.15) * 100)}%</div>
+              <div className="mt-1 text-[10px] text-emerald-300">{workshopText.effect}: {Math.round(st.workshopSpeed * 100)}%</div>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <Button size="sm" className="h-auto min-h-10 whitespace-normal px-2 py-2 text-[11px]" disabled={machineCost === null || state.cash < machineCost} onClick={() => buyMachine(plotId)}>

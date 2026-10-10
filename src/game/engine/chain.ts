@@ -10,6 +10,7 @@ import { CARS, CAR_BY_ID, CAR_MODEL, type CarConfig } from "../config/cars";
 import {
   AUTOMATION,
   BASE_RECIPE,
+  BODY_WORKSHOP,
   OUTSOURCE,
   OUTSOURCED_PARTS,
   SUPPLIED_PARTS,
@@ -175,31 +176,72 @@ export function plantLock(s: GameState, type: PlantType): PlantLock {
   return null;
 }
 
-/** The first interactive production-floor slice is Body Works: one basic machine and one worker. */
+/** A plant's shop floor: machines installed along its line and the operators running them. */
+export interface Workshop {
+  machines: number;
+  workers: number;
+}
+
+/** One machine slot of the Body Works line and what it adds to the plant's speed. */
+export interface WorkshopMachine {
+  index: number;
+  installed: boolean;
+  /** An operator runs it (operators take the machines in line order). */
+  staffed: boolean;
+  /** Share added to the plant's speed (the first machine is the plant's base: 0). */
+  bonus: number;
+}
+
+/** A plant's shop floor within its limits (older saves and other plants: one machine, one operator). */
+export function workshopOf(p: PlantData): Workshop {
+  const w = p.workshop;
+  const machines = Math.max(1, Math.min(BODY_WORKSHOP.max, Math.floor(w?.machines ?? 1)));
+  const workers = Math.max(1, Math.min(machines, Math.floor(w?.workers ?? 1)));
+  return { machines, workers };
+}
+
+/** Every machine slot of the Body Works line, in order, with its real contribution. */
+export function workshopMachines(w: Workshop): WorkshopMachine[] {
+  return Array.from({ length: BODY_WORKSHOP.max }, (_, index) => {
+    const installed = index < w.machines;
+    const staffed = installed && index < w.workers;
+    const bonus = index === 0 || !installed ? 0 : BODY_WORKSHOP.machine + (staffed ? BODY_WORKSHOP.operator : 0);
+    return { index, installed, staffed, bonus };
+  });
+}
+
+/** The shop floor's speed multiplier (1: the base machine and its operator; only the Body Works has one). */
+export function workshopSpeed(type: PlantType, w: Workshop): number {
+  if (type !== "bodyWorks") return 1;
+  return 1 + workshopMachines(w).reduce((a, m) => a + m.bonus, 0);
+}
+
+/** The next machine for the Body Works line (null: not a Body Works, or the line is full). */
 export function bodyMachineCost(s: GameState, plotId: string): number | null {
   const b = s.city.buildings[plotId];
   if (b?.type !== "bodyWorks" || !b.plant) return null;
-  const machines = b.plant.workshop?.machines ?? 1;
-  if (machines >= 5) return null;
-  return Math.round(350 * Math.pow(1.75, machines - 1));
+  const { machines } = workshopOf(b.plant);
+  if (machines >= BODY_WORKSHOP.max) return null;
+  return Math.round(BODY_WORKSHOP.machineCost.base * Math.pow(BODY_WORKSHOP.machineCost.growth, machines - 1));
 }
 
+/** The next operator (null: every machine already has one). */
 export function bodyWorkerCost(s: GameState, plotId: string): number | null {
   const b = s.city.buildings[plotId];
   if (b?.type !== "bodyWorks" || !b.plant) return null;
-  const workshop = b.plant.workshop ?? { machines: 1, workers: 1 };
-  if (workshop.workers >= workshop.machines || workshop.workers >= 5) return null;
-  return Math.round(180 * Math.pow(1.65, workshop.workers - 1));
+  const { machines, workers } = workshopOf(b.plant);
+  if (workers >= machines) return null;
+  return Math.round(BODY_WORKSHOP.operatorCost.base * Math.pow(BODY_WORKSHOP.operatorCost.growth, workers - 1));
 }
 
 export function buyBodyMachine(s: GameState, plotId: string): boolean {
   const b = s.city.buildings[plotId];
   const cost = bodyMachineCost(s, plotId);
   if (!b?.plant || cost === null || s.cash < cost) return false;
-  const workshop = b.plant.workshop ?? { machines: 1, workers: 1 };
+  const w = workshopOf(b.plant);
   s.cash -= cost;
   book(s, "maintenance", cost);
-  b.plant.workshop = { ...workshop, machines: workshop.machines + 1 };
+  b.plant.workshop = { ...w, machines: w.machines + 1 };
   return true;
 }
 
@@ -207,10 +249,10 @@ export function hireBodyWorker(s: GameState, plotId: string): boolean {
   const b = s.city.buildings[plotId];
   const cost = bodyWorkerCost(s, plotId);
   if (!b?.plant || cost === null || s.cash < cost) return false;
-  const workshop = b.plant.workshop ?? { machines: 1, workers: 1 };
+  const w = workshopOf(b.plant);
   s.cash -= cost;
   book(s, "labor", cost);
-  b.plant.workshop = { ...workshop, workers: workshop.workers + 1 };
+  b.plant.workshop = { ...w, workers: w.workers + 1 };
   return true;
 }
 
@@ -435,6 +477,8 @@ export interface PlantStats {
   chassisValue: number | null;
   /** Engine factory: what a plain engine is worth. */
   engineValue: number;
+  /** Speed from the shop floor's machines and operators (Body Works; 1 elsewhere), part of `cycle`. */
+  workshopSpeed: number;
   /** Seconds per tile for this plant's trucks. */
   pace: number;
   /** Dock time multiplier for loading and unloading (Loading upgrades and the delivery rate). */
@@ -496,14 +540,9 @@ export function plantStats(s: GameState, plotId: string, gm: GlobalMods, cars: C
   const speed = Math.pow(SPEED.mult, p.speed) * AUTOMATION[p.automation].speed * gm.speed * mm.speed * big * qm.speed;
   const car = cfg.item ? null : activeCar(s, p, cars);
   const baseTime = cfg.item ? componentTime(cfg.item, p.grade) : car ? assemblyTime(car) * modelStats(s, car).timeMult : assemblyTime(CAR_BY_ID.city);
-  const workshop = p.workshop ?? { machines: 1, workers: 1 };
-  // Extra machines add a small capacity bonus; staffing additional stations
-  // adds the larger throughput bonus. A machine alone never replaces a worker.
-  const staffedMachines = b.type === "bodyWorks" ? Math.min(workshop.machines, workshop.workers) : 1;
-  const machineBonus = b.type === "bodyWorks" ? Math.max(0, workshop.machines - 1) * 0.05 : 0;
-  const staffingBonus = b.type === "bodyWorks" ? Math.max(0, staffedMachines - 1) * 0.15 : 0;
-  const workshopSpeed = 1 + machineBonus + staffingBonus;
-  const cycle = baseTime / (speed * workshopSpeed);
+  // the Body Works shop floor: machines built and operators hired along the line
+  const floor = workshopSpeed(b.type, workshopOf(p));
+  const cycle = baseTime / (speed * floor);
   const lines = lv.lines;
   const itemValue = cfg.item ? componentValue(cfg.item, p.grade, gm, mm.value * qm.value) : car ? carValue(s, car, gm, mm.value * qm.value) : 0;
   // engine + the best body you make, worth a little more together
@@ -543,6 +582,7 @@ export function plantStats(s: GameState, plotId: string, gm: GlobalMods, cars: C
     combine,
     chassisValue,
     engineValue: itemValue,
+    workshopSpeed: floor,
     pace: 1 / ROAD_SPEED,
     trucks: trucksOf(b) + lm.trucks,
     dock: lm.dock,
@@ -1364,6 +1404,8 @@ export function migratePlant(type: PlantType, raw: unknown): PlantData {
   p.route = "use";
   if (raw.combine === true) p.combine = true;
   if (raw.auto === true) p.auto = true;
+  // the machines built and operators hired on the shop floor (bought, so never lost on load)
+  if (isObj(raw.workshop)) p.workshop = workshopOf({ ...p, workshop: { machines: num(raw.workshop.machines) || 1, workers: num(raw.workshop.workers) || 1 } });
   p.progress = Math.min(0.999, num(raw.progress));
   p.stock = migrateStock(raw.stock);
   p.warehouse = int(raw.warehouse, 1, WAREHOUSE_CAP.length, 1);

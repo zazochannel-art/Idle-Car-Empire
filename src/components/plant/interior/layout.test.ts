@@ -66,4 +66,23 @@ describe("factory interior layout", () => {
     expect(stages[0]).toBe(0);
     expect(stages[6]).toBe(8);
   });
+  it("the Body Works shop floor builds and staffs its machines in line order", () => {
+    const at = (machines: number, workers: number) => interiorLayout({ level: 6, automation: 0, manager: false, floor: { machines, workers } }).lines[0];
+    // one machine: only the cutter stands, every other bay is waiting to be built
+    expect(lineStops(at(1, 1)).map((s) => s.def.id)).toEqual(["rawStore", "cutting", "finished"]);
+    const l = at(3, 2);
+    expect(lineStops(l).map((s) => s.def.id)).toEqual(["rawStore", "cutting", "press", "welding", "finished"]);
+    expect(l.stations.filter((s) => s.slot !== undefined).map((s) => s.slot)).toEqual([0, 1, 2, 3, 4]);
+    expect(l.stations.map((s) => s.staffed)).toEqual([true, true, true, false, false, false, true]);
+    // nobody stands at the unstaffed welder; the cutter and the press have their people
+    const people = interiorLayout({ level: 6, automation: 0, manager: false, floor: { machines: 3, workers: 2 } }).people;
+    expect(people.some((h) => h.station === "welding")).toBe(false);
+    expect(people.some((h) => h.station === "cutting")).toBe(true);
+    expect(people.some((h) => h.station === "press")).toBe(true);
+    // robot cells keep their robots; only the staffed ones have an operator
+    const auto = interiorLayout({ level: 6, automation: 2, manager: false, floor: { machines: 4, workers: 2 } });
+    expect(auto.robots.some((r) => r.station === "welding")).toBe(true);
+    expect(auto.people.some((h) => h.station === "welding")).toBe(false);
+    expect(auto.people.some((h) => h.station === "press")).toBe(true);
+  });
 });

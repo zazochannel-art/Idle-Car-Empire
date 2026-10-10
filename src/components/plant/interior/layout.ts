@@ -306,6 +306,11 @@ export interface InteriorSpec {
   automation: number;
   /** A manager runs this plant. */
   manager: boolean;
+  /**
+   * The Body Works shop floor: how many of the line's machines are built and
+   * staffed, in line order (absent: machines open with the plant level).
+   */
+  floor?: { machines: number; workers: number };
 }
 
 export type StationMode = "planned" | "manual" | "robot";
@@ -319,6 +324,10 @@ export interface PlacedStation {
   w: number;
   d: number;
   mode: StationMode;
+  /** Its place among the line's machines (stores have none). */
+  slot?: number;
+  /** An operator runs it (always, unless the shop floor says otherwise). */
+  staffed: boolean;
   /** Where a unit stops on the line at this station. */
   stop: { x: number; y: number };
 }
@@ -369,8 +378,9 @@ export interface Interior {
   gates: { inX: number; outX: number; y: number };
 }
 
-const stationMode = (def: StationDef, s: InteriorSpec): StationMode => {
-  if (s.level < def.unlock) return "planned";
+const stationMode = (def: StationDef, s: InteriorSpec, slot: number | undefined): StationMode => {
+  const built = s.floor && slot !== undefined ? slot < s.floor.machines : s.level >= def.unlock;
+  if (!built) return "planned";
   if (def.robotsFrom <= s.automation || (s.level >= 10 && def.robotsFrom <= 2 && s.automation >= 1)) return "robot";
   return "manual";
 };
@@ -386,16 +396,12 @@ export function interiorLayout(s: InteriorSpec, defs: StationDef[] = BODY_STATIO
   for (let i = 0; i < open; i++) {
     const y0 = TOP + i * HALL_D;
     const belt = y0 + 2.2;
-    const stations: PlacedStation[] = defs.map((def) => ({
-      def,
-      line: i,
-      x: def.x,
-      y: y0 + 0.5,
-      w: def.w,
-      d: 1.3,
-      mode: stationMode(def, spec),
-      stop: { x: def.x + def.w / 2, y: belt },
-    }));
+    const stations: PlacedStation[] = defs.map((def) => {
+      const slot = machineSlot(defs, def);
+      const mode = stationMode(def, spec, slot);
+      const staffed = mode !== "planned" && (!s.floor || slot === undefined || slot < s.floor.workers);
+      return { def, line: i, x: def.x, y: y0 + 0.5, w: def.w, d: 1.3, mode, slot, staffed, stop: { x: def.x + def.w / 2, y: belt } };
+    });
     lines.push({ index: i, y0, belt, conveyor: level >= CONVEYOR_LEVEL, stations });
 
     // people and robots work in front of the line
@@ -405,14 +411,18 @@ export function interiorLayout(s: InteriorSpec, defs: StationDef[] = BODY_STATIO
       const cx = st.x + st.w / 2;
       const d = st.def;
       if (st.mode === "planned" || d.staff === 0) continue;
+      // a machine without an operator: nobody stands at it (robots stay, they are the automation)
+      if (!st.staffed && st.mode !== "robot") continue;
       if (st.mode === "robot") {
         const tool = d.tool ?? "gripper";
         const reach = d.robot === "reach";
         if (d.robot !== "embedded") robots.push({ x: cx - 0.7, y: front - 0.2, station: d.id, line: i, tool, reach });
         // big lines get a robot on both sides of the busiest stations
         if (reach && (level >= 8 || auto >= 3)) robots.push({ x: cx + 0.7, y: front - 0.2, station: d.id, line: i, tool, reach });
+        // on the Body Works shop floor every staffed robot cell has its operator
+        if (s.floor && st.staffed) people.push({ x: cx + 1.15, y: front + 0.6, role: "supervisor", station: d.id, line: i });
         // someone still watches the robots until the plant runs itself
-        if (auto < 4 && !watched && reach) {
+        else if (!s.floor && auto < 4 && !watched && reach) {
           people.push({ x: cx + 1.2, y: front + 0.6, role: "supervisor", line: i });
           watched = true;
         }
@@ -442,6 +452,13 @@ export function interiorLayout(s: InteriorSpec, defs: StationDef[] = BODY_STATIO
     office,
     gates: { inX: 0, outX: HALL_W, y: aisleY },
   };
+}
+
+/** A station's place among the line's machines (0 the first after the raw store); undefined for the stores. */
+export function machineSlot(defs: StationDef[], def: StationDef): number | undefined {
+  if (def.staff === 0) return undefined;
+  const k = defs.filter((d) => d.staff > 0).indexOf(def);
+  return k < 0 ? undefined : k;
 }
 
 /** The stations a unit actually stops at on a line, in order. */
