@@ -55,7 +55,8 @@ export function processSteps(type: PlantType, t: T): string[] {
 
 // ───────────────────────────── plants ─────────────────────────────
 
-export function PlantPanel({ id }: { id: string }) {
+/** A plant's controls; `inside` when shown in the factory itself (no "enter the factory" button there). */
+export function PlantPanel({ id, inside }: { id: string; inside?: boolean }) {
   const state = useGame((g) => g.state);
   const snap = useGame((g) => g.snap);
   const g = useGame.getState();
@@ -213,9 +214,11 @@ export function PlantPanel({ id }: { id: string }) {
         )}
       </div>
 
-      <Button variant="secondary" className="w-full" onClick={() => openFloor(id)}>
-        <Factory /> {t("plant.floor")}
-      </Button>
+      {!inside && (
+        <Button variant="secondary" className="w-full" onClick={() => openFloor(id)}>
+          <Factory /> {t("plant.floor")}
+        </Button>
+      )}
     </div>
   );
 }
@@ -383,7 +386,14 @@ function ManagerSlot({ id }: { id: string }) {
               {next.avatar} {t("managers.unlockAt", { amount: formatMoney(next.unlockAt) })}
             </p>
           )}
-          <button onClick={() => setView("managers")} className="text-[11px] font-semibold text-sky-300 hover:text-sky-200">
+          {/* the managers list lives on the map: leave the factory first if we are in it */}
+          <button
+            onClick={() => {
+              useUi.getState().openFloor(null);
+              setView("managers");
+            }}
+            className="text-[11px] font-semibold text-sky-300 hover:text-sky-200"
+          >
             {t("plant.allManagers")} →
           </button>
         </div>
