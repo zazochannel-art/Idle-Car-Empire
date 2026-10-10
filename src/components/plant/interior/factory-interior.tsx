@@ -19,7 +19,8 @@ import { debtVars, stockTotal } from "@/game/engine/materials";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { CAR_MODEL_FOR } from "../../map/vehicles";
-import { gradeName, itemName, plantName } from "../../panels/plant-panel";
+import { gradeName, itemName, plantName, PlantPanel } from "../../panels/plant-panel";
+import { Sheet } from "../../panels/sheet";
 import { InteriorEngine, type InteriorScene, type StationPick } from "./interior-engine";
 import { interiorLayout, RECIPES, recipeFor, type PlacedStation, type StationId } from "./layout";
 
@@ -36,12 +37,13 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
   const st = snap.chain.plants[plotId];
   const b = state.city.buildings[plotId];
   const openFloor = useUi((u) => u.openFloor);
-  const selectPlot = useUi((u) => u.selectPlot);
   const { t } = useT();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<InteriorEngine | null>(null);
   const [pick, setPick] = useState<StationPick | null>(null);
   const [hint, setHint] = useState(true);
+  // the plant's full controls, opened over the factory (the map stays closed)
+  const [manage, setManage] = useState(false);
   const p = b?.plant;
   const manager = MANAGERS.some((m) => state.managers[m.id].hired && state.managers[m.id].assignedTo === plotId);
 
@@ -51,6 +53,8 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
     engine.onSelect = (s) => {
       setPick(s);
       setHint(false);
+      // a machine tapped: its card replaces the plant's panel
+      if (s) setManage(false);
     };
     engine.low = useGame.getState().state.settings.lowGraphics;
     if (process.env.NODE_ENV !== "production") Object.assign(window, { __interior: engine });
@@ -65,14 +69,15 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      if (engineRef.current?.selected) {
+      if (manage) setManage(false);
+      else if (engineRef.current?.selected) {
         engineRef.current.selected = null;
         setPick(null);
       } else openFloor(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [openFloor]);
+  }, [openFloor, manage]);
 
   const type = st?.type ?? "bodyWorks";
   const labels = useMemo(() => Object.fromEntries(recipeFor(type).map((d) => [d.id, t(`interior.station.${d.id}` as MessageKey)])) as Record<StationId, string>, [t, type]);
@@ -197,18 +202,24 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
             ) : null}
           </AnimatePresence>
         </div>
-        <Button
-          size="sm"
-          variant="secondary"
-          className="pointer-events-auto self-end shadow-lg"
-          onClick={() => {
-            openFloor(null);
-            selectPlot(plotId);
-          }}
-        >
-          <SlidersHorizontal /> {t("plant.manage")}
-        </Button>
+        {!manage && (
+          <Button
+            size="sm"
+            variant="secondary"
+            className="pointer-events-auto self-end shadow-lg"
+            onClick={() => {
+              if (engineRef.current) engineRef.current.selected = null;
+              setPick(null);
+              setManage(true);
+            }}
+          >
+            <SlidersHorizontal /> {t("plant.manage")}
+          </Button>
+        )}
       </div>
+      <Sheet open={manage} onClose={() => setManage(false)} title={plantName(state, plotId, t)} icon={cfg.emoji} sheetKey="factory-manage">
+        <PlantPanel id={plotId} inside />
+      </Sheet>
     </motion.div>
   );
 }
