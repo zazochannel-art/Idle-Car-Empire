@@ -1,8 +1,6 @@
 import { setDurationUnits } from "@/game/format";
 import type { Lang } from "@/game/types";
 import { en, type MessageKey } from "./en";
-import { ro, roContent } from "./ro";
-import { ru, ruContent } from "./ru";
 
 export type { Lang, MessageKey };
 
@@ -12,9 +10,39 @@ export const LANGS: { id: Lang; label: string; short: string; flag: string }[] =
   { id: "ru", label: "Русский", short: "RU", flag: "🇷🇺" },
 ];
 
-const MESSAGES: Record<Lang, Record<MessageKey, string>> = { en, ro, ru };
+// English ships with the game (it is every text's fallback); the other
+// languages load on demand, so a player downloads only the one they use.
+const MESSAGES: Partial<Record<Lang, Record<MessageKey, string>>> = { en };
 /** Game content (car, factory, research… names). English lives in config/. */
-const CONTENT: Record<Lang, Record<string, string>> = { en: {}, ro: roContent, ru: ruContent };
+const CONTENT: Partial<Record<Lang, Record<string, string>>> = { en: {} };
+const loading: Partial<Record<Lang, Promise<void>>> = {};
+
+/** Bumped whenever a language finishes loading (components showing text re-render). */
+let version = 0;
+const listeners = new Set<() => void>();
+export const i18nVersion = () => version;
+export function onI18nChange(fn: () => void) {
+  listeners.add(fn);
+  return () => void listeners.delete(fn);
+}
+
+/** Loads a language's texts (at once for English, and for one already loaded). */
+export function loadLanguage(lang: Lang): Promise<void> {
+  if (MESSAGES[lang]) return Promise.resolve();
+  return (loading[lang] ??= (lang === "ro" ? import("./ro").then((m) => [m.ro, m.roContent] as const) : import("./ru").then((m) => [m.ru, m.ruContent] as const)).then(
+    ([messages, content]) => {
+      MESSAGES[lang] = messages;
+      CONTENT[lang] = content;
+      version++;
+      listeners.forEach((fn) => fn());
+    },
+    (err) => {
+      // a failed download (offline): English stays, and the next call tries again
+      delete loading[lang];
+      throw err;
+    },
+  ));
+}
 
 const UNITS: Record<Lang, { d: string; h: string; m: string; s: string }> = {
   en: { d: "d", h: "h", m: "m", s: "s" },

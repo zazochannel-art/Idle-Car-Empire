@@ -25,8 +25,9 @@ export function Showcase() {
   const close = useUi((u) => u.setShowcase);
   const { t, lang } = useT();
   const n = useContent(lang);
-  const designs = useGame((g) => g.state.designs);
-  if (!v) return null;
+  // the model names, read only while a vehicle is shown (the designs object is new every tick)
+  const designs = useGame((g) => (v ? g.state.designs : null));
+  if (!v || !designs) return null;
 
   const car = v.kind === "car" ? CAR_BY_ID[CAR_OF_MODEL[v.model]] : null;
   const parts: ComponentId[] = car ? [...BASE_RECIPE, ...car.extras] : [];

@@ -12,7 +12,7 @@ import { RESEARCH, RESEARCH_CATEGORIES } from "@/game/config/research";
 import { en } from "./en";
 import { ro, roContent } from "./ro";
 import { ru, ruContent } from "./ru";
-import { translate } from ".";
+import { loadLanguage, translate } from ".";
 
 const placeholders = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
 
@@ -61,7 +61,9 @@ describe("translations", () => {
     for (const dict of [ro, ru]) for (const p of PLANTS) expect(dict[`process.${p.id}`].split("|"), p.id).toHaveLength(en[`process.${p.id}`].split("|").length);
   });
 
-  it("fills placeholders", () => {
+  it("loads a language on demand (English until then) and fills placeholders", async () => {
+    await loadLanguage("ro");
+    await loadLanguage("ru");
     expect(translate("ro", "common.lv", { level: 7 })).toBe("Nv 7");
     expect(translate("ru", "offline.collect", { amount: "$5K" })).toBe("ЗАБРАТЬ $5K");
   });

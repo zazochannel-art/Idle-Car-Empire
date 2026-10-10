@@ -20,6 +20,12 @@ import { LedgerTable } from "../views/ledger-table";
 
 /** "Welcome Back!" — shown while an offline report is waiting to be collected. */
 export function OfflineDialog() {
+  // only whether a report waits: the report itself (and the plants it names) is read while it is open
+  const waiting = useGame((g) => !!g.state.pendingOffline);
+  return waiting ? <OfflineReport /> : null;
+}
+
+function OfflineReport() {
   const report = useGame((g) => g.state.pendingOffline);
   const buildings = useGame((g) => g.state.city.buildings);
   const collect = useGame((g) => g.collectOffline);

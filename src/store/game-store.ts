@@ -34,7 +34,7 @@ import { tick as engineTick } from "@/game/engine/tick";
 import { formatDuration, formatMoney, formatPercent } from "@/game/format";
 import { decodeSave, encodeSave, SaveManager } from "@/game/save";
 import type { BuyAmount, CarId, CarRoute, DealerId, FacilityType, GameState, Lang, ManagerId, QualityMode, Specialization, StructureType, ZoneId } from "@/game/types";
-import { applyLanguage, detectLanguage, translate, type MessageKey, type Vars } from "@/i18n";
+import { applyLanguage, detectLanguage, loadLanguage, translate, type MessageKey, type Vars } from "@/i18n";
 import { contentFor } from "@/i18n/content";
 import { uiEvents } from "./events";
 import * as Mk from "@/game/engine/market";
@@ -170,6 +170,8 @@ interface GameStore {
 
 const saves = typeof window !== "undefined" ? new SaveManager() : null;
 let loop: ReturnType<typeof setInterval> | null = null;
+/** Set as init starts (it awaits the save): a second call meanwhile must not start a second loop. */
+let starting = false;
 let lastTick = 0;
 let lastSave = 0;
 
@@ -314,7 +316,8 @@ export const useGame = create<GameStore>((set, get) => {
     act,
 
     init: async () => {
-      if (get().ready || loop) return;
+      if (get().ready || loop || starting) return;
+      starting = true;
       const now = Date.now();
       let state = (await saves?.load(now)) ?? null;
       if (!state) {
@@ -324,6 +327,8 @@ export const useGame = create<GameStore>((set, get) => {
         settleOffline(state, now);
       }
       refreshDaily(state, now);
+      // the player's language before the first screen (English if it cannot load)
+      await loadLanguage(state.settings.lang).catch(() => {});
       applyLanguage(state.settings.lang);
       lastTick = Date.now();
       lastSave = lastTick;
@@ -656,12 +661,17 @@ export const useGame = create<GameStore>((set, get) => {
       });
     },
     setLang: (lang) => {
-      applyLanguage(lang);
-      act((s) => {
-        s.settings.lang = lang;
-        return true;
-      });
-      persist(true);
+      // switch once the language's texts are here (no flash of English)
+      void loadLanguage(lang)
+        .catch(() => {})
+        .then(() => {
+          applyLanguage(lang);
+          act((s) => {
+            s.settings.lang = lang;
+            return true;
+          });
+          persist(true);
+        });
     },
     exportSave: () => encodeSave(get().state),
     importSave: (text) => {
@@ -671,6 +681,8 @@ export const useGame = create<GameStore>((set, get) => {
         state.lastActiveAt = now;
         commit(state);
         persist(true);
+        // the save's language: its texts follow as soon as they load
+        void loadLanguage(state.settings.lang).then(() => applyLanguage(state.settings.lang), () => {});
         return true;
       } catch {
         return false;

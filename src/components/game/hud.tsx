@@ -16,12 +16,11 @@ const money = (n: number) => formatMoney(n);
 
 /** Top bar floating over the map: cash, profit/s, production rate, factories, Empire Points. */
 export function Hud({ onSettings }: { onSettings: () => void }) {
-  const cash = useGame((g) => g.state.cash);
-  const income = useGame((g) => g.snap.incomePerSec);
-  // before the first car, count the parts the plants have made
+  // the bar re-renders only when a number it shows changes (the cash counter has its own component)
+  const income = useGame((g) => formatMoney(g.snap.incomePerSec));
   // production rate: cars per minute once an assembly plant runs, parts before
-  const carsRate = useGame((g) => g.snap.carsPerSec * 60);
-  const partsRate = useGame((g) => Object.values(g.snap.chain.plants).reduce((a, p) => (p.type === "assemblyPlant" ? a : a + p.unitsPerSec), 0) * 60);
+  const carsRate = useGame((g) => (g.snap.carsPerSec > 0 ? formatNumber(g.snap.carsPerSec * 60) : ""));
+  const partsRate = useGame((g) => (g.snap.carsPerSec > 0 ? "" : formatNumber(Object.values(g.snap.chain.plants).reduce((a, p) => (p.type === "assemblyPlant" ? a : a + p.unitsPerSec), 0) * 60)));
   const owned = useGame((g) => plantsOf(g.state).length);
   const trucks = useGame((g) => g.state.chain.shipments.length);
   const ep = useGame((g) => g.state.empirePoints);
@@ -34,15 +33,10 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
       <div className="flex items-start gap-2 p-2 sm:p-3">
         <div className="pointer-events-auto flex min-w-0 flex-1 flex-wrap items-center gap-1.5 rounded-2xl bg-[rgba(36,104,214,0.82)] p-1.5 shadow-[0_3px_0_0_rgba(10,40,110,0.35)] md:flex-nowrap md:gap-2 md:bg-[rgba(36,104,214,0.62)] md:p-2 md:hud-bar">
           <div className="relative flex min-w-0 items-center gap-2 pl-1 pr-2">
-            <CashFlash cash={cash} />
-            <CashBill />
-            <div className="min-w-0">
-              <div className="hidden text-[9px] font-bold uppercase tracking-[0.14em] text-white/70 md:block">{t("hud.cash")}</div>
-              <AnimatedNumber value={cash} format={money} className="race-type block truncate text-[22px] tabular-nums leading-tight text-white not-italic [text-shadow:0_2px_0_rgba(0,0,0,0.25)] md:text-[26px]" />
-            </div>
+            <CashCounter label={t("hud.cash")} />
           </div>
-          <Pill icon={<TrendingUp className="size-4 stroke-[3] text-lime" />} label={t("hud.profit")} value={`${formatMoney(income)}${t("unit.perSec")}`} />
-          <Pill icon={<Car className="size-4 stroke-[2.5] text-white" />} label={carsRate > 0 ? t("hud.carsRate") : t("hud.partsRate")} value={`${formatNumber(carsRate > 0 ? carsRate : partsRate)}${t("unit.perMin")}`} />
+          <Pill icon={<TrendingUp className="size-4 stroke-[3] text-lime" />} label={t("hud.profit")} value={`${income}${t("unit.perSec")}`} />
+          <Pill icon={<Car className="size-4 stroke-[2.5] text-white" />} label={carsRate ? t("hud.carsRate") : t("hud.partsRate")} value={`${carsRate || partsRate}${t("unit.perMin")}`} />
           <div className="hidden md:block">
             <Pill icon={<Factory className="size-3.5 text-cyan-300" />} label={t("hud.factories")} value={`${owned} · 🚚${trucks}`} />
           </div>
@@ -126,6 +120,21 @@ function LanguageSwitch() {
 }
 
 /** The green banknote in front of the cash, as on the racing game's top bar. */
+/** The cash counter: the one part of the bar that follows every tick. */
+function CashCounter({ label }: { label: string }) {
+  const cash = useGame((g) => g.state.cash);
+  return (
+    <>
+      <CashFlash cash={cash} />
+      <CashBill />
+      <div className="min-w-0">
+        <div className="hidden text-[9px] font-bold uppercase tracking-[0.14em] text-white/70 md:block">{label}</div>
+        <AnimatedNumber value={cash} format={money} className="race-type block truncate text-[22px] tabular-nums leading-tight text-white not-italic [text-shadow:0_2px_0_rgba(0,0,0,0.25)] md:text-[26px]" />
+      </div>
+    </>
+  );
+}
+
 function CashBill() {
   return (
     <span className="relative flex h-5 w-8 shrink-0 items-center justify-center rounded-[4px] bg-[#3fcf5a] shadow-[0_2px_0_0_#1d8a34] ring-2 ring-[#1d8a34] md:h-6 md:w-9" aria-hidden>

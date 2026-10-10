@@ -33,6 +33,12 @@ const DIST1 = 30;
 const TIER_ZOOM = { region: 0, districts: 0.42, buildings: 1, detail: 2.6 };
 /** Below this zoom the district names are shown over the map. */
 const LABEL_ZOOM = 0.55;
+/**
+ * Camera distance under which a view is "close up": the scenery draws its
+ * small cells (most are out of view and culled) and traffic its real car
+ * models; further out, the whole scenery sets and the simple car batch.
+ */
+const CLOSE_VIEW = 70;
 const FOV = 40;
 /** Game area ids in the order of the areas raster (id = index + 1; 0 = sea). */
 const AREA_IDS = ["town", "industrial", "downtown", "automotive", "luxury", "supercar", "mega", "global", "mountain", "port", "raw", "suburbs", "boulevard", "airport", "campus", "racing"];
@@ -178,6 +184,9 @@ export class MapEngine {
   private ground: Ground | null = null;
   private terrain: TerrainParts | null = null;
   private scenery: Scenery | null = null;
+  /** Shadows are drawn (close enough), and the frame parity for redrawing them. */
+  private shadowLive = false;
+  private shadowTick = 0;
   private plots: PlotLayer | null = null;
   readonly traffic: TrafficFacade;
   private trafficLayer: Traffic3D | null = null;
@@ -227,6 +236,8 @@ export class MapEngine {
     this.renderer.toneMappingExposure = 1.05;
     this.renderer.shadowMap.enabled = !this.low;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    // redrawn on demand (see render): every other frame, and whenever the view moves
+    this.renderer.shadowMap.autoUpdate = false;
     this.ctx = labels.getContext("2d")!;
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
@@ -301,6 +312,7 @@ export class MapEngine {
     this.scene.add(...this.terrain.tiles, this.terrain.sea, this.terrain.floor);
     this.scenery = new Scenery(data, ground, this.mats, { low: this.low, lots: WORLD_MAP.plots.map((p) => ({ x: p.x, y: p.y, w: p.w, d: p.d, rot: p.rot })) });
     this.scene.add(this.scenery.root);
+    this.scenery.setClose(this.cam.dist < CLOSE_VIEW);
     const roads = buildRoads(data, ground, this.scenery.roads, aniso);
     this.roadMarks = roads.markings;
     this.scene.add(roads.root);
@@ -313,6 +325,7 @@ export class MapEngine {
     this.trafficLayer.density = this.low ? 0.5 : 1;
     this.trafficLayer.onArrive = (id) => this.pop(id, "🚗", "#93c5fd");
     this.scene.add(this.trafficLayer.root);
+    this.trafficLayer.setFar(this.cam.dist >= CLOSE_VIEW);
     this.race = new RaceCars(ground, this.mats.car);
     this.scene.add(this.race.mesh);
     this.traffic.flush();
@@ -549,9 +562,15 @@ export class MapEngine {
     // the shadow box follows the view; far out (a whole region in view) shadows fade
     // away and stop being redrawn, which saves the most work on phones
     const near = d < 110;
+    // close up: the scenery's small cells (culled out of view) and the real car models
+    const close = d < CLOSE_VIEW;
+    this.scenery?.setClose(close);
+    this.trafficLayer?.setFar(!close);
     // road lines only shimmer from far away
     if (this.roadMarks) this.roadMarks.visible = d < 150;
-    this.renderer.shadowMap.autoUpdate = near;
+    this.shadowLive = near;
+    // the shadow box moved with the view: redraw the shadows this frame
+    if (near) this.renderer.shadowMap.needsUpdate = true;
     this.sun.shadow.intensity = smoothstep(110, 80, d);
     const ext = Math.max(10, Math.min(110, d * 1.1));
     const sh = this.sun.shadow.camera;
@@ -619,6 +638,9 @@ export class MapEngine {
       waves.offset.x = (waves.offset.x + dt * 0.004) % 1;
       waves.offset.y = (waves.offset.y + dt * 0.0025) % 1;
     }
+    // the shadows of moving cars and trucks follow at 30 FPS: the shadow pass
+    // (about half the draw calls up close) runs every other frame
+    if (this.shadowLive && (this.shadowTick ^= 1)) this.renderer.shadowMap.needsUpdate = true;
     this.renderer.render(this.scene, this.camera);
     // HTML cards remain frame-accurate; the heavier canvas labels only need ~30 FPS.
     const labelDt = this.t - this.lastLabelsAt;

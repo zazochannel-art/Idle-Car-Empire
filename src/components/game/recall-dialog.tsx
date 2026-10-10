@@ -13,20 +13,24 @@ import { useUi } from "@/store/ui-store";
 
 /** ⚠️ A batch of cars has a defect: recall them (money, trust) or gamble on silence. */
 export function RecallDialog() {
+  // only whether there is a recall: the card itself follows the game while it is open
+  const open = useGame((g) => !!g.state.quality.recall);
+  const busy = useUi((u) => !!u.celebrate);
+  return <AnimatePresence>{open && !busy && <RecallCard />}</AnimatePresence>;
+}
+
+function RecallCard() {
   const recall = useGame((g) => g.state.quality.recall);
   const state = useGame((g) => g.state);
   const snap = useGame((g) => g.snap);
   const pay = useGame((g) => g.payRecall);
   const ignore = useGame((g) => g.ignoreRecall);
-  const busy = useUi((u) => !!u.celebrate);
   const { t } = useT();
-  const show = !!recall && !busy;
   const car = recall ? CAR_BY_ID[recall.car] : null;
   const cost = recall && car ? recallCost(state, carValue(state, car, snap.gm)) : 0;
   return (
-    <AnimatePresence>
-      {show && car && recall && (
-        <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+    <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      {car && recall && (
           <motion.div
             initial={{ scale: 0.85, y: 30 }}
             animate={{ scale: 1, y: 0 }}
@@ -54,8 +58,7 @@ export function RecallDialog() {
               </Button>
             </div>
           </motion.div>
-        </motion.div>
       )}
-    </AnimatePresence>
+    </motion.div>
   );
 }

@@ -351,17 +351,21 @@ export function EngineersCard() {
 
 /** 🕵️ A rival tries to poach an engineer: match the offer or let them go. */
 export function PoachDialog() {
+  // only whether a rival is calling: the card itself follows the cash and the clock while it is open
+  const open = useGame((g) => !!g.state.engineers.poach);
+  const busy = useUi((u) => !!u.celebrate);
+  return <AnimatePresence>{open && !busy && <PoachCard />}</AnimatePresence>;
+}
+
+function PoachCard() {
   const poach = useGame((g) => g.state.engineers.poach);
   const cash = useGame((g) => g.state.cash);
   const now = useGame((g) => g.state.lastActiveAt);
   const { counterOffer, letGoEngineer } = useGame.getState();
-  const busy = useUi((u) => !!u.celebrate);
   const { t } = useT();
-  const show = !!poach && !busy;
   return (
-    <AnimatePresence>
-      {show && poach && (
-        <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+    <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      {poach && (
           <motion.div initial={{ scale: 0.85, y: 30 }} animate={{ scale: 1, y: 0 }} className="w-[min(92vw,22rem)] rounded-3xl border border-violet-400/40 bg-ink/95 p-5 text-center">
             <div className="text-5xl">{ENGINEER_BY_ID[poach.id].emoji}</div>
             <div className="mt-2 text-lg font-black text-violet-200">{t("eng.poachTitle")}</div>
@@ -376,8 +380,7 @@ export function PoachDialog() {
               </Button>
             </div>
           </motion.div>
-        </motion.div>
       )}
-    </AnimatePresence>
+    </motion.div>
   );
 }

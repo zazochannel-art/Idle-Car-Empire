@@ -55,14 +55,13 @@ function veil(areas: HTMLImageElement, unlocked: ReadonlySet<string>): HTMLCanva
 
 export function Minimap({ engine }: { engine: RefObject<MapEngine | null> }) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const state = useGame((g) => g.state);
-  const stateRef = useRef(state);
+  // the drawing loop reads the latest state from a ref; only the district list re-renders, when an area opens
+  const stateRef = useRef(useGame.getState().state);
+  const areasKey = useGame((g) => [...unlockedAreas(g.state)].join("|"));
   const { t } = useT();
   const [tier, setTier] = useState<ZoomTier>("buildings");
   const [list, setList] = useState(false);
-  useEffect(() => {
-    stateRef.current = state;
-  }, [state]);
+  useEffect(() => useGame.subscribe((g) => (stateRef.current = g.state)), []);
 
   useEffect(() => {
     const canvas = ref.current!;
@@ -149,7 +148,7 @@ export function Minimap({ engine }: { engine: RefObject<MapEngine | null> }) {
   };
 
   const btn = "flex size-8 items-center justify-center rounded-lg hud-bar text-white transition hover:brightness-110";
-  const areas = unlockedAreas(state);
+  const areas = new Set(areasKey.split("|"));
   const go = (id: MapArea) => {
     engine.current?.flyToArea(id);
     setList(false);
