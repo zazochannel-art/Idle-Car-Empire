@@ -122,6 +122,7 @@ function Shell() {
   const garage = useUi((u) => u.garage);
   const floor = useUi((u) => u.floor);
   const showcase = useUi((u) => !!u.showcase);
+  const tutorial = useUi((u) => u.tutorial);
   const closeAll = useUi((u) => u.closeAll);
   // Subscribe only to the selected plot's title-relevant structure. This keeps the
   // shell off the 100ms tick while still updating a title after a build/upgrade.
@@ -190,7 +191,7 @@ function Shell() {
       <LeftRail />
       {/* on phones the showroom card sits where the goal tracker is */}
       {!open && !(showcase && !desktop) && <GoalTracker />}
-      {!open && !showcase && <Coach />}
+      {!open && !showcase && !tutorial && <Coach />}
       <BottomDock />
 
       <Sheet open={open} onClose={closeAll} title={title} icon={icon} sheetKey={desktop ? "panel" : key}>

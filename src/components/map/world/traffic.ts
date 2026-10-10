@@ -37,7 +37,11 @@ const VSCALE = 0.12;
 /** Town cars keep about the trucks' pace (the engine times trucks at ROAD_SPEED tiles/s, with stops). */
 const TOWN_SPEED = 1.9;
 const COUNTRY_SPEED = 3.6;
-const MAX_CARS = 90;
+/** Town cars at most: each is a full 3D model (several draw calls), so phones stay smooth. */
+const MAX_CARS = 48;
+/** Buyers driving off at once, and the gap between two at the same dealership (s): a busy dealer sells several cars a second. */
+const MAX_BUYERS = 10;
+const BUYER_GAP = 2.5;
 
 type P3 = [number, number, number];
 
@@ -60,6 +64,10 @@ interface RoadCar {
   scale: number;
   visual: THREE.Group;
   hero?: boolean;
+  /** A customer driving off in the car they just bought. */
+  buyer?: boolean;
+  /** Town traffic is painted in its own colour; buyers and the first car keep the model's factory look. */
+  paint?: boolean;
   /** Cached road segment to avoid a binary search every rendered frame. */
   seg: number;
   /** Last visual alpha scale applied; avoids redundant matrix updates every frame. */
@@ -158,6 +166,9 @@ export class Traffic3D {
   private sc = new THREE.Vector3();
   private yAxis = new THREE.Vector3(0, 1, 0);
   hero: RoadCar | null = null;
+  /** Seconds since start, and when each dealership last sent a buyer off. */
+  private clock = 0;
+  private lastBuyer = new Map<string, number>();
 
   constructor(
     private ground: Ground,
@@ -187,7 +198,11 @@ export class Traffic3D {
     this.open = WORLD_MAP.roads.map((_, i) => roadOpen(i, unlocked));
     this.openLen = WORLD_MAP.roads.reduce((a, r, i) => a + (this.open[i] ? r.len : 0), 0);
     // cars on roads that closed (a new game) leave
-    this.cars = this.cars.filter((c) => this.open[c.road] || c.life > 0);
+    this.cars = this.cars.filter((c) => {
+      const keep = this.open[c.road] || c.life > 0;
+      if (!keep) this.root.remove(c.visual);
+      return keep;
+    });
   }
 
   // ───────────────────────── road cars ─────────────────────────
@@ -206,14 +221,14 @@ export class Traffic3D {
     return this.open.indexOf(true);
   }
 
-  private newCar(road: number, s: number, dir: 1 | -1, hex: string, model: CarModel, life = 0, scale = 1): RoadCar {
+  private newCar(road: number, s: number, dir: 1 | -1, hex: string, model: CarModel, life = 0, scale = 1, paint = false): RoadCar {
     const r = WORLD_MAP.roads[road];
     if (r.oneway) dir = 1;
     const c: RoadCar = {
       road, s, dir,
       speed: (r.fast ? COUNTRY_SPEED : TOWN_SPEED) * (0.85 + Math.random() * 0.3),
       color: new THREE.Color(hex), hex, model, x: 0, y: 0, z: 0, yaw: 0,
-      alpha: life ? 0 : 1, life, scale, visual: new THREE.Group(), seg: 0, visualScale: -1,
+      alpha: life ? 0 : 1, life, scale, paint, visual: new THREE.Group(), seg: 0, visualScale: -1,
     };
     c.visual.name = `traffic-car-${model}`;
     this.root.add(c.visual);
@@ -228,15 +243,23 @@ export class Traffic3D {
     const r = WORLD_MAP.roads[road];
     const hex = CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)];
     const model = TRAFFIC_MODELS[Math.floor(Math.random() * TRAFFIC_MODELS.length)];
-    const c = this.newCar(road, Math.random() * r.len, Math.random() < 0.5 ? 1 : -1, hex, model, 0, TRAFFIC_SCALE[model]);
+    const c = this.newCar(road, Math.random() * r.len, Math.random() < 0.5 ? 1 : -1, hex, model, 0, TRAFFIC_SCALE[model], true);
     c.alpha = 0;
     this.cars.push(c);
   }
 
   /** A buyer drives off from a dealership in the car they bought. */
   spawnBuyer(site: Site, model: CarModel, color?: string) {
+    // a few buyers stand for all the sales: one per dealership every few seconds, ten on the roads at most
+    if (this.clock - (this.lastBuyer.get(site.id) ?? -Infinity) < BUYER_GAP) return;
+    let buyers = 0;
+    for (const c of this.cars) if (c.buyer) buyers++;
+    if (buyers >= MAX_BUYERS) return;
+    this.lastBuyer.set(site.id, this.clock);
     const e = site.entry;
-    this.cars.push(this.newCar(e.edge, e.s, Math.random() < 0.5 ? 1 : -1, color ?? CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)], model, 14));
+    const c = this.newCar(e.edge, e.s, Math.random() < 0.5 ? 1 : -1, color ?? CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)], model, 14);
+    c.buyer = true;
+    this.cars.push(c);
   }
 
   /** FIRST CAR: the new car rolls out of its plant and onto the road. */
@@ -250,7 +273,7 @@ export class Traffic3D {
 
   /** Replace the generic traffic silhouette with the actual GLB-backed model. */
   private refreshCarVisual(c: RoadCar) {
-    const model = buildCar(THREE, { model: c.model, color: c.hex, finish: "gloss" });
+    const model = buildCar(THREE, { model: c.model, color: c.hex, finish: "gloss", build: c.paint ? { color: c.hex } : undefined });
     if (!model.children.length) return;
     c.visual.clear();
     model.scale.setScalar(0.118 * c.scale);
@@ -457,6 +480,7 @@ export class Traffic3D {
   // ───────────────────────── frame ─────────────────────────
 
   update(dt: number) {
+    this.clock += dt;
     // keep the town's traffic at its level
     const want = this.target();
     let ambient = 0;

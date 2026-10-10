@@ -62,6 +62,9 @@ interface UiStore {
   showcase: VehiclePick | null;
   /** The race viewer: preparing a race (event chosen, not started) or watching the live one. */
   race: { phase: "prep"; event: string; special?: string } | { phase: "watch" } | null;
+  /** The first-company tour is on screen (the one-line tips wait until it is closed). */
+  tutorial: boolean;
+  setTutorial: (on: boolean) => void;
   setRace: (r: UiStore["race"]) => void;
   setShowcase: (v: VehiclePick | null) => void;
   setTimeMode: (m: TimeMode) => void;
@@ -96,6 +99,8 @@ export const useUi = create<UiStore>((set) => ({
   preview: null,
   showcase: null,
   race: null,
+  tutorial: false,
+  setTutorial: (tutorial) => set({ tutorial }),
   setRace: (race) => set({ race }),
   setShowcase: (showcase) => set(showcase ? { showcase, view: null, plot: null, zone: null, preview: null } : { showcase }),
   setTimeMode: (timeMode) => {

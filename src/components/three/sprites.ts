@@ -187,7 +187,7 @@ class SpriteFactory {
       // bright daylight over flat-shaded low-poly models (see lowPoly below)
       renderer.toneMappingExposure = 1.05;
       renderer.shadowMap.enabled = true;
-      renderer.shadowMap.type = T.PCFSoftShadowMap;
+      renderer.shadowMap.type = T.PCFShadowMap;
 
       const scene = new T.Scene();
       const pmrem = new T.PMREMGenerator(renderer);
