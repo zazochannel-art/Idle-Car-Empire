@@ -89,6 +89,26 @@ interface Truck {
   yaw: number;
   /** Delivered: fading out in the yard. */
   gone: number;
+  /** Its model's length, height and width (for the simple shape far out). */
+  size?: THREE.Vector3;
+}
+
+/** The simple car shape's own size (length, height, width). */
+const SHAPE = new THREE.Vector3(0.56, 0.29, 0.27);
+/** Room in the far-out batch: every road car and every truck. */
+const FAR_CAP = 256;
+
+/** A vehicle model's size in its own frame (length along x, height, width along z). */
+function modelSize(obj: THREE.Object3D): THREE.Vector3 {
+  const box = new THREE.Box3();
+  const part = new THREE.Box3();
+  obj.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh) return;
+    if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+    box.union(part.copy(m.geometry.boundingBox!).applyMatrix4(m.matrix));
+  });
+  return box.isEmpty() ? SHAPE.clone() : box.getSize(new THREE.Vector3());
 }
 
 /** Where a lot's vehicles park: just inside its front edge, and the front edge itself. */
@@ -155,7 +175,9 @@ export class Traffic3D {
   private openLen = 0;
   /** Roads leaving each junction: [road, forward]. */
   private exits: [number, boolean][][] = [];
+  /** Far out, every road car is drawn from this one batch of simple car shapes. */
   private inst: THREE.InstancedMesh;
+  private far = false;
   private kit: MaterialKit = materialKit(THREE);
   private models = new Map<string, THREE.Group>();
   private carMats = new Map<string, THREE.Material>();
@@ -165,6 +187,7 @@ export class Traffic3D {
   private v = new THREE.Vector3();
   private sc = new THREE.Vector3();
   private yAxis = new THREE.Vector3(0, 1, 0);
+  private col = new THREE.Color();
   hero: RoadCar | null = null;
   /** Seconds since start, and when each dealership last sent a buyer off. */
   private clock = 0;
@@ -176,12 +199,13 @@ export class Traffic3D {
     carMat: THREE.Material,
   ) {
     this.root.name = "traffic";
-    this.inst = new THREE.InstancedMesh(this.carGeo, carMat, MAX_CARS + 24);
+    this.inst = new THREE.InstancedMesh(this.carGeo, carMat, FAR_CAP);
     this.inst.count = 0;
     this.inst.castShadow = true;
     this.inst.frustumCulled = false;
     this.inst.count = 0;
     this.inst.visible = false;
+    this.root.add(this.inst);
     void loadHeroes(THREE).then(() => {
       for (const car of this.cars) this.refreshCarVisual(car);
     });
@@ -191,6 +215,14 @@ export class Traffic3D {
       this.exits[r.a].push([i, true]);
       if (!r.oneway) this.exits[r.b].push([i, false]);
     });
+  }
+
+  /**
+   * From far out a car is a few pixels wide: then the cars draw as one
+   * instanced batch of simple shapes instead of a dozen meshes each.
+   */
+  setFar(far: boolean) {
+    this.far = far;
   }
 
   /** Which roads carry traffic (those through open districts and territories). */
@@ -506,9 +538,9 @@ export class Traffic3D {
     });
     if (this.hero && !this.cars.includes(this.hero)) this.hero = null;
 
-    // Real traffic models are individual cached GLB clones.
+    // Real traffic models are individual cached GLB clones (close up).
     for (const car of this.cars) {
-      const visible = car.alpha > 0.01;
+      const visible = car.alpha > 0.01 && !this.far;
       if (car.visual.visible !== visible) car.visual.visible = visible;
       const fade = car.life > 0 ? Math.max(0.05, car.alpha) : 1;
       if (Math.abs(fade - car.visualScale) > 0.001) {
@@ -528,7 +560,42 @@ export class Traffic3D {
         }
       } else tr.lt = Math.min(tr.view.dur, tr.lt + dt);
       this.placeTruck(tr, Math.min(1, dt * 6));
+      if (tr.obj.visible === this.far) tr.obj.visible = !this.far;
     }
+    this.drawFar();
+  }
+
+  /** Far out: every car and truck on the road as one instance of the simple shape, in its colour. */
+  private drawFar() {
+    const inst = this.inst;
+    if (!this.far) {
+      if (inst.visible) inst.visible = false;
+      return;
+    }
+    const cap = inst.instanceMatrix.count;
+    let n = 0;
+    for (const car of this.cars) {
+      if (car.alpha <= 0.01 || n >= cap) continue;
+      const s = car.scale * (car.life > 0 ? Math.max(0.05, car.alpha) : 1);
+      this.m4.compose(this.v.set(car.x, car.y, car.z), this.q.setFromAxisAngle(this.yAxis, car.yaw), this.sc.set(s, s, s));
+      inst.setMatrixAt(n, this.m4);
+      inst.setColorAt(n, car.color);
+      n++;
+    }
+    // trucks: the same shape stretched to the truck's size, in its cargo's colour
+    for (const tr of this.trucks.values()) {
+      if (n >= cap) break;
+      const size = (tr.size ??= modelSize(tr.obj));
+      const f = tr.gone > 0 ? Math.max(0.01, 1 - tr.gone / 0.8) : 1;
+      this.m4.compose(this.v.set(tr.x, tr.y, tr.z), this.q.setFromAxisAngle(this.yAxis, tr.yaw), this.sc.set((size.x / SHAPE.x) * f, (size.y / SHAPE.y) * f, (size.z / SHAPE.z) * f));
+      inst.setMatrixAt(n, this.m4);
+      inst.setColorAt(n, this.col.set(tr.view.color));
+      n++;
+    }
+    inst.count = n;
+    inst.instanceMatrix.needsUpdate = true;
+    if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
+    inst.visible = n > 0;
   }
 
   /** Releases GPU resources owned by this traffic layer when the map is unmounted. */

@@ -10,11 +10,14 @@ import { ZONE_BY_ID } from "@/game/config/city";
 import { canResearch, isManagerUnlocked } from "@/game/engine/actions";
 import { buildingUpgradeCost } from "@/game/engine/city";
 import { levelCost } from "@/game/engine/chain";
-import { nextGoals } from "@/game/engine/insights";
+import { nextGoals, type Goal } from "@/game/engine/insights";
 import { canPrestige } from "@/game/engine/prestige";
 import { claimableCount } from "@/game/engine/progress";
 import { formatDuration, formatMoney, formatNumber } from "@/game/format";
-import { useContent } from "@/i18n/content";
+import { useContent, type Content } from "@/i18n/content";
+import { useShallow } from "zustand/react/shallow";
+import type { GameState } from "@/game/types";
+import type { EconomySnapshot } from "@/game/engine/economy";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { useGame } from "@/store/game-store";
@@ -395,50 +398,66 @@ function BottomDock() {
 
 /** The current goal, floating above the dock like a quest tracker. */
 function GoalTracker() {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
   const { t, lang } = useT();
   const n = useContent(lang);
-  const goal = nextGoals(state, snap, 1)[0];
-  if (!goal) return null;
-  const cost = "cost" in goal ? goal.cost : undefined;
-  const ready = !cost || state.cash >= cost;
-  const pct = goal.kind === "made" ? Math.min(100, (goal.have / goal.n) * 100) : cost ? Math.min(100, (state.cash / cost) * 100) : 100;
-  const eta = cost && !ready && snap.incomePerSec > 0 && (cost - state.cash) / snap.incomePerSec < 86400 * 30 ? (cost - state.cash) / snap.incomePerSec : null;
-  const text = goalText(goal, t, n);
+  // the card as it shows (texts, whole-percent progress): worked out every tick,
+  // re-rendered only when something on it changes
+  const view = useGame(useShallow((g) => goalView(g.state, g.snap, t, n)));
+  if (!view) return null;
+  const { icon, title, detail, bar, pct, label, ready } = view;
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] z-20 flex justify-center px-3">
       <button
-        onClick={() => runGoal(goal, ready)}
+        onClick={() => {
+          const g = useGame.getState();
+          const goal = nextGoals(g.state, g.snap, 1)[0];
+          if (goal) runGoal(goal, goalReady(goal, g.state.cash));
+        }}
         className={cn(
           "pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-xl p-2.5 text-left shadow-[0_4px_0_0_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:brightness-110",
           ready ? "bg-[#2b2b2e]/95 ring-2 ring-gold" : "bg-[#2b2b2e]/90",
         )}
       >
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/5 text-xl">{goal.icon}</span>
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/5 text-xl">{icon}</span>
         <span className="min-w-0 flex-1">
           <span className="block text-[10px] font-bold uppercase tracking-[0.14em] text-white/50">{t("goal.next")}</span>
-          <span className="race-type block truncate text-[17px] leading-tight">{text.title}</span>
-          {goal.kind === "made" ? (
+          <span className="race-type block truncate text-[17px] leading-tight">{title}</span>
+          {bar ? (
             <span className="mt-1 flex items-center gap-2">
-              <Progress value={pct} className="h-1.5" />
-              <span className="shrink-0 text-[10px] tabular-nums text-white/55">
-                {formatNumber(Math.min(goal.have, goal.n))}/{formatNumber(goal.n)}
-              </span>
-            </span>
-          ) : cost !== undefined ? (
-            <span className="mt-1 flex items-center gap-2">
-              <Progress value={pct} className="h-1.5" indicatorClassName={ready ? "from-gold to-amber-300" : undefined} />
-              <span className="shrink-0 text-[10px] tabular-nums text-white/55">{ready ? formatMoney(cost) : eta !== null ? `~${formatDuration(eta)}` : formatMoney(cost)}</span>
+              <Progress value={pct} className="h-1.5" indicatorClassName={bar === "cost" && ready ? "from-gold to-amber-300" : undefined} />
+              <span className="shrink-0 text-[10px] tabular-nums text-white/55">{label}</span>
             </span>
           ) : (
-            <span className="block truncate text-[11px] text-white/50">{text.detail}</span>
+            <span className="block truncate text-[11px] text-white/50">{detail}</span>
           )}
         </span>
         <ArrowRight className={cn("size-5 shrink-0", ready ? "text-gold" : "text-white/40")} />
       </button>
     </div>
   );
+}
+
+const goalReady = (goal: Goal, cash: number) => !("cost" in goal) || !goal.cost || cash >= goal.cost;
+
+/** What the goal card shows, as plain values (so an unchanged card is not drawn again). */
+function goalView(state: GameState, snap: EconomySnapshot, t: ReturnType<typeof useT>["t"], n: Content) {
+  const goal = nextGoals(state, snap, 1)[0];
+  if (!goal) return null;
+  const cost = "cost" in goal ? goal.cost : undefined;
+  const ready = goalReady(goal, state.cash);
+  const text = goalText(goal, t, n);
+  const view = { icon: goal.icon, title: text.title, detail: text.detail, ready, bar: "" as "" | "made" | "cost", pct: 0, label: "" };
+  if (goal.kind === "made") {
+    view.bar = "made";
+    view.pct = Math.floor(Math.min(100, (goal.have / goal.n) * 100));
+    view.label = `${formatNumber(Math.min(goal.have, goal.n))}/${formatNumber(goal.n)}`;
+  } else if (cost !== undefined) {
+    view.bar = "cost";
+    view.pct = Math.floor(cost ? Math.min(100, (state.cash / cost) * 100) : 100);
+    const eta = !ready && snap.incomePerSec > 0 && (cost - state.cash) / snap.incomePerSec < 86400 * 30 ? (cost - state.cash) / snap.incomePerSec : null;
+    view.label = ready ? formatMoney(cost) : eta !== null ? `~${formatDuration(eta)}` : formatMoney(cost);
+  }
+  return view;
 }
 
 function NavBadge({ n, gold, className }: { n?: number; gold?: boolean; className?: string }) {

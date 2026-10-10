@@ -111,8 +111,22 @@ export interface SceneryOptions {
   lots?: { x: number; y: number; w: number; d: number; rot: number }[];
 }
 
+/** Side of the cells the big instanced sets are cut into for close-up views (world units). */
+const CELL = 25;
+/** Sets smaller than this stay whole: one draw is cheaper than several. */
+const CELL_MIN = 48;
+
 export class Scenery {
   readonly root = new THREE.Group();
+  /**
+   * The big instanced sets (trees, bushes, props) exist twice, sharing their
+   * geometry and materials: whole, for views of a whole region, and cut into
+   * small cells, for close-up views, where the camera (and the sun's shadow
+   * box) culls the cells out of sight instead of drawing the whole island.
+   */
+  private whole = new THREE.Group();
+  private cells = new THREE.Group();
+  private close = false;
   readonly roads: MapRoad[];
   readonly animated: Animated = { rotors: [], pumps: [], cabins: [] };
   /** Lamp posts along town streets and on bridges, [x, z, yaw, y]. */
@@ -133,6 +147,54 @@ export class Scenery {
     this.parked();
     this.landmarks();
     this.cableCar();
+    this.cutIntoCells();
+  }
+
+  /** Close-up views draw the cells, wide views the whole sets. */
+  setClose(close: boolean) {
+    if (close === this.close) return;
+    this.close = close;
+    this.cells.visible = close;
+    this.whole.visible = !close;
+  }
+
+  private cutIntoCells() {
+    const big: THREE.InstancedMesh[] = [];
+    for (const o of this.root.children) {
+      const m = o as THREE.InstancedMesh;
+      if (!m.isInstancedMesh || m.count < CELL_MIN) continue;
+      if (!m.boundingSphere) m.computeBoundingSphere();
+      if (m.boundingSphere!.radius > CELL) big.push(m);
+    }
+    const col = new THREE.Color();
+    for (const m of big) {
+      const byCell = new Map<number, number[]>();
+      const a = m.instanceMatrix.array;
+      for (let i = 0; i < m.count; i++) {
+        const k = Math.floor(a[i * 16 + 12] / CELL + 512) * 1024 + Math.floor(a[i * 16 + 14] / CELL + 512);
+        let list = byCell.get(k);
+        if (!list) byCell.set(k, (list = []));
+        list.push(i);
+      }
+      for (const list of byCell.values()) {
+        const c = new THREE.InstancedMesh(m.geometry, m.material, list.length);
+        c.castShadow = m.castShadow;
+        c.receiveShadow = m.receiveShadow;
+        list.forEach((i, j) => {
+          m.getMatrixAt(i, M4);
+          c.setMatrixAt(j, M4);
+          if (m.instanceColor) {
+            m.getColorAt(i, col);
+            c.setColorAt(j, col);
+          }
+        });
+        c.computeBoundingSphere();
+        this.cells.add(c);
+      }
+      this.whole.add(m);
+    }
+    this.cells.visible = false;
+    this.root.add(this.whole, this.cells);
   }
 
   private tileOf(x: number, z: number) {
