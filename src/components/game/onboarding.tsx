@@ -80,23 +80,33 @@ function languageOf(lang: string): keyof typeof copy {
 
 export function Onboarding() {
   const ready = useGame((g) => g.ready);
-  const state = useGame((g) => g.state);
   const lang = useGame((g) => g.state.settings.lang);
   const [dismissed, setDismissed] = useState(true);
   const [step, setStep] = useState(0);
+  const setTutorial = useUi((u) => u.setTutorial);
 
   useEffect(() => {
+    // decided once the save has loaded: a returning player whose plants already
+    // make cars doesn't need the first-company tour
+    if (!ready) return;
     const timer = window.setTimeout(() => {
+      let seen = false;
       try {
-        setDismissed(localStorage.getItem(STORAGE_KEY) === "1");
+        seen = localStorage.getItem(STORAGE_KEY) === "1";
       } catch {
-        setDismissed(false);
+        // storage unavailable: show the tour
       }
+      setDismissed(seen || useGame.getState().state.chain.firstCar);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [ready]);
 
-  if (!ready || dismissed) return null;
+  const visible = ready && !dismissed;
+  useEffect(() => {
+    setTutorial(visible);
+  }, [visible, setTutorial]);
+
+  if (!visible) return null;
 
   const l = languageOf(lang);
   const text = STEPS[step];
@@ -105,6 +115,7 @@ export function Onboarding() {
 
   const go = () => {
     const ui = useUi.getState();
+    const state = useGame.getState().state;
     if (step === 0) {
       const starter = Object.keys(state.city.buildings).find((id) => state.city.buildings[id]?.type === "bodyWorks");
       if (starter) ui.selectPlot(starter);

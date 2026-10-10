@@ -123,7 +123,7 @@ function Turntable({ v }: { v: VehiclePick }) {
         renderer.outputColorSpace = T.SRGBColorSpace;
         renderer.toneMapping = T.NeutralToneMapping;
         renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = T.PCFSoftShadowMap;
+        renderer.shadowMap.type = T.PCFShadowMap;
         const scene = new T.Scene();
         const pmrem = new T.PMREMGenerator(renderer);
         const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
