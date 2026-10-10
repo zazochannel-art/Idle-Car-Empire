@@ -161,6 +161,22 @@ export const PLANT_MAX_LEVEL = PLANT_LEVELS.length;
 /** Speed upgrades: each makes production this much faster. */
 export const SPEED = { mult: 1.06, firstCost: 0.08, growth: 1.5, max: 40 };
 
+/**
+ * The Body Works shop floor: up to five machines along its line (blanking,
+ * press, welding, framing, inspection), each run by one hired operator. The
+ * plant comes with the first machine and its operator. Every further machine
+ * makes the plant `machine` faster; with an operator at it, `operator` more
+ * (a machine alone never replaces a worker). Machines and operators are
+ * one-off purchases: the plant's crew wages already cover the shifts.
+ */
+export const BODY_WORKSHOP = {
+  max: 5,
+  machine: 0.05,
+  operator: 0.15,
+  machineCost: { base: 350, growth: 1.75 },
+  operatorCost: { base: 180, growth: 1.65 },
+};
+
 /** Manual → Semi-Automated → Automated → Advanced Automation → AI Factory. */
 export const AUTOMATION = [
   { speed: 1, offline: 0, cost: 0 },

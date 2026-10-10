@@ -4,9 +4,11 @@
 // as vector shapes; machines, robots, people and vehicles are cached 3D
 // sprites (a few dozen per frame), so it stays light on phones.
 //
-// The line works like a real transfer line: every few seconds all parts
-// move one station forward together, then each station works on its part
-// (the press strokes, the laser sweeps, the welding robots spark).
+// The line works like a real transfer line: all parts move one station
+// forward together, then each station works on its part (the press strokes,
+// the laser sweeps, the welding robots spark). The transfers follow the
+// plant's real batch: a part walks the whole line in one production cycle,
+// and the line stands still whenever the plant does.
 import { liveryOf } from "../../three/livery";
 import { attachControls, Camera } from "../../map/camera";
 import { Painter, sx, sy, toTile } from "../../map/iso";
@@ -21,6 +23,13 @@ export interface InteriorScene {
   spec: InteriorSpec;
   /** The line is moving (materials in, room for the output). */
   running: boolean;
+  /** The plant's real batch: progress 0..1 and seconds per batch (absent: a steady demo pace). */
+  progress?: number;
+  cycle?: number;
+  /** Why the line stands, shown at the stage it concerns. */
+  stop?: "noRaw" | "full";
+  /** Words painted on the floor (Body Works shop floor and stops). */
+  words?: { noOperator: string; build: string; noRaw: string; full: string };
   /** Fill levels 0..1 of raw material and finished goods. */
   raw: number;
   out: number;
@@ -44,9 +53,11 @@ export interface StationPick {
   id: StationId;
 }
 
-/** Seconds per transfer: the parts glide for MOVE, then the stations work. */
+/** Seconds per transfer without a real batch to follow; the parts glide for about MOVE, then the stations work. */
 const CYCLE = 2.8;
 const MOVE = 0.9;
+/** Faster transfers than this are unreadable: the line then runs at this pace (and no longer follows the batch). */
+const MIN_TRANSFER = 0.7;
 const STATION_SIZE: SpriteSize = { w: 230, h: 230, ax: 115, ay: 150 };
 const PERSON_SIZE: SpriteSize = { w: 34, h: 44, ax: 17, ay: 36 };
 const PROP_SIZE: SpriteSize = { w: 56, h: 50, ax: 28, ay: 32 };
@@ -68,6 +79,9 @@ export class InteriorEngine {
   private t = 0;
   /** Production clock: only advances while the line runs. */
   private work = 0;
+  /** Transfers done (fractional), locked to the plant's batch progress. */
+  private beat = 0;
+  private sceneAt = 0;
   private scene: InteriorScene | null = null;
   private layout: Interior | null = null;
   private layoutKey = "";
@@ -101,7 +115,9 @@ export class InteriorEngine {
 
   setScene(s: InteriorScene) {
     this.scene = s;
-    const key = `${s.type}|${s.spec.level}|${s.spec.automation}|${s.spec.manager}`;
+    this.sceneAt = performance.now();
+    const f = s.spec.floor;
+    const key = `${s.type}|${s.spec.level}|${s.spec.automation}|${s.spec.manager}|${f ? `${f.machines}/${f.workers}` : ""}`;
     if (key !== this.layoutKey) {
       const grew = this.layout !== null;
       this.layout = interiorLayout(s.spec, recipeFor(s.type));
@@ -174,11 +190,35 @@ export class InteriorEngine {
       const { x: tx, y: ty } = toTile(wx, wy + lift);
       for (const line of L.lines)
         for (const st of line.stations)
-          if (st.mode !== "planned" && tx >= st.x - 0.1 && tx <= st.x + st.w + 0.1 && ty >= line.belt - 1.2 && ty <= line.belt + 1.1) hit = { line: line.index, id: st.def.id };
+          if (this.pickable(st) && tx >= st.x - 0.1 && tx <= st.x + st.w + 0.1 && ty >= line.belt - 1.2 && ty <= line.belt + 1.1) hit = { line: line.index, id: st.def.id };
       if (hit) break;
     }
     this.selected = hit;
     this.onSelect(hit);
+  }
+
+  /** Built stations can be tapped; on the Body Works shop floor, so can the empty machine bays (to build them). */
+  private pickable(st: PlacedStation) {
+    return st.mode !== "planned" || (!!this.scene?.spec.floor && st.slot !== undefined);
+  }
+
+  /** Moves the line on: one transfer per station per batch, caught up with the plant's real progress. */
+  private advance(s: InteriorScene, L: Interior, dt: number) {
+    if (!s.running) return;
+    const steps = Math.max(1, lineStops(L.lines[0]).length - 1);
+    const per = s.cycle && s.cycle > 0 ? s.cycle / steps : CYCLE;
+    if (s.progress === undefined || per < MIN_TRANSFER) {
+      this.beat += dt / Math.max(MIN_TRANSFER, per);
+      return;
+    }
+    // where the batch is now (the store ticks ten times a second; fill in between)
+    const since = Math.min(0.15, (performance.now() - this.sceneAt) / 1000);
+    const target = Math.min(1, s.progress + since / (s.cycle ?? CYCLE)) * steps;
+    let err = target - (((this.beat % steps) + steps) % steps);
+    if (err > steps / 2) err -= steps;
+    if (err < -steps / 2) err += steps;
+    // forward at the real pace, closing the gap smoothly; never backwards
+    this.beat += Math.max(0, dt / per + err * Math.min(1, dt * 4));
   }
 
   // ───────────────────────── rendering ─────────────────────────
@@ -188,6 +228,7 @@ export class InteriorEngine {
     const s = this.scene;
     const L = this.layout;
     if (s?.running) this.work += dt;
+    if (s && L) this.advance(s, L, dt);
     const { ctx, p, cam } = this;
     cam.update(dt);
     const W = this.canvas.width;
@@ -301,22 +342,27 @@ export class InteriorEngine {
     const c = this.ctx;
     const stops = lineStops(line);
     const n = stops.length;
-    // phase of the transfer cycle (lines are a little out of step with each other)
-    const clock = this.work + line.index * 0.7;
-    const cyc = Math.floor(clock / CYCLE);
-    const ph = clock / CYCLE - cyc;
-    const moving = s.running && ph * CYCLE < MOVE;
-    const mk = moving ? smooth((ph * CYCLE) / MOVE) : 1;
+    // phase of the transfer (lines are a little out of step with each other)
+    const clock = this.beat + line.index * 0.25;
+    const ph = clock - Math.floor(clock);
+    const steps = Math.max(1, n - 1);
+    const per = s.cycle && s.cycle > 0 ? Math.max(MIN_TRANSFER, s.cycle / steps) : CYCLE;
+    // the glide takes about MOVE seconds, the rest of the transfer is work
+    const glide = Math.max(0.15, Math.min(0.45, MOVE / per));
+    const moving = s.running && ph < glide;
+    const mk = moving ? smooth(ph / glide) : 1;
     const working = s.running && !moving;
     const k = tierCap(this.cam.zoom * this.dpr);
     const near = this.cam.zoom > 0.5;
+    const floor = s.spec.floor;
 
-    // planned bays: just the painted outline and the station's name
+    // planned bays: just the painted outline and the station's name; on the
+    // shop floor the next one to build is marked out in green
     for (const st of line.stations) {
-      const lab = s.labels[st.def.id] ?? st.def.id;
       if (st.mode === "planned") {
-        p.quadStroke(st.x, line.belt - 1, st.w, 2, "rgba(255,255,255,0.55)", 1.5, [6, 6]);
-        if (near) p.tag(`${st.def.icon} ${lab}`, st.x + st.w / 2, line.belt, 2, { size: 9, bg: "rgba(15,23,42,0.6)" });
+        const next = !!floor && st.slot === floor.machines;
+        p.quadStroke(st.x, line.belt - 1, st.w, 2, next ? "rgba(74,222,128,0.9)" : "rgba(255,255,255,0.55)", next ? 2 : 1.5, [6, 6]);
+        if (next) p.quad(st.x, line.belt - 1, st.w, 2, `rgba(74,222,128,${0.1 + Math.sin(this.t * 3) * 0.05})`);
       } else {
         p.quad(st.x, line.belt - 1.05, st.w, 2.1, "rgba(30,41,59,0.18)");
         p.quadStroke(st.x, line.belt - 1.05, st.w, 2.1, "rgba(250,204,21,0.75)", 1.2);
@@ -333,6 +379,10 @@ export class InteriorEngine {
       p.box(cx - 0.12, line.y0 + 0.05, 0.24, 0.24, 0, 88, "#64748b", "#94a3b8");
       p.box(cx - 0.17, line.y0, 0.34, 0.34, 0, 6, "#facc15", "#fde047");
     }
+
+    // work lamps: a lit machine is a manned, working one
+    for (const st of stops)
+      if (s.running && st.def.staff > 0 && st.staffed) p.light(sx(st.stop.x, st.stop.y - 0.4), sy(st.stop.x, st.stop.y - 0.4, 2), 48, "#fff3c4", 0.2);
 
     // 1. what stands behind the belt
     for (const st of stops) this.station(s, st, "back", working, k);
@@ -363,7 +413,7 @@ export class InteriorEngine {
     // 3. parts on the line: one per station, each a step further along.
     // While moving, a part shows what the station it left made of it; at a
     // station it changes into the station's product halfway through the work.
-    const late = working && ph * CYCLE > MOVE + (CYCLE - MOVE) * 0.5;
+    const late = working && ph > glide + (1 - glide) * 0.5;
     for (let i = 0; i < n; i++) {
       if (moving) {
         if (i === n - 1) continue; // the last one went onto the rack
@@ -390,9 +440,10 @@ export class InteriorEngine {
     // 4. what stands in front of the belt
     for (const st of stops) this.station(s, st, "front", working, k);
 
-    // effects: sparks, laser, heat, paint mist, the QC scan; warning beacons when stopped
+    // effects: sparks, laser, heat, paint mist, the QC scan (a machine without
+    // its operator works in fits and starts)
     for (const st of stops) {
-      if (!working) continue;
+      if (!working || (!st.staffed && Math.sin(this.t * 2 + st.x) < 0)) continue;
       const { x, y } = st.stop;
       switch (st.def.fx) {
         case "sparks":
@@ -415,39 +466,58 @@ export class InteriorEngine {
         }
       }
     }
-    if (!s.running) {
-      const on = Math.sin(this.t * 6) > 0;
-      for (const st of stops) {
-        if (st.def.staff === 0) continue;
-        p.box(st.x + st.w - 0.35, line.belt - 0.95, 0.12, 0.12, 0, 24, "#475569");
-        p.box(st.x + st.w - 0.38, line.belt - 0.98, 0.18, 0.18, 24, 4, on ? "#f59e0b" : "#78350f");
-        if (on) p.light(sx(st.x + st.w - 0.3, line.belt - 0.9), sy(st.x + st.w - 0.3, line.belt - 0.9, 26), 30, "#f59e0b", 0.7);
-      }
+    // a stack light on every machine: green working, amber without its operator, red blinking when the line stands
+    const blink = Math.sin(this.t * 6) > 0;
+    for (const st of stops) {
+      if (st.def.staff === 0) continue;
+      const [on, off] = !s.running ? ["#ef4444", "#7f1d1d"] : st.staffed ? ["#22c55e", "#22c55e"] : ["#f59e0b", "#78350f"];
+      const lit = s.running ? st.staffed || Math.sin(this.t * 2.5) > 0 : blink;
+      p.box(st.x + st.w - 0.35, line.belt - 0.95, 0.12, 0.12, 0, 24, "#475569");
+      p.box(st.x + st.w - 0.38, line.belt - 0.98, 0.18, 0.18, 24, 4, lit ? on : off);
+      if (lit) p.light(sx(st.x + st.w - 0.3, line.belt - 0.9), sy(st.x + st.w - 0.3, line.belt - 0.9, 26), s.running ? 18 : 30, on, s.running ? 0.45 : 0.7);
     }
 
-    // 5. robots and people in front of the line
+    // 5. robots and people in front of the line (robots in a cell without its operator at half pace)
+    const pace = (id: StationId) => (line.stations.find((x) => x.def.id === id)?.staffed === false ? 0.5 : 1);
     for (const r of L.robots) {
       if (r.line !== line.index || r.reach) continue;
-      this.robot(r.x, r.y, working ? Math.floor(this.t * 4 + r.x) % 4 : 0, r.tool, k);
+      this.robot(r.x, r.y, working ? Math.floor(this.t * 4 * pace(r.station) + r.x) % 4 : 0, r.tool, k);
     }
     for (const r of L.robots) {
       if (r.line !== line.index || !r.reach) continue;
       // welding, framing and assembly robots reach over the part from the front
-      this.robot(r.x, line.belt + 0.75, working ? Math.floor(this.t * 5 + r.x * 3) % 4 : 0, r.tool, k);
+      this.robot(r.x, line.belt + 0.75, working ? Math.floor(this.t * 5 * pace(r.station) + r.x * 3) % 4 : 0, r.tool, k);
     }
     for (const [i, h] of L.people.entries()) {
       if (h.line !== line.index) continue;
-      const busy = working && h.station !== undefined;
+      const busy = working && h.station !== undefined && h.role !== "supervisor";
       const pose = busy ? Math.floor(this.t * 4 + i) % 4 : s.running ? Math.floor(this.t * 1.5 + i) % 2 : 0;
       this.person(h.x, h.y, h.role, pose, i, k);
       if (h.role === "welder" && working && near) this.sparks(h.x + 0.1, h.y - 0.6);
     }
-    // station names on the floor in front of each station
+    // empty bays keep their name (the next one to build on the shop floor says so), above the belt
+    if (near)
+      for (const st of line.stations) {
+        if (st.mode !== "planned") continue;
+        const lab = s.labels[st.def.id] ?? st.def.id;
+        const next = !!floor && st.slot === floor.machines;
+        p.tag(next && s.words ? `＋ ${s.words.build} · ${lab}` : `${st.def.icon} ${lab}`, st.x + st.w / 2, line.belt, line.conveyor ? 8 : 2, { size: 9, bg: next ? "rgba(21,128,61,0.9)" : "rgba(15,23,42,0.6)" });
+      }
+    // station names on the floor in front of each station (with its operator on the shop floor)
     if (near)
       for (const st of stops) {
         const sel = this.selected?.line === line.index && this.selected.id === st.def.id;
-        p.tag(`${st.def.icon} ${s.labels[st.def.id] ?? st.def.id}`, st.x + st.w / 2, line.belt + 1.3, 1, { size: 9, bg: sel ? "rgba(14,165,233,0.95)" : "rgba(15,23,42,0.78)" });
+        const crew = floor && st.slot !== undefined && st.staffed ? ` · 👷${st.slot + 1}` : "";
+        p.tag(`${st.def.icon} ${s.labels[st.def.id] ?? st.def.id}${crew}`, st.x + st.w / 2, line.belt + 1.3, 1, { size: 9, bg: sel ? "rgba(14,165,233,0.95)" : "rgba(15,23,42,0.78)" });
       }
+    // what holds a machine back, at that machine: no operator, no material in, no room out
+    if (near && s.words) {
+      const w = s.words;
+      for (const st of stops)
+        if (st.def.staff > 0 && !st.staffed) p.tag(`⚠ ${w.noOperator}`, st.x + st.w / 2, line.belt - 0.4, 34, { size: 9, bg: "rgba(217,119,6,0.92)" });
+      const at = s.stop === "noRaw" ? stops[0] : s.stop === "full" ? stops[n - 1] : undefined;
+      if (at) p.tag(`⛔ ${s.stop === "noRaw" ? w.noRaw : w.full}`, at.x + at.w / 2, line.belt - 0.4, 34, { size: 10, bg: "rgba(220,38,38,0.92)" });
+    }
   }
 
   /** Forklifts (or robot carts) shuttling between the gates and the stores; the office; trucks. */
@@ -525,7 +595,9 @@ export class InteriorEngine {
   private station(s: InteriorScene, st: PlacedStation, part: "back" | "front", working: boolean, k: number) {
     const model = st.def.machine;
     const poses = POSES[model] ?? 1;
-    const pose = working && poses > 1 ? Math.floor(this.t * (model === "press" ? 3 : 4)) % poses : 0;
+    // without its operator a machine runs at half pace
+    const pace = (model === "press" ? 3 : 4) * (st.staffed ? 1 : 0.5);
+    const pose = working && poses > 1 ? Math.floor(this.t * pace) % poses : 0;
     const robots = st.mode === "robot";
     const variant = st.def.variant ?? "";
     const key = `ist|${model}|${variant}|${pose}|${robots ? 1 : 0}|${part}|${s.accent}|${s.color}`;
