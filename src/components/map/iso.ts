@@ -229,7 +229,7 @@ export class Painter {
   }
 
   /** Rectangle drawn on the left face (y = y1 plane): u along x, v up. */
-  onLeft(x: number, y1: number, z: number, u0: number, u1: number, v0: number, v1: number, fill: string) {
+  onLeft(x: number, y1: number, z: number, u0: number, u1: number, v0: number, v1: number, fill: string | CanvasGradient | CanvasPattern) {
     const c = this.ctx;
     c.beginPath();
     c.moveTo(sx(x + u0, y1), sy(x + u0, y1, z + v0));
@@ -242,7 +242,7 @@ export class Painter {
   }
 
   /** Rectangle on the right face (x = x1 plane): u along y, v up. */
-  onRight(x1: number, y: number, z: number, u0: number, u1: number, v0: number, v1: number, fill: string) {
+  onRight(x1: number, y: number, z: number, u0: number, u1: number, v0: number, v1: number, fill: string | CanvasGradient | CanvasPattern) {
     const c = this.ctx;
     c.beginPath();
     c.moveTo(sx(x1, y + u0), sy(x1, y + u0, z + v0));
