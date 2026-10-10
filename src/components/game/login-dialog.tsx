@@ -11,20 +11,32 @@ import { useGame } from "@/store/game-store";
 
 /** Once a day: the streak calendar and today's reward. */
 export function LoginDialog() {
+  // not in the first minutes of a brand-new game, and not over the offline report
+  const open = useGame((g) => {
+    const s = g.state;
+    return !!s.login.day && !s.login.claimed && s.lifetime.playTime > 120 && !s.pendingOffline;
+  });
+  const claimLogin = useGame((g) => g.claimLogin);
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && claimLogin()}>
+      <DialogContent>
+        <LoginBody />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** The calendar and the reward (mounted only while the dialog is open). */
+function LoginBody() {
   const login = useGame((g) => g.state.login);
-  const played = useGame((g) => g.state.lifetime.playTime);
-  const away = useGame((g) => !!g.state.pendingOffline);
   const snap = useGame((g) => g.snap);
   const claimLogin = useGame((g) => g.claimLogin);
   const { t } = useT();
-  // not in the first minutes of a brand-new game, and not over the offline report
-  const open = !!login.day && !login.claimed && played > 120 && !away;
   // a new game has no streak yet (0): never index before day 1
   const r = LOGIN_REWARDS[Math.max(0, login.streak - 1) % LOGIN_REWARDS.length];
   const reward = r.stars ? `${r.stars} ⭐` : formatMoney(rewardCash(r, snap));
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && claimLogin()}>
-      <DialogContent>
+    <>
         <div className="mb-2 text-5xl">🎁</div>
         <DialogTitle>{t("login.title", { n: login.streak })}</DialogTitle>
         <DialogDescription className="mt-1">{t("login.subtitle")}</DialogDescription>
@@ -50,7 +62,6 @@ export function LoginDialog() {
           {t("login.claim", { reward })}
         </Button>
         <p className="mt-2 text-center text-[11px] text-white/45">{t("login.hint")}</p>
-      </DialogContent>
-    </Dialog>
+    </>
   );
 }

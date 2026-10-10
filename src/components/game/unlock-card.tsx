@@ -41,7 +41,8 @@ export function UnlockCard() {
 
   // the first-car celebration plays first
   const cur = celebrating ? undefined : queue[0];
-  const bonus = useGame((g) => unlockBonus(g.state));
+  // the bonus moves with production every tick: read it only while a card is up
+  const bonus = useGame((g) => (cur ? unlockBonus(g.state) : 0));
   const next = () => setQueue((q) => q.slice(1));
 
   const claim = (then?: () => void) => {
