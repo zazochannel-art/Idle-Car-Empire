@@ -40,6 +40,7 @@ import { uiEvents } from "./events";
 import * as Mk from "@/game/engine/market";
 import * as Lv from "@/game/engine/live";
 import * as Cl from "@/game/engine/classics";
+import * as Fl from "@/game/engine/floor";
 import * as Ex from "@/game/engine/expansion";
 import * as Dn from "@/game/engine/car-dna";
 import * as Sh from "@/game/engine/showroom";
@@ -69,6 +70,10 @@ interface GameStore {
   buyBodyMachine: (plot: string) => boolean;
   hireBodyWorker: (plot: string) => boolean;
   plantSpeed: (plot: string) => boolean;
+  /** Fixes a broken machine at once (a tap). */
+  repairPlant: (plot: string) => boolean;
+  /** Overtime: double speed for a while, on cooldown after. */
+  boostPlant: (plot: string) => boolean;
   plantAutomation: (plot: string) => boolean;
   plantGrade: (plot: string) => boolean;
   setPlantCar: (plot: string, car: CarId | null) => void;
@@ -261,6 +266,10 @@ export const useGame = create<GameStore>((set, get) => {
       else if (e.type === "emergency") uiEvents.emit({ type: "toast", tone: "warn", icon: "🆘", title: tr("toast.emergency"), body: tr("toast.emergencyBody", { money: formatMoney(e.cost) }) });
       else if (e.type === "restructured") uiEvents.emit({ type: "toast", tone: "warn", icon: "🏦", title: tr("toast.restructured"), body: tr("toast.restructuredBody", { money: formatMoney(e.amount), rep: RESCUE.restructure.rep }) });
       else if (e.type === "suspended") uiEvents.emit({ type: "toast", tone: "warn", icon: "⛔", title: tr("toast.suspended"), body: tr("toast.suspendedBody") });
+      else if (e.type === "breakdown") {
+        const b = next.city.buildings[e.plot];
+        if (b) uiEvents.emit({ type: "toast", tone: "warn", icon: "🔧", title: tr("floor.brokeToast", { name: tr(`structure.${b.type}` as MessageKey) }), body: tr("floor.brokeToastBody"), action: { label: tr("floor.repair"), plot: e.plot } });
+      }
       else if (e.type === "raceFinished") {
         const rec = next.racing.last;
         const rw = rec?.result;
@@ -361,6 +370,8 @@ export const useGame = create<GameStore>((set, get) => {
       return ok;
     },
     plantSpeed: (plot) => act((s) => Ch.upgradePlantSpeed(s, plot, get().snap.gm)),
+    repairPlant: (plot) => act((s) => Fl.repairPlant(s, plot)),
+    boostPlant: (plot) => act((s) => Fl.boostPlant(s, plot)),
     plantAutomation: (plot) => act((s) => Ch.upgradeAutomation(s, plot, get().snap.gm)),
     plantGrade: (plot) => act((s) => Ch.upgradeGrade(s, plot, get().snap.gm)),
     setAutoUpgrade: (plot, on) => {

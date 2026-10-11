@@ -342,6 +342,16 @@ export interface PlantData {
   mode?: QualityMode;
   /** Assembly: where its cars go (best price when unset). */
   carRoute?: CarRoute;
+  /** The crew's morale, 0..100 (unset: the base, see MORALE). */
+  morale?: number;
+  /** Seconds of boost left, and of its cooldown. */
+  boost?: number;
+  boostCd?: number;
+  /** A machine is broken: seconds until the mechanic has fixed it (0 = all running). */
+  broken?: number;
+  /** Running time since the last breakdown (s), and breakdowns so far. */
+  wear?: number;
+  breaks?: number;
 }
 
 export type QualityMode = "fast" | "balanced" | "premium";
@@ -579,7 +589,9 @@ export type GameEvent =
   /** The account went over its limit: every plant stops until sales pay it down. */
   | { type: "suspended" }
   /** A stuck company's account was cut back to its limit (the creditors took `amount`); reputation fell. */
-  | { type: "restructured"; amount: number };
+  | { type: "restructured"; amount: number }
+  /** A machine broke down at a plant: the line slows until it is repaired. */
+  | { type: "breakdown"; plot: string };
 
 // ───────────────────────────── racing ─────────────────────────────
 

@@ -17,6 +17,9 @@ import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
 import { debtVars, stockTotal } from "@/game/engine/materials";
 import { seasonAt } from "@/game/engine/season";
+import { brokenSlot, moraleOf } from "@/game/engine/floor";
+import { cue } from "@/lib/feedback";
+import { BoostButton, BreakdownBanner, MoraleChip } from "../floor-controls";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { CAR_MODEL_FOR } from "../../map/vehicles";
@@ -71,6 +74,17 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
     };
   }, []);
 
+  // tapping the broken machine fixes it
+  useEffect(() => {
+    const e = engineRef.current;
+    if (!e) return;
+    e.onRepair = () => {
+      const ok = useGame.getState().repairPlant(plotId);
+      if (ok) cue("buy");
+      return ok;
+    };
+  }, [plotId]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
@@ -87,7 +101,15 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
   const type = st?.type ?? "bodyWorks";
   const labels = useMemo(() => Object.fromEntries(recipeFor(type).map((d) => [d.id, t(`interior.station.${d.id}` as MessageKey)])) as Record<StationId, string>, [t, type]);
   const words = useMemo(
-    () => ({ noOperator: t("interior.tag.noOperator"), build: t("interior.tag.build"), noRaw: t("interior.tag.noRaw"), full: t("interior.tag.full"), upgraded: t("interior.upgraded") }),
+    () => ({
+      noOperator: t("interior.tag.noOperator"),
+      build: t("interior.tag.build"),
+      noRaw: t("interior.tag.noRaw"),
+      full: t("interior.tag.full"),
+      upgraded: t("interior.upgraded"),
+      repaired: t("interior.repaired"),
+      tapRepair: t("floor.tapRepair"),
+    }),
     [t],
   );
   // the Body Works shop floor: which machines are built and staffed (the engine's own numbers)
@@ -124,6 +146,10 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
       title: plantName(state, plotId, t),
       // speed and quality: a step up is celebrated at the stations they stand for
       tiers: { speed: p.speed, grade: p.grade },
+      // the floor: a broken machine (line 1, by its place among the machines), a boost, the crew's mood
+      brokenSlot: p.broken ? brokenSlot(plotId, p) : -1,
+      boost: p.boost ?? 0,
+      morale: moraleOf(p),
       // the season's decorations, and the time of day the map is showing
       season: seasonAt(Date.now()),
       timeMode,
@@ -186,6 +212,16 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
             <div className="rounded-lg bg-black/55 px-2 py-1 text-[10px] font-semibold text-emerald-300 backdrop-blur">👔 {t("interior.manager")}</div>
           </div>
         )}
+        <div className="mt-1.5 flex">
+          <div className="rounded-lg bg-black/45 px-2 py-1 text-[10px] font-semibold text-white/75 backdrop-blur">
+            <MoraleChip plotId={plotId} />
+          </div>
+        </div>
+        {!!p.broken && (
+          <div className="mt-1.5">
+            <BreakdownBanner plotId={plotId} compact />
+          </div>
+        )}
         {p.status !== "ok" && (
           <div className="mt-2 flex justify-center">
             <div className="rounded-xl bg-amber-500/90 px-3 py-1.5 text-xs font-black text-black shadow-lg">
@@ -223,7 +259,8 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
             ) : null}
           </AnimatePresence>
         </div>
-        <div className="pointer-events-auto flex gap-2 self-end">
+        <div className="pointer-events-auto flex flex-wrap justify-end gap-2 self-end">
+          {!touring && <BoostButton plotId={plotId} />}
           <Button
             size="sm"
             variant={touring ? "default" : "secondary"}

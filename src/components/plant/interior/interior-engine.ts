@@ -32,7 +32,11 @@ export interface InteriorScene {
   /** Why the line stands, shown at the stage it concerns. */
   stop?: "noRaw" | "full";
   /** Words painted on the floor (Body Works shop floor and stops), and the cheer of an upgrade. */
-  words?: { noOperator: string; build: string; noRaw: string; full: string; upgraded?: string };
+  words?: { noOperator: string; build: string; noRaw: string; full: string; upgraded?: string; repaired?: string; tapRepair?: string };
+  /** The shop floor: which machine of the first line is broken (its place among the machines, -1 none), seconds of boost left, the crew's morale. */
+  brokenSlot?: number;
+  boost?: number;
+  morale?: number;
   /** The plant's speed and quality tiers: a step up is celebrated at the stations they stand for. */
   tiers?: { speed: number; grade: number };
   /** Fill levels 0..1 of raw material and finished goods. */
@@ -146,12 +150,14 @@ export class InteriorEngine {
   /** The ring that spreads from a machine you tap. */
   private ripple: { pick: StationPick; t0: number } | null = null;
   /** An upgrade being celebrated: confetti over the stations it changed, a flash, the crew jumping. */
-  private party: { t0: number; lines: Set<number>; stations: StationPick[]; bits: Confetti[] } | null = null;
+  private party: { t0: number; lines: Set<number>; stations: StationPick[]; bits: Confetti[]; word?: "upgraded" | "repaired" } | null = null;
   private tiers: { speed: number; grade: number } | null = null;
   /** The camera tours the plant by itself until the player touches it. */
   private touring = false;
   private tourLeg = 0;
   onTourEnd: () => void = () => {};
+  /** Tapping the broken machine: fixes it (returns true when it did). */
+  onRepair: () => boolean = () => false;
   private interrupt = () => {
     if (!this.touring) return;
     this.touring = false;
@@ -293,9 +299,24 @@ export class InteriorEngine {
           if (this.pickable(st) && tx >= st.x - 0.1 && tx <= st.x + st.w + 0.1 && ty >= line.belt - 1.2 && ty <= line.belt + 1.1) hit = { line: line.index, id: st.def.id };
       if (hit) break;
     }
+    // the broken machine: a tap fixes it
+    const broken = this.brokenStation();
+    const picked = hit as StationPick | null;
+    if (picked && broken && picked.line === 0 && picked.id === broken.def.id && this.onRepair()) {
+      this.celebrate([picked], [], "repaired");
+      return;
+    }
     this.selected = hit;
     if (hit) this.ripple = { pick: hit, t0: this.t };
     this.onSelect(hit);
+  }
+
+  /** The broken machine of the first line, if one is down. */
+  private brokenStation(): PlacedStation | undefined {
+    const k = this.scene?.brokenSlot ?? -1;
+    if (k < 0 || !this.layout?.lines[0]) return undefined;
+    const machines = this.layout.lines[0].stations.filter((st) => st.slot !== undefined && st.mode !== "planned");
+    return machines.length ? machines[k % machines.length] : undefined;
   }
 
   /** Built stations can be tapped; on the Body Works shop floor, so can the empty machine bays (to build them). */
@@ -328,7 +349,7 @@ export class InteriorEngine {
     this.t += dt;
     const s = this.scene;
     const L = this.layout;
-    if (s?.running) this.work += dt;
+    if (s?.running) this.work += dt * ((s.boost ?? 0) > 0 ? 2 : 1);
     if (s && L) this.advance(s, L, dt);
     // a fast line: the units it makes go up together every POP_EVERY seconds
     if (s?.running && s.batch && s.cycle && s.cycle < POP_EVERY) {
@@ -412,7 +433,7 @@ export class InteriorEngine {
   }
 
   /** Celebrates an upgrade: confetti over the stations it changed (or stands for), a flash, the crew jumping. */
-  private celebrate(changed: StationPick[], ups: StationUpgrade[]) {
+  private celebrate(changed: StationPick[], ups: StationUpgrade[], word: "upgraded" | "repaired" = "upgraded") {
     const L = this.layout;
     if (!L) return;
     const picks = [...changed];
@@ -440,7 +461,7 @@ export class InteriorEngine {
           w: 2 + Math.random() * 2.5,
         });
     }
-    this.party = { t0: this.t, lines: new Set(picks.map((q) => q.line)), stations: picks, bits };
+    this.party = { t0: this.t, lines: new Set(picks.map((q) => q.line)), stations: picks, bits, word };
   }
 
   private updateParty(dt: number) {
@@ -500,7 +521,7 @@ export class InteriorEngine {
     }
     // the cheer, over the first station it celebrates
     const first = party.stations[0] && this.find(party.stations[0]);
-    const word = s.words?.upgraded;
+    const word = party.word === "repaired" ? s.words?.repaired : s.words?.upgraded;
     if (first && word && age < 2.4) {
       const line = L.lines[party.stations[0].line];
       const pop = age < 0.25 ? backOut(age / 0.25) : 1;
@@ -1497,13 +1518,47 @@ export class InteriorEngine {
     }
     // a stack light on every machine: green working, amber blinking without its operator;
     // while the line waits (the reason is tagged where it is) they glow a calm amber: standby
+    const down = line.index === 0 ? this.brokenStation() : undefined;
     for (const st of stops) {
       if (st.def.staff === 0) continue;
+      if (st === down) {
+        const lit = Math.sin(this.t * 8) > 0;
+        p.box(st.x + st.w - 0.35, line.belt - 0.95, 0.12, 0.12, 0, 24, "#475569");
+        p.box(st.x + st.w - 0.38, line.belt - 0.98, 0.18, 0.18, 24, 4, lit ? "#ef4444" : "#7f1d1d");
+        if (lit) p.light(sx(st.x + st.w - 0.3, line.belt - 0.9), sy(st.x + st.w - 0.3, line.belt - 0.9, 26), 26, "#ef4444", 0.7);
+        continue;
+      }
       const [on, off] = !s.running ? ["#f59e0b", "#b45309"] : st.staffed ? ["#22c55e", "#22c55e"] : ["#f59e0b", "#78350f"];
       const lit = s.running ? st.staffed || Math.sin(this.t * 2.5) > 0 : Math.sin(this.t * 1.2 + st.x * 0.3) > -0.3;
       p.box(st.x + st.w - 0.35, line.belt - 0.95, 0.12, 0.12, 0, 24, "#475569");
       p.box(st.x + st.w - 0.38, line.belt - 0.98, 0.18, 0.18, 24, 4, lit ? on : off);
       if (lit) p.light(sx(st.x + st.w - 0.3, line.belt - 0.9), sy(st.x + st.w - 0.3, line.belt - 0.9, 26), 18, on, s.running ? 0.45 : 0.3);
+    }
+
+    // the broken machine: dark smoke, a red glow, and the call to fix it
+    if (down) {
+      this.smoke(down.stop.x, down.stop.y - 0.5);
+      p.light(sx(down.stop.x, down.stop.y), sy(down.stop.x, down.stop.y, 14), 46 + Math.sin(this.t * 6) * 6, "#ef4444", 0.35);
+      if (s.words?.tapRepair) p.tag(`🔧 ${s.words.tapRepair}`, down.stop.x, line.belt - 0.4, 48 + Math.sin(this.t * 4) * 3, { size: 10, bg: "rgba(220,38,38,0.95)" });
+    }
+    // a boost: the belt hums with light
+    if ((s.boost ?? 0) > 0 && line.conveyor && stops.length) {
+      const x0b = stops[0].stop.x - 0.5;
+      const x1b = stops[stops.length - 1].stop.x + 0.5;
+      c.save();
+      c.globalCompositeOperation = "lighter";
+      c.strokeStyle = "rgba(34,211,238,0.85)";
+      c.lineWidth = 1.6;
+      c.setLineDash([10, 14]);
+      c.lineDashOffset = -this.t * 120;
+      for (const dy of [-0.34, 0.34]) {
+        c.beginPath();
+        c.moveTo(sx(x0b, line.belt + dy), sy(x0b, line.belt + dy, 4.5));
+        c.lineTo(sx(x1b, line.belt + dy), sy(x1b, line.belt + dy, 4.5));
+        c.stroke();
+      }
+      c.restore();
+      for (const st of stops) if (st.def.staff > 0) p.light(sx(st.stop.x, st.stop.y), sy(st.stop.x, st.stop.y, 6), 30, "#22d3ee", 0.3);
     }
 
     // 5. robots and people in front of the line (robots in a cell without its operator at half pace)
@@ -1532,6 +1587,11 @@ export class InteriorEngine {
       // waiting people still shift from foot to foot
       const pose = busy ? Math.floor(this.t * 4 + i) % 4 : Math.floor(this.t * (s.running ? 1.5 : 0.7) + i) % 2;
       this.person(h.x, h.y, h.role, pose, i, k, 0, lift);
+      // now and then someone shows how they feel
+      if (near && s.morale !== undefined) {
+        const ph = (this.t / 9 + i * 0.37) % 1;
+        if (ph < 0.22) this.mood(h.x, h.y, s.morale, ph / 0.22);
+      }
       if (h.role === "welder" && working && near) this.sparks(h.x + 0.1, h.y - 0.6);
     }
     // people walking along the walkway, between the stations
@@ -1806,6 +1866,38 @@ export class InteriorEngine {
     }
     c.stroke();
     p.light(px, py, 22, "#fde68a", 0.9);
+  }
+
+  /** Dark smoke rising off a broken machine. */
+  private smoke(x: number, y: number) {
+    const c = this.ctx;
+    const [bx, by] = [sx(x, y), sy(x, y, 26)];
+    for (let i = 0; i < 4; i++) {
+      const u = (this.t * 0.45 + i / 4) % 1;
+      c.fillStyle = `rgba(55,60,68,${(0.5 * (1 - u) * Math.min(1, u * 6)).toFixed(3)})`;
+      c.beginPath();
+      c.arc(bx + Math.sin(u * 5 + i) * 5 + u * 8, by - u * 52, 5 + u * 15, 0, Math.PI * 2);
+      c.fill();
+    }
+  }
+
+  /** A little bubble over a worker's head with how they feel (the crew's morale). */
+  private mood(x: number, y: number, morale: number, u: number) {
+    const c = this.ctx;
+    const face = morale >= 85 ? "😄" : morale >= 70 ? "🙂" : morale >= 50 ? "😐" : morale >= 30 ? "😟" : "😫";
+    const a = Math.min(1, u * 5, (1 - u) * 5);
+    const [px, py] = [sx(x, y), sy(x, y, 30 + u * 4)];
+    c.save();
+    c.globalAlpha = a;
+    c.fillStyle = "rgba(255,255,255,0.92)";
+    c.beginPath();
+    c.arc(px, py, 6.5, 0, Math.PI * 2);
+    c.fill();
+    c.font = "8px system-ui, sans-serif";
+    c.textAlign = "center";
+    c.textBaseline = "middle";
+    c.fillText(face, px, py + 0.5);
+    c.restore();
   }
 
   /** Soft puffs of steam rising off a hot machine and fading out. */

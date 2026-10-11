@@ -760,6 +760,10 @@ export class MapEngine {
           if (!b) break;
           tag(c, zoom < 0.9 ? names.level(b.level) : `${names.plant(plot.id)} · ${names.level(b.level)}`, x, y, { icon: STRUCTURE_BY_ID[b.type].emoji, bg: "rgba(15,23,42,0.85)" });
           const pl = b.plant;
+          // a machine down: a red wrench (tap the plant to repair it)
+          if (pl?.broken) tag(c, "🔧", x - 22, y - 22 + Math.sin(this.t * 6) * 2, { bg: "rgba(220,38,38,0.95)", size: 11 });
+          // a boost: a lightning bolt
+          else if ((pl?.boost ?? 0) > 0) tag(c, "⚡", x - 22, y - 22, { bg: "rgba(8,145,178,0.95)", size: 11 });
           if (pl && pl.status !== "ok") {
             const icon = pl.status === "noParts" && pl.missing ? COMPONENT_BY_ID[pl.missing as ComponentId].emoji : pl.status === "noRaw" ? "🪨" : pl.status === "full" ? "📦" : "⚠️";
             tag(c, zoom < 0.6 ? "!" : `⚠️ ${icon}`, x + 22, y - 22 + Math.sin(this.t * 4) * 2, { bg: "rgba(245,158,11,0.95)", fg: "#111", size: 11 });
