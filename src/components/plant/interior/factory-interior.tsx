@@ -110,6 +110,10 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
       // the model on the line, with the parts the factories make today
       model: CAR_MODEL_FOR[st.car?.id ?? "city"],
       build: st.car ? lineBuildLook(state, st.car.id) : undefined,
+      // each batch done rises over the stores; the sign over the halls
+      batch: st.lines,
+      icon: cfg.item ? COMPONENT_BY_ID[cfg.item].emoji : "🚗",
+      title: plantName(state, plotId, t),
     });
   }, [p, st, b, labels, words, manager, plotId, state, t]);
 
