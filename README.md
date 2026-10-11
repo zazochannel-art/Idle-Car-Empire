@@ -124,7 +124,8 @@ src/game/
     insights.ts   "next goal" hints and lock reasons for the UI
     city.ts       districts, plot buildings, garages: placement rules,
                   workers, power, specializations, income, save migration
-  save/       SaveAdapter interface, localStorage + Supabase adapters, migration
+  save/       accounts and saves: device copy, cloud sync (revisions, conflicts,
+              retries), start policy, Supabase backend, migration
   format.ts   $1,250 · $25.4K · $3.2M · $4.7B · $2.8T
 src/store/    Zustand stores: game loop + autosave (game-store), panels and
               camera requests (ui-store), UI events
@@ -200,13 +201,18 @@ Every push to `main` builds the static site and publishes it to GitHub Pages
 (`.github/workflows/pages.yml`). In the repository settings, **Pages → Build
 and deployment → Source** must be set to **GitHub Actions**.
 
-## Cloud saves (optional)
+## Player accounts and cloud saves (optional)
 
 1. Create a Supabase project, run `supabase/migrations/0001_game_saves.sql`
-   and enable **Anonymous sign-ins** under Auth.
+   and `0002_profiles_and_revisions.sql` (and `0003_saves_through_rpc_only.sql`
+   once this version is live), and enable **Anonymous sign-ins** and
+   **Email** under Auth.
 2. Copy `.env.example` to `.env.local` and fill in
-   `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+   `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (the
+   publishable key; never the service-role key).
 
-With those set, saves are mirrored to the `game_saves` table (Row Level
-Security limits each player to their own row) and the newer of the local and
-cloud copies is loaded on start. Without them the game is local-only.
+With those set, every player gets an account (a guest at first, email +
+password when they register), a profile, and their own cloud save with
+revisions, conflict handling and backups. Without them the game is
+local-only. Details, dashboard settings and tests:
+[`docs/cloud-save.md`](docs/cloud-save.md).

@@ -33,6 +33,7 @@ export type View =
   | "upgrade"
   | "logistics"
   | "story"
+  | "profile"
   | "menu";
 
 /** Requests for the map camera, consumed by the map component. */

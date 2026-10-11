@@ -1,76 +1,152 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { CloudAccount, SaveAdapter, SavePayload } from "./types";
+// The cloud on Supabase (schema and rules in supabase/migrations): accounts
+// through Supabase Auth, a profile per player, and the save written only
+// through the save_game() function, which checks revisions on the server.
+// Row Level Security keeps every row to its owner; this file holds only the
+// project's public (publishable) key.
+import type { AuthError as SbAuthError, SupabaseClient, User } from "@supabase/supabase-js";
+import type { GameState } from "../types";
+import type { Account, AuthError, AuthResult, CloudBackend, CloudCopy, Profile } from "./types";
 
-/**
- * Cloud saves in a Supabase table (see supabase/migrations). Players are
- * signed in anonymously, so progress follows the browser session and can later
- * be linked to a real account. Row Level Security keeps each row private.
- */
-export class SupabaseAdapter implements SaveAdapter, CloudAccount {
-  readonly name = "supabase";
+function account(u: User | null | undefined): Account | null {
+  if (!u) return null;
+  return { id: u.id, email: u.email || null, guest: !!u.is_anonymous, pendingEmail: u.new_email || null };
+}
+
+/** Supabase's error, in the few kinds the game tells apart. */
+export function authError(e: Pick<SbAuthError, "message"> & { code?: string; status?: number; name?: string }): AuthError {
+  const code = e.code ?? "";
+  const msg = e.message?.toLowerCase() ?? "";
+  if (code === "email_exists" || code === "user_already_exists" || msg.includes("already")) return "taken";
+  if (code === "weak_password" || msg.includes("password should")) return "weak";
+  if (code === "invalid_credentials" || msg.includes("invalid login")) return "credentials";
+  if (code === "email_not_confirmed" || msg.includes("not confirmed")) return "unconfirmed";
+  if (code.startsWith("over_") || e.status === 429 || msg.includes("rate limit")) return "rate";
+  if (code === "validation_failed" || code === "email_address_invalid" || msg.includes("invalid")) return "invalid";
+  if (e.name === "AuthRetryableFetchError" || msg.includes("fetch") || msg.includes("network")) return "network";
+  return "unknown";
+}
+
+const fail = (e: Parameters<typeof authError>[0]): AuthResult => ({ ok: false, error: authError(e), detail: e.message });
+
+const ms = (t: unknown) => (typeof t === "string" ? Date.parse(t) || 0 : 0);
+
+export class SupabaseBackend implements CloudBackend {
   private client: Promise<SupabaseClient>;
 
-  constructor(url: string, anonKey: string) {
+  constructor(url: string, key: string) {
     this.client = import("@supabase/supabase-js").then(({ createClient }) =>
-      createClient(url, anonKey, { auth: { persistSession: true, autoRefreshToken: true } }),
+      // sessions stay on this device and refresh themselves; email links come back with tokens in the URL
+      createClient(url, key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }),
     );
   }
 
-  private async userId(): Promise<{ client: SupabaseClient; id: string } | null> {
-    const client = await this.client;
-    const { data } = await client.auth.getSession();
-    if (data.session?.user) return { client, id: data.session.user.id };
-    const { data: signed, error } = await client.auth.signInAnonymously();
-    if (error || !signed.user) return null;
-    return { client, id: signed.user.id };
+  private async uid(): Promise<string> {
+    const c = await this.client;
+    const { data } = await c.auth.getSession();
+    const id = data.session?.user.id;
+    if (!id) throw new Error("not signed in");
+    return id;
   }
 
-  async load(): Promise<SavePayload | null> {
-    const who = await this.userId();
-    if (!who) return null;
-    const { data, error } = await who.client
-      .from("game_saves")
-      .select("data, saved_at")
-      .eq("user_id", who.id)
-      .maybeSingle();
-    if (error || !data) return null;
-    return { state: data.data, savedAt: new Date(data.saved_at).getTime() };
+  async session(): Promise<Account | null> {
+    const c = await this.client;
+    const { data } = await c.auth.getSession();
+    return account(data.session?.user);
   }
 
-  async save(payload: SavePayload): Promise<void> {
-    const who = await this.userId();
-    if (!who) return;
-    await who.client.from("game_saves").upsert({
-      user_id: who.id,
-      data: payload.state,
-      saved_at: new Date(payload.savedAt).toISOString(),
-    });
+  async signInGuest(): Promise<Account> {
+    const c = await this.client;
+    const { data, error } = await c.auth.signInAnonymously();
+    if (error || !data.user) throw error ?? new Error("no guest account");
+    return account(data.user)!;
   }
 
-  async account(): Promise<{ email: string | null } | null> {
-    const who = await this.userId();
-    if (!who) return null;
-    const { data } = await who.client.auth.getUser();
-    return { email: data.user?.is_anonymous ? null : (data.user?.email ?? null) };
+  async register(email: string, password: string, redirectTo: string): Promise<AuthResult> {
+    const c = await this.client;
+    // the guest's account gets an email: same id, same save
+    const { data, error } = await c.auth.updateUser({ email }, { emailRedirectTo: redirectTo });
+    if (error) return fail(error);
+    // the project confirms emails by link: the password comes after the confirmation
+    if ((data.user?.email ?? "").toLowerCase() !== email.toLowerCase()) return { ok: true, pending: true };
+    const pw = await c.auth.updateUser({ password });
+    return pw.error ? fail(pw.error) : { ok: true };
   }
 
-  async linkEmail(email: string, redirectTo: string): Promise<{ ok: boolean; error?: string }> {
-    const who = await this.userId();
-    if (!who) return { ok: false };
-    const { error } = await who.client.auth.updateUser({ email }, { emailRedirectTo: redirectTo });
-    return error ? { ok: false, error: error.message } : { ok: true };
+  async login(email: string, password: string): Promise<AuthResult> {
+    const c = await this.client;
+    const { error } = await c.auth.signInWithPassword({ email, password });
+    return error ? fail(error) : { ok: true };
   }
 
-  async signIn(email: string, redirectTo: string): Promise<{ ok: boolean; error?: string }> {
-    const client = await this.client;
-    // only an email that already holds a save: a new player starts as a guest
-    const { error } = await client.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo, shouldCreateUser: false } });
-    return error ? { ok: false, error: error.message } : { ok: true };
+  async sendLink(email: string, redirectTo: string): Promise<AuthResult> {
+    const c = await this.client;
+    // only an existing account: a new player starts as a guest
+    const { error } = await c.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo, shouldCreateUser: false } });
+    return error ? fail(error) : { ok: true };
   }
 
-  async clear(): Promise<void> {
-    const who = await this.userId();
-    if (!who) return;
-    await who.client.from("game_saves").delete().eq("user_id", who.id);
+  async setPassword(password: string): Promise<AuthResult> {
+    const c = await this.client;
+    const { error } = await c.auth.updateUser({ password });
+    return error ? fail(error) : { ok: true };
+  }
+
+  async logout(): Promise<void> {
+    const c = await this.client;
+    // this device only: the player stays signed in elsewhere
+    await c.auth.signOut({ scope: "local" });
+  }
+
+  async refreshAccount(): Promise<Account | null> {
+    const c = await this.client;
+    const { data, error } = await c.auth.getUser();
+    if (error) throw error;
+    return account(data.user);
+  }
+
+  async profile(): Promise<Profile | null> {
+    const c = await this.client;
+    const id = await this.uid();
+    const { data, error } = await c.from("profiles").select("id, username, avatar").eq("id", id).maybeSingle();
+    if (error) throw error;
+    if (data) return data as Profile;
+    // a rare name clash at sign-up left the player without one: the server makes it
+    const made = await c.rpc("ensure_profile");
+    if (made.error) throw made.error;
+    const row = (made.data as Profile[] | null)?.[0];
+    return row ? { id: row.id, username: row.username, avatar: row.avatar } : null;
+  }
+
+  async updateProfile(p: { username?: string; avatar?: string }): Promise<AuthResult> {
+    const c = await this.client;
+    const id = await this.uid();
+    const { error } = await c.from("profiles").update(p).eq("id", id);
+    if (!error) return { ok: true };
+    if (error.code === "23505") return { ok: false, error: "taken", detail: error.message };
+    if (error.code === "23514" || error.code === "22001") return { ok: false, error: "invalid", detail: error.message };
+    return { ok: false, error: "unknown", detail: error.message };
+  }
+
+  async load(): Promise<CloudCopy> {
+    const c = await this.client;
+    const { data, error } = await c.rpc("load_game");
+    if (error) throw error;
+    const row = (data as { data: unknown; save_version: number | null; revision: number | string; updated_at: string | null; server_now: string }[] | null)?.[0];
+    return {
+      state: row?.data ?? null,
+      version: row?.save_version ?? 0,
+      revision: Number(row?.revision ?? 0),
+      updatedAt: ms(row?.updated_at),
+      serverNow: ms(row?.server_now),
+    };
+  }
+
+  async save(state: GameState, version: number, baseRevision: number, device: string) {
+    const c = await this.client;
+    const { data, error } = await c.rpc("save_game", { p_data: state, p_save_version: version, p_base_revision: baseRevision, p_device: device });
+    if (error) throw error;
+    const row = (data as { ok: boolean; revision: number | string; updated_at: string | null }[] | null)?.[0];
+    if (!row) throw new Error("no answer from save_game");
+    return { ok: !!row.ok, revision: Number(row.revision), updatedAt: ms(row.updated_at) };
   }
 }

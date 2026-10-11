@@ -1,0 +1,121 @@
+// End-to-end check of the cloud save against the real Supabase project, with
+// only the public (publishable) key, exactly as the game's browser code
+// talks to it: two players A and B (anonymous accounts), saving, restoring,
+// revision conflicts, session restore, and what each may (not) reach.
+//
+//   NEXT_PUBLIC_SUPABASE_URL=… NEXT_PUBLIC_SUPABASE_ANON_KEY=… node scripts/cloud-e2e.mjs
+//
+// It leaves no save behind (each test player deletes its own); the two
+// anonymous accounts stay, named "e2e-…" (see docs/cloud-save.md to clear them).
+import { createClient } from "@supabase/supabase-js";
+
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+if (!url || !key) {
+  console.log("cloud-e2e: no Supabase env, skipped");
+  process.exit(0);
+}
+
+let failed = 0;
+const check = (ok, what, detail = "") => {
+  console.log(`${ok ? "PASS" : "FAIL"}  ${what}${detail ? `  (${detail})` : ""}`);
+  if (!ok) failed++;
+};
+
+/** A browser: its own storage, so its session survives a "reload". */
+function browser(storage = new Map()) {
+  const store = { getItem: (k) => storage.get(k) ?? null, setItem: (k, v) => void storage.set(k, v), removeItem: (k) => void storage.delete(k) };
+  return { storage, client: createClient(url, key, { auth: { storage: store, persistSession: true, autoRefreshToken: false, detectSessionInUrl: false } }) };
+}
+
+const tag = `e2e-${Date.now().toString(36)}`;
+const one = (res) => (Array.isArray(res.data) ? res.data[0] : res.data);
+
+// ── player A ──
+const a = browser();
+const signA = await a.client.auth.signInAnonymously();
+check(!signA.error && !!signA.data.user, "A signs in as a guest", signA.error?.message);
+const idA = signA.data.user?.id;
+
+const profA = await a.client.from("profiles").select("id, username, avatar").eq("id", idA).maybeSingle();
+check(!profA.error && profA.data?.id === idA, "A has a profile made by the server", profA.error?.message ?? profA.data?.username);
+const rename = await a.client.from("profiles").update({ username: `${tag}-A` }).eq("id", idA).select("username");
+check(!rename.error && rename.data?.[0]?.username === `${tag}-A`, "A renames themselves", rename.error?.message);
+const badName = await a.client.from("profiles").update({ username: "x" }).eq("id", idA);
+check(!!badName.error, "a too-short name is refused", badName.error?.code);
+
+const empty = one(await a.client.rpc("load_game"));
+check(empty && Number(empty.revision) === 0 && empty.data === null && !!empty.server_now, "A starts with no save");
+
+const s1 = one(await a.client.rpc("save_game", { p_data: { cash: 100, createdAt: 1 }, p_save_version: 3, p_base_revision: 0, p_device: "e2e" }));
+check(s1?.ok === true && Number(s1.revision) === 1, "A's first save", JSON.stringify(s1));
+const s2 = one(await a.client.rpc("save_game", { p_data: { cash: 250, createdAt: 1 }, p_save_version: 3, p_base_revision: 1, p_device: "e2e" }));
+check(s2?.ok === true && Number(s2.revision) === 2, "A's next save builds on revision 1", JSON.stringify(s2));
+const stale = one(await a.client.rpc("save_game", { p_data: { cash: 999, createdAt: 1 }, p_save_version: 3, p_base_revision: 1, p_device: "other" }));
+check(stale?.ok === false && Number(stale.revision) === 2, "a stale save (another device) is refused, not overwritten", JSON.stringify(stale));
+const older = one(await a.client.rpc("save_game", { p_data: { cash: 1 }, p_save_version: 2, p_base_revision: 2, p_device: "old" }));
+check(older?.ok === false, "an older game version can't overwrite a newer save");
+const junk = await a.client.rpc("save_game", { p_data: [1, 2], p_save_version: 3, p_base_revision: 2, p_device: "e2e" });
+check(!!junk.error, "a save that isn't a game object is refused", junk.error?.message);
+
+const loadA = one(await a.client.rpc("load_game"));
+check(loadA?.data?.cash === 250 && Number(loadA.revision) === 2, "A restores the latest save", JSON.stringify(loadA?.data));
+check(Date.parse(loadA.server_now) >= Date.parse(loadA.updated_at), "the save carries server time");
+
+// "reload": a new client on the same storage keeps the session
+const reload = browser(a.storage);
+const restored = await reload.client.auth.getSession();
+check(restored.data.session?.user.id === idA, "the session survives a reload");
+const loadAgain = one(await reload.client.rpc("load_game"));
+check(loadAgain?.data?.cash === 250, "and the save comes back with it");
+
+// a write that skips save_game: refused once 0003 is applied; before that it still gets a new
+// revision and server time from the trigger, so other sessions see a conflict instead of losing it
+const before = Number(one(await a.client.rpc("load_game"))?.revision);
+const direct = await a.client.from("game_saves").update({ data: { cash: 250, createdAt: 1 } }).eq("user_id", idA).select("user_id");
+const after = Number(one(await a.client.rpc("load_game"))?.revision);
+const refused = !!direct.error || (direct.data ?? []).length === 0;
+check(refused || after === before + 1, refused ? "direct table writes are refused" : "a direct table write still bumps the revision", direct.error?.code ?? `${before} -> ${after}`);
+
+// ── player B ──
+const b = browser();
+const signB = await b.client.auth.signInAnonymously();
+check(!signB.error && signB.data.user && signB.data.user.id !== idA, "B is a different player", signB.error?.message);
+const idB = signB.data.user?.id;
+await b.client.from("profiles").update({ username: `${tag}-B` }).eq("id", idB);
+
+const emptyB = one(await b.client.rpc("load_game"));
+check(emptyB && Number(emptyB.revision) === 0, "B starts with an empty game, not A's");
+const peek = await b.client.from("game_saves").select("data").eq("user_id", idA);
+check(!peek.error && (peek.data ?? []).length === 0, "B can't read A's save");
+const peekProfile = await b.client.from("profiles").select("username").eq("id", idA);
+check(!peekProfile.error && (peekProfile.data ?? []).length === 0, "B can't read A's profile");
+const renameA = await b.client.from("profiles").update({ username: "hacked" }).eq("id", idA).select("id");
+check((renameA.data ?? []).length === 0, "B can't rename A");
+const takeName = await b.client.from("profiles").update({ username: `${tag}-a` }).eq("id", idB);
+check(!!takeName.error, "B can't take A's name (any case)", takeName.error?.code);
+const overwrite = await b.client.from("game_saves").update({ data: { cash: 0 } }).eq("user_id", idA).select("user_id");
+check((overwrite.data ?? []).length === 0, "B can't overwrite A's save");
+const insertForA = await b.client.from("game_saves").insert({ user_id: idA, data: { cash: 0 } });
+check(!!insertForA.error, "B can't create a save for A", insertForA.error?.code);
+const sB = one(await b.client.rpc("save_game", { p_data: { cash: 7 }, p_save_version: 3, p_base_revision: 0, p_device: "e2e" }));
+check(sB?.ok === true, "B saves their own game");
+check(one(await a.client.rpc("load_game"))?.data?.cash === 250, "A's save is untouched by B");
+
+// ── signed out ──
+const anon = browser();
+const anonLoad = await anon.client.rpc("load_game");
+check(!!anonLoad.error, "signed out: no access to saves", anonLoad.error?.code);
+const anonRead = await anon.client.from("game_saves").select("user_id");
+check(!!anonRead.error || (anonRead.data ?? []).length === 0, "signed out: the table shows nothing", anonRead.error?.code);
+
+// ── clean up: each test player deletes its own save ──
+for (const p of [a, b]) {
+  const del = await p.client.from("game_saves").delete().not("user_id", "is", null);
+  if (del.error) console.log("cleanup:", del.error.message);
+}
+await a.client.auth.signOut();
+await b.client.auth.signOut();
+
+console.log(failed ? `\n${failed} check(s) failed` : "\nall cloud checks passed");
+process.exit(failed ? 1 : 0);

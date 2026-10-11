@@ -1,0 +1,28 @@
+name: Cloud save (live check)
+
+# Runs scripts/cloud-e2e.mjs against the real Supabase project with its
+# public key: two test players, saving, restoring, conflicts and access
+# rules. Only when the save code or the database changes.
+on:
+  pull_request:
+    paths:
+      - "supabase/**"
+      - "src/game/save/**"
+      - "scripts/cloud-e2e.mjs"
+      - ".github/workflows/cloud-e2e.yml"
+  workflow_dispatch:
+
+jobs:
+  cloud-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: node scripts/cloud-e2e.mjs
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://orffhhsogoymalyogfzl.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_hqGfNt6uaNbq0AgGyp0I8g_QLjjFaJ-

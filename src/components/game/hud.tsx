@@ -1,5 +1,6 @@
 "use client";
 
+import { ProfileButton } from "./account";
 import { Car, Factory, Globe2, Moon, Settings, Star, Sun, Sunset, SunMoon, TrendingUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { TIME_MODES } from "@/components/map/lighting";
@@ -55,6 +56,7 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
           )}
         </div>
         <div className="pointer-events-auto flex shrink-0 flex-col gap-1.5 md:flex-row">
+          <ProfileButton />
           <TimeButton />
           <div className="hidden md:block"><LanguageSwitch /></div>
           <button

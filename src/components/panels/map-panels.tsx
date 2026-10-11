@@ -443,6 +443,7 @@ export function MenuPanel({ onSettings }: { onSettings: () => void }) {
   const { t } = useT();
   const waiting = useGame((g) => storyWaiting(g.state, g.snap));
   const tiles: { icon: string; label: string; go: () => void; gold?: boolean; badge?: boolean }[] = [
+    { icon: "👤", label: t("account.title"), go: () => setView("profile"), gold: true },
     { icon: "📖", label: t("nav.story"), go: () => setView("story"), gold: true, badge: waiting },
     { icon: "📊", label: t("nav.economy"), go: () => setView("economy"), gold: true },
     { icon: "🏁", label: t("nav.racing"), go: () => setView("racing"), gold: true },

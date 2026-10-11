@@ -1,120 +1,40 @@
 "use client";
 
-import { Bell, Cloud, Mail, RefreshCw } from "lucide-react";
-import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { PREFER_CLOUD_KEY } from "@/game/save";
+import { Bell, ChevronRight, Cloud } from "lucide-react";
+import { useState } from "react";
 import { useT } from "@/i18n/use-t";
 import { askNotify, notifySupported } from "@/lib/notify";
 import { cn } from "@/lib/utils";
+import { useCloud } from "@/store/cloud-store";
 import { useGame } from "@/store/game-store";
+import { useUi } from "@/store/ui-store";
+import { useSaveStatus } from "./account";
 
-/** Where the email links bring the player back: this page, without its hash. */
-const here = () => window.location.href.split("#")[0];
-
-/**
- * Cloud save: the game saves to the cloud as a guest on this device; an
- * email keeps that save and lets the player continue it on another device.
- */
-export function CloudSection() {
-  const cloud = useGame((g) => g.cloud);
-  const syncNow = useGame((g) => g.syncNow);
+/** In the settings: the account and how the save goes, opening the profile. */
+export function CloudSection({ onOpen }: { onOpen?: () => void }) {
+  const profile = useCloud((c) => c.profile);
+  const account = useCloud((c) => c.account);
+  const setView = useUi((u) => u.setView);
+  const { text } = useSaveStatus();
   const { t } = useT();
-  const [who, setWho] = useState<{ email: string | null } | null | undefined>(undefined);
-  const [email, setEmail] = useState("");
-  const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (!cloud) return;
-    let live = true;
-    cloud
-      .account()
-      .then((a) => live && setWho(a))
-      .catch(() => live && setWho(null));
-    return () => {
-      live = false;
-    };
-  }, [cloud]);
-
-  if (!cloud) return <p className="text-[11px] text-white/45">☁️ {t("cloud.off")}</p>;
-
-  const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  const run = async (fn: () => Promise<{ ok: boolean; error?: string }>, ok: string) => {
-    setBusy(true);
-    setMsg(null);
-    try {
-      const r = await fn();
-      setMsg(r.ok ? { text: ok } : { text: r.error ? t("cloud.failedWhy", { why: r.error }) : t("cloud.failed"), bad: true });
-    } catch {
-      setMsg({ text: t("cloud.failed"), bad: true });
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
-    <div className="space-y-2 rounded-xl bg-white/[0.04] p-3 ring-1 ring-white/10">
-      <div className="flex items-center gap-2 text-sm font-bold">
-        <Cloud className="size-4 text-sky-300" /> {t("cloud.title")}
-      </div>
-      <p className="text-[11px] leading-snug text-white/55">
-        {who === undefined ? t("cloud.checking") : who === null ? t("cloud.offline") : who.email ? t("cloud.linked", { email: who.email }) : t("cloud.guest")}
-      </p>
-      {who !== null && who !== undefined && (
-        <>
-          <input
-            type="email"
-            inputMode="email"
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder={t("cloud.emailPh")}
-            className="h-10 w-full rounded-xl bg-black/40 px-3 text-base text-white/85 ring-1 ring-white/10 outline-none focus:ring-electric/50"
-          />
-          <div className={cn("grid gap-1.5", who.email ? "grid-cols-1" : "grid-cols-2")}>
-            {!who.email && (
-              <Button size="sm" variant="gold" disabled={!valid || busy} onClick={() => run(() => cloud.linkEmail(email.trim(), here()), t("cloud.linkSent"))}>
-                <Mail /> {t("cloud.link")}
-              </Button>
-            )}
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={!valid || busy}
-              onClick={() =>
-                run(async () => {
-                  const r = await cloud.signIn(email.trim(), here());
-                  // back from the link, this device takes the account's save
-                  if (r.ok) {
-                    try {
-                      localStorage.setItem(PREFER_CLOUD_KEY, "1");
-                    } catch {
-                      // storage blocked: the newer copy wins as usual
-                    }
-                  }
-                  return r;
-                }, t("cloud.signInSent"))
-              }
-            >
-              {t("cloud.signIn")}
-            </Button>
-          </div>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="w-full"
-            onClick={() => {
-              syncNow();
-              setMsg({ text: t("cloud.synced") });
-            }}
-          >
-            <RefreshCw /> {t("cloud.sync")}
-          </Button>
-        </>
-      )}
-      {msg && <p className={cn("text-center text-xs", msg.bad ? "text-rose-300" : "text-sky-300")}>{msg.text}</p>}
-    </div>
+    <button
+      onClick={() => {
+        onOpen?.();
+        setView("profile");
+      }}
+      className="flex w-full items-center gap-3 rounded-xl bg-white/[0.04] px-3 py-2.5 text-left ring-1 ring-white/10 hover:bg-white/[0.07]"
+    >
+      <span className="text-2xl">{profile?.avatar ?? "👤"}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold">{profile?.username ?? t("account.title")}</span>
+        <span className="flex items-center gap-1 text-[11px] text-white/50">
+          <Cloud className="size-3" /> {text}
+          {account && <span className="truncate">· {account.guest ? t("account.guestShort") : (account.email ?? "")}</span>}
+        </span>
+      </span>
+      <ChevronRight className="size-4 text-white/40" />
+    </button>
   );
 }
 
