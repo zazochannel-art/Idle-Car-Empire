@@ -568,6 +568,8 @@ export interface GameState {
   export: import("./engine/expansion").ExportState;
   fleet: import("./engine/expansion").FleetState;
   engineers: import("./engine/expansion").EngineersState;
+  /** Decisions on the CEO's desk and the rival campaign. */
+  story: import("./engine/story").StoryState;
   /** Unlock bonuses already claimed this run ("car:sedan", "plant:engineFactory"). */
   unlocks: string[];
   settings: { buyAmount: BuyAmount; lang: Lang; lowGraphics: boolean; sound: boolean; haptics: boolean };

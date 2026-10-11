@@ -1,10 +1,14 @@
 import type { CarId, ItemId } from "@/game/types";
+import type { View } from "./ui-store";
+
+/** A toast's button: opens a plot's panel or a screen. */
+export type UiToastAction = { label: string; plot?: string; view?: View };
 
 /** Fire-and-forget UI effects (floating cash, toasts). Not part of game state. */
 export type UiEvent =
   | { type: "sale"; plot: string; item: ItemId; count: number; amount: number }
   | { type: "firstCar"; plot: string; car: CarId }
-  | { type: "toast"; tone: "success" | "gold" | "info" | "warn"; title: string; body?: string; icon?: string; action?: { label: string; plot: string } }
+  | { type: "toast"; tone: "success" | "gold" | "info" | "warn"; title: string; body?: string; icon?: string; action?: UiToastAction }
   | { type: "prestige"; points: number; stars?: boolean }
   | { type: "race"; id: number }
   | { type: "unlock"; kind: "car" | "plant"; id: string };

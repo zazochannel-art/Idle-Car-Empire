@@ -13,7 +13,7 @@ import { LANGS } from "@/i18n";
 import { useContent } from "@/i18n/content";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
-import { uiEvents, type UiEvent } from "@/store/events";
+import { uiEvents, type UiEvent, type UiToastAction } from "@/store/events";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { LedgerTable } from "../views/ledger-table";
@@ -153,7 +153,7 @@ interface Toast {
   title: string;
   body?: string;
   icon?: string;
-  action?: { label: string; plot: string };
+  action?: UiToastAction;
 }
 let toastId = 0;
 
@@ -200,7 +200,9 @@ export function Toasts() {
                 type="button"
                 className="shrink-0 rounded-xl bg-gold/90 px-3 py-1.5 text-xs font-bold text-black hover:bg-gold"
                 onClick={() => {
-                  useUi.getState().selectPlot(t.action!.plot);
+                  const a = t.action!;
+                  if (a.view) useUi.getState().setView(a.view);
+                  else if (a.plot) useUi.getState().selectPlot(a.plot);
                   setToasts((list) => list.filter((x) => x.id !== t.id));
                 }}
               >

@@ -23,6 +23,7 @@ import { CostButton } from "../game/cost-button";
 import { DealerPanel, DepotPanel, MarketPanel, PlantPanel, plantFlow, plantName } from "./plant-panel";
 import { LandPanel, SitePanel, WorksBanner, landName } from "./land-panel";
 import { plotStatus } from "@/game/engine/construction";
+import { storyWaiting } from "@/game/engine/story";
 
 type T = (k: MessageKey, v?: Vars) => string;
 
@@ -440,7 +441,9 @@ export function UpgradePanel() {
 export function MenuPanel({ onSettings }: { onSettings: () => void }) {
   const setView = useUi((u) => u.setView);
   const { t } = useT();
-  const tiles: { icon: string; label: string; go: () => void; gold?: boolean }[] = [
+  const waiting = useGame((g) => storyWaiting(g.state, g.snap));
+  const tiles: { icon: string; label: string; go: () => void; gold?: boolean; badge?: boolean }[] = [
+    { icon: "📖", label: t("nav.story"), go: () => setView("story"), gold: true, badge: waiting },
     { icon: "📊", label: t("nav.economy"), go: () => setView("economy"), gold: true },
     { icon: "🏁", label: t("nav.racing"), go: () => setView("racing"), gold: true },
     { icon: "⭐", label: t("nav.prestige"), go: () => setView("prestige"), gold: true },
@@ -460,8 +463,9 @@ export function MenuPanel({ onSettings }: { onSettings: () => void }) {
         <button
           key={x.label}
           onClick={x.go}
-          className={cn("flex flex-col items-center gap-1.5 rounded-2xl p-4 text-sm font-semibold ring-1 transition hover:bg-white/[0.07]", x.gold ? "bg-gold/[0.08] ring-gold/30" : "bg-white/[0.04] ring-white/[0.07]")}
+          className={cn("relative flex flex-col items-center gap-1.5 rounded-2xl p-4 text-sm font-semibold ring-1 transition hover:bg-white/[0.07]", x.gold ? "bg-gold/[0.08] ring-gold/30" : "bg-white/[0.04] ring-white/[0.07]")}
         >
+          {x.badge && <span className="absolute right-2 top-2 size-3 animate-pulse rounded-full bg-red-500 ring-2 ring-[#2b2b2e]" />}
           <span className="text-2xl">{x.icon}</span>
           <span className="text-center leading-tight">{x.label}</span>
         </button>

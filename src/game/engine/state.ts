@@ -11,6 +11,7 @@ import { createRacing } from "./racing";
 import { createSeason, createShow, createVip } from "./live";
 import { createClassics } from "./classics";
 import { createEngineers, createExport, createFleet, createProto } from "./expansion";
+import { createStory } from "./story";
 import type { CarDesign, CarId, ComponentId, DealerId, DealerState, GameState, ManagerId, ManagerState, Stats } from "../types";
 
 /** v3: the supply-chain economy (older saves start a new company). */
@@ -92,6 +93,7 @@ export function createInitialState(now: number): GameState {
     eventGoal: { start: 0, base: 0, claimed: false },
     brand: createBrand(),
     showroom: { campaignUntil: 0, campaigns: 0, sold: 0, revenue: 0 },
+    story: createStory(),
     research: [],
     achievements: [],
     missions: { dailyDate: "", daily: [], milestonesClaimed: [] },
