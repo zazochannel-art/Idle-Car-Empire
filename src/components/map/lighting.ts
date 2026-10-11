@@ -9,6 +9,13 @@ export const TIME_MODES: TimeMode[] = ["auto", "day", "evening", "night"];
 /** One full day/night cycle in auto mode, in seconds. */
 const CYCLE = 480;
 
+/**
+ * The clock the day/night cycle runs on. The map and the factory interiors
+ * both move it forward while they show, so the time of day carries over
+ * from one to the other.
+ */
+export const worldClock = { t: 0 };
+
 export interface Sky {
   /** 0 = noon … 0.5 = golden hour … 1 = night. */
   dark: number;

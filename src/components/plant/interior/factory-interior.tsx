@@ -2,7 +2,7 @@
 
 import { lineBuildLook } from "@/game/engine/car-dna";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, SlidersHorizontal, X } from "lucide-react";
+import { ArrowLeft, SlidersHorizontal, Square, Video, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CostButton } from "@/components/game/cost-button";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
 import { debtVars, stockTotal } from "@/game/engine/materials";
+import { seasonAt } from "@/game/engine/season";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { CAR_MODEL_FOR } from "../../map/vehicles";
@@ -37,6 +38,7 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
   const st = snap.chain.plants[plotId];
   const b = state.city.buildings[plotId];
   const openFloor = useUi((u) => u.openFloor);
+  const timeMode = useUi((u) => u.timeMode);
   const { t } = useT();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<InteriorEngine | null>(null);
@@ -44,6 +46,8 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
   const [hint, setHint] = useState(true);
   // the plant's full controls, opened over the factory (the map stays closed)
   const [manage, setManage] = useState(false);
+  // the camera touring the plant by itself (any touch ends it)
+  const [touring, setTouring] = useState(false);
   const p = b?.plant;
   const manager = MANAGERS.some((m) => state.managers[m.id].hired && state.managers[m.id].assignedTo === plotId);
 
@@ -57,6 +61,7 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
       if (s) setManage(false);
     };
     engine.low = useGame.getState().state.settings.lowGraphics;
+    engine.onTourEnd = () => setTouring(false);
     if (process.env.NODE_ENV !== "production") Object.assign(window, { __interior: engine });
     engine.start();
     const id = setTimeout(() => setHint(false), 6000);
@@ -81,7 +86,10 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
 
   const type = st?.type ?? "bodyWorks";
   const labels = useMemo(() => Object.fromEntries(recipeFor(type).map((d) => [d.id, t(`interior.station.${d.id}` as MessageKey)])) as Record<StationId, string>, [t, type]);
-  const words = useMemo(() => ({ noOperator: t("interior.tag.noOperator"), build: t("interior.tag.build"), noRaw: t("interior.tag.noRaw"), full: t("interior.tag.full") }), [t]);
+  const words = useMemo(
+    () => ({ noOperator: t("interior.tag.noOperator"), build: t("interior.tag.build"), noRaw: t("interior.tag.noRaw"), full: t("interior.tag.full"), upgraded: t("interior.upgraded") }),
+    [t],
+  );
   // the Body Works shop floor: which machines are built and staffed (the engine's own numbers)
   const floor = type === "bodyWorks" && p ? workshopOf(p) : undefined;
 
@@ -114,8 +122,13 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
       batch: st.lines,
       icon: cfg.item ? COMPONENT_BY_ID[cfg.item].emoji : "🚗",
       title: plantName(state, plotId, t),
+      // speed and quality: a step up is celebrated at the stations they stand for
+      tiers: { speed: p.speed, grade: p.grade },
+      // the season's decorations, and the time of day the map is showing
+      season: seasonAt(Date.now()),
+      timeMode,
     });
-  }, [p, st, b, labels, words, manager, plotId, state, t]);
+  }, [p, st, b, labels, words, manager, plotId, state, t, timeMode]);
 
   if (!b?.plant || !st || !p) return null;
   const cfg = PLANT_BY_ID[st.type];
@@ -143,6 +156,8 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
           </div>
           <Badge variant="gold">{t("common.lv", { level: b.level })}</Badge>
         </div>
+        {!touring && (
+          <>
         <div className="mt-2 grid grid-cols-4 gap-1.5">
           <Chip icon="💰" label={t("interior.money")} value={formatMoney(state.cash)} />
           <Chip icon="📈" label={t("interior.income")} value={`${formatMoney(snap.incomePerSec)}${t("unit.perSec")}`} />
@@ -178,6 +193,8 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
             </div>
           </div>
         )}
+          </>
+        )}
       </div>
 
       {/* bottom: the picked machine, or a hint; and the plant's full controls */}
@@ -185,7 +202,7 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
         {/* phones: the card takes the full width, the plant's controls sit above it */}
         <div className="pointer-events-auto min-w-0 flex-1 sm:max-w-[340px]">
           <AnimatePresence mode="wait">
-            {pick ? (
+            {touring ? null : pick ? (
               <motion.div key={`${pick.line}-${pick.id}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }} transition={{ duration: 0.16 }}>
                 <StationCard
                   plotId={plotId}
@@ -206,20 +223,38 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
             ) : null}
           </AnimatePresence>
         </div>
-        {!manage && (
+        <div className="pointer-events-auto flex gap-2 self-end">
           <Button
             size="sm"
-            variant="secondary"
-            className="pointer-events-auto self-end shadow-lg"
+            variant={touring ? "default" : "secondary"}
+            className="shadow-lg"
             onClick={() => {
-              if (engineRef.current) engineRef.current.selected = null;
+              const e = engineRef.current;
+              if (!e) return;
+              e.selected = null;
               setPick(null);
-              setManage(true);
+              setManage(false);
+              e.tour(!touring);
+              setTouring(!touring);
             }}
           >
-            <SlidersHorizontal /> {t("plant.manage")}
+            {touring ? <Square /> : <Video />} {t(touring ? "interior.tourStop" : "interior.tour")}
           </Button>
-        )}
+          {!manage && !touring && (
+            <Button
+              size="sm"
+              variant="secondary"
+              className="shadow-lg"
+              onClick={() => {
+                if (engineRef.current) engineRef.current.selected = null;
+                setPick(null);
+                setManage(true);
+              }}
+            >
+              <SlidersHorizontal /> {t("plant.manage")}
+            </Button>
+          )}
+        </div>
       </div>
       <Sheet open={manage} onClose={() => setManage(false)} title={plantName(state, plotId, t)} icon={cfg.emoji} sheetKey="factory-manage">
         <PlantPanel id={plotId} inside />
