@@ -1,5 +1,6 @@
 "use client";
 
+import { CloudSection, NotifyToggle } from "./cloud-section";
 import { AnimatePresence, motion } from "framer-motion";
 import { Clock, Download, RotateCcw, Smartphone, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -318,6 +319,11 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
           <Toggle label={t("settings.lowGraphics")} hint={t("settings.lowGraphicsHint")} k="lowGraphics" />
           <Toggle label={t("settings.sound")} k="sound" />
           <Toggle label={t("settings.haptics")} k="haptics" />
+          <NotifyToggle />
+        </div>
+
+        <div className="mt-4">
+          <CloudSection />
         </div>
 
         <div className="mt-4 space-y-2">

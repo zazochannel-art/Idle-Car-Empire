@@ -42,7 +42,7 @@ import { RacingView } from "../views/racing-view";
 import { StoryView } from "../views/story-view";
 import { RaceViewer } from "../racing/race-viewer";
 import { Coach } from "./coach";
-import { FeedbackBridge } from "./feedback-bridge";
+import { AwayNotifier, FeedbackBridge } from "./feedback-bridge";
 import { ServiceWorker } from "./service-worker";
 import { TransferImport } from "./transfer-import";
 import { LoginDialog } from "./login-dialog";
@@ -220,6 +220,7 @@ function Shell() {
 
       <Toasts />
       <FeedbackBridge />
+      <AwayNotifier />
       <ServiceWorker />
       <TransferImport />
       <LoginDialog />

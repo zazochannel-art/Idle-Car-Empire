@@ -17,6 +17,17 @@ self.addEventListener("activate", (e) => {
   );
 });
 
+// A notification tapped while the game was in the background: back to the game.
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  e.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      const open = list.find((c) => new URL(c.url).pathname.startsWith(scope));
+      return open ? open.focus() : self.clients.openWindow(scope);
+    }),
+  );
+});
+
 self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method !== "GET") return;

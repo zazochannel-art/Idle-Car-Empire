@@ -1,12 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { SaveAdapter, SavePayload } from "./types";
+import type { CloudAccount, SaveAdapter, SavePayload } from "./types";
 
 /**
  * Cloud saves in a Supabase table (see supabase/migrations). Players are
  * signed in anonymously, so progress follows the browser session and can later
  * be linked to a real account. Row Level Security keeps each row private.
  */
-export class SupabaseAdapter implements SaveAdapter {
+export class SupabaseAdapter implements SaveAdapter, CloudAccount {
   readonly name = "supabase";
   private client: Promise<SupabaseClient>;
 
@@ -45,6 +45,27 @@ export class SupabaseAdapter implements SaveAdapter {
       data: payload.state,
       saved_at: new Date(payload.savedAt).toISOString(),
     });
+  }
+
+  async account(): Promise<{ email: string | null } | null> {
+    const who = await this.userId();
+    if (!who) return null;
+    const { data } = await who.client.auth.getUser();
+    return { email: data.user?.is_anonymous ? null : (data.user?.email ?? null) };
+  }
+
+  async linkEmail(email: string, redirectTo: string): Promise<{ ok: boolean; error?: string }> {
+    const who = await this.userId();
+    if (!who) return { ok: false };
+    const { error } = await who.client.auth.updateUser({ email }, { emailRedirectTo: redirectTo });
+    return error ? { ok: false, error: error.message } : { ok: true };
+  }
+
+  async signIn(email: string, redirectTo: string): Promise<{ ok: boolean; error?: string }> {
+    const client = await this.client;
+    // only an email that already holds a save: a new player starts as a guest
+    const { error } = await client.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo, shouldCreateUser: false } });
+    return error ? { ok: false, error: error.message } : { ok: true };
   }
 
   async clear(): Promise<void> {

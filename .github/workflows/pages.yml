@@ -29,6 +29,10 @@ jobs:
       - run: npm run build
         env:
           PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          # Cloud saves (Supabase project "Idle Car Empire"). The publishable key is meant
+          # for the browser: Row Level Security keeps every player's save private.
+          NEXT_PUBLIC_SUPABASE_URL: https://orffhhsogoymalyogfzl.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_hqGfNt6uaNbq0AgGyp0I8g_QLjjFaJ-
       # Pages would otherwise run Jekyll, which drops the _next/ folder.
       - run: touch out/.nojekyll
       - uses: actions/upload-pages-artifact@v3

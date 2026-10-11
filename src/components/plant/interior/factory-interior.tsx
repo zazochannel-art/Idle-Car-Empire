@@ -19,6 +19,7 @@ import { debtVars, stockTotal } from "@/game/engine/materials";
 import { seasonAt } from "@/game/engine/season";
 import { brokenSlot, moraleOf } from "@/game/engine/floor";
 import { cue } from "@/lib/feedback";
+import { FactoryAmbience } from "@/lib/ambience";
 import { BoostButton, BreakdownBanner, MoraleChip } from "../floor-controls";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
@@ -78,6 +79,21 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
       engine.destroy();
     };
   }, []);
+
+  // the sound of the floor, while the player is inside
+  const ambience = useRef<FactoryAmbience | null>(null);
+  useEffect(() => {
+    const a = new FactoryAmbience();
+    a.start();
+    ambience.current = a;
+    return () => a.stop();
+  }, []);
+  const running = b?.plant?.status === "ok";
+  const boosted = (b?.plant?.boost ?? 0) > 0;
+  const broken = !!b?.plant?.broken;
+  useEffect(() => {
+    ambience.current?.set({ running, boost: boosted, broken });
+  }, [running, boosted, broken]);
 
   // tapping the broken machine fixes it
   useEffect(() => {

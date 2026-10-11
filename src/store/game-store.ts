@@ -32,7 +32,7 @@ import { checkAchievements, claimDaily, claimMilestone, recordHistory, refreshDa
 import { cloneState, createInitialState } from "@/game/engine/state";
 import { tick as engineTick } from "@/game/engine/tick";
 import { formatDuration, formatMoney, formatPercent } from "@/game/format";
-import { decodeSave, encodeSave, SaveManager } from "@/game/save";
+import { decodeSave, encodeSave, SaveManager, type CloudAccount } from "@/game/save";
 import type { BuyAmount, CarId, CarRoute, DealerId, FacilityType, GameState, Lang, ManagerId, QualityMode, Specialization, StructureType, ZoneId } from "@/game/types";
 import { applyLanguage, detectLanguage, loadLanguage, translate, type MessageKey, type Vars } from "@/i18n";
 import { contentFor } from "@/i18n/content";
@@ -66,6 +66,10 @@ interface GameStore {
   state: GameState;
   snap: EconomySnapshot;
   backend: string;
+  /** The cloud account (null: saves stay on this device). */
+  cloud: CloudAccount | null;
+  /** Saves to the cloud now. */
+  syncNow: () => void;
   init: () => Promise<void>;
   /** Runs a player action on a copy of the state and commits it if it succeeded. */
   act: <T>(fn: (s: GameState) => T) => T;
@@ -176,7 +180,7 @@ interface GameStore {
   setAutoRacing: (on: boolean) => boolean;
   setAutoRepair: (on: boolean) => void;
   setBuyAmount: (a: BuyAmount) => void;
-  setPref: (key: "lowGraphics" | "sound" | "haptics", on: boolean) => void;
+  setPref: (key: "lowGraphics" | "sound" | "haptics" | "notify", on: boolean) => void;
   setLang: (lang: Lang) => void;
   exportSave: () => string;
   importSave: (text: string) => boolean;
@@ -347,6 +351,8 @@ export const useGame = create<GameStore>((set, get) => {
     state: initial,
     snap: snapshot(initial),
     backend: saves?.backend ?? "memory",
+    cloud: saves?.cloud ?? null,
+    syncNow: () => persist(true),
     act,
 
     init: async () => {
