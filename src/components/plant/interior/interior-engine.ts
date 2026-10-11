@@ -66,7 +66,8 @@ const PART_SIZE: SpriteSize = { w: 40, h: 30, ax: 20, ay: 18 };
 const ROBOT_SIZE: SpriteSize = { w: 90, h: 100, ax: 45, ay: 76 };
 /** How many poses each animated machine has. */
 const POSES: Record<string, number> = { laserCutter: 4, press: 3, bodyJig: 2, furnace: 2, cnc: 4, curing: 2, filler: 4 };
-const FLOOR = "#9ba4ae";
+/** Polished concrete, a touch warm. */
+const FLOOR = "#a0a6ac";
 
 export class InteriorEngine {
   readonly cam = new Camera({ minX: -2000, maxX: 2000, minY: -400, maxY: 1600 });
@@ -93,6 +94,13 @@ export class InteriorEngine {
   /** Low graphics: fewer frames, no people animation. */
   low = false;
   private skip = 0;
+  /**
+   * The hall's still layer (floor, markings, walls, windows, daylight), drawn
+   * once around the view and reused until the camera leaves it or zooms.
+   */
+  private hall: { canvas: HTMLCanvasElement; key: string; scale: number; x0: number; y0: number; x1: number; y1: number } | null = null;
+  private vig: { w: number; h: number; g: CanvasGradient } | null = null;
+  private cone: CanvasGradient | null = null;
 
   constructor(private canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext("2d", { alpha: false })!;
@@ -242,7 +250,9 @@ export class InteriorEngine {
     p.t = this.t;
     p.zoom = cam.zoom;
     p.dpr = this.dpr;
-    p.night = 0;
+    // indoors the lamps are always on: every glow (lamp pools, the laser,
+    // furnaces, sparks, stack lights) is drawn
+    p.night = 1;
     p.dim = false;
     p.lights.length = 0;
 
@@ -250,36 +260,117 @@ export class InteriorEngine {
     for (const line of L.lines) this.drawLine(s, L, line);
     this.drawAisle(s, L);
     if (L.crane) this.drawCrane(L);
+    this.drawLamps(L);
     this.drawSelection(L);
     this.drawLights();
+    this.vignette();
   }
 
-  /** Slab, floor, markings, locked halls, walls with windows and gates, ceiling lamps. */
+  /** A soft darkening toward the corners of the screen: the eye goes to the line. */
+  private vignette() {
+    const ctx = this.ctx;
+    const W = this.canvas.width;
+    const H = this.canvas.height;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (this.vig?.w !== W || this.vig.h !== H) {
+      const g = ctx.createRadialGradient(W / 2, H * 0.55, Math.min(W, H) * 0.35, W / 2, H * 0.55, Math.hypot(W, H) * 0.62);
+      g.addColorStop(0, "rgba(8,10,16,0)");
+      g.addColorStop(1, "rgba(8,10,16,0.32)");
+      this.vig = { w: W, h: H, g };
+    }
+    ctx.fillStyle = this.vig.g;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  /** The hall (from its cached still layer when it can), then what changes on it. */
   private drawBuilding(s: InteriorScene, L: Interior) {
+    const p = this.p;
+    if (!this.blitHall(s, L)) this.drawHall(s, L);
+    // the raw material gate lights up while a delivery comes in
+    const ay = L.aisle.y;
+    if (s.inbound) p.onRight(0, 0, 0, ay - 0.9, ay + 0.9, 0, 30, "rgba(253,230,138,0.85)");
+    for (const lk of L.locked) p.tag(s.lockedLabel(L.lines.length + L.locked.indexOf(lk), lk.level), L.w / 2, lk.y0 + 2.5, 2, { size: 13, bg: "rgba(15,23,42,0.85)", icon: "🔒" });
+  }
+
+  /**
+   * Draws the hall's still layer into an offscreen canvas covering the view
+   * (plus a margin to pan into) at the current zoom, and blits it. Redrawn
+   * only when the view leaves it or the zoom moves a quarter octave. False
+   * when the area would be too big to keep (then the hall is drawn live).
+   */
+  private blitHall(s: InteriorScene, L: Interior): boolean {
+    const { cam, p } = this;
+    const scale = 2 ** (Math.ceil(Math.log2(cam.zoom * this.dpr) * 4) / 4);
+    const detail = p.zoom > 0.6 ? 2 : p.zoom > 0.45 ? 1 : 0;
+    const key = `${this.layoutKey}|${s.accent}|${scale}|${detail}`;
+    // the hall's extent in world px: slab, and the walls up to the roof
+    const bx0 = sx(-0.4, L.d + 0.4) - 8;
+    const bx1 = sx(L.w + 0.4, -0.4) + 8;
+    const by0 = sy(-0.4, -0.4, 100);
+    const by1 = sy(L.w + 0.4, L.d + 0.4, -16) + 8;
+    const hw = cam.w / 2 / cam.zoom;
+    const hh = cam.h / 2 / cam.zoom;
+    const vx0 = Math.max(bx0, cam.x - hw);
+    const vx1 = Math.min(bx1, cam.x + hw);
+    const vy0 = Math.max(by0, cam.y - hh);
+    const vy1 = Math.min(by1, cam.y + hh);
+    if (vx1 <= vx0 || vy1 <= vy0) return true; // the hall is off screen
+    let h = this.hall;
+    if (!h || h.key !== key || vx0 < h.x0 || vy0 < h.y0 || vx1 > h.x1 || vy1 > h.y1) {
+      const m = 200 / cam.zoom;
+      const x0 = Math.max(bx0, vx0 - m);
+      const x1 = Math.min(bx1, vx1 + m);
+      const y0 = Math.max(by0, vy0 - m);
+      const y1 = Math.min(by1, vy1 + m);
+      const cw = Math.ceil((x1 - x0) * scale);
+      const ch = Math.ceil((y1 - y0) * scale);
+      if (cw > 6000 || ch > 6000 || cw * ch > 12e6) return false;
+      const canvas = h?.canvas ?? document.createElement("canvas");
+      canvas.width = cw;
+      canvas.height = ch;
+      const c = canvas.getContext("2d");
+      if (!c) return false;
+      c.setTransform(scale, 0, 0, scale, -x0 * scale, -y0 * scale);
+      const main = this.ctx;
+      this.ctx = c;
+      p.ctx = c;
+      try {
+        this.drawHall(s, L);
+      } finally {
+        this.ctx = main;
+        p.ctx = main;
+      }
+      h = this.hall = { canvas, key, scale, x0, y0, x1, y1 };
+    }
+    this.ctx.drawImage(h.canvas, h.x0, h.y0, h.canvas.width / h.scale, h.canvas.height / h.scale);
+    return true;
+  }
+
+  /** Slab, floor, markings, locked halls, walls with windows and gates: everything that stays still. */
+  private drawHall(s: InteriorScene, L: Interior) {
     const p = this.p;
     const c = this.ctx;
     const { w, d } = L;
     p.box(-0.4, -0.4, w + 0.8, d + 0.8, -16, 16, "#2a3240", "#353e4c", false);
-    p.quad(0, 0, w, d, FLOOR);
-    // polished concrete: large slabs and a soft sheen
-    c.strokeStyle = "rgba(255,255,255,0.08)";
-    c.lineWidth = 1;
-    c.beginPath();
-    for (let x = 2; x < w; x += 2) {
-      c.moveTo(sx(x, 0), sy(x, 0));
-      c.lineTo(sx(x, d), sy(x, d));
-    }
-    for (let y = 2; y < d; y += 2) {
-      c.moveTo(sx(0, y), sy(0, y));
-      c.lineTo(sx(w, y), sy(w, y));
-    }
-    c.stroke();
-    // hall floors: each line's bay is a slightly darker epoxy floor with a green walkway in front
+    this.drawFloor(L);
+    // hall floors: each line's bay is a glossy epoxy floor (it catches the
+    // window light at the back), with a green walkway in front
     for (const line of L.lines) {
-      p.quad(0.3, line.y0 + 0.2, w - 0.6, 4.6, "#8a939e");
+      const g = c.createLinearGradient(sx(w / 2, line.y0 + 0.2), sy(w / 2, line.y0 + 0.2), sx(w / 2, line.y0 + 4.8), sy(w / 2, line.y0 + 4.8));
+      g.addColorStop(0, "#98a1ab");
+      g.addColorStop(0.55, "#8a939d");
+      g.addColorStop(1, "#838c96");
+      p.quad(0.3, line.y0 + 0.2, w - 0.6, 4.6, g);
+      p.quad(0.3, line.y0 + 0.2, w - 0.6, 4.6, floorGrain(c));
+      p.quadStroke(0.3, line.y0 + 0.2, w - 0.6, 4.6, "rgba(15,23,42,0.18)", 1);
       p.quad(0.3, line.belt + 1.55, w - 0.6, 0.55, "rgba(34,197,94,0.32)");
       p.line(0.3, line.belt + 1.55, w - 0.3, line.belt + 1.55, "#facc15", 1.4);
       p.line(0.3, line.belt + 2.1, w - 0.3, line.belt + 2.1, "#facc15", 1.4);
+      // painted walking arrows along the walkway
+      for (let x = 2; x < w - 1; x += 5) this.chevron(x, line.belt + 1.82, "rgba(255,255,255,0.55)");
+      // keep-clear hatching at both ends of the line
+      this.hatch(0.3, line.y0 + 0.2, 0.45, 4.6);
+      this.hatch(w - 0.75, line.y0 + 0.2, 0.45, 4.6);
     }
     // locked halls: bare, hatched, with the level that builds them
     for (const lk of L.locked) {
@@ -296,45 +387,308 @@ export class InteriorEngine {
       c.stroke();
       c.restore();
       p.quadStroke(0.3, lk.y0 + 0.2, w - 0.6, 4.6, "rgba(250,204,21,0.8)", 2, [10, 8]);
-      p.tag(s.lockedLabel(L.lines.length + L.locked.indexOf(lk), lk.level), w / 2, lk.y0 + 2.5, 2, { size: 13, bg: "rgba(15,23,42,0.85)", icon: "🔒" });
     }
-    // aisle: lane markings and arrows
+    // aisle: lane markings, arrows and the tyre marks of the forklifts
     const ay = L.aisle.y;
+    c.strokeStyle = "rgba(30,30,32,0.07)";
+    c.lineWidth = 3;
+    c.beginPath();
+    for (const off of [-0.32, -0.12, 0.14, 0.34]) {
+      c.moveTo(sx(0.5, ay + off), sy(0.5, ay + off));
+      c.lineTo(sx(w - 0.5, ay + off), sy(w - 0.5, ay + off));
+    }
+    c.stroke();
     p.line(0.2, ay - 0.6, w - 0.2, ay - 0.6, "#facc15", 2);
     p.line(0.2, ay + 0.6, w - 0.2, ay + 0.6, "#facc15", 2);
     for (let x = 2; x < w - 2; x += 2.5) p.line(x, ay, x + 1.2, ay, "rgba(255,255,255,0.75)", 2, 0, [6, 6]);
+    this.drawWalls(s, L);
+    this.drawSunlight(L);
+  }
 
-    // back walls (the camera looks in from the open front)
+  /** Polished concrete: power-floated grain, saw-cut joints, a few stains. */
+  private drawFloor(L: Interior) {
+    const p = this.p;
+    const c = this.ctx;
+    const { w, d } = L;
+    p.quad(0, 0, w, d, FLOOR);
+    p.quad(0, 0, w, d, floorGrain(c));
+    // a darker band along the walls (the floor nobody walks on, and the shade of the walls)
+    for (let k = 0; k < 4; k++) {
+      p.quad(0, 0, w, 0.25 - k * 0.05, "rgba(15,23,42,0.05)");
+      p.quad(0, 0, 0.25 - k * 0.05, d, "rgba(15,23,42,0.05)");
+    }
+    // saw-cut joints every four tiles: a dark groove and a lit edge
+    c.lineWidth = 1.2;
+    c.strokeStyle = "rgba(20,24,30,0.16)";
+    c.beginPath();
+    for (let x = 4; x < w; x += 4) {
+      c.moveTo(sx(x, 0), sy(x, 0));
+      c.lineTo(sx(x, d), sy(x, d));
+    }
+    for (let y = 4; y < d; y += 4) {
+      c.moveTo(sx(0, y), sy(0, y));
+      c.lineTo(sx(w, y), sy(w, y));
+    }
+    c.stroke();
+    c.lineWidth = 1;
+    c.strokeStyle = "rgba(255,255,255,0.08)";
+    c.beginPath();
+    for (let x = 4; x < w; x += 4) {
+      c.moveTo(sx(x + 0.05, 0), sy(x + 0.05, 0));
+      c.lineTo(sx(x + 0.05, d), sy(x + 0.05, d));
+    }
+    for (let y = 4; y < d; y += 4) {
+      c.moveTo(sx(0, y + 0.05), sy(0, y + 0.05));
+      c.lineTo(sx(w, y + 0.05), sy(w, y + 0.05));
+    }
+    c.stroke();
+    // oil and water stains (the same ones every visit)
+    for (let i = 0; i < 22; i++) {
+      const x = 0.8 + hash(i * 3 + 1) * (w - 1.6);
+      const y = 0.8 + hash(i * 3 + 2) * (d - 1.6);
+      p.ellipse(x, y, 0, 6 + hash(i * 3 + 3) * 18, `rgba(48,44,40,${0.04 + hash(i * 7) * 0.05})`, 0.5);
+    }
+  }
+
+  /** The back walls: cladding, a painted dado, windows, pipes, panels and the gate. */
+  private drawWalls(s: InteriorScene, L: Interior) {
+    const p = this.p;
+    const c = this.ctx;
+    const { w, d } = L;
+    const ay = L.aisle.y;
     const WH = 92;
     p.box(-0.35, -0.35, w + 0.35, 0.35, 0, WH, "#cfd6de", "#9aa4b0");
     p.box(-0.35, 0, 0.35, d, 0, WH, "#dde3ea", "#9aa4b0");
-    // sandwich-panel ribs and an accent band
+    // sandwich-panel ribs
     c.strokeStyle = "rgba(15,23,42,0.07)";
     c.lineWidth = 1;
     c.beginPath();
     for (let x = 0.5; x < w; x += 0.5) {
-      c.moveTo(sx(x, 0), sy(x, 0, 0));
+      c.moveTo(sx(x, 0), sy(x, 0, 24));
       c.lineTo(sx(x, 0), sy(x, 0, WH));
     }
     for (let y = 0.5; y < d; y += 0.5) {
-      c.moveTo(sx(0, y), sy(0, y, 0));
+      c.moveTo(sx(0, y), sy(0, y, 24));
       c.lineTo(sx(0, y), sy(0, y, WH));
     }
     c.stroke();
+    // the lower wall: a painted dado and a yellow-black kick band
+    p.onLeft(-0.35, 0, 0, 0.35, w, 0, 24, "#7d8896");
+    p.onRight(0, 0, 0, 0, d, 0, 24, "#8a95a2");
+    p.onLeft(-0.35, 0, 0, 0.35, w, 23, 24.5, "#5f6976");
+    p.onRight(0, 0, 0, 0, d, 23, 24.5, "#68727f");
+    this.kickBand(L);
+    // the accent band under the roof
     p.onLeft(-0.35, 0, 0, 0.35, w, WH - 12, WH - 6, p.col(s.accent));
     p.onRight(0, 0, 0, 0, d, WH - 12, WH - 6, p.col(s.accent));
-    // clerestory windows
-    for (let x = 1; x < w - 1; x += 3) p.onLeft(-0.35, 0, 0, x, x + 2.2, 52, 76, "#93c5fd");
-    for (let y = 1; y < d - 4; y += 3) p.onRight(0, 0, 0, y, y + 2.2, 52, 76, "#a5d4fd");
-    // the raw material gate on the side wall, by the aisle
-    p.onRight(0, 0, 0, ay - 1, ay + 1, 0, 40, "#374151");
-    if (s.inbound) p.onRight(0, 0, 0, ay - 0.9, ay + 0.9, 0, 38, "#fde68a");
-    for (let k = 0; k < 8; k++) p.onRight(0, 0, 0, ay - 1, ay + 1, 40 + k * 0.01, 40 + k * 0.01, "#111");
-    // ceiling lamps over every hall (light pools on the floor)
+    // clerestory windows: frame, sky, mullions and a transom
+    for (let x = 1; x < w - 1; x += 3) this.windowLeft(x, 2.2);
+    for (let y = 1; y < d - 4; y += 3) this.windowRight(y, 2.2);
+    // pipes along the walls (compressed air, and the red sprinkler main under the roof)
+    for (const [z, col] of [[34, "#6b7684"], [38, "#7c8795"], [WH - 16, "#dc2626"]] as const) {
+      p.onLeft(-0.35, 0, 0, 0.35, w, z, z + 2.2, col);
+      p.onRight(0, 0, 0, 0, d, z, z + 2.2, col);
+    }
+    for (let x = 1.5; x < w; x += 2) p.onLeft(-0.35, 0, 0, x, x + 0.06, 32, 41, "#475569");
+    for (let y = 1.5; y < d; y += 2) p.onRight(0, 0, 0, y, y + 0.06, 32, 41, "#475569");
+    // electrical panels and fire points along the back wall, clear of the columns
+    for (const x of [2.2, 8.4, 14.6, 21.4]) {
+      if (x > w - 1.5) continue;
+      p.box(x, 0, 0.8, 0.22, 0, 30, "#c7ced6", "#dfe4ea");
+      p.onLeft(x, 0.22, 0, 0.08, 0.36, 12, 26, "#9aa4b0");
+      p.onLeft(x, 0.22, 0, 0.44, 0.72, 12, 26, "#9aa4b0");
+      p.onLeft(x, 0.22, 0, 0.62, 0.68, 27, 29, "#22c55e");
+      // the fire point: an extinguisher on a red board
+      p.onLeft(-0.35, 0, 0, x + 1.25 + 0.35, x + 1.55 + 0.35, 14, 30, "#dc2626");
+      p.box(x + 1.33, 0.02, 0.1, 0.1, 0, 11, "#ef4444", "#f87171");
+    }
+    // the raw material gate on the side wall, by the aisle: a roller door in a striped frame
+    p.onRight(0, 0, 0, ay - 1.12, ay + 1.12, 0, 44, "#facc15");
+    for (let k = 0; k < 6; k++) p.onRight(0, 0, 0, ay - 1.12 + k * 0.4, ay - 0.92 + k * 0.4, 0, 44, "#111827");
+    p.onRight(0, 0, 0, ay - 1, ay + 1, 0, 40, "#4b5563");
+    for (let z = 3; z < 40; z += 3) p.onRight(0, 0, 0, ay - 1, ay + 1, z, z + 0.8, "#374151");
+  }
+
+  /** A window high on the back wall (plane y = 0): frame, sky, mullions, transom. */
+  private windowLeft(x: number, w: number) {
+    const p = this.p;
+    const c = this.ctx;
+    p.onLeft(-0.35, 0, 0, x - 0.08 + 0.35, x + w + 0.08 + 0.35, 50, 78, "#475569");
+    const g = c.createLinearGradient(0, sy(x, 0, 76), 0, sy(x, 0, 52));
+    g.addColorStop(0, "#b9dcfb");
+    g.addColorStop(0.6, "#e3f1fd");
+    g.addColorStop(1, "#cfe5f8");
+    p.onLeft(-0.35, 0, 0, x + 0.35, x + w + 0.35, 52, 76, g);
+    for (let u = 0.55; u < w; u += 0.55) p.onLeft(-0.35, 0, 0, x + u + 0.33, x + u + 0.37, 52, 76, "#64748b");
+    p.onLeft(-0.35, 0, 0, x + 0.35, x + w + 0.35, 63.5, 64.5, "#64748b");
+  }
+
+  /** A window high on the side wall (plane x = 0). */
+  private windowRight(y: number, w: number) {
+    const p = this.p;
+    const c = this.ctx;
+    p.onRight(0, 0, 0, y - 0.08, y + w + 0.08, 50, 78, "#475569");
+    const g = c.createLinearGradient(0, sy(0, y, 76), 0, sy(0, y, 52));
+    g.addColorStop(0, "#b4d6f5");
+    g.addColorStop(0.6, "#dcecfa");
+    g.addColorStop(1, "#c6ddf2");
+    p.onRight(0, 0, 0, y, y + w, 52, 76, g);
+    for (let u = 0.55; u < w; u += 0.55) p.onRight(0, 0, 0, y + u - 0.02, y + u + 0.02, 52, 76, "#64748b");
+    p.onRight(0, 0, 0, y, y + w, 63.5, 64.5, "#64748b");
+  }
+
+  /** A yellow-black safety band along the foot of both walls. */
+  private kickBand(L: Interior) {
+    const p = this.p;
+    p.onLeft(-0.35, 0, 0, 0.35, L.w, 0, 4, "#facc15");
+    p.onRight(0, 0, 0, 0, L.d, 0, 4, "#facc15");
+    for (let u = 0.35; u < L.w; u += 0.5) p.onLeft(-0.35, 0, 0, u, u + 0.22, 0, 4, "#1f2937");
+    for (let u = 0; u < L.d; u += 0.5) p.onRight(0, 0, 0, u, u + 0.22, 0, 4, "#1f2937");
+  }
+
+  /** Daylight from the back windows, falling across the floor in soft shafts. */
+  private drawSunlight(L: Interior) {
+    const c = this.ctx;
+    // where light through a point of the back wall (height z) meets the floor
+    const fx = (x: number, z: number) => x + z * 0.012;
+    const fy = (z: number) => z * 0.05;
+    c.save();
+    c.globalCompositeOperation = "lighter";
+    for (let x = 1; x < L.w - 1; x += 3) {
+      const x0 = x;
+      const x1 = x + 2.2;
+      // the patch of light on the floor
+      c.beginPath();
+      c.moveTo(sx(fx(x0, 76), fy(76)), sy(fx(x0, 76), fy(76)));
+      c.lineTo(sx(fx(x1, 76), fy(76)), sy(fx(x1, 76), fy(76)));
+      c.lineTo(sx(fx(x1, 52), fy(52)), sy(fx(x1, 52), fy(52)));
+      c.lineTo(sx(fx(x0, 52), fy(52)), sy(fx(x0, 52), fy(52)));
+      c.closePath();
+      c.fillStyle = "rgba(255,244,214,0.10)";
+      c.fill();
+      // the beam itself, fading toward the floor
+      const top = [sx(x0, 0), sy(x0, 0, 76)];
+      const bot = [sx(fx(x0, 76), fy(76)), sy(fx(x0, 76), fy(76))];
+      const g = c.createLinearGradient(top[0], top[1], bot[0], bot[1]);
+      g.addColorStop(0, "rgba(255,246,222,0.10)");
+      g.addColorStop(1, "rgba(255,246,222,0.01)");
+      c.beginPath();
+      c.moveTo(sx(x0, 0), sy(x0, 0, 76));
+      c.lineTo(sx(x1, 0), sy(x1, 0, 76));
+      c.lineTo(sx(fx(x1, 76), fy(76)), sy(fx(x1, 76), fy(76)));
+      c.lineTo(sx(fx(x1, 52), fy(52)), sy(fx(x1, 52), fy(52)));
+      c.lineTo(sx(fx(x0, 52), fy(52)), sy(fx(x0, 52), fy(52)));
+      c.lineTo(sx(x0, 0), sy(x0, 0, 52));
+      c.closePath();
+      c.fillStyle = g;
+      c.fill();
+    }
+    c.restore();
+  }
+
+  /** High-bay lamps over the lines: a housing, its glow and a faint cone of light. */
+  private drawLamps(L: Interior) {
+    const c = this.ctx;
+    const Z = 86;
+    c.save();
     for (const line of L.lines)
-      for (let x = 2; x < w; x += 4) {
-        p.light(sx(x, line.belt), sy(x, line.belt, 0), 70, "#fff7e0", 0.18);
+      for (let x = 2.5; x < L.w - 1; x += 4) {
+        const y = line.belt - 0.4;
+        const [lx, ly] = [sx(x, y), sy(x, y, Z)];
+        const [fx, fy] = [sx(x, y), sy(x, y, 0)];
+        // the cone is the same for every lamp: one gradient, moved to each
+        if (!this.cone) {
+          this.cone = c.createLinearGradient(0, 0, 0, Z);
+          this.cone.addColorStop(0, "rgba(255,248,226,0.08)");
+          this.cone.addColorStop(0.7, "rgba(255,248,226,0.03)");
+          this.cone.addColorStop(1, "rgba(255,248,226,0)");
+        }
+        c.globalCompositeOperation = "lighter";
+        c.translate(lx, ly);
+        c.fillStyle = this.cone;
+        c.beginPath();
+        c.moveTo(-5, 0);
+        c.lineTo(5, 0);
+        c.lineTo(40, Z);
+        c.lineTo(-40, Z);
+        c.closePath();
+        c.fill();
+        c.translate(-lx, -ly);
+        c.globalCompositeOperation = "source-over";
+        // the housing and its hot lens
+        c.fillStyle = "#2b3038";
+        c.beginPath();
+        c.moveTo(lx - 7, ly + 1);
+        c.lineTo(lx - 4, ly - 5);
+        c.lineTo(lx + 4, ly - 5);
+        c.lineTo(lx + 7, ly + 1);
+        c.closePath();
+        c.fill();
+        c.fillStyle = "#fffaf0";
+        c.beginPath();
+        c.ellipse(lx, ly + 1, 6.5, 2, 0, 0, Math.PI * 2);
+        c.fill();
+        c.strokeStyle = "rgba(43,48,56,0.6)";
+        c.lineWidth = 0.8;
+        c.beginPath();
+        c.moveTo(lx, ly - 5);
+        c.lineTo(lx, ly - 22);
+        c.stroke();
+        // the pool of light on the floor (lit after the scene)
+        this.p.light(fx, fy, 78, "#fff4dc", 0.32);
       }
+    c.restore();
+  }
+
+  /** A painted walking arrow (pointing along +x). */
+  private chevron(x: number, y: number, color: string) {
+    const c = this.ctx;
+    c.strokeStyle = color;
+    c.lineWidth = 2;
+    c.beginPath();
+    c.moveTo(sx(x - 0.15, y - 0.12), sy(x - 0.15, y - 0.12));
+    c.lineTo(sx(x + 0.1, y), sy(x + 0.1, y));
+    c.lineTo(sx(x - 0.15, y + 0.12), sy(x - 0.15, y + 0.12));
+    c.stroke();
+  }
+
+  /** Yellow-black hatching on the floor (keep clear). */
+  private hatch(x: number, y: number, w: number, d: number) {
+    const c = this.ctx;
+    const p = this.p;
+    c.save();
+    c.beginPath();
+    c.moveTo(sx(x, y), sy(x, y));
+    c.lineTo(sx(x + w, y), sy(x + w, y));
+    c.lineTo(sx(x + w, y + d), sy(x + w, y + d));
+    c.lineTo(sx(x, y + d), sy(x, y + d));
+    c.closePath();
+    c.clip();
+    p.quad(x, y, w, d, "rgba(250,204,21,0.55)");
+    c.strokeStyle = "rgba(17,24,39,0.6)";
+    c.lineWidth = 4;
+    c.beginPath();
+    for (let k = -w; k < d + w; k += 0.35) {
+      c.moveTo(sx(x, y + k), sy(x, y + k));
+      c.lineTo(sx(x + w, y + k + w), sy(x + w, y + k + w));
+    }
+    c.stroke();
+    c.restore();
+  }
+
+  /** A soft dark patch on the floor under a machine (ambient occlusion). */
+  private contactShade(x: number, y: number, rx: number, a = 0.22) {
+    const c = this.ctx;
+    const [px, py] = [sx(x, y), sy(x, y)];
+    c.save();
+    c.translate(px, py);
+    c.scale(1, 0.5);
+    const g = c.createRadialGradient(0, 0, rx * 0.2, 0, 0, rx);
+    g.addColorStop(0, `rgba(10,14,20,${a})`);
+    g.addColorStop(1, "rgba(10,14,20,0)");
+    c.fillStyle = g;
+    c.fillRect(-rx, -rx, rx * 2, rx * 2);
+    c.restore();
   }
 
   private drawLine(s: InteriorScene, L: Interior, line: Line) {
@@ -379,6 +733,9 @@ export class InteriorEngine {
       p.box(cx - 0.12, line.y0 + 0.05, 0.24, 0.24, 0, 88, "#64748b", "#94a3b8");
       p.box(cx - 0.17, line.y0, 0.34, 0.34, 0, 6, "#facc15", "#fde047");
     }
+
+    // machines sit on the floor: a soft shade around their feet
+    for (const st of stops) if (st.def.staff > 0 || st.def.machine === "sheetRack" || st.def.machine === "bodyRack") this.contactShade(st.stop.x, st.stop.y - 0.45, st.w * 30, 0.2);
 
     // work lamps: a lit machine is a manned, working one
     for (const st of stops)
@@ -474,7 +831,7 @@ export class InteriorEngine {
       const lit = s.running ? st.staffed || Math.sin(this.t * 2.5) > 0 : blink;
       p.box(st.x + st.w - 0.35, line.belt - 0.95, 0.12, 0.12, 0, 24, "#475569");
       p.box(st.x + st.w - 0.38, line.belt - 0.98, 0.18, 0.18, 24, 4, lit ? on : off);
-      if (lit) p.light(sx(st.x + st.w - 0.3, line.belt - 0.9), sy(st.x + st.w - 0.3, line.belt - 0.9, 26), s.running ? 18 : 30, on, s.running ? 0.45 : 0.7);
+      if (lit) p.light(sx(st.x + st.w - 0.3, line.belt - 0.9), sy(st.x + st.w - 0.3, line.belt - 0.9, 26), s.running ? 18 : 24, on, s.running ? 0.45 : 0.5);
     }
 
     // 5. robots and people in front of the line (robots in a cell without its operator at half pace)
@@ -582,7 +939,8 @@ export class InteriorEngine {
     ctx.globalCompositeOperation = "lighter";
     for (const l of this.p.lights) {
       const g = ctx.createRadialGradient(l.x, l.y, 0, l.x, l.y, l.r);
-      g.addColorStop(0, l.color + "88");
+      // each glow at its own strength
+      g.addColorStop(0, l.color + Math.round(Math.max(0, Math.min(1, l.a)) * 0xaa).toString(16).padStart(2, "0"));
       g.addColorStop(1, l.color + "00");
       ctx.fillStyle = g;
       ctx.fillRect(l.x - l.r, l.y - l.r, l.r * 2, l.r * 2);
@@ -601,7 +959,7 @@ export class InteriorEngine {
     const robots = st.mode === "robot";
     const variant = st.def.variant ?? "";
     const key = `ist|${model}|${variant}|${pose}|${robots ? 1 : 0}|${part}|${s.accent}|${s.color}`;
-    const spr = sprites3d.get(key, STATION_SIZE, k, (T, { kit, interior }) => interior.buildStation(T, kit, model, pose, s.accent, robots, part, variant, s.color), part === "back");
+    const spr = sprites3d.get(key, STATION_SIZE, k, (T, { kit, interior }) => interior.buildStation(T, kit, model, pose, s.accent, robots, part, variant, s.color), part === "back", "indoor");
     if (!spr) {
       // until the 3D model is ready: a simple block
       if (part === "back") this.p.box(st.x + 0.2, st.stop.y - 0.9, st.w - 0.4, 0.6, 0, 22, "#64748b", "#94a3b8");
@@ -619,7 +977,7 @@ export class InteriorEngine {
     }
     const kind: PartKind = after.part;
     const color = s.color;
-    const spr = sprites3d.get(`ipart|${kind}|${color}`, PART_SIZE, k, (T, { interior }) => interior.buildPart(T, kind, color), false);
+    const spr = sprites3d.get(`ipart|${kind}|${color}`, PART_SIZE, k, (T, { interior }) => interior.buildPart(T, kind, color), false, "indoor");
     if (!spr) {
       this.p.box(x - 0.25, y - 0.18, 0.5, 0.36, z, 2, "#aeb6c1");
       return;
@@ -636,7 +994,7 @@ export class InteriorEngine {
 
   private prop(kind: PropKind, x: number, y: number, s: InteriorScene, k: number) {
     const { accent, color } = s;
-    const spr = sprites3d.get(`iprop|${kind}|${accent}|${color}`, PROP_SIZE, k, (T, { interior }) => interior.buildProp(T, kind, accent, color));
+    const spr = sprites3d.get(`iprop|${kind}|${accent}|${color}`, PROP_SIZE, k, (T, { interior }) => interior.buildProp(T, kind, accent, color), true, "indoor");
     if (!spr) return;
     this.ctx.drawImage(spr.img, sx(x, y) - PROP_SIZE.ax, sy(x, y) - PROP_SIZE.ay, PROP_SIZE.w, PROP_SIZE.h);
   }
@@ -647,7 +1005,7 @@ export class InteriorEngine {
       return;
     }
     const tone = i % 4;
-    const spr = sprites3d.get(`iman|${role}|${pose}|${tone}`, PERSON_SIZE, Math.min(4, k + 1), (T, { interior }) => interior.buildWorker(T, role, pose, tone));
+    const spr = sprites3d.get(`iman|${role}|${pose}|${tone}`, PERSON_SIZE, Math.min(4, k + 1), (T, { interior }) => interior.buildWorker(T, role, pose, tone), true, "indoor");
     if (!spr) {
       this.p.person(x, y, "#f97316", this.t * 3 + i);
       return;
@@ -661,13 +1019,13 @@ export class InteriorEngine {
       r.scale.setScalar(1.5);
       r.rotation.y = Math.PI / 2;
       return r;
-    });
+    }, true, "indoor");
     if (!spr) return;
     this.ctx.drawImage(spr.img, sx(x, y) - ROBOT_SIZE.ax, sy(x, y) - ROBOT_SIZE.ay, ROBOT_SIZE.w, ROBOT_SIZE.h);
   }
 
   private vehicle(key: string, x: number, y: number, k: number, build: Parameters<typeof sprites3d.get>[3]) {
-    const spr = sprites3d.get(`iveh|${key}`, VEHICLE_SIZE, k, build);
+    const spr = sprites3d.get(`iveh|${key}`, VEHICLE_SIZE, k, build, true, "indoor");
     if (!spr) {
       this.p.box(x - 0.15, y - 0.1, 0.3, 0.2, 0, 6, "#f59e0b");
       return;
@@ -696,6 +1054,49 @@ export class InteriorEngine {
 }
 
 const smooth = (u: number) => u * u * (3 - 2 * u);
+/** A fixed pseudo-random number in [0, 1) for an index (stains stay put). */
+const hash = (i: number) => {
+  const v = Math.sin(i * 127.1 + 311.7) * 43758.5453;
+  return v - Math.floor(v);
+};
+
+/** The grain of power-floated concrete: fine speckle and soft clouds, as a repeating pattern. */
+const grains = new WeakMap<CanvasRenderingContext2D, CanvasPattern>();
+function floorGrain(ctx: CanvasRenderingContext2D): CanvasPattern | string {
+  let pat = grains.get(ctx);
+  if (pat) return pat;
+  const N = 160;
+  const cv = document.createElement("canvas");
+  cv.width = cv.height = N;
+  const g = cv.getContext("2d");
+  if (!g) return "rgba(0,0,0,0)";
+  const img = g.createImageData(N, N);
+  for (let i = 0; i < N * N; i++) {
+    const v = hash(i + 7);
+    const dark = v < 0.5;
+    img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = dark ? 40 : 255;
+    img.data[i * 4 + 3] = Math.round(Math.abs(v - 0.5) * 2 * 18);
+  }
+  g.putImageData(img, 0, 0);
+  // soft lighter and darker clouds (trowel marks)
+  for (let k = 0; k < 14; k++) {
+    const x = hash(k * 5 + 1) * N;
+    const y = hash(k * 5 + 2) * N;
+    const r = 20 + hash(k * 5 + 3) * 40;
+    const light = k % 2 === 0;
+    for (const [ox, oy] of [[0, 0], [N, 0], [-N, 0], [0, N], [0, -N]]) {
+      const rg = g.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r);
+      rg.addColorStop(0, light ? "rgba(255,255,255,0.06)" : "rgba(30,30,30,0.05)");
+      rg.addColorStop(1, "rgba(0,0,0,0)");
+      g.fillStyle = rg;
+      g.fillRect(x + ox - r, y + oy - r, r * 2, r * 2);
+    }
+  }
+  pat = ctx.createPattern(cv, "repeat") ?? undefined;
+  if (!pat) return "rgba(0,0,0,0)";
+  grains.set(ctx, pat);
+  return pat;
+}
 /** Interior sprites are big: cap their resolution (memory on phones). */
 const tierCap = (scale: number) => Math.min(3, tierFor(scale));
 

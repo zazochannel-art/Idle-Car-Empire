@@ -39,12 +39,20 @@ export interface BuildCtx {
   interior: typeof import("./interior-models");
 }
 
+/**
+ * How a sprite is lit: "map" is the island in the sun (flat-shaded, matte
+ * low-poly look); "indoor" is a factory hall (lamps overhead, steel that
+ * reflects the hall, smooth shading).
+ */
+export type SpriteLook = "map" | "indoor";
+
 interface Job {
   key: string;
   size: SpriteSize;
   k: number;
   shadow: boolean;
   build: Build;
+  look: SpriteLook;
 }
 
 /**
@@ -96,6 +104,43 @@ function outdoorEnvironment(T: Three) {
   return env;
 }
 
+/**
+ * A factory hall for reflections: polished concrete below, grey cladding
+ * around, a bright roof with rows of strip lamps and a band of windows on
+ * one side. Steel, paint and glass then mirror a real workshop (lamp
+ * streaks across a press, a cool window glint on glass) instead of a sky.
+ */
+function indoorEnvironment(T: Three) {
+  const env = new T.Scene();
+  const wall = new T.Mesh(new T.BoxGeometry(18, 8, 18), new T.MeshBasicMaterial({ color: "#6f7782", side: T.BackSide }));
+  wall.position.y = 3;
+  env.add(wall);
+  const floor = new T.Mesh(new T.PlaneGeometry(18, 18), new T.MeshBasicMaterial({ color: "#5a5f66" }));
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = -0.9;
+  env.add(floor);
+  // the roof: light panels, then rows of hot strip lamps
+  const roof = new T.Mesh(new T.PlaneGeometry(18, 18), new T.MeshBasicMaterial({ color: "#c9cfd6", side: T.DoubleSide }));
+  roof.rotation.x = Math.PI / 2;
+  roof.position.y = 6.9;
+  env.add(roof);
+  const lampM = new T.MeshBasicMaterial({ side: T.DoubleSide });
+  lampM.color.setRGB(9, 8.6, 7.8);
+  for (let i = -3; i <= 3; i++) {
+    const lamp = new T.Mesh(new T.PlaneGeometry(10, 0.35), lampM);
+    lamp.rotation.x = Math.PI / 2;
+    lamp.position.set(0, 6.8, i * 2.2);
+    env.add(lamp);
+  }
+  // a band of windows on the left wall: cool daylight
+  const win = new T.Mesh(new T.PlaneGeometry(14, 1.6), new T.MeshBasicMaterial({ side: T.DoubleSide }));
+  win.material.color.setRGB(2.2, 2.6, 3.2);
+  win.rotation.y = Math.PI / 2;
+  win.position.set(-8.9, 4.4, 0);
+  env.add(win);
+  return env;
+}
+
 class SpriteFactory {
   private T: Three | null = null;
   private renderer: THREE_NS.WebGLRenderer | null = null;
@@ -103,6 +148,8 @@ class SpriteFactory {
   private camera: THREE_NS.OrthographicCamera | null = null;
   private ground: THREE_NS.Mesh | null = null;
   private pad: THREE_NS.Mesh | null = null;
+  /** The two lighting setups (map sun, factory hall), switched per sprite. */
+  private looks: Record<SpriteLook, { lights: THREE_NS.Light[]; env: THREE_NS.Texture; envIntensity: number; exposure: number; shadow: number }> | null = null;
   private ctx: BuildCtx | null = null;
   private keep = new Set<THREE_NS.Material>();
   private loading = false;
@@ -140,9 +187,10 @@ class SpriteFactory {
     return hit;
   }
 
-  get(key: string, size: SpriteSize, k: number, build: Build, shadow = true): Sprite | null {
+  get(key: string, size: SpriteSize, k: number, build: Build, shadow = true, look: SpriteLook = "map"): Sprite | null {
     if (this.failed || typeof document === "undefined") return null;
-    const full = `${key}|${k}|${shadow ? 1 : 0}`;
+    // the same model lit for the hall is a different sprite
+    const full = `${key}|${k}|${shadow ? 1 : 0}${look === "map" ? "" : `|${look}`}`;
     const hit = this.cache.get(full);
     if (hit) {
       this.lastUse.set(full, ++this.uses);
@@ -150,7 +198,7 @@ class SpriteFactory {
     }
     if (hit === null) return null; // queued
     this.cache.set(full, null);
-    this.queue.push({ key: full, size, k, shadow, build });
+    this.queue.push({ key: full, size, k, shadow, build, look });
     this.kick();
     return null;
   }
@@ -191,7 +239,9 @@ class SpriteFactory {
 
       const scene = new T.Scene();
       const pmrem = new T.PMREMGenerator(renderer);
-      scene.environment = pmrem.fromScene(outdoorEnvironment(T), 0.03).texture;
+      const outdoorEnv = pmrem.fromScene(outdoorEnvironment(T), 0.03).texture;
+      const indoorEnv = pmrem.fromScene(indoorEnvironment(T), 0.04).texture;
+      scene.environment = outdoorEnv;
       scene.environmentIntensity = 1.2;
 
       // the map's sun: from the upper left, shadows fall to the lower right
@@ -209,7 +259,30 @@ class SpriteFactory {
       sc.near = 0.1;
       sc.far = 20;
       scene.add(sun);
-      scene.add(new T.HemisphereLight("#cfe6ff", "#7d8a5c", 1.0));
+      const sky = new T.HemisphereLight("#cfe6ff", "#7d8a5c", 1.0);
+      scene.add(sky);
+
+      // the hall: high-bay lamps almost straight overhead (short shadows right
+      // under the machines), light bouncing off the concrete, and a soft cool
+      // fill from the windows so the sides facing the camera keep their shape
+      const lamps = new T.DirectionalLight("#fff6e8", 2.5);
+      lamps.position.set(-1.1, 6, 1.4);
+      lamps.castShadow = true;
+      lamps.shadow.mapSize.set(1024, 1024);
+      lamps.shadow.radius = 6;
+      lamps.shadow.bias = -0.0008;
+      Object.assign(lamps.shadow.camera, { left: -2.5, right: 2.5, top: 2.5, bottom: -2.5, near: 0.1, far: 20 });
+      const bounce = new T.HemisphereLight("#eef3fa", "#8a8f96", 0.85);
+      const windowFill = new T.DirectionalLight("#dbe8ff", 0.55);
+      windowFill.position.set(4, 3, 3);
+      for (const l of [lamps, bounce, windowFill]) {
+        l.visible = false;
+        scene.add(l);
+      }
+      this.looks = {
+        map: { lights: [sun, sky], env: outdoorEnv, envIntensity: 1.2, exposure: 1.05, shadow: 0.32 },
+        indoor: { lights: [lamps, bounce, windowFill], env: indoorEnv, envIntensity: 1.0, exposure: 1.0, shadow: 0.4 },
+      };
 
       const ground = new T.Mesh(new T.PlaneGeometry(12, 12), new T.ShadowMaterial({ opacity: 0.32 }));
       ground.rotation.x = -Math.PI / 2;
@@ -333,8 +406,17 @@ class SpriteFactory {
     cam.bottom = -(h - ay) / PX_PER_TILE;
     cam.updateProjectionMatrix();
 
+    // the look: the map's low-poly sunlight, or the factory hall's lamps
+    const look = this.looks![job.look];
+    for (const [name, l] of Object.entries(this.looks!)) for (const light of l.lights) light.visible = name === job.look;
+    this.scene!.environment = look.env;
+    this.scene!.environmentIntensity = look.envIntensity;
+    r.toneMappingExposure = look.exposure;
+    (this.ground!.material as THREE_NS.ShadowMaterial).opacity = look.shadow;
+
     const obj = job.build(T, this.ctx!);
-    this.lowPoly(obj);
+    // indoors the models keep their own smooth, metallic materials
+    if (job.look === "map") this.lowPoly(obj);
     this.scene!.add(obj);
     this.ground!.visible = job.shadow;
     this.pad!.visible = job.shadow;

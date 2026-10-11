@@ -9,6 +9,7 @@ import { EMPIRE_PERKS } from "@/game/config/prestige";
 import { EVENTS } from "@/game/config/events";
 import { REGIONS } from "@/game/config/regions";
 import { RESEARCH, RESEARCH_CATEGORIES } from "@/game/config/research";
+import { RECIPES } from "@/components/plant/interior/layout";
 import { en } from "./en";
 import { ro, roContent } from "./ro";
 import { ru, ruContent } from "./ru";
@@ -56,6 +57,8 @@ describe("translations", () => {
       ...["noRaw", "full", "noModel"].map((v) => `status.${v}`),
     ];
     for (const key of keys) expect(key in en, key).toBe(true);
+    // every station inside every plant has a name and a description
+    for (const d of Object.values(RECIPES).flat()) for (const key of [`interior.station.${d.id}`, `interior.desc.${d.id}`]) expect(key in en, key).toBe(true);
     // the assembly line has one station per step
     expect(en["process.assemblyPlant"].split("|")).toHaveLength(9);
     for (const dict of [ro, ru]) for (const p of PLANTS) expect(dict[`process.${p.id}`].split("|"), p.id).toHaveLength(en[`process.${p.id}`].split("|").length);
