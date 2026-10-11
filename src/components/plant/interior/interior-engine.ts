@@ -11,7 +11,7 @@
 // and the line stands still whenever the plant does.
 import { liveryOf } from "../../three/livery";
 import { attachControls, Camera } from "../../map/camera";
-import { Painter, sx, sy, toTile } from "../../map/iso";
+import { Painter, raceFont, sx, sy, toTile } from "../../map/iso";
 import { drawModel, drawTruck, type CarModel } from "../../map/vehicles";
 import { sprites3d, tierFor, type SpriteSize } from "../../three/sprites";
 import type { WorkerRole } from "../../three/interior-models";
@@ -46,6 +46,11 @@ export interface InteriorScene {
   model?: CarModel;
   /** The parts the cars on this line get (paint, rims, engine, brakes). */
   build?: import("../../three/car-models").BuildLook;
+  /** Units one batch makes, and their icon: they rise over the finished stores when it is done. */
+  batch?: number;
+  icon?: string;
+  /** The plant's name, on the sign over the halls. */
+  title?: string;
 }
 
 export interface StationPick {
@@ -68,6 +73,10 @@ const ROBOT_SIZE: SpriteSize = { w: 90, h: 100, ax: 45, ay: 76 };
 const POSES: Record<string, number> = { laserCutter: 4, press: 3, bodyJig: 2, furnace: 2, cnc: 4, curing: 2, filler: 4 };
 /** Polished concrete, a touch warm. */
 const FLOOR = "#a0a6ac";
+/** At most one "+N" per line this often (fast lines sum their units up). */
+const POP_EVERY = 1.4;
+/** How long a "+N" rises before it is gone. */
+const POP_LIFE = 1.7;
 
 export class InteriorEngine {
   readonly cam = new Camera({ minX: -2000, maxX: 2000, minY: -400, maxY: 1600 });
@@ -101,6 +110,14 @@ export class InteriorEngine {
   private hall: { canvas: HTMLCanvasElement; key: string; scale: number; x0: number; y0: number; x1: number; y1: number } | null = null;
   private vig: { w: number; h: number; g: CanvasGradient } | null = null;
   private cone: CanvasGradient | null = null;
+  /** Finished units rising over each line's store ("+5 ⚙️"), and when the last ones went up. */
+  private pops: { line: number; n: number; t0: number; bump: number }[] = [];
+  private popAt = -99;
+  /** Units made on a fast line, not shown yet. */
+  private made = 0;
+  private lastProgress = -1;
+  /** The ring that spreads from a machine you tap. */
+  private ripple: { pick: StationPick; t0: number } | null = null;
 
   constructor(private canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext("2d", { alpha: false })!;
@@ -122,6 +139,11 @@ export class InteriorEngine {
   }
 
   setScene(s: InteriorScene) {
+    // a batch done (its progress starts over): its units rise over the stores;
+    // fast lines are summed up as they run (see render)
+    const prog = s.progress ?? -1;
+    if (s.running && this.lastProgress >= 0 && prog >= 0 && prog < this.lastProgress - 0.3 && (s.cycle ?? 0) >= POP_EVERY) this.reward(s.batch ?? 0);
+    this.lastProgress = prog;
     this.scene = s;
     this.sceneAt = performance.now();
     const f = s.spec.floor;
@@ -202,6 +224,7 @@ export class InteriorEngine {
       if (hit) break;
     }
     this.selected = hit;
+    if (hit) this.ripple = { pick: hit, t0: this.t };
     this.onSelect(hit);
   }
 
@@ -237,6 +260,15 @@ export class InteriorEngine {
     const L = this.layout;
     if (s?.running) this.work += dt;
     if (s && L) this.advance(s, L, dt);
+    // a fast line: the units it makes go up together every POP_EVERY seconds
+    if (s?.running && s.batch && s.cycle && s.cycle < POP_EVERY) {
+      this.made += (dt * s.batch) / s.cycle;
+      if (this.t - this.popAt >= POP_EVERY && this.made >= 1) {
+        const n = Math.floor(this.made);
+        this.made -= n;
+        this.reward(n);
+      }
+    }
     const { ctx, p, cam } = this;
     cam.update(dt);
     const W = this.canvas.width;
@@ -257,13 +289,125 @@ export class InteriorEngine {
     p.lights.length = 0;
 
     this.drawBuilding(s, L);
-    for (const line of L.lines) this.drawLine(s, L, line);
+    this.drawDust(L);
+    // the line in the middle of the view gets the full station names, the others their icons
+    const ty = toTile(cam.x, cam.y + 20).y;
+    let focus = 0;
+    for (const line of L.lines) if (Math.abs(line.belt - ty) < Math.abs(L.lines[focus].belt - ty)) focus = line.index;
+    for (const line of L.lines) this.drawLine(s, L, line, line.index === focus);
     this.drawAisle(s, L);
     if (L.crane) this.drawCrane(L);
     this.drawLamps(L);
     this.drawSelection(L);
     this.drawLights();
+    this.drawPops(L);
     this.vignette();
+  }
+
+  /** Shares `n` finished units out over the lines, each rising from its own store. */
+  private reward(n: number) {
+    const L = this.layout;
+    if (!L || n < 1) return;
+    const k = L.lines.length;
+    for (let i = 0; i < k; i++) {
+      const share = Math.floor(n / k) + (i < n % k ? 1 : 0);
+      if (share <= 0) continue;
+      // batches done back to back (a truck freed the store) add up on the label still rising
+      const young = this.pops.find((q) => q.line === i && this.t - q.t0 < 0.9);
+      if (young) {
+        young.n += share;
+        young.bump = this.t;
+      } else this.pops.push({ line: i, n: share, t0: this.t + i * 0.12, bump: -99 });
+    }
+    this.popAt = this.t;
+    this.pops = this.pops.filter((q) => this.t - q.t0 < POP_LIFE);
+  }
+
+  /** "+5 ⚙️" rising from each line's finished store, with a burst of sparkles and a flash. */
+  private drawPops(L: Interior) {
+    const s = this.scene;
+    if (!s || !this.pops.length) return;
+    const c = this.ctx;
+    for (const q of this.pops) {
+      const age = this.t - q.t0;
+      if (age < 0 || age > POP_LIFE) continue;
+      const line = L.lines[q.line];
+      if (!line) continue;
+      const stops = lineStops(line);
+      const fin = stops[stops.length - 1].stop;
+      const [bx, by] = [sx(fin.x, fin.y), sy(fin.x, fin.y, 30)];
+      // the flash and the sparkles
+      if (age < 0.6) {
+        const f = 1 - age / 0.6;
+        c.globalCompositeOperation = "lighter";
+        const g = c.createRadialGradient(bx, by, 0, bx, by, 46);
+        g.addColorStop(0, `rgba(253,224,71,${0.45 * f})`);
+        g.addColorStop(1, "rgba(253,224,71,0)");
+        c.fillStyle = g;
+        c.fillRect(bx - 46, by - 46, 92, 92);
+        c.fillStyle = `rgba(255,244,190,${f})`;
+        for (let i = 0; i < 9; i++) {
+          const a = (i / 9) * Math.PI * 2 + q.line;
+          const r = 8 + age * 70;
+          const [px, py] = [bx + Math.cos(a) * r, by + Math.sin(a) * r * 0.6 - age * 18];
+          const d = 2.2 * f + 0.6;
+          c.fillRect(px - d, py - 0.5, d * 2, 1);
+          c.fillRect(px - 0.5, py - d, 1, d * 2);
+        }
+        c.globalCompositeOperation = "source-over";
+      }
+      // the label: pops in, rises, fades
+      const pop = (age < 0.2 ? backOut(age / 0.2) : 1) * (1 + 0.2 * Math.max(0, 1 - (this.t - q.bump) / 0.25));
+      const alpha = age > POP_LIFE - 0.5 ? (POP_LIFE - age) / 0.5 : 1;
+      const text = `+${q.n} ${s.icon ?? ""}`.trim();
+      c.save();
+      c.globalAlpha = Math.max(0, alpha);
+      c.translate(bx, by - 14 - age * 26);
+      c.scale(pop, pop);
+      c.font = raceFont(900, 15);
+      const w = c.measureText(text).width + 16;
+      c.beginPath();
+      c.roundRect(-w / 2, -12, w, 24, 12);
+      c.fillStyle = "rgba(250,204,21,0.96)";
+      c.shadowColor = "rgba(0,0,0,0.35)";
+      c.shadowBlur = 6;
+      c.shadowOffsetY = 2;
+      c.fill();
+      c.shadowColor = "transparent";
+      c.strokeStyle = "rgba(255,255,255,0.85)";
+      c.lineWidth = 1.5;
+      c.stroke();
+      c.fillStyle = "#1f2937";
+      c.textAlign = "center";
+      c.textBaseline = "middle";
+      c.fillText(text, 0, 1);
+      c.restore();
+    }
+  }
+
+  /** Motes of dust drifting and glinting in the daylight from the back windows. */
+  private drawDust(L: Interior) {
+    if (this.low || this.cam.zoom < 0.6) return;
+    const c = this.ctx;
+    c.globalCompositeOperation = "lighter";
+    let i = 0;
+    for (let x = 1; x < L.w - 1; x += 3)
+      for (let m = 0; m < 5; m++, i++) {
+        // somewhere in the shaft: across it (u), down it (v), from the window's height (z)
+        const u = (hash(i * 3 + 1) + Math.sin(this.t * 0.11 + i) * 0.08 + 1) % 1;
+        const v = (hash(i * 3 + 2) + this.t * (0.012 + hash(i) * 0.01)) % 1;
+        const z = 54 + hash(i * 3 + 3) * 20;
+        const wx = x + u * 2.2 + z * 0.012 * v;
+        const wy = z * 0.05 * v + 0.05;
+        const tw = 0.3 + 0.3 * Math.sin(this.t * (1.3 + hash(i + 9)) + i * 2.1);
+        const a = tw * Math.min(1, v * 6, (1 - v) * 4);
+        if (a <= 0.02) continue;
+        c.fillStyle = `rgba(255,246,214,${a.toFixed(3)})`;
+        c.beginPath();
+        c.arc(sx(wx, wy), sy(wx, wy, z * (1 - v)), (1 + hash(i + 5) * 0.7) / Math.max(1, this.cam.zoom * 0.8), 0, Math.PI * 2);
+        c.fill();
+      }
+    c.globalCompositeOperation = "source-over";
   }
 
   /** A soft darkening toward the corners of the screen: the eye goes to the line. */
@@ -302,7 +446,9 @@ export class InteriorEngine {
     const { cam, p } = this;
     const scale = 2 ** (Math.ceil(Math.log2(cam.zoom * this.dpr) * 4) / 4);
     const detail = p.zoom > 0.6 ? 2 : p.zoom > 0.45 ? 1 : 0;
-    const key = `${this.layoutKey}|${s.accent}|${scale}|${detail}`;
+    // the sign's lettering needs the game font: drawn again once it has loaded
+    const fonts = typeof document !== "undefined" ? document.fonts?.status : "";
+    const key = `${this.layoutKey}|${s.accent}|${s.title}|${s.icon}|${fonts}|${scale}|${detail}`;
     // the hall's extent in world px: slab, and the walls up to the roof
     const bx0 = sx(-0.4, L.d + 0.4) - 8;
     const bx1 = sx(L.w + 0.4, -0.4) + 8;
@@ -507,6 +653,34 @@ export class InteriorEngine {
     for (let k = 0; k < 6; k++) p.onRight(0, 0, 0, ay - 1.12 + k * 0.4, ay - 0.92 + k * 0.4, 0, 44, "#111827");
     p.onRight(0, 0, 0, ay - 1, ay + 1, 0, 40, "#4b5563");
     for (let z = 3; z < 40; z += 3) p.onRight(0, 0, 0, ay - 1, ay + 1, z, z + 0.8, "#374151");
+    if (s.title) this.sign(s, w);
+  }
+
+  /** The plant's sign, hung in front of the back wall: its icon and name in its own colour. */
+  private sign(s: InteriorScene, w: number) {
+    const p = this.p;
+    const c = this.ctx;
+    const text = `${s.icon ?? ""} ${(s.title ?? "").toUpperCase()}`.trim();
+    // as wide as the name needs (within reason), centred over the halls
+    c.font = raceFont(900, 14 * 1.1, false);
+    const size = Math.min(14, (14 * 250) / Math.max(1, c.measureText(text).width));
+    c.font = raceFont(900, size * 1.1, false);
+    const half = Math.min(4.6, (c.measureText(text).width + 36) / 64);
+    const [x0, x1, y] = [w / 2 - half, w / 2 + half, 0.45];
+    // the cables to the roof
+    c.strokeStyle = "#334155";
+    c.lineWidth = 1;
+    c.beginPath();
+    for (const x of [x0 + 0.4, x1 - 0.4]) {
+      c.moveTo(sx(x, y), sy(x, y, 80));
+      c.lineTo(sx(x, y), sy(x, y, 92));
+    }
+    c.stroke();
+    // the board: a white rim, the plant's colour, a lit top edge
+    p.onLeft(x0, y, 0, 0, x1 - x0, 58, 80, "#f8fafc");
+    p.onLeft(x0, y, 0, 0.1, x1 - x0 - 0.1, 59.5, 78.5, p.col(s.accent));
+    p.onLeft(x0, y, 0, 0.1, x1 - x0 - 0.1, 76.5, 78.5, "rgba(255,255,255,0.25)");
+    p.textLeft(text, (x0 + x1) / 2, y, 68.5, size, "#ffffff", 900);
   }
 
   /** A window high on the back wall (plane y = 0): frame, sky, mullions, transom. */
@@ -691,7 +865,7 @@ export class InteriorEngine {
     c.restore();
   }
 
-  private drawLine(s: InteriorScene, L: Interior, line: Line) {
+  private drawLine(s: InteriorScene, L: Interior, line: Line, focus: boolean) {
     const p = this.p;
     const c = this.ctx;
     const stops = lineStops(line);
@@ -811,6 +985,7 @@ export class InteriorEngine {
           break;
         case "heat":
           p.light(sx(x - 0.4, y - 0.5), sy(x - 0.4, y - 0.5, 10), 34 + Math.sin(this.t * 3 + x) * 4, "#ff8a3d", 0.55);
+          if (near && !this.low) this.steam(x - 0.3, y - 0.6);
           break;
         case "spray":
           for (let i = 0; i < 3; i++) p.light(sx(x - 0.6 + i * 0.6, y - 0.2), sy(x - 0.6 + i * 0.6, y - 0.2, 12), 16 + ((this.t * 40 + i * 7) % 8), s.color, 0.45);
@@ -823,15 +998,15 @@ export class InteriorEngine {
         }
       }
     }
-    // a stack light on every machine: green working, amber without its operator, red blinking when the line stands
-    const blink = Math.sin(this.t * 6) > 0;
+    // a stack light on every machine: green working, amber blinking without its operator;
+    // while the line waits (the reason is tagged where it is) they glow a calm amber: standby
     for (const st of stops) {
       if (st.def.staff === 0) continue;
-      const [on, off] = !s.running ? ["#ef4444", "#7f1d1d"] : st.staffed ? ["#22c55e", "#22c55e"] : ["#f59e0b", "#78350f"];
-      const lit = s.running ? st.staffed || Math.sin(this.t * 2.5) > 0 : blink;
+      const [on, off] = !s.running ? ["#f59e0b", "#b45309"] : st.staffed ? ["#22c55e", "#22c55e"] : ["#f59e0b", "#78350f"];
+      const lit = s.running ? st.staffed || Math.sin(this.t * 2.5) > 0 : Math.sin(this.t * 1.2 + st.x * 0.3) > -0.3;
       p.box(st.x + st.w - 0.35, line.belt - 0.95, 0.12, 0.12, 0, 24, "#475569");
       p.box(st.x + st.w - 0.38, line.belt - 0.98, 0.18, 0.18, 24, 4, lit ? on : off);
-      if (lit) p.light(sx(st.x + st.w - 0.3, line.belt - 0.9), sy(st.x + st.w - 0.3, line.belt - 0.9, 26), s.running ? 18 : 24, on, s.running ? 0.45 : 0.5);
+      if (lit) p.light(sx(st.x + st.w - 0.3, line.belt - 0.9), sy(st.x + st.w - 0.3, line.belt - 0.9, 26), 18, on, s.running ? 0.45 : 0.3);
     }
 
     // 5. robots and people in front of the line (robots in a cell without its operator at half pace)
@@ -848,7 +1023,8 @@ export class InteriorEngine {
     for (const [i, h] of L.people.entries()) {
       if (h.line !== line.index) continue;
       const busy = working && h.station !== undefined && h.role !== "supervisor";
-      const pose = busy ? Math.floor(this.t * 4 + i) % 4 : s.running ? Math.floor(this.t * 1.5 + i) % 2 : 0;
+      // waiting people still shift from foot to foot
+      const pose = busy ? Math.floor(this.t * 4 + i) % 4 : Math.floor(this.t * (s.running ? 1.5 : 0.7) + i) % 2;
       this.person(h.x, h.y, h.role, pose, i, k);
       if (h.role === "welder" && working && near) this.sparks(h.x + 0.1, h.y - 0.6);
     }
@@ -860,12 +1036,14 @@ export class InteriorEngine {
         const next = !!floor && st.slot === floor.machines;
         p.tag(next && s.words ? `＋ ${s.words.build} · ${lab}` : `${st.def.icon} ${lab}`, st.x + st.w / 2, line.belt, line.conveyor ? 8 : 2, { size: 9, bg: next ? "rgba(21,128,61,0.9)" : "rgba(15,23,42,0.6)" });
       }
-    // station names on the floor in front of each station (with its operator on the shop floor)
+    // station names on the floor in front of each station (with its operator on the shop floor);
+    // the lines away from the middle of the view just show their icons, so the hall stays calm
     if (near)
       for (const st of stops) {
         const sel = this.selected?.line === line.index && this.selected.id === st.def.id;
         const crew = floor && st.slot !== undefined && st.staffed ? ` · 👷${st.slot + 1}` : "";
-        p.tag(`${st.def.icon} ${s.labels[st.def.id] ?? st.def.id}${crew}`, st.x + st.w / 2, line.belt + 1.3, 1, { size: 9, bg: sel ? "rgba(14,165,233,0.95)" : "rgba(15,23,42,0.78)" });
+        if (focus || sel) p.tag(`${st.def.icon} ${s.labels[st.def.id] ?? st.def.id}${crew}`, st.x + st.w / 2, line.belt + 1.3, 1, { size: 9, bg: sel ? "rgba(14,165,233,0.95)" : "rgba(15,23,42,0.78)" });
+        else p.tag(st.def.icon, st.x + st.w / 2, line.belt + 1.3, 1, { size: 8, bg: "rgba(15,23,42,0.5)" });
       }
     // what holds a machine back, at that machine: no operator, no material in, no room out
     if (near && s.words) {
@@ -926,6 +1104,18 @@ export class InteriorEngine {
   }
 
   private drawSelection(L: Interior) {
+    // a ring spreading from the machine you tapped
+    const r = this.ripple;
+    if (r) {
+      const age = this.t - r.t0;
+      const st = this.find(r.pick);
+      const line = L.lines[r.pick.line];
+      if (age > 0.6 || !st || !line) this.ripple = null;
+      else {
+        const g = 0.15 + age * 1.2;
+        this.p.quadStroke(st.x - g, line.belt - 1.1 - g, st.w + g * 2, 2.2 + g * 2, `rgba(125,211,252,${(1 - age / 0.6) * 0.9})`, 2.5);
+      }
+    }
     if (!this.selected) return;
     const st = this.find(this.selected);
     if (!st) return;
@@ -1051,9 +1241,25 @@ export class InteriorEngine {
     c.stroke();
     p.light(px, py, 22, "#fde68a", 0.9);
   }
+
+  /** Soft puffs of steam rising off a hot machine and fading out. */
+  private steam(x: number, y: number) {
+    const c = this.ctx;
+    const [bx, by] = [sx(x, y), sy(x, y, 34)];
+    for (let i = 0; i < 3; i++) {
+      const u = (this.t * 0.35 + i / 3 + x * 0.17) % 1;
+      const r = 6 + u * 16;
+      c.fillStyle = `rgba(241,245,249,${(0.34 * (1 - u) * Math.min(1, u * 5)).toFixed(3)})`;
+      c.beginPath();
+      c.arc(bx + Math.sin(u * 4 + i) * 4 + u * 6, by - u * 42, r, 0, Math.PI * 2);
+      c.fill();
+    }
+  }
 }
 
 const smooth = (u: number) => u * u * (3 - 2 * u);
+/** Overshoots a little, then settles (a label popping in). */
+const backOut = (u: number) => 1 + 2.2 * Math.pow(u - 1, 3) + 1.2 * Math.pow(u - 1, 2);
 /** A fixed pseudo-random number in [0, 1) for an index (stains stay put). */
 const hash = (i: number) => {
   const v = Math.sin(i * 127.1 + 311.7) * 43758.5453;
