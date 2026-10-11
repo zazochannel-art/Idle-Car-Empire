@@ -101,6 +101,7 @@ import { logisticsMods } from "./logistics";
 import { starMods } from "./imperium";
 import { managerMult, type GlobalMods } from "./modifiers";
 import { floorPace, floorTick, MORALE } from "./floor";
+import { SKIN_BY_ID, type SkinId } from "../config/collection";
 
 // ───────────────────────────── state ─────────────────────────────
 
@@ -1438,6 +1439,7 @@ export function migratePlant(type: PlantType, raw: unknown): PlantData {
   // the shop floor: the crew's morale, a boost or a breakdown in progress, the machines' wear
   if (raw.morale !== undefined) p.morale = Math.min(100, num(raw.morale, MORALE.base));
   for (const k of ["boost", "boostCd", "broken", "wear", "breaks"] as const) if (raw[k] !== undefined) p[k] = num(raw[k]);
+  if (typeof raw.skin === "string" && raw.skin in SKIN_BY_ID && raw.skin !== "auto") p.skin = raw.skin as SkinId;
   return p;
 }
 

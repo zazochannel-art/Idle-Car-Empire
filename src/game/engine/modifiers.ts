@@ -12,6 +12,7 @@ import { starMods } from "./imperium";
 import { RESEARCH_BY_ID } from "../config/research";
 import type { CarId, Effect, GameState, PlantType } from "../types";
 import { cityEffects } from "./city";
+import { editionBonus } from "./collection";
 
 export const MAX_TIER = 9;
 
@@ -191,7 +192,8 @@ export function computeGlobalMods(s: GameState): GlobalMods {
 
   m.income *= 1 + s.achievements.length * ACHIEVEMENT_INCOME_BONUS;
   m.income *= 1 + s.empirePoints * PRESTIGE.incomePerPoint;
-  // permanent boosts from milestones
+  // permanent boosts from milestones, and the limited editions collected
   m.income *= 1 + s.boost;
+  m.income *= 1 + editionBonus(s);
   return m;
 }

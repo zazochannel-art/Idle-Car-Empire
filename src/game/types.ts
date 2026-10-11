@@ -352,6 +352,8 @@ export interface PlantData {
   /** Running time since the last breakdown (s), and breakdowns so far. */
   wear?: number;
   breaks?: number;
+  /** The halls' style, chosen by the player (absent: the one the plant's level brings). */
+  skin?: import("./config/collection").SkinId;
 }
 
 export type QualityMode = "fast" | "balanced" | "premium";
@@ -570,6 +572,8 @@ export interface GameState {
   engineers: import("./engine/expansion").EngineersState;
   /** Decisions on the CEO's desk and the rival campaign. */
   story: import("./engine/story").StoryState;
+  /** Limited editions found on the assembly lines (kept through every reset). */
+  editions: import("./engine/collection").EditionsState;
   /** Unlock bonuses already claimed this run ("car:sedan", "plant:engineFactory"). */
   unlocks: string[];
   settings: { buyAmount: BuyAmount; lang: Lang; lowGraphics: boolean; sound: boolean; haptics: boolean };

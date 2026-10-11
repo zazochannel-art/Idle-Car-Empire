@@ -5,6 +5,7 @@
 // rubber). Pure data, so every plant and level can be checked in tests.
 import { mix } from "../../map/iso";
 import type { PartKind } from "./layout";
+import type { SkinId } from "@/game/config/collection";
 
 export type HallEra = "workshop" | "factory" | "hightech";
 
@@ -127,9 +128,49 @@ export interface HallLook extends PlantTheme, EraLook {
   era: HallEra;
 }
 
-export function hallLook(type: string, level: number): HallLook {
-  const era = hallEra(level);
+/** The styles a player can pick on top of the eras: each starts from an era and repaints it. */
+const STYLES: Partial<Record<SkinId, { era: HallEra; look: Partial<EraLook>; floor: string; k: number; haze: string; walkway: string; stains: number }>> = {
+  // a dark hall lit by violet LED strips, magenta lines on a black mirror floor
+  neon: {
+    era: "hightech",
+    look: { wall: ["#1e1b3a", "#26224a"], dado: ["#141127", "#1b1733"], lampColor: "#c4b5fd", lampStrength: 0.5, lines: "#e879f9", column: ["#312e81", "#4338ca"] },
+    floor: "#16142c",
+    k: 0.8,
+    haze: "rgba(168,85,247,0.09)",
+    walkway: "rgba(34,211,238,0.36)",
+    stains: 0,
+  },
+  // heavy industry: soot-dark walls, rust-red steel, sodium lamps over a grimy floor
+  industrial: {
+    era: "factory",
+    look: { wall: ["#5b5249", "#665c52"], dado: ["#3a332d", "#423a33"], lampColor: "#ffb347", lampStrength: 0.44, lines: "#f59e0b", column: ["#7c2d12", "#9a3412"] },
+    floor: "#4a4440",
+    k: 0.45,
+    haze: "rgba(255,140,40,0.06)",
+    walkway: "rgba(245,158,11,0.3)",
+    stains: 1.8,
+  },
+};
+
+const SKIN_ERA: Partial<Record<SkinId, HallEra>> = { retro: "workshop", modern: "factory", hightech: "hightech" };
+
+export function hallLook(type: string, level: number, skin: SkinId = "auto"): HallLook {
+  const style = STYLES[skin];
+  const era = style?.era ?? SKIN_ERA[skin] ?? hallEra(level);
   const t = PLANT_THEMES[type] ?? PLANT_THEMES.bodyWorks;
+  if (style) {
+    const e = { ...ERAS[era], ...style.look };
+    return {
+      ...t,
+      ...e,
+      era,
+      floor: mix(t.floor, style.floor, style.k),
+      bay: [mix(t.bay[0], style.floor, style.k), mix(t.bay[1], style.floor, style.k * 1.05)],
+      walkway: style.walkway,
+      haze: style.haze,
+      stainCount: Math.round(t.stainCount * style.stains),
+    };
+  }
   const e = ERAS[era];
   // the workshop is older and dirtier; the high-tech plant light and spotless
   const old = era === "workshop";

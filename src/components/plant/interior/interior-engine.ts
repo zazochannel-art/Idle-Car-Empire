@@ -39,6 +39,8 @@ export interface InteriorScene {
   morale?: number;
   /** The plant's speed and quality tiers: a step up is celebrated at the stations they stand for. */
   tiers?: { speed: number; grade: number };
+  /** The halls' style the player picked (absent: the one the level brings). */
+  skin?: import("@/game/config/collection").SkinId;
   /** Fill levels 0..1 of raw material and finished goods. */
   raw: number;
   out: number;
@@ -205,11 +207,11 @@ export class InteriorEngine {
     this.sceneAt = performance.now();
     this.season = s.season ?? null;
     const f = s.spec.floor;
-    const key = `${s.type}|${s.spec.level}|${s.spec.automation}|${s.spec.manager}|${f ? `${f.machines}/${f.workers}` : ""}`;
+    const key = `${s.type}|${s.spec.level}|${s.spec.automation}|${s.spec.manager}|${f ? `${f.machines}/${f.workers}` : ""}|${s.skin ?? ""}`;
     let changed: StationPick[] = [];
     if (key !== this.layoutKey) {
       const grew = this.layout !== null;
-      this.look = hallLook(s.type, s.spec.level);
+      this.look = hallLook(s.type, s.spec.level, s.skin);
       this.layout = interiorLayout(s.spec, recipeFor(s.type));
       // what an upgrade changed: a new hall, a machine built or manned, robots in
       if (before && was && before.lines.length <= this.layout.lines.length) {

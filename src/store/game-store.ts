@@ -42,6 +42,8 @@ import * as Lv from "@/game/engine/live";
 import * as Cl from "@/game/engine/classics";
 import * as Fl from "@/game/engine/floor";
 import * as Sy from "@/game/engine/story";
+import * as Cn from "@/game/engine/collection";
+import { EDITION, type SkinId } from "@/game/config/collection";
 import { DILEMMA_BY_ID, RIVAL_CEO } from "@/game/config/story";
 import * as Ex from "@/game/engine/expansion";
 import * as Dn from "@/game/engine/car-dna";
@@ -76,6 +78,8 @@ interface GameStore {
   repairPlant: (plot: string) => boolean;
   /** Overtime: double speed for a while, on cooldown after. */
   boostPlant: (plot: string) => boolean;
+  /** Gives a plant's halls a style. */
+  setPlantSkin: (plot: string, skin: SkinId) => boolean;
   /** Takes the decision on the CEO's desk (choice 0 or 1). */
   decide: (choice: 0 | 1) => boolean;
   /** Closes the rival campaign's current chapter and pays its reward. */
@@ -305,6 +309,13 @@ export const useGame = create<GameStore>((set, get) => {
     const fo = Ex.fleetOrderTick(next, now);
     if (fo === "offer") uiEvents.emit({ type: "toast", tone: "info", icon: "🚌", title: tr("fleet.offerToast") });
     else if (fo === "failed") uiEvents.emit({ type: "toast", tone: "warn", icon: "⌛", title: tr("fleet.failed") });
+    // now and then a car off the line is a limited edition
+    const built = events.find((e) => e.type === "carBuilt");
+    const edition = Cn.editionTick(next, built?.type === "carBuilt" ? built.car : null, now);
+    if (edition) {
+      const car = built?.type === "carBuilt" ? names().car(CAR_BY_ID[built.car]) : "";
+      uiEvents.emit({ type: "toast", tone: "gold", icon: edition.icon, title: tr("edition.toast", { name: tr(`edition.${edition.id}` as MessageKey), car }), body: tr("edition.toastBody", { pct: formatPercent(EDITION.income) }), action: { label: tr("edition.see"), view: "cars" } });
+    }
     const story = Sy.storyTick(next, snap);
     if (story === "offer") {
       const { id, plot } = next.story.pending!;
@@ -386,6 +397,7 @@ export const useGame = create<GameStore>((set, get) => {
     plantSpeed: (plot) => act((s) => Ch.upgradePlantSpeed(s, plot, get().snap.gm)),
     repairPlant: (plot) => act((s) => Fl.repairPlant(s, plot)),
     boostPlant: (plot) => act((s) => Fl.boostPlant(s, plot)),
+    setPlantSkin: (plot, skin) => act((s) => Cn.setPlantSkin(s, plot, skin)),
     decide: (choice) => act((s) => Sy.decide(s, choice, get().snap)),
     claimChapter: () => {
       const ok = act((s) => Sy.claimChapter(s, get().snap));
