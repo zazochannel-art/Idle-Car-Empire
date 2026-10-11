@@ -150,6 +150,29 @@ export class Scenery {
     this.cutIntoCells();
   }
 
+  /** The roadside billboards: they advertise the company once it has a model to show. */
+  private boards: { face: THREE.Mesh; base: THREE.Material }[] = [];
+  private ad: { tex: THREE.CanvasTexture; mat: THREE.MeshStandardMaterial; key: string } | null = null;
+
+  setAd(ad: BillboardAd | null) {
+    const key = ad ? `${ad.name}|${ad.logo}|${ad.color}|${ad.accent}|${ad.line}` : "";
+    if (!ad) {
+      for (const b of this.boards) b.face.material = b.base;
+      return;
+    }
+    if (!this.ad) {
+      const tex = new THREE.CanvasTexture(document.createElement("canvas"));
+      tex.colorSpace = THREE.SRGBColorSpace;
+      this.ad = { tex, mat: new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6 }), key: "" };
+    }
+    if (this.ad.key !== key) {
+      drawAd(this.ad.tex.image as HTMLCanvasElement, ad);
+      this.ad.tex.needsUpdate = true;
+      this.ad.key = key;
+    }
+    for (const b of this.boards) b.face.material = this.ad.mat;
+  }
+
   /** Close-up views draw the cells, wide views the whole sets. */
   setClose(close: boolean) {
     if (close === this.close) return;
@@ -1224,9 +1247,11 @@ export class Scenery {
     }
     for (const [x, z, rot] of list("panou")) {
       const m = this.place(this.object([box(0.06, 1.0, 0.06, G, -0.45, 0, 0, 0), box(0.06, 1.0, 0.06, G, 0.45, 0, 0, 0), box(1.4, 0.62, 0.05, C("#3a3f45"), 0, 0.92, -0.03, 0)]), x, z);
-      const face = new THREE.Mesh(new THREE.PlaneGeometry(1.32, 0.56), new THREE.MeshStandardMaterial({ map: billboardTexture(), roughness: 0.7 }));
+      const base = new THREE.MeshStandardMaterial({ map: billboardTexture(), roughness: 0.7 });
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(1.32, 0.56), base);
       face.position.set(0, 1.23, 0);
       m.add(face);
+      this.boards.push({ face, base });
       m.rotation.y = rot;
     }
     for (const [x, z] of list("fantani")) {
@@ -1386,6 +1411,58 @@ export function carGeometry() {
     ...[[-0.17, 0.13], [0.17, 0.13], [-0.17, -0.13], [0.17, -0.13]].map(([x, z]) => paint(new THREE.CylinderGeometry(0.055, 0.055, 0.04, 8).rotateX(Math.PI / 2).translate(x, 0.055, z), C("#22262b"))),
     paint(new THREE.BoxGeometry(0.02, 0.03, 0.2).translate(0.285, 0.12, 0), C("#fff6d0")),
   ].map(plainUv));
+}
+
+/** What a billboard advertises: the brand, its logo and colours, and a line about its model. */
+export interface BillboardAd {
+  name: string;
+  logo: string;
+  color: string;
+  accent: string;
+  line: string;
+}
+
+/** The company's ad: its colours, its logo in a white disc, its name and its newest model. */
+function drawAd(cv: HTMLCanvasElement, ad: BillboardAd) {
+  cv.width = 512;
+  cv.height = 216;
+  const g = cv.getContext("2d")!;
+  const gr = g.createLinearGradient(0, 0, 512, 216);
+  gr.addColorStop(0, ad.color);
+  gr.addColorStop(1, ad.accent);
+  g.fillStyle = gr;
+  g.fillRect(0, 0, 512, 216);
+  // a sheen across the panel
+  const sh = g.createLinearGradient(0, 0, 0, 216);
+  sh.addColorStop(0, "rgba(255,255,255,0.22)");
+  sh.addColorStop(0.5, "rgba(255,255,255,0)");
+  g.fillStyle = sh;
+  g.fillRect(0, 0, 512, 216);
+  g.fillStyle = "#ffffff";
+  g.beginPath();
+  g.arc(108, 108, 78, 0, Math.PI * 2);
+  g.fill();
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.font = "96px sans-serif";
+  g.fillText(ad.logo, 108, 114);
+  g.textAlign = "left";
+  g.textBaseline = "alphabetic";
+  g.shadowColor = "rgba(0,0,0,0.45)";
+  g.shadowBlur = 8;
+  g.fillStyle = "#ffffff";
+  let size = 64;
+  g.font = `900 ${size}px sans-serif`;
+  while (size > 30 && g.measureText(ad.name).width > 300) g.font = `900 ${(size -= 4)}px sans-serif`;
+  g.fillText(ad.name, 200, 104);
+  g.font = "700 28px sans-serif";
+  let line = ad.line;
+  while (line.length > 4 && g.measureText(line).width > 300) line = `${line.slice(0, -2)}…`;
+  g.fillText(line, 200, 152);
+  g.shadowBlur = 0;
+  g.strokeStyle = "rgba(255,255,255,0.85)";
+  g.lineWidth = 8;
+  g.strokeRect(10, 10, 492, 196);
 }
 
 function billboardTexture() {

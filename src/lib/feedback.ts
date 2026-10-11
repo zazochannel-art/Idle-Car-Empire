@@ -9,8 +9,11 @@ export function setFeedbackPrefs(p: { sound: boolean; haptics: boolean }) {
   Object.assign(prefs, p);
 }
 
+/** Whether the player has sound on (the factory's ambience follows it too). */
+export const soundOn = () => prefs.sound;
+
 let ctx: AudioContext | null = null;
-function audio(): AudioContext | null {
+export function audio(): AudioContext | null {
   if (typeof window === "undefined") return null;
   try {
     ctx ??= new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();

@@ -21,7 +21,8 @@ import { banner, pop, tag } from "./labels";
 import { PlotLayer, plotViews, type PlotView } from "./plots";
 import { RaceCars } from "./race";
 import { buildRoads } from "./roads";
-import { Scenery } from "./scenery";
+import { Scenery, type BillboardAd } from "./scenery";
+import type { CityLife } from "./city-life";
 import { Ground, NTX, NTY, buildTerrain, type TerrainParts, type WorldJson } from "./terrain";
 import { Traffic3D } from "./traffic";
 
@@ -330,6 +331,7 @@ export class MapEngine {
     this.scene.add(this.race.mesh);
     this.traffic.flush();
     this.applyState();
+    this.applyLife();
     this.plots.setSelected(this._selected);
     this.plots.setBuildInfo(this._buildInfo);
     this.plots.setPreview(this._preview);
@@ -381,6 +383,19 @@ export class MapEngine {
   set preview(p: { plot: string; type: StructureType } | null) {
     this._preview = p;
     this.plots?.setPreview(p);
+  }
+
+  /** The town and the company: its cars in the traffic, its ad on the billboards. */
+  setCityLife(life: CityLife, ad: BillboardAd | null) {
+    this.life = { life, ad };
+    this.applyLife();
+  }
+
+  private life: { life: CityLife; ad: BillboardAd | null } | null = null;
+  private applyLife() {
+    if (!this.life) return;
+    this.trafficLayer?.setOwn(this.life.life.own, this.life.life.share);
+    this.scenery?.setAd(this.life.ad);
   }
 
   setEarners(earners: { plotId: string; perSec: number }[]) {

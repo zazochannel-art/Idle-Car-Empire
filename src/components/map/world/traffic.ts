@@ -68,6 +68,8 @@ interface RoadCar {
   buyer?: boolean;
   /** Town traffic is painted in its own colour; buyers and the first car keep the model's factory look. */
   paint?: boolean;
+  /** One of the company's own cars (the town drives them as sales grow). */
+  own?: boolean;
   /** Cached road segment to avoid a binary search every rendered frame. */
   seg: number;
   /** Last visual alpha scale applied; avoids redundant matrix updates every frame. */
@@ -273,11 +275,44 @@ export class Traffic3D {
     const road = this.randomRoad();
     if (road < 0) return;
     const r = WORLD_MAP.roads[road];
-    const hex = CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)];
-    const model = TRAFFIC_MODELS[Math.floor(Math.random() * TRAFFIC_MODELS.length)];
-    const c = this.newCar(road, Math.random() * r.len, Math.random() < 0.5 ? 1 : -1, hex, model, 0, TRAFFIC_SCALE[model], true);
+    // as the company sells, more of the town drives its cars
+    const mine = this.own.length && Math.random() < this.ownShare ? this.own[Math.floor(Math.random() * this.own.length)] : null;
+    const hex = mine?.color ?? CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)];
+    const model = mine?.model ?? TRAFFIC_MODELS[Math.floor(Math.random() * TRAFFIC_MODELS.length)];
+    const c = this.newCar(road, Math.random() * r.len, Math.random() < 0.5 ? 1 : -1, hex, model, 0, mine ? 1 : TRAFFIC_SCALE[model], mine ? mine.paint : true);
+    c.own = !!mine;
     c.alpha = 0;
     this.cars.push(c);
+  }
+
+  private own: { model: CarModel; color: string; paint: boolean }[] = [];
+  private ownShare = 0;
+
+  /**
+   * The company's models and the share of the town that drives them: the
+   * cars already on the roads change hands too (a fixed spread of them), so
+   * the mix follows sales without waiting for new cars.
+   */
+  setOwn(own: { model: CarModel; color: string; paint: boolean }[], share: number) {
+    this.own = own;
+    this.ownShare = own.length ? share : 0;
+    let i = 0;
+    for (const c of this.cars) {
+      if (c.life || c.buyer || c.hero) continue;
+      const k = i++;
+      const want = this.own.length > 0 && ((k * 0.6180339887) % 1) < this.ownShare;
+      const mine = want ? this.own[k % this.own.length] : null;
+      if (mine) {
+        if (c.own && c.model === mine.model && c.hex === mine.color) continue;
+        Object.assign(c, { own: true, model: mine.model, hex: mine.color, paint: mine.paint, scale: 1 });
+      } else if (c.own) {
+        const model = TRAFFIC_MODELS[k % TRAFFIC_MODELS.length];
+        Object.assign(c, { own: false, model, hex: CAR_COLORS[k % CAR_COLORS.length], paint: true, scale: TRAFFIC_SCALE[model] });
+      } else continue;
+      c.color.set(c.hex);
+      c.visual.name = `traffic-car-${c.model}`;
+      this.refreshCarVisual(c);
+    }
   }
 
   /** A buyer drives off from a dealership in the car they bought. */

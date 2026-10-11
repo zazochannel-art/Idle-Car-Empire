@@ -576,7 +576,7 @@ export interface GameState {
   editions: import("./engine/collection").EditionsState;
   /** Unlock bonuses already claimed this run ("car:sedan", "plant:engineFactory"). */
   unlocks: string[];
-  settings: { buyAmount: BuyAmount; lang: Lang; lowGraphics: boolean; sound: boolean; haptics: boolean };
+  settings: { buyAmount: BuyAmount; lang: Lang; lowGraphics: boolean; sound: boolean; haptics: boolean; notify: boolean };
   createdAt: number;
   runStartedAt: number;
   lastActiveAt: number;

@@ -2,12 +2,14 @@ import type { GameState } from "../types";
 import { LocalStorageAdapter } from "./local";
 import { migrate } from "./serialize";
 import { SupabaseAdapter } from "./supabase";
-import type { SaveAdapter, SavePayload } from "./types";
+import type { CloudAccount, SaveAdapter, SavePayload } from "./types";
 
-export type { SaveAdapter, SavePayload } from "./types";
+export type { CloudAccount, SaveAdapter, SavePayload } from "./types";
 export { encodeSave, decodeSave, migrate } from "./serialize";
 
 const REMOTE_INTERVAL_MS = 30_000;
+/** Set when the player asks for a sign-in link: the next load takes the cloud's copy, even if this device's is newer. */
+export const PREFER_CLOUD_KEY = "idle-car-empire:prefer-cloud";
 
 /**
  * Local save is always on (instant, works offline). When Supabase env vars
@@ -15,14 +17,24 @@ const REMOTE_INTERVAL_MS = 30_000;
  * the newer of the two copies wins.
  */
 export class SaveManager {
-  private local: SaveAdapter = new LocalStorageAdapter();
-  private remote: SaveAdapter | null = null;
+  private local: SaveAdapter;
+  private remote: (SaveAdapter & Partial<CloudAccount>) | null = null;
   private lastRemote = 0;
 
-  constructor() {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (url && key) this.remote = new SupabaseAdapter(url, key);
+  constructor(adapters?: { local: SaveAdapter; remote: (SaveAdapter & Partial<CloudAccount>) | null }) {
+    this.local = adapters?.local ?? new LocalStorageAdapter();
+    if (adapters) this.remote = adapters.remote;
+    else {
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      if (url && key) this.remote = new SupabaseAdapter(url, key);
+    }
+  }
+
+  /** The cloud account, when saves go to the cloud. */
+  get cloud(): CloudAccount | null {
+    const r = this.remote;
+    return r && r.account && r.linkEmail && r.signIn ? (r as CloudAccount) : null;
   }
 
   get backend(): string {
@@ -34,7 +46,10 @@ export class SaveManager {
       this.local.load(),
       this.remote ? this.remote.load().catch(() => null) : Promise.resolve(null),
     ]);
-    const best = pickNewest(local, remote);
+    // just signed in from an email link: the account's save wins
+    const preferCloud = readFlag();
+    if (preferCloud) clearFlag();
+    const best = preferCloud && remote ? remote : pickNewest(local, remote);
     return best ? migrate(best.state, now) : null;
   }
 
@@ -51,6 +66,22 @@ export class SaveManager {
 
   async clear(): Promise<void> {
     await Promise.all([this.local.clear(), this.remote?.clear().catch(() => undefined)]);
+  }
+}
+
+function readFlag(): boolean {
+  try {
+    return typeof localStorage !== "undefined" && localStorage.getItem(PREFER_CLOUD_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function clearFlag() {
+  try {
+    localStorage.removeItem(PREFER_CLOUD_KEY);
+  } catch {
+    // storage blocked: nothing to clear
   }
 }
 

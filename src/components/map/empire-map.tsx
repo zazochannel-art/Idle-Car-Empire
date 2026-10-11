@@ -30,6 +30,7 @@ import { Minimap } from "./minimap";
 import { plantName } from "../panels/plant-panel";
 import type { MapArea, MapNames, ShipView, Site } from "./map-types";
 import { CAR_MODEL_FOR } from "./vehicles";
+import { cityLife, cityLifeKey } from "./world/city-life";
 
 /** Changes only when something visible on the map changes (not every tick). */
 function sceneKey(s: GameState) {
@@ -251,6 +252,19 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
     e.setState(s, names);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine, key, lang]);
+
+  // the town drives the company's cars, and its billboard shows the newest model
+  const lifeKey = useGame((g) => cityLifeKey(g.state, g.snap));
+  useEffect(() => {
+    const e = engineRef.current;
+    if (!e) return;
+    const { state: s, snap } = useGame.getState();
+    const life = cityLife(s, snap);
+    const car = life.ad ? CAR_BY_ID[life.ad.car] : null;
+    const ad = life.ad && car ? { name: life.ad.name || n.car(car), logo: life.ad.logo, color: life.ad.color, accent: life.ad.accent, line: t("city.billboard", { car: s.designs[car.id]?.name || car.modelName || n.car(car) }) } : null;
+    e.setCityLife(life, ad);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engine, lifeKey, lang]);
 
   // floating "+$" over everything that earns on its own
   useEffect(() => {
