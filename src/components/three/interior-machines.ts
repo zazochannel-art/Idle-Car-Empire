@@ -49,23 +49,31 @@ export function addMachine(T: Three, kit: MaterialKit, g: G, model: string, vari
   const yellow = std(T, "#f5b301", 0.3, 0.45);
   switch (model) {
     case "rawRack": {
+      // "sack|5": the rack's stock, and how many of its places are full (bottom shelf first)
+      const [stock, fill] = variant.split("|");
+      const full = fill === undefined ? Infinity : Number(fill);
       const { bays, step, lvH } = racking(T, g, -1.35, 1.35, 3, 38 * H);
-      for (let i = 0; i < bays; i++)
-        for (let lv = 0; lv < 3; lv++) {
+      for (let lv = 0; lv < 3; lv++)
+        for (let i = 0; i < bays; i++) {
+          if (lv * bays + i >= full) continue;
           const x = -1.35 + step * (i + 0.5);
           const y = lv * lvH + 0.4 * H;
-          addStock(T, g, variant, x, y, -0.68, (i + lv) % 3);
+          addStock(T, g, stock, x, y, -0.68, (i + lv) % 3);
         }
       g.add(rollers(T, -0.6, 0.6, 5 * H));
       g.add(box(T, yellow, -1.4, 0, 0.55, 2.8, 0.2 * H, 0.05));
       break;
     }
     case "goodsRack": {
+      // "|4": how many places hold a wrapped pallet of finished goods (bottom shelf first)
+      const fill = variant.split("|")[1];
+      const full = fill === undefined ? Infinity : Number(fill);
       const { bays, step, lvH } = racking(T, g, -1.45, 1.45, 2, 40 * H);
       const wrap = clear(T, "#e2e8f0", 0.45);
       const goods = std(T, color, 0.35, 0.5);
-      for (let i = 0; i < bays; i++)
-        for (let lv = 0; lv < 2; lv++) {
+      for (let lv = 0; lv < 2; lv++)
+        for (let i = 0; i < bays; i++) {
+          if (lv * bays + i >= full) continue;
           const x = -1.45 + step * (i + 0.5);
           const y = lv * lvH + 0.4 * H;
           g.add(box(T, std(T, "#a16207", 0, 0.8), x - 0.3, y, -0.9, 0.6, 1.4 * H, 0.42));

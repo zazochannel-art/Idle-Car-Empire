@@ -464,6 +464,8 @@ class SpriteFactory {
 }
 
 export const sprites3d = new SpriteFactory();
+// in development, tests can wait for the queue to empty
+if (process.env.NODE_ENV !== "production" && typeof window !== "undefined") Object.assign(window, { __sprites: sprites3d });
 
 /** Picks the sprite resolution for how big it will appear on screen. */
 export function tierFor(scale: number): number {

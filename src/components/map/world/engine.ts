@@ -13,7 +13,7 @@ import { plotStatus, type PlotStatus } from "@/game/engine/construction";
 import type { EconomySnapshot } from "@/game/engine/economy";
 import { unlockedAreas } from "@/game/engine/territory";
 import type { ComponentId, GameState, StructureType, ZoneId } from "@/game/types";
-import { skyAt, type TimeMode } from "../lighting";
+import { skyAt, worldClock, type TimeMode } from "../lighting";
 import type { MapArea, MapNames, MapTarget, ShipView, Site, ZoomTier } from "../map-types";
 import type { CarModel } from "../vehicles";
 import { LOCK, mapMaterials, type MapMaterials } from "./kit";
@@ -619,7 +619,8 @@ export class MapEngine {
     this.place(dt);
 
     // time of day
-    const sky = skyAt(this.timeMode, this.t);
+    worldClock.t += dt;
+    const sky = skyAt(this.timeMode, worldClock.t);
     this.applySky(sky.dark);
 
     if (this.ground && live) {
