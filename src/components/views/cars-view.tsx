@@ -1,5 +1,6 @@
 "use client";
 
+import { EditionsCard } from "./editions-card";
 import { PrototypeLab } from "./expansion-cards";
 import { ClassicsPanel, ShowCard } from "./live-cards";
 import { MyCars } from "./my-cars";
@@ -51,6 +52,7 @@ export function CarsView() {
         ))}
       </div>
       {tab === "mine" && <>
+        <EditionsCard />
         <MyCars />
         <div className="mt-4 space-y-2">
           <ShowCard />

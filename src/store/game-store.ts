@@ -40,6 +40,11 @@ import { uiEvents } from "./events";
 import * as Mk from "@/game/engine/market";
 import * as Lv from "@/game/engine/live";
 import * as Cl from "@/game/engine/classics";
+import * as Fl from "@/game/engine/floor";
+import * as Sy from "@/game/engine/story";
+import * as Cn from "@/game/engine/collection";
+import { EDITION, type SkinId } from "@/game/config/collection";
+import { DILEMMA_BY_ID, RIVAL_CEO } from "@/game/config/story";
 import * as Ex from "@/game/engine/expansion";
 import * as Dn from "@/game/engine/car-dna";
 import * as Sh from "@/game/engine/showroom";
@@ -69,6 +74,16 @@ interface GameStore {
   buyBodyMachine: (plot: string) => boolean;
   hireBodyWorker: (plot: string) => boolean;
   plantSpeed: (plot: string) => boolean;
+  /** Fixes a broken machine at once (a tap). */
+  repairPlant: (plot: string) => boolean;
+  /** Overtime: double speed for a while, on cooldown after. */
+  boostPlant: (plot: string) => boolean;
+  /** Gives a plant's halls a style. */
+  setPlantSkin: (plot: string, skin: SkinId) => boolean;
+  /** Takes the decision on the CEO's desk (choice 0 or 1). */
+  decide: (choice: 0 | 1) => boolean;
+  /** Closes the rival campaign's current chapter and pays its reward. */
+  claimChapter: () => boolean;
   plantAutomation: (plot: string) => boolean;
   plantGrade: (plot: string) => boolean;
   setPlantCar: (plot: string, car: CarId | null) => void;
@@ -261,6 +276,10 @@ export const useGame = create<GameStore>((set, get) => {
       else if (e.type === "emergency") uiEvents.emit({ type: "toast", tone: "warn", icon: "🆘", title: tr("toast.emergency"), body: tr("toast.emergencyBody", { money: formatMoney(e.cost) }) });
       else if (e.type === "restructured") uiEvents.emit({ type: "toast", tone: "warn", icon: "🏦", title: tr("toast.restructured"), body: tr("toast.restructuredBody", { money: formatMoney(e.amount), rep: RESCUE.restructure.rep }) });
       else if (e.type === "suspended") uiEvents.emit({ type: "toast", tone: "warn", icon: "⛔", title: tr("toast.suspended"), body: tr("toast.suspendedBody") });
+      else if (e.type === "breakdown") {
+        const b = next.city.buildings[e.plot];
+        if (b) uiEvents.emit({ type: "toast", tone: "warn", icon: "🔧", title: tr("floor.brokeToast", { name: tr(`structure.${b.type}` as MessageKey) }), body: tr("floor.brokeToastBody"), action: { label: tr("floor.repair"), plot: e.plot } });
+      }
       else if (e.type === "raceFinished") {
         const rec = next.racing.last;
         const rw = rec?.result;
@@ -290,6 +309,21 @@ export const useGame = create<GameStore>((set, get) => {
     const fo = Ex.fleetOrderTick(next, now);
     if (fo === "offer") uiEvents.emit({ type: "toast", tone: "info", icon: "🚌", title: tr("fleet.offerToast") });
     else if (fo === "failed") uiEvents.emit({ type: "toast", tone: "warn", icon: "⌛", title: tr("fleet.failed") });
+    // now and then a car off the line is a limited edition
+    const built = events.find((e) => e.type === "carBuilt");
+    const edition = Cn.editionTick(next, built?.type === "carBuilt" ? built.car : null, now);
+    if (edition) {
+      const car = built?.type === "carBuilt" ? names().car(CAR_BY_ID[built.car]) : "";
+      uiEvents.emit({ type: "toast", tone: "gold", icon: edition.icon, title: tr("edition.toast", { name: tr(`edition.${edition.id}` as MessageKey), car }), body: tr("edition.toastBody", { pct: formatPercent(EDITION.income) }), action: { label: tr("edition.see"), view: "cars" } });
+    }
+    const story = Sy.storyTick(next, snap);
+    if (story === "offer") {
+      const { id, plot } = next.story.pending!;
+      const b = next.city.buildings[plot];
+      const plant = b ? tr(`structure.${b.type}` as MessageKey) : "";
+      uiEvents.emit({ type: "toast", tone: "gold", icon: DILEMMA_BY_ID[id].icon, title: tr("story.offerToast"), body: tr(`story.d.${id}.title` as MessageKey, { plant }), action: { label: tr("story.decide"), view: "story" } });
+    } else if (story === "expired") uiEvents.emit({ type: "toast", tone: "warn", icon: "⌛", title: tr("story.expired") });
+    else if (story === "chapter") uiEvents.emit({ type: "toast", tone: "gold", icon: RIVAL_CEO.emoji, title: tr("story.chapterToast"), body: tr("story.chapterToastBody"), action: { label: tr("story.open"), view: "story" } });
     const pa = state.proto.active;
     if (pa && state.lastActiveAt < pa.until && now >= pa.until) uiEvents.emit({ type: "toast", tone: "success", icon: "🧪", title: tr("proto.stageDone") });
     const trend = Mk.trendOf(next);
@@ -361,6 +395,15 @@ export const useGame = create<GameStore>((set, get) => {
       return ok;
     },
     plantSpeed: (plot) => act((s) => Ch.upgradePlantSpeed(s, plot, get().snap.gm)),
+    repairPlant: (plot) => act((s) => Fl.repairPlant(s, plot)),
+    boostPlant: (plot) => act((s) => Fl.boostPlant(s, plot)),
+    setPlantSkin: (plot, skin) => act((s) => Cn.setPlantSkin(s, plot, skin)),
+    decide: (choice) => act((s) => Sy.decide(s, choice, get().snap)),
+    claimChapter: () => {
+      const ok = act((s) => Sy.claimChapter(s, get().snap));
+      if (ok) uiEvents.emit({ type: "toast", tone: "gold", icon: RIVAL_CEO.emoji, title: tr("story.chapterClaimed", { n: get().state.story.chapter }) });
+      return ok;
+    },
     plantAutomation: (plot) => act((s) => Ch.upgradeAutomation(s, plot, get().snap.gm)),
     plantGrade: (plot) => act((s) => Ch.upgradeGrade(s, plot, get().snap.gm)),
     setAutoUpgrade: (plot, on) => {

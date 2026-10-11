@@ -12,6 +12,7 @@ import { buildingUpgradeCost } from "@/game/engine/city";
 import { levelCost } from "@/game/engine/chain";
 import { nextGoals, type Goal } from "@/game/engine/insights";
 import { canPrestige } from "@/game/engine/prestige";
+import { storyWaiting } from "@/game/engine/story";
 import { claimableCount } from "@/game/engine/progress";
 import { formatDuration, formatMoney, formatNumber } from "@/game/format";
 import { useContent, type Content } from "@/i18n/content";
@@ -38,6 +39,7 @@ import { ResearchView } from "../views/research-view";
 import { StatsView } from "../views/stats-view";
 import { EconomyView } from "../views/economy-view";
 import { RacingView } from "../views/racing-view";
+import { StoryView } from "../views/story-view";
 import { RaceViewer } from "../racing/race-viewer";
 import { Coach } from "./coach";
 import { FeedbackBridge } from "./feedback-bridge";
@@ -79,7 +81,8 @@ function badgeCounts(state: ReturnType<typeof useGame.getState>["state"], snap: 
     research: RESEARCH.filter((r) => canResearch(state, r.id) && state.rp >= r.cost).length,
     managers: MANAGERS.filter((m) => !state.managers[m.id].hired && isManagerUnlocked(state, m.id) && state.cash >= m.cost).length + (idle > 0 ? 1 : 0),
     missions: claimableCount(state, snap),
-    prestige: canPrestige(state) ? 1 : 0,
+    // the crown menu: an expansion ready, a decision on the desk or a chapter to close
+    prestige: (canPrestige(state) ? 1 : 0) + (storyWaiting(state, snap) ? 1 : 0),
     upgrade: upgrades,
   };
 }
@@ -282,6 +285,8 @@ const ViewSwitch = memo(function ViewSwitch({ view, onSettings }: { view: View; 
       return <EconomyView />;
     case "racing":
       return <RacingView />;
+    case "story":
+      return <StoryView />;
     case "prestige":
       return <PrestigeView />;
   }
@@ -297,7 +302,7 @@ export const PILLARS: { id: PillarId; icon: Icon; views: View[] }[] = [
   { id: "empire", icon: Factory, views: ["empire", "garages", "logistics", "research", "managers", "prestige"] },
   { id: "cars", icon: Car, views: ["cars"] },
   { id: "racing", icon: Flag, views: ["racing"] },
-  { id: "business", icon: Briefcase, views: ["dealers", "economy", "missions", "stats", "achievements"] },
+  { id: "business", icon: Briefcase, views: ["dealers", "economy", "missions", "stats", "achievements", "story"] },
 ];
 export const pillarOf = (v: View | null) => (v ? (PILLARS.find((p) => p.views.includes(v))?.id ?? null) : null);
 

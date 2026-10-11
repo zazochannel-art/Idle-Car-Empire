@@ -342,6 +342,18 @@ export interface PlantData {
   mode?: QualityMode;
   /** Assembly: where its cars go (best price when unset). */
   carRoute?: CarRoute;
+  /** The crew's morale, 0..100 (unset: the base, see MORALE). */
+  morale?: number;
+  /** Seconds of boost left, and of its cooldown. */
+  boost?: number;
+  boostCd?: number;
+  /** A machine is broken: seconds until the mechanic has fixed it (0 = all running). */
+  broken?: number;
+  /** Running time since the last breakdown (s), and breakdowns so far. */
+  wear?: number;
+  breaks?: number;
+  /** The halls' style, chosen by the player (absent: the one the plant's level brings). */
+  skin?: import("./config/collection").SkinId;
 }
 
 export type QualityMode = "fast" | "balanced" | "premium";
@@ -558,6 +570,10 @@ export interface GameState {
   export: import("./engine/expansion").ExportState;
   fleet: import("./engine/expansion").FleetState;
   engineers: import("./engine/expansion").EngineersState;
+  /** Decisions on the CEO's desk and the rival campaign. */
+  story: import("./engine/story").StoryState;
+  /** Limited editions found on the assembly lines (kept through every reset). */
+  editions: import("./engine/collection").EditionsState;
   /** Unlock bonuses already claimed this run ("car:sedan", "plant:engineFactory"). */
   unlocks: string[];
   settings: { buyAmount: BuyAmount; lang: Lang; lowGraphics: boolean; sound: boolean; haptics: boolean };
@@ -579,7 +595,9 @@ export type GameEvent =
   /** The account went over its limit: every plant stops until sales pay it down. */
   | { type: "suspended" }
   /** A stuck company's account was cut back to its limit (the creditors took `amount`); reputation fell. */
-  | { type: "restructured"; amount: number };
+  | { type: "restructured"; amount: number }
+  /** A machine broke down at a plant: the line slows until it is repaired. */
+  | { type: "breakdown"; plot: string };
 
 // ───────────────────────────── racing ─────────────────────────────
 

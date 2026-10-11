@@ -2,6 +2,7 @@
 
 import { WorksBanner } from "./land-panel";
 import { Factory, Truck } from "lucide-react";
+import { BoostButton, BreakdownBanner, MoraleChip } from "../plant/floor-controls";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -90,7 +91,12 @@ export function PlantPanel({ id, inside }: { id: string; inside?: boolean }) {
       </div>
 
       <WorksBanner id={id} />
+      <BreakdownBanner plotId={id} />
       <StatusLine id={id} />
+      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold text-white/70">
+        <MoraleChip plotId={id} />
+        <BoostButton plotId={id} className="h-8" />
+      </div>
 
       {/* production */}
       <div className="rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.07]">

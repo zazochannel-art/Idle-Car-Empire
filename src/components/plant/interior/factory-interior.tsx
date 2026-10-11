@@ -2,7 +2,7 @@
 
 import { lineBuildLook } from "@/game/engine/car-dna";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, SlidersHorizontal, Square, Video, X } from "lucide-react";
+import { ArrowLeft, Camera, Palette, SlidersHorizontal, Square, Video, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CostButton } from "@/components/game/cost-button";
 import { Badge } from "@/components/ui/badge";
@@ -17,12 +17,16 @@ import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
 import { debtVars, stockTotal } from "@/game/engine/materials";
 import { seasonAt } from "@/game/engine/season";
+import { brokenSlot, moraleOf } from "@/game/engine/floor";
+import { cue } from "@/lib/feedback";
+import { BoostButton, BreakdownBanner, MoraleChip } from "../floor-controls";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { CAR_MODEL_FOR } from "../../map/vehicles";
 import { gradeName, itemName, plantName, PlantPanel } from "../../panels/plant-panel";
 import { Sheet } from "../../panels/sheet";
 import { InteriorEngine, type InteriorScene, type StationPick } from "./interior-engine";
+import { PHOTO_FILTERS, PhotoMode, SkinPicker, type PhotoFilter } from "./photo-mode";
 import { interiorLayout, RECIPES, recipeFor, type PlacedStation, type StationId } from "./layout";
 
 /** Plants with a walk-in interior (every plant with a recipe; others keep the factory floor view). */
@@ -48,6 +52,10 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
   const [manage, setManage] = useState(false);
   // the camera touring the plant by itself (any touch ends it)
   const [touring, setTouring] = useState(false);
+  // the halls' style picker, and photo mode (everything else hidden, a filter on the picture)
+  const [styling, setStyling] = useState(false);
+  const [photo, setPhoto] = useState(false);
+  const [filter, setFilter] = useState<PhotoFilter>("none");
   const p = b?.plant;
   const manager = MANAGERS.some((m) => state.managers[m.id].hired && state.managers[m.id].assignedTo === plotId);
 
@@ -71,10 +79,22 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
     };
   }, []);
 
+  // tapping the broken machine fixes it
+  useEffect(() => {
+    const e = engineRef.current;
+    if (!e) return;
+    e.onRepair = () => {
+      const ok = useGame.getState().repairPlant(plotId);
+      if (ok) cue("buy");
+      return ok;
+    };
+  }, [plotId]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      if (manage) setManage(false);
+      if (photo) setPhoto(false);
+      else if (manage) setManage(false);
       else if (engineRef.current?.selected) {
         engineRef.current.selected = null;
         setPick(null);
@@ -82,12 +102,20 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [openFloor, manage]);
+  }, [openFloor, manage, photo]);
 
   const type = st?.type ?? "bodyWorks";
   const labels = useMemo(() => Object.fromEntries(recipeFor(type).map((d) => [d.id, t(`interior.station.${d.id}` as MessageKey)])) as Record<StationId, string>, [t, type]);
   const words = useMemo(
-    () => ({ noOperator: t("interior.tag.noOperator"), build: t("interior.tag.build"), noRaw: t("interior.tag.noRaw"), full: t("interior.tag.full"), upgraded: t("interior.upgraded") }),
+    () => ({
+      noOperator: t("interior.tag.noOperator"),
+      build: t("interior.tag.build"),
+      noRaw: t("interior.tag.noRaw"),
+      full: t("interior.tag.full"),
+      upgraded: t("interior.upgraded"),
+      repaired: t("interior.repaired"),
+      tapRepair: t("floor.tapRepair"),
+    }),
     [t],
   );
   // the Body Works shop floor: which machines are built and staffed (the engine's own numbers)
@@ -124,6 +152,11 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
       title: plantName(state, plotId, t),
       // speed and quality: a step up is celebrated at the stations they stand for
       tiers: { speed: p.speed, grade: p.grade },
+      // the floor: a broken machine (line 1, by its place among the machines), a boost, the crew's mood
+      brokenSlot: p.broken ? brokenSlot(plotId, p) : -1,
+      boost: p.boost ?? 0,
+      morale: moraleOf(p),
+      skin: p.skin,
       // the season's decorations, and the time of day the map is showing
       season: seasonAt(Date.now()),
       timeMode,
@@ -143,10 +176,12 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
       exit={{ opacity: 0, scale: 1.12 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
     >
-      <canvas ref={canvasRef} className="absolute inset-0 size-full touch-none" />
+      <canvas ref={canvasRef} className="absolute inset-0 size-full touch-none" style={photo && filter !== "none" ? { filter: PHOTO_FILTERS[filter] } : undefined} />
+
+      {photo && <PhotoMode getCanvas={() => canvasRef.current} title={plantName(state, plotId, t)} filter={filter} onFilter={setFilter} onClose={() => setPhoto(false)} />}
 
       {/* top: exit, the plant, and the empire's numbers */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 p-2 pt-[calc(env(safe-area-inset-top)+0.5rem)]">
+      <div className={cn("pointer-events-none absolute inset-x-0 top-0 p-2 pt-[calc(env(safe-area-inset-top)+0.5rem)]", photo && "hidden")}>
         <div className="pointer-events-auto flex items-center gap-2">
           <Button size="sm" variant="secondary" className="shadow-lg" onClick={() => openFloor(null)}>
             <ArrowLeft /> {t("interior.exit")}
@@ -186,6 +221,16 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
             <div className="rounded-lg bg-black/55 px-2 py-1 text-[10px] font-semibold text-emerald-300 backdrop-blur">👔 {t("interior.manager")}</div>
           </div>
         )}
+        <div className="mt-1.5 flex">
+          <div className="rounded-lg bg-black/45 px-2 py-1 text-[10px] font-semibold text-white/75 backdrop-blur">
+            <MoraleChip plotId={plotId} />
+          </div>
+        </div>
+        {!!p.broken && (
+          <div className="mt-1.5">
+            <BreakdownBanner plotId={plotId} compact />
+          </div>
+        )}
         {p.status !== "ok" && (
           <div className="mt-2 flex justify-center">
             <div className="rounded-xl bg-amber-500/90 px-3 py-1.5 text-xs font-black text-black shadow-lg">
@@ -198,11 +243,15 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
       </div>
 
       {/* bottom: the picked machine, or a hint; and the plant's full controls */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col-reverse gap-2 p-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] sm:flex-row sm:items-end">
+      <div className={cn("pointer-events-none absolute inset-x-0 bottom-0 flex flex-col-reverse gap-2 p-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] sm:flex-row sm:items-end", photo && "hidden")}>
         {/* phones: the card takes the full width, the plant's controls sit above it */}
         <div className="pointer-events-auto min-w-0 flex-1 sm:max-w-[340px]">
           <AnimatePresence mode="wait">
-            {touring ? null : pick ? (
+            {touring ? null : styling ? (
+              <motion.div key="skins" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }} transition={{ duration: 0.16 }}>
+                <SkinPicker plotId={plotId} onClose={() => setStyling(false)} />
+              </motion.div>
+            ) : pick ? (
               <motion.div key={`${pick.line}-${pick.id}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }} transition={{ duration: 0.16 }}>
                 <StationCard
                   plotId={plotId}
@@ -223,7 +272,40 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
             ) : null}
           </AnimatePresence>
         </div>
-        <div className="pointer-events-auto flex gap-2 self-end">
+        <div className="pointer-events-auto flex flex-wrap justify-end gap-2 self-end">
+          {!touring && <BoostButton plotId={plotId} />}
+          {!touring && (
+            <Button
+              size="sm"
+              variant={styling ? "default" : "secondary"}
+              className="shadow-lg"
+              title={t("skin.title")}
+              onClick={() => {
+                if (engineRef.current) engineRef.current.selected = null;
+                setPick(null);
+                setStyling(!styling);
+              }}
+            >
+              <Palette /> <span className="hidden sm:inline">{t("skin.button")}</span>
+            </Button>
+          )}
+          {!touring && (
+            <Button
+              size="sm"
+              variant="secondary"
+              className="shadow-lg"
+              title={t("photo.title")}
+              onClick={() => {
+                if (engineRef.current) engineRef.current.selected = null;
+                setPick(null);
+                setStyling(false);
+                setManage(false);
+                setPhoto(true);
+              }}
+            >
+              <Camera /> <span className="hidden sm:inline">{t("photo.button")}</span>
+            </Button>
+          )}
           <Button
             size="sm"
             variant={touring ? "default" : "secondary"}

@@ -100,6 +100,8 @@ import { designStats } from "./design";
 import { logisticsMods } from "./logistics";
 import { starMods } from "./imperium";
 import { managerMult, type GlobalMods } from "./modifiers";
+import { floorPace, floorTick, MORALE } from "./floor";
+import { SKIN_BY_ID, type SkinId } from "../config/collection";
 
 // ───────────────────────────── state ─────────────────────────────
 
@@ -858,9 +860,14 @@ export function chainTick(
       return { n, why: "noParts" as const };
     };
     let can = canMake();
-    const speed = offline ? st.offline : 1;
+    // the floor: a boost, a broken machine, the crew's morale
+    const managed = Object.values(s.managers).some((m) => m.hired && m.assignedTo === id);
+    if (floorTick(id, p, dt, { running: p.status === "ok", offline, managed })) events?.push({ type: "breakdown", plot: id });
+    const speed = (offline ? st.offline : 1) * floorPace(p);
     // running the plant costs wages, energy and maintenance for every second it works
-    const run = st.opPerSec * dt * speed;
+    // (whatever pace the floor keeps)
+    const runSpeed = offline ? st.offline : 1;
+    const run = st.opPerSec * dt * runSpeed;
     if (can.n <= 0) {
       p.status = can.why;
     } else if (s.chain.suspended) {
@@ -872,10 +879,10 @@ export function chainTick(
       p.short = undefined;
       payOrOwe(s, run);
       out.spent += run;
-      const k = run / Math.max(1e-9, st.opPerSec * dt * speed);
-      book(s, "labor", st.op.labor * dt * speed * k);
-      book(s, "energy", st.op.energy * dt * speed * k);
-      book(s, "maintenance", st.op.maintenance * dt * speed * k);
+      const k = run / Math.max(1e-9, st.opPerSec * dt * runSpeed);
+      book(s, "labor", st.op.labor * dt * runSpeed * k);
+      book(s, "energy", st.op.energy * dt * runSpeed * k);
+      book(s, "maintenance", st.op.maintenance * dt * runSpeed * k);
       p.progress += (dt * speed) / st.cycle;
       while (p.progress >= 1) {
         can = canMake();
@@ -1429,6 +1436,10 @@ export function migratePlant(type: PlantType, raw: unknown): PlantData {
   if (raw.mode === "fast" || raw.mode === "premium") p.mode = raw.mode;
   if (raw.carRoute === "fast" || (typeof raw.carRoute === "string" && (raw.carRoute in DEALER_BY_ID || isExportRoute(raw.carRoute)))) p.carRoute = raw.carRoute as CarRoute;
   if (isObj(raw.inputs)) for (const c of Object.keys(COMPONENT_BY_ID) as ComponentId[]) if (raw.inputs[c] !== undefined) p.inputs[c] = num(raw.inputs[c]);
+  // the shop floor: the crew's morale, a boost or a breakdown in progress, the machines' wear
+  if (raw.morale !== undefined) p.morale = Math.min(100, num(raw.morale, MORALE.base));
+  for (const k of ["boost", "boostCd", "broken", "wear", "breaks"] as const) if (raw[k] !== undefined) p[k] = num(raw[k]);
+  if (typeof raw.skin === "string" && raw.skin in SKIN_BY_ID && raw.skin !== "auto") p.skin = raw.skin as SkinId;
   return p;
 }
 
