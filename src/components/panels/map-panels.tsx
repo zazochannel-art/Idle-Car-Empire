@@ -24,6 +24,7 @@ import { DealerPanel, DepotPanel, MarketPanel, PlantPanel, plantFlow, plantName 
 import { LandPanel, SitePanel, WorksBanner, landName } from "./land-panel";
 import { plotStatus } from "@/game/engine/construction";
 import { storyWaiting } from "@/game/engine/story";
+import { winterWaiting, winterYear } from "@/game/engine/winter";
 
 type T = (k: MessageKey, v?: Vars) => string;
 
@@ -442,12 +443,15 @@ export function MenuPanel({ onSettings }: { onSettings: () => void }) {
   const setView = useUi((u) => u.setView);
   const { t } = useT();
   const waiting = useGame((g) => storyWaiting(g.state, g.snap));
+  // the winter festival's tile, only while it runs
+  const winter = useGame((g) => (winterYear(g.state.lastActiveAt) === null ? null : winterWaiting(g.state, g.state.lastActiveAt)));
   const tiles: { icon: string; label: string; go: () => void; gold?: boolean; badge?: boolean }[] = [
     { icon: "👤", label: t("account.title"), go: () => setView("profile"), gold: true },
     { icon: "📖", label: t("nav.story"), go: () => setView("story"), gold: true, badge: waiting },
     { icon: "📊", label: t("nav.economy"), go: () => setView("economy"), gold: true },
     { icon: "🏁", label: t("nav.racing"), go: () => setView("racing"), gold: true },
     { icon: "👑", label: t("imperium.title"), go: () => setView("imperium"), gold: true },
+    ...(winter !== null ? [{ icon: "🎄", label: t("nav.winter"), go: () => setView("winter"), gold: true, badge: winter }] : []),
     { icon: "🏆", label: t("nav.leaderboard"), go: () => setView("leaderboard"), gold: true },
     { icon: "🤝", label: t("nav.alliance"), go: () => setView("alliance"), gold: true },
     { icon: "🚗", label: t("nav.cars"), go: () => setView("cars") },

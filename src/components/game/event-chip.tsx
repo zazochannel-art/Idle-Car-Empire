@@ -8,6 +8,7 @@ import { useContent } from "@/i18n/content";
 import { useT } from "@/i18n/use-t";
 import { uiEvents } from "@/store/events";
 import { useGame } from "@/store/game-store";
+import { useUi } from "@/store/ui-store";
 
 /** The running market event in the HUD, with the time it has left. */
 export function EventChip() {
@@ -19,10 +20,19 @@ export function EventChip() {
   const season = seasonAt(now);
   if (!w) {
     if (!season) return null;
-    return (
-      <span className="pointer-events-auto flex items-center gap-1.5 rounded-xl bg-orange-500/15 px-2 py-1 text-xs font-bold text-orange-200 ring-1 ring-orange-400/40 md:py-1.5">
+    const chip = (
+      <>
         {season === "halloween" ? "🎃" : "❄️"} {t(`season.${season}`)} · {t("season.bonus")}
-      </span>
+      </>
+    );
+    const style = "pointer-events-auto flex items-center gap-1.5 rounded-xl bg-orange-500/15 px-2 py-1 text-xs font-bold text-orange-200 ring-1 ring-orange-400/40 md:py-1.5";
+    // in winter the chip opens the festival
+    return season === "winter" ? (
+      <button onClick={() => useUi.getState().setView("winter")} className={style}>
+        {chip}
+      </button>
+    ) : (
+      <span className={style}>{chip}</span>
     );
   }
   return (

@@ -398,6 +398,9 @@ export const SKINS: Record<string, { emoji: string; color: string; accent: strin
   spring: { emoji: "🌸", color: "#f9a8d4", accent: "#15803d" },
   alpine: { emoji: "🏔️", color: "#e2e8f0", accent: "#0ea5e9" },
   festival: { emoji: "🎪", color: "#ef4444", accent: "#fbbf24" },
+  // the winter festival (engine/winter.ts)
+  frost: { emoji: "❄️", color: "#e0f2fe", accent: "#0284c7" },
+  aurora: { emoji: "🌌", color: "#0f766e", accent: "#a7f3d0" },
 };
 
 /** "Build the fastest car in the world": the goal at the end of the ladder. */

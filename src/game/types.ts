@@ -533,6 +533,14 @@ export interface GameState {
   login: { day: string; streak: number; claimed: boolean };
   /** Duels with other players' ghosts today (engine/ghost.ts): the rivals raced. */
   duels: { day: string; raced: string[] };
+  /** Winter festival (engine/winter.ts): its year, advent doors opened, goals taken, and where the goals started and how big they are. */
+  winter: {
+    year: number;
+    doors: number[];
+    goals: import("./engine/winter").WinterGoal[];
+    base: { cars: number; earned: number; wins: number } | null;
+    target: { cars: number; earned: number; wins: number } | null;
+  };
   /** Rival companies the player has overtaken. */
   rivalsBeaten: string[];
   /** Tutorial tips the player has dismissed. */
