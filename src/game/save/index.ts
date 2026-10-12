@@ -17,14 +17,20 @@ export { summarize } from "./policy";
 export type { SyncInfo, SyncStatus } from "./sync";
 export { encodeSave, decodeSave, migrate } from "./serialize";
 
-/** Set by logging out: the next start asks to sign in instead of making a new guest. */
+/** Set by logging out: the welcome page opens on "sign in" instead of "create account". */
 export const SIGNED_OUT_KEY = "idle-car-empire:signed-out";
+/** Set once this device went past the welcome page (an account, or playing without one). */
+export const WELCOMED_KEY = "idle-car-empire:welcomed";
 
 export interface StartHooks {
   /** Both copies hold progress the other has not: the player keeps one. */
   choose(local: SaveSummary, cloud: SaveSummary, reason: "both-changed" | "different-games"): Promise<"local" | "cloud">;
-  /** The player logged out: wait for them to sign in or play as a guest. */
-  signIn(): Promise<"guest">;
+  /**
+   * The welcome page: nobody is signed in on this device (a new player, or after a logout).
+   * Resolves once the player registered or signed in ("account"), or chose to play without
+   * an account ("guest").
+   */
+  signIn(returning: boolean): Promise<"account" | "guest">;
 }
 
 export interface StartResult {
@@ -101,20 +107,27 @@ export class SaveManager {
     this.local.remove(null);
   }
 
+  private async currentAccount(): Promise<Account | null> {
+    try {
+      return this.backend ? await timeout(this.backend.session(), 8_000) : null;
+    } catch {
+      return null;
+    }
+  }
+
   async start(now: number, hooks: StartHooks): Promise<StartResult> {
     const legacy = this.local.read(null);
     if (!this.backend) return { state: legacy ? this.read(legacy.state, now) : null, mode: "local" };
 
-    // who plays: the session on this device, a sign-in after a logout, or a new guest
-    let account: Account | null = null;
-    try {
-      account = await timeout(this.backend.session(), 8_000);
-    } catch {
-      account = null;
-    }
-    if (!account && flag(SIGNED_OUT_KEY)) {
-      await hooks.signIn();
+    // who plays: the session on this device, or whoever registers or signs in on the welcome page
+    let account = await this.currentAccount();
+    // a guest that never got past the welcome page (it left while registering) sees it again
+    const welcomed = flag(WELCOMED_KEY) || !!legacy || (!!account && !!this.local.read(account.id));
+    if (!account || (account.guest && !welcomed)) {
+      const how = await hooks.signIn(flag(SIGNED_OUT_KEY));
       flag(SIGNED_OUT_KEY, false);
+      flag(WELCOMED_KEY, true);
+      if (how === "account") account = await this.currentAccount();
     }
     if (!account) {
       try {
@@ -248,6 +261,29 @@ export class SaveManager {
 
   // ───────────────────────── account ─────────────────────────
 
+  /**
+   * The welcome page's "create account": a new account with this name, email and password.
+   * (It starts as a guest account that gets the email and password, so a confirmation link
+   * the player hasn't clicked yet never blocks the game.) A failed attempt can be retried:
+   * it goes on with the same account.
+   */
+  async welcomeRegister(username: string, email: string, password: string, redirectTo: string): Promise<AuthResult & { field?: "name" }> {
+    if (!this.backend) return { ok: false, error: "network" };
+    try {
+      if (!(await this.currentAccount())) await timeout(this.backend.signInGuest(), 10_000);
+    } catch {
+      return { ok: false, error: "network" };
+    }
+    const named = await this.backend.updateProfile({ username });
+    if (!named.ok) return { ...named, field: "name" };
+    return this.backend.register(email, password, redirectTo);
+  }
+
+  /** The welcome page's "sign in" (the game then starts with this account's save). */
+  async welcomeLogin(email: string, password: string): Promise<AuthResult> {
+    return this.backend ? this.backend.login(email, password) : { ok: false, error: "network" };
+  }
+
   async profile(): Promise<Profile | null> {
     return this.backend && this.account ? this.backend.profile() : null;
   }
@@ -301,10 +337,5 @@ export class SaveManager {
     if (this.account) this.local.remove(this.account.id);
     await this.backend.logout().catch(() => {});
     flag(SIGNED_OUT_KEY, true);
-  }
-
-  /** After a logout: play as a new guest instead of signing in. */
-  playAsGuest() {
-    flag(SIGNED_OUT_KEY, false);
   }
 }

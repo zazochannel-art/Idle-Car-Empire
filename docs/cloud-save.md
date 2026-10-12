@@ -6,18 +6,28 @@ settings, or while it can't be reached, it saves on the device only.
 
 ## How it works for a player
 
-- **First visit**: a guest account is created silently (Supabase anonymous
-  sign-in). The game is saved to the cloud under that account at once, but
-  only this browser can reach it.
-- **Create an account** (Profile → Account): email + password are added to
-  the *same* account, so the game, the id and the name stay as they are.
-  From then on the player can sign in on any device.
-- **Sign in on another device**: the account's game is loaded from the cloud.
-  A guest game that device had is never merged into the account; the sign-in
-  form warns that it is left behind (register it first to keep it).
+- **Welcome page**: before the game, a player who isn't signed in on this
+  device sees "Create account" (name, email, password) and "Sign in" (email
+  and password, or a sign-in link by email). Nothing starts or saves behind
+  it. A small "Play without an account" link at the bottom starts a guest
+  game (Supabase anonymous sign-in, saved to the cloud but reachable only
+  from this browser), which can become an account later from the profile.
+- **Create an account**: under the hood it is a guest account that gets the
+  name, email and password, so a confirmation email the player hasn't
+  clicked yet never blocks the game (they play meanwhile, the profile shows
+  the email as waiting). A failed attempt (name or email taken) is retried
+  with the same account; a guest that left the page mid-registration sees
+  the page again on its next visit.
+- **Create an account later** (guests: Profile → Account): email + password
+  are added to the *same* account, so the game, the id and the name stay as
+  they are. From then on the player can sign in on any device.
+- **Sign in on another device** (welcome page or profile): the account's game
+  is loaded from the cloud. A guest game that device had is never merged into
+  the account; the profile's sign-in form warns that it is left behind.
 - **Log out**: the game is saved first, then the account's copy is removed
-  from the device; the next start shows the sign-in screen (or "play as a new
-  guest").
+  from the device; the next start shows the welcome page, opened on "Sign in".
+- Players who already played before the welcome page existed (a guest
+  session and a game on the device) go straight in, as before.
 - **Profile**: name (3–20 characters, unique, case-insensitive) and an avatar;
   company, money, earnings, factories, cars built, the cloud save's status
   and time, "save now", password, switch account, log out. In English,

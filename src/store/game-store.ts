@@ -33,7 +33,7 @@ import { cloneState, createInitialState } from "@/game/engine/state";
 import { tick as engineTick } from "@/game/engine/tick";
 import { formatDuration, formatMoney, formatPercent } from "@/game/format";
 import { decodeSave, encodeSave, SaveManager } from "@/game/save";
-import { askSignIn, askStartChoice, useCloud } from "./cloud-store";
+import { askStartChoice, askWelcome, useCloud } from "./cloud-store";
 import type { BuyAmount, CarId, CarRoute, DealerId, FacilityType, GameState, Lang, ManagerId, QualityMode, Specialization, StructureType, ZoneId } from "@/game/types";
 import { applyLanguage, detectLanguage, loadLanguage, translate, type MessageKey, type Vars } from "@/i18n";
 import { contentFor } from "@/i18n/content";
@@ -396,7 +396,7 @@ export const useGame = create<GameStore>((set, get) => {
       set({ state: { ...get().state, settings: { ...get().state.settings, lang: guess } } });
       // the account and its save first: nothing starts (or gets saved) before they are known
       const start = saves
-        ? await saves.start(now, { choose: (local, cloud, reason) => askStartChoice({ local, cloud, reason }), signIn: askSignIn })
+        ? await saves.start(now, { choose: (local, cloud, reason) => askStartChoice({ local, cloud, reason }), signIn: askWelcome })
         : { state: null, mode: "local" as const };
       useCloud.setState({ mode: start.mode, account: saves?.account ?? null, outdated: !!start.outdated, phase: "save" });
       set({ backend: saves?.backendName ?? "memory" });
