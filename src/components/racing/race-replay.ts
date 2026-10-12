@@ -89,6 +89,8 @@ export class RaceReplay {
         yaw,
         model: CAR_MODEL_FOR[e.model],
         color: e.color,
+        // the player's car in its own paint and with its spoiler (tuning garage)
+        ...(e.id === "player" ? { build: { color: e.color, wing: e.wing === "none" ? undefined : e.wing } } : {}),
         braking: c.braking,
         steer: Math.abs(k) > 0.25 ? -Math.sign(k) : 0,
         alpha,
