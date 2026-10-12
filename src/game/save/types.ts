@@ -53,6 +53,8 @@ export interface Profile {
   id: string;
   username: string;
   avatar: string;
+  /** On the global leaderboard and visitable by other players (default). */
+  listed?: boolean;
 }
 
 export type AuthError = "invalid" | "taken" | "weak" | "credentials" | "unconfirmed" | "rate" | "network" | "unknown";
@@ -74,7 +76,7 @@ export interface CloudBackend {
   /** The account as the server knows it now (email confirmed, guest or not). */
   refreshAccount(): Promise<Account | null>;
   profile(): Promise<Profile | null>;
-  updateProfile(p: { username?: string; avatar?: string }): Promise<AuthResult>;
+  updateProfile(p: { username?: string; avatar?: string; listed?: boolean }): Promise<AuthResult>;
   load(): Promise<CloudCopy>;
   /** Saves if the cloud is still at baseRevision; otherwise ok is false and nothing changed. */
   save(state: GameState, version: number, baseRevision: number, device: string): Promise<{ ok: boolean; revision: number; updatedAt: number }>;

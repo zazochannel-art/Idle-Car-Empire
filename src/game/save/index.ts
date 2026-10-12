@@ -8,6 +8,7 @@ import { LocalStore } from "./local";
 import { decideStart, summarize, trustedLastActive, type SaveSummary } from "./policy";
 import { migrate } from "./serialize";
 import { SupabaseBackend } from "./supabase";
+import type { Social } from "./social";
 import { CloudSync, type SyncInfo } from "./sync";
 import type { Account, AuthResult, CloudBackend, CloudCopy, LocalCopy, Profile } from "./types";
 
@@ -15,6 +16,8 @@ export type { Account, AuthResult, CloudBackend, CloudCopy, LocalCopy, Profile, 
 export type { SaveSummary } from "./policy";
 export { summarize } from "./policy";
 export type { SyncInfo, SyncStatus } from "./sync";
+export type { BoardKind, BoardRow, EmpireCard, GiftResult } from "./social";
+export { GIFTS_PER_DAY } from "./social";
 export { encodeSave, decodeSave, migrate } from "./serialize";
 
 /** Set by logging out: the welcome page opens on "sign in" instead of "create account". */
@@ -261,6 +264,13 @@ export class SaveManager {
 
   // ───────────────────────── account ─────────────────────────
 
+  private socialApi: Social | null = null;
+  /** The leaderboard, visits and gifts (null without the cloud, or before a player is signed in). */
+  get social(): Social | null {
+    if (!this.account || !this.backend || !("social" in this.backend)) return null;
+    return (this.socialApi ??= (this.backend as SupabaseBackend).social());
+  }
+
   /**
    * The welcome page's "create account": a new account with this name, email and password.
    * (It starts as a guest account that gets the email and password, so a confirmation link
@@ -288,7 +298,7 @@ export class SaveManager {
     return this.backend && this.account ? this.backend.profile() : null;
   }
 
-  async updateProfile(p: { username?: string; avatar?: string }): Promise<AuthResult> {
+  async updateProfile(p: { username?: string; avatar?: string; listed?: boolean }): Promise<AuthResult> {
     if (!this.backend || !this.account) return { ok: false, error: "network" };
     return this.backend.updateProfile(p);
   }

@@ -76,7 +76,7 @@ class FakeCloud implements CloudBackend {
   async profile() {
     return this.server.profiles.get(this.user!) ?? null;
   }
-  async updateProfile(p: { username?: string; avatar?: string }): Promise<AuthResult> {
+  async updateProfile(p: { username?: string; avatar?: string; listed?: boolean }): Promise<AuthResult> {
     if (p.username && [...this.server.profiles.values()].some((x) => x.id !== this.user && x.username.toLowerCase() === p.username!.toLowerCase())) return { ok: false, error: "taken" };
     this.server.profiles.set(this.user!, { ...this.server.profiles.get(this.user!)!, ...p });
     return { ok: true };

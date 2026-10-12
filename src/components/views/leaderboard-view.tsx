@@ -1,0 +1,279 @@
+"use client";
+
+import { Gift, RefreshCw } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { PLANT_BY_ID, isPlantType } from "@/game/config/chain";
+import { GIFT } from "@/game/engine/gifts";
+import { formatDuration, formatMoney, formatNumber } from "@/game/format";
+import { GIFTS_PER_DAY, type BoardKind, type BoardRow, type EmpireCard, type GiftResult } from "@/game/save";
+import type { MessageKey } from "@/i18n";
+import { useT } from "@/i18n/use-t";
+import { cn } from "@/lib/utils";
+import { useCloud } from "@/store/cloud-store";
+import { useGame } from "@/store/game-store";
+import { useUi } from "@/store/ui-store";
+import { ViewHeader } from "./section-title";
+
+const MEDALS = ["🥇", "🥈", "🥉"];
+
+/** The global leaderboard (this week, all time); a tap on a player visits their empire. */
+export function LeaderboardView() {
+  const saves = useGame((g) => g.saves);
+  const listed = useCloud((c) => c.profile?.listed !== false);
+  const setView = useUi((u) => u.setView);
+  const { t } = useT();
+  const social = saves?.social ?? null;
+  const [kind, setKind] = useState<BoardKind>("week");
+  const [attempt, setAttempt] = useState(0);
+  // the last answer, for the board it was asked for (another board shows as loading)
+  const [answer, setAnswer] = useState<{ key: string; rows: BoardRow[] | null }>({ key: "", rows: null });
+  const [sent, setSent] = useState<number | null>(null);
+  const [visiting, setVisiting] = useState<string | null>(null);
+  const key = `${kind}:${attempt}`;
+
+  useEffect(() => {
+    if (!social) return;
+    let live = true;
+    social.leaderboard(kind).then(
+      (rows) => live && setAnswer({ key, rows }),
+      () => live && setAnswer({ key, rows: null }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [social, kind, key]);
+  const rows = answer.key === key ? answer.rows : null;
+  const failed = answer.key === key && !answer.rows;
+  const load = () => setAttempt((n) => n + 1);
+
+  // opening the board also collects any gifts waiting
+  useEffect(() => {
+    if (!social) return;
+    void useGame.getState().claimGifts();
+    void social.giftsSentToday().then(setSent, () => {});
+  }, [social]);
+
+  const header = <ViewHeader icon="🏆" title={t("nav.leaderboard")} subtitle={t("board.subtitle")} />;
+  if (!social) {
+    return (
+      <div className="space-y-4">
+        {header}
+        <div className="space-y-3 rounded-2xl bg-[#2b2b2e] p-4 text-center ring-1 ring-white/10">
+          <p className="text-sm text-white/70">{t("board.offline")}</p>
+          <Button variant="secondary" size="sm" onClick={() => setView("profile")}>
+            👤 {t("account.title")}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const me = rows?.find((r) => r.me);
+  const top = rows?.filter((r) => r.rank <= 50 || !r.me) ?? [];
+  const meBelow = me && me.rank > 50 ? me : null;
+  return (
+    <div className="space-y-4">
+      {header}
+
+      <div className="grid grid-cols-2 gap-1 rounded-2xl bg-[#2b2b2e] p-1 ring-1 ring-white/10">
+        {(["week", "all"] as const).map((k) => (
+          <button key={k} aria-pressed={kind === k} onClick={() => setKind(k)} className={cn("rounded-xl py-2 text-sm font-black transition", kind === k ? "bg-gold text-[#1d1d20]" : "text-white/60 hover:bg-white/[0.06]")}>
+            {t(k === "week" ? "board.week" : "board.all")}
+          </button>
+        ))}
+      </div>
+      <p className="px-1 text-[11px] leading-snug text-white/50">
+        {t(kind === "week" ? "board.weekHint" : "board.allHint")} {t("board.tapToVisit")}
+      </p>
+      {!listed && <p className="rounded-xl bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200 ring-1 ring-amber-400/20">{t("board.hidden")}</p>}
+
+      {failed ? (
+        <div className="space-y-3 rounded-2xl bg-[#2b2b2e] p-4 text-center ring-1 ring-white/10">
+          <p className="text-sm text-rose-300">{t("board.error")}</p>
+          <Button variant="secondary" size="sm" onClick={load}>
+            <RefreshCw /> {t("board.retry")}
+          </Button>
+        </div>
+      ) : !rows ? (
+        <div className="space-y-1.5">
+          {Array.from({ length: 6 }, (_, i) => (
+            <div key={i} className="h-14 animate-pulse rounded-2xl bg-white/[0.04]" />
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          {!top.length && <p className="rounded-2xl bg-[#2b2b2e] p-4 text-center text-sm text-white/60 ring-1 ring-white/10">{t("board.empty")}</p>}
+          {top.map((r) => (
+            <Row key={r.userId} r={r} onVisit={() => setVisiting(r.userId)} />
+          ))}
+          {meBelow && (
+            <>
+              <div className="text-center text-white/30">⋯</div>
+              <Row r={meBelow} onVisit={() => setVisiting(meBelow.userId)} />
+            </>
+          )}
+          {!me && <p className="px-1 pt-1 text-center text-[11px] text-white/50">{t("board.notYet")}</p>}
+        </div>
+      )}
+
+      {sent !== null && (
+        <p className="flex items-center justify-center gap-1.5 text-[11px] text-white/55">
+          <Gift className="size-3.5" /> {t("gift.left", { n: Math.max(0, GIFTS_PER_DAY - sent), max: GIFTS_PER_DAY })}
+        </p>
+      )}
+
+      <VisitDialog userId={visiting} sent={sent} onSent={() => setSent((n) => (n ?? 0) + 1)} onClose={() => setVisiting(null)} />
+    </div>
+  );
+}
+
+function Row({ r, onVisit }: { r: BoardRow; onVisit: () => void }) {
+  const { t } = useT();
+  return (
+    <button onClick={onVisit} className={cn("flex w-full items-center gap-2.5 rounded-2xl px-3 py-2.5 text-left ring-1 transition hover:bg-white/[0.07]", r.me ? "bg-gold/[0.12] ring-gold/50" : "bg-white/[0.04] ring-white/[0.07]")}>
+      <span className={cn("w-8 shrink-0 text-center font-black tabular-nums", r.rank <= 3 ? "text-xl" : "text-sm text-white/60")}>{MEDALS[r.rank - 1] ?? r.rank}</span>
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-xl">{r.avatar || "👤"}</span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-1.5">
+          <span className="truncate text-sm font-black">{r.username || "—"}</span>
+          {r.me && <span className="shrink-0 rounded-full bg-gold px-1.5 py-px text-[9px] font-black uppercase text-[#1d1d20]">{t("board.you")}</span>}
+        </span>
+        {r.company && <span className="block truncate text-[11px] text-white/50">{r.company}</span>}
+      </span>
+      <span className="shrink-0 text-sm font-black tabular-nums text-emerald-300">{formatMoney(r.value)}</span>
+    </button>
+  );
+}
+
+/** Another player's empire, read only: their public card, and a gift. */
+function VisitDialog({ userId, sent, onSent, onClose }: { userId: string | null; sent: number | null; onSent: () => void; onClose: () => void }) {
+  return (
+    <Dialog open={userId !== null} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">{userId && <Visit key={userId} userId={userId} sent={sent} onSent={onSent} />}</DialogContent>
+    </Dialog>
+  );
+}
+
+/** One visit (mounted afresh for every player visited). */
+function Visit({ userId, sent, onSent }: { userId: string; sent: number | null; onSent: () => void }) {
+  const saves = useGame((g) => g.saves);
+  const { t } = useT();
+  // the card, and when it came (for "last save: … ago")
+  const [card, setCard] = useState<{ card: EmpireCard | null; at: number } | "loading" | "error">("loading");
+  const [gift, setGift] = useState<GiftResult | "error" | "sending" | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    saves?.social?.visit(userId).then(
+      (c) => live && setCard({ card: c, at: Date.now() }),
+      () => live && setCard("error"),
+    );
+    return () => {
+      live = false;
+    };
+  }, [userId, saves]);
+
+  const send = async () => {
+    const social = saves?.social;
+    if (!social) return;
+    setGift("sending");
+    try {
+      const r = await social.sendGift(userId);
+      setGift(r);
+      if (r === "sent") {
+        onSent();
+        useGame.getState().giftSent();
+      }
+    } catch {
+      setGift("error");
+    }
+  };
+
+  const c = typeof card === "object" ? card.card : null;
+  const at = typeof card === "object" ? card.at : 0;
+  const mine = c?.userId === saves?.account?.id;
+  const out = sent !== null && sent >= GIFTS_PER_DAY;
+  const plants = (c?.plants ?? []).filter((p) => isPlantType(p.type)).sort((a, b) => b.level - a.level);
+  return (
+    <>
+      {card === "loading" ? (
+        <>
+          <DialogTitle className="text-xl">{t("visit.loading")}</DialogTitle>
+          <DialogDescription className="sr-only">{t("visit.loading")}</DialogDescription>
+          <div className="mt-3 h-40 animate-pulse rounded-2xl bg-white/[0.04]" />
+        </>
+      ) : !c ? (
+        <>
+          <DialogTitle className="text-xl">🏚️</DialogTitle>
+          <DialogDescription>{t(card === "error" ? "board.error" : "visit.gone")}</DialogDescription>
+        </>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-white/[0.06] text-3xl">{c.avatar || "👤"}</span>
+            <div className="min-w-0">
+              <DialogTitle className="truncate text-2xl">{c.username || "—"}</DialogTitle>
+              <DialogDescription className="truncate">{c.company || t("account.noCompany")}</DialogDescription>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-1.5 text-xs">
+            <Stat label={t("visit.earned")} value={formatMoney(c.earned)} />
+            <Stat label={t("visit.cars")} value={formatNumber(c.cars)} />
+            <Stat label={t("visit.stars")} value={`⭐ ${formatNumber(c.stars)}`} />
+            <Stat label={t("visit.districts")} value={formatNumber(c.zones)} />
+            <Stat label={t("visit.races")} value={`${formatNumber(c.races)} (🏆 ${formatNumber(c.wins)})`} />
+            <Stat label={t("visit.resets")} value={`👑 ${formatNumber(c.resets)}`} />
+          </div>
+
+          <div>
+            <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-white/55">
+              {t("visit.plants")} · {formatNumber(plants.length)}
+            </div>
+            {plants.length ? (
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                {plants.map((p, i) => (
+                  <div key={`${p.type}-${i}`} className="flex items-center gap-2 rounded-xl bg-white/[0.04] px-2.5 py-1.5 ring-1 ring-white/[0.07]">
+                    <span className="text-lg">{PLANT_BY_ID[p.type as keyof typeof PLANT_BY_ID].emoji}</span>
+                    <span className="min-w-0 flex-1 truncate text-[11px] font-semibold">{t(`structure.${p.type}` as MessageKey)}</span>
+                    <span className="shrink-0 text-[11px] font-black tabular-nums text-gold">{t("common.lv", { level: p.level })}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[11px] text-white/50">{t("visit.noPlants")}</p>
+            )}
+          </div>
+
+          {c.updatedAt > 0 && <p className="text-[11px] text-white/45">{t("visit.updated", { when: t("account.ago", { time: formatDuration(Math.max(1, (at - c.updatedAt) / 1000)) }) })}</p>}
+
+          {!mine && (
+            <div className="space-y-1.5 rounded-2xl bg-gold/[0.08] p-3 ring-1 ring-gold/30">
+              <p className="text-[11px] leading-snug text-white/65">{t("gift.hint", { min: Math.round(GIFT.receiveSeconds / 60), n: GIFTS_PER_DAY })}</p>
+              <Button variant={gift === "sent" || out ? "locked" : "gold"} className="w-full" disabled={gift === "sending" || gift === "sent" || gift === "already" || out} onClick={() => void send()}>
+                <Gift /> {t("gift.send")}
+              </Button>
+              {gift && gift !== "sending" && (
+                <p className={cn("text-center text-xs", gift === "sent" ? "text-emerald-300" : "text-amber-300")}>
+                  {t(gift === "sent" ? "gift.sent" : gift === "already" ? "gift.already" : gift === "limit" ? "gift.limit" : gift === "full" ? "gift.full" : gift === "error" ? "gift.error" : "gift.unknown")}
+                </p>
+              )}
+              {gift !== "sent" && out && <p className="text-center text-xs text-amber-300">{t("gift.limit")}</p>}
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-white/[0.04] px-2.5 py-2 ring-1 ring-white/[0.07]">
+      <div className="text-[10px] uppercase tracking-wide text-white/45">{label}</div>
+      <div className="truncate text-sm font-black tabular-nums">{value}</div>
+    </div>
+  );
+}

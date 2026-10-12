@@ -204,7 +204,7 @@ function ProfileEditor() {
   const [name, setName] = useState(profile?.username ?? "");
   const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null);
   if (!saves || !profile) return null;
-  const save = async (p: { username?: string; avatar?: string }) => {
+  const save = async (p: { username?: string; avatar?: string; listed?: boolean }) => {
     setMsg(null);
     const r = await saves.updateProfile(p).catch(() => ({ ok: false as const, error: "network" as const }));
     if (!r.ok) return setMsg({ text: r.error === "taken" ? t("account.err.nameTaken") : r.error === "invalid" ? t("account.err.nameInvalid") : errorText(t, r), bad: true });
@@ -213,6 +213,7 @@ function ProfileEditor() {
   };
   const trimmed = name.trim();
   const valid = trimmed.length >= 3 && trimmed.length <= 20;
+  const listed = profile.listed !== false;
   return (
     <div className="space-y-2.5">
       <div className="flex items-end gap-2">
@@ -233,6 +234,20 @@ function ProfileEditor() {
           ))}
         </div>
       </div>
+      <button
+        role="switch"
+        aria-checked={listed}
+        onClick={() => save({ listed: !listed })}
+        className="flex w-full items-center gap-3 rounded-xl bg-white/[0.04] px-3 py-2.5 text-left ring-1 ring-white/10"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold">🏆 {t("account.listed")}</span>
+          <span className="block text-[11px] text-white/45">{t("account.listedHint")}</span>
+        </span>
+        <span className={cn("relative h-6 w-10 shrink-0 rounded-full transition", listed ? "bg-emerald-500" : "bg-white/15")}>
+          <span className={cn("absolute top-0.5 size-5 rounded-full bg-white shadow transition-all", listed ? "left-[1.125rem]" : "left-0.5")} />
+        </span>
+      </button>
       {msg && <p className={cn("text-center text-xs", msg.bad ? "text-rose-300" : "text-sky-300")}>{msg.text}</p>}
     </div>
   );

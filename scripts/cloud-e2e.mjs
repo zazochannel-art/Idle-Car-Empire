@@ -1,7 +1,8 @@
 // End-to-end check of the cloud save against the real Supabase project, with
 // only the public (publishable) key, exactly as the game's browser code
 // talks to it: two players A and B (anonymous accounts), saving, restoring,
-// revision conflicts, session restore, and what each may (not) reach.
+// revision conflicts, session restore, what each may (not) reach, and the
+// leaderboard, visits and gifts.
 //
 //   NEXT_PUBLIC_SUPABASE_URL=… NEXT_PUBLIC_SUPABASE_ANON_KEY=… node scripts/cloud-e2e.mjs
 //
@@ -102,18 +103,62 @@ const sB = one(await b.client.rpc("save_game", { p_data: { cash: 7 }, p_save_ver
 check(sB?.ok === true, "B saves their own game");
 check(one(await a.client.rpc("load_game"))?.data?.cash === 250, "A's save is untouched by B");
 
+// ── the leaderboard, visits and gifts (0004) ──
+// A saves a bigger game: the card on the board takes it, but a jump this big is held to what is plausible
+const revA = Number(one(await a.client.rpc("load_game"))?.revision);
+const bigA = { cash: 250, createdAt: 1, brand: { name: `${tag} Motors` }, lifetime: { moneyEarned: 4e6, carsProduced: 50 }, city: { zones: ["town"], buildings: { p1: { type: "bodyWorks", level: 2, plant: { secret: 1 } }, g1: { type: "garage", level: 1 } } } };
+const sBig = one(await a.client.rpc("save_game", { p_data: bigA, p_save_version: 3, p_base_revision: revA, p_device: "e2e" }));
+check(sBig?.ok === true, "A saves a bigger game");
+const boardB = await b.client.rpc("leaderboard", { p_kind: "all" });
+const rowA = (boardB.data ?? []).find((r) => r.user_id === idA);
+const rowB = (boardB.data ?? []).find((r) => r.user_id === idB);
+check(!boardB.error && rowB?.me === true && (boardB.data ?? []).filter((r) => r.me).length === 1, "B sees the board, with their own row marked", boardB.error?.message);
+check(!!rowA || (boardB.data ?? []).length > 50, "A is on B's board", JSON.stringify(rowA));
+if (rowA) check(rowA.me === false && rowA.company === `${tag} Motors` && Number(rowA.value) >= 1e6 && Number(rowA.value) < 2e6, "A's total is held to the plausible limit (no save data on the board)", JSON.stringify(rowA));
+const weekB = await b.client.rpc("leaderboard", { p_kind: "week" });
+check(!weekB.error && (weekB.data ?? []).some((r) => r.me), "the weekly board", weekB.error?.message);
+const visit = one(await b.client.rpc("visit_empire", { p_user: idA }));
+check(visit?.user_id === idA && visit.card?.plants?.length === 1 && visit.card.plants[0].level === 2 && !JSON.stringify(visit).includes("secret") && !("data" in visit), "B visits A: the public card only", JSON.stringify(visit));
+const cardsTable = await b.client.from("empires").select("user_id");
+check(!!cardsTable.error || (cardsTable.data ?? []).length === 0, "the cards table itself is closed", cardsTable.error?.code);
+
+const g1 = await b.client.rpc("send_gift", { p_to: idA });
+check(g1.data === "sent", "B sends A a gift", g1.error?.message ?? g1.data);
+const g2 = await b.client.rpc("send_gift", { p_to: idA });
+check(g2.data === "already", "only one gift a day to the same player", g2.data);
+const gSelf = await b.client.rpc("send_gift", { p_to: idB });
+check(gSelf.data === "self", "no gifts to oneself", gSelf.data);
+check((await b.client.rpc("gifts_sent_today")).data === 1, "B's gifts today are counted");
+const giftsTable = await b.client.from("gifts").insert({ from_user: idB, to_user: idA, day: "2000-01-01" });
+check(!!giftsTable.error, "the gifts table can't be written directly", giftsTable.error?.code);
+check((await a.client.rpc("claim_gifts")).data === 1, "A collects the gift");
+check((await a.client.rpc("claim_gifts")).data === 0, "a gift is collected once");
+
+// A leaves the board: hidden from B, not visitable, no gifts; A still sees their own rank
+const listB = await b.client.from("profiles").update({ listed: false }).eq("id", idA).select("id");
+check((listB.data ?? []).length === 0, "B can't hide A");
+const unlist = await a.client.from("profiles").update({ listed: false }).eq("id", idA).select("listed");
+check(!unlist.error && unlist.data?.[0]?.listed === false, "A leaves the board", unlist.error?.message);
+check(!((await b.client.rpc("leaderboard", { p_kind: "all" })).data ?? []).some((r) => r.user_id === idA), "A is gone from B's board");
+check(((await b.client.rpc("visit_empire", { p_user: idA })).data ?? []).length === 0, "A can't be visited");
+check((await b.client.rpc("send_gift", { p_to: idA })).data === "unknown", "A can't be sent gifts");
+check(((await a.client.rpc("leaderboard", { p_kind: "all" })).data ?? []).some((r) => r.me && r.user_id === idA), "A still sees their own rank");
+
 // ── signed out ──
 const anon = browser();
 const anonLoad = await anon.client.rpc("load_game");
 check(!!anonLoad.error, "signed out: no access to saves", anonLoad.error?.code);
 const anonRead = await anon.client.from("game_saves").select("user_id");
 check(!!anonRead.error || (anonRead.data ?? []).length === 0, "signed out: the table shows nothing", anonRead.error?.code);
+const anonBoard = await anon.client.rpc("leaderboard", { p_kind: "all" });
+check(!!anonBoard.error, "signed out: no leaderboard", anonBoard.error?.code);
 
-// ── clean up: each test player deletes its own save ──
+// ── clean up: each test player deletes its own save (and so its card) ──
 for (const p of [a, b]) {
   const del = await p.client.from("game_saves").delete().not("user_id", "is", null);
   if (del.error) console.log("cleanup:", del.error.message);
 }
+check(!((await a.client.rpc("leaderboard", { p_kind: "all" })).data ?? []).some((r) => r.me), "a deleted save takes its card off the board");
 await a.client.auth.signOut();
 await b.client.auth.signOut();
 

@@ -104,10 +104,41 @@ factories, cars, last played). The copy not chosen is kept as a backup.
   (an older game can't overwrite a newer save), its revision, and its size
   (4 MB). **What it does not check**: the economy values inside the save.
   The whole simulation runs in the browser, so a determined player can edit
-  their own save. That only affects their own game: there is no shared
-  economy or trading. Validating the economy on the server would need the
-  simulation to run there (e.g. a Supabase Edge Function replaying actions);
-  that is a large change and was left out on purpose.
+  their own save. In their own game that harms no one (there is no trading);
+  what others see of it (the leaderboard) is limited instead, see below.
+  Validating the economy on the server would need the simulation to run
+  there (e.g. a Supabase Edge Function replaying actions); that is a large
+  change and was left out on purpose.
+
+## Leaderboard, visits and gifts
+
+Signed-in players (guests too) see a **global leaderboard** (this week: money
+earned since Monday 00:00 UTC; all time: money earned in total, across
+resets), can tap a player to **visit their empire** (read only) and send them
+a **gift** once a day.
+
+- **What others can see**: only a public card the server builds from each
+  save after it is written (`public.empires`): the profile's name and avatar,
+  the company name, money earned, cars built, Stars, and the plants with
+  their levels, number of districts, racing totals and resets. Nothing else
+  of a save is ever readable by another player.
+- **Plausible totals**: the card's money earned can't grow faster than the
+  game allows on the server's clock: at most doubling every 30 minutes, plus
+  $20K a second and $1M (for the early game); a first card starts at no more
+  than $10M and 5,000 cars. It never goes down. A hand-edited save therefore
+  climbs only as fast as a very good player could, not to the top at once.
+  This limits cheating on the board; it doesn't make it impossible.
+- **Leaving the board**: Profile → "Show me on the leaderboard" off
+  (`profiles.listed`). The player is then neither listed, visitable nor
+  giftable; they still see their own rank.
+- **Gifts**: one a day (UTC) to the same player, 5 a day in all, and a
+  player receives at most 20 a day (so spare guest accounts can't feed one
+  player without end). The receiver collects them at the next start, every
+  10 minutes while playing, or on opening the board; each is worth 2 minutes
+  of their income, and sending one pays the sender 30 seconds of theirs.
+  Gifts are rewards: they don't count as money earned (not for the board,
+  not for resets).
+- A deleted save takes its card off the board.
 
 ## Database
 
@@ -122,6 +153,10 @@ Migrations in `supabase/migrations/`, in order:
    It closes direct table writes, so saves go through `save_game()` only.
    Until then, an old tab's direct write still gets a new revision from the
    trigger, so newer clients see a conflict instead of losing anything.
+4. `0004_leaderboard_visits_gifts.sql` — the public empire cards, the
+   leaderboard, visits and gifts (see "Leaderboard, visits and gifts").
+   Independent of 0003. Players who saved before it get their card at their
+   next save.
 
 `profiles`: `id` (= the auth user, deleted with it), `username` (unique on
 `lower(username)`, 3–20 characters, no control characters), `avatar`,
@@ -143,6 +178,18 @@ Functions (all for signed-in players only, `search_path` pinned):
   newer; otherwise returns `ok = false` and the current revision.
 - `load_game()` → `data, save_version, revision, updated_at, server_now`.
 - `ensure_profile()` → the caller's profile, created if missing.
+- `leaderboard(p_kind)` (`'week'` or `'all'`) → the top 50 listed players
+  plus the caller's own row: `rank, user_id, username, avatar, company,
+  value, me`.
+- `visit_empire(p_user)` → a listed player's card (or the caller's own).
+- `send_gift(p_to)` → `'sent'`, `'already'`, `'limit'`, `'full'`, `'self'`
+  or `'unknown'`; `claim_gifts()` → how many gifts were waiting (each
+  counted once); `gifts_sent_today()`.
+
+`empires` (the public cards) and `gifts` have Row Level Security on and no
+policies, and no table rights for players: they are reached only through the
+functions above. A trigger on `game_saves` writes the card after every save
+and removes it with the save.
 
 Apply them in the Supabase dashboard → SQL Editor (paste each file, run), or
 with the Supabase CLI (`supabase db push`).
@@ -200,8 +247,13 @@ Level Security. The game doesn't need it.
   users inside a transaction, checks every access rule as each of them and as
   a signed-out visitor, and rolls everything back. Ends with "all access
   checks passed".
+- `supabase/tests/social_rules.sql` — the same for the leaderboard, visits
+  and gifts (plausibility limits, leaving the board, the gift limits, a new
+  week, a deleted save). Ends with "all social checks passed".
 - `scripts/cloud-e2e.mjs` — the same checks against the real project through
-  its public API, exactly as the browser does (two anonymous test players).
+  its public API, exactly as the browser does (two anonymous test players;
+  they appear on the board for a few seconds, under `e2e-…` names, until
+  they delete their saves).
   Runs in CI (`.github/workflows/cloud-e2e.yml`) on pull requests that touch
   the save code or the database, and on demand.
 
