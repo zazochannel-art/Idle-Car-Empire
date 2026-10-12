@@ -40,6 +40,7 @@ import { StatsView } from "../views/stats-view";
 import { EconomyView } from "../views/economy-view";
 import { RacingView } from "../views/racing-view";
 import { StoryView } from "../views/story-view";
+import { ConflictDialog, ProfileView, StartGate } from "./account";
 import { RaceViewer } from "../racing/race-viewer";
 import { Coach } from "./coach";
 import { AwayNotifier, FeedbackBridge } from "./feedback-bridge";
@@ -112,11 +113,13 @@ export function Game() {
 
 function Splash() {
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center gap-4">
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-4 px-4 py-6">
       <motion.div animate={{ x: [-30, 30, -30] }} transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }} className="text-6xl">
         🏎️
       </motion.div>
       <div className="text-sm font-semibold uppercase tracking-[0.3em] text-white/50">Idle Car Empire</div>
+      {/* the account and its save load first; a choice, if one is needed, is asked here */}
+      <StartGate />
     </div>
   );
 }
@@ -227,6 +230,7 @@ function Shell() {
       <OfflineDialog />
       <PrestigeOverlay />
       <RaceViewer />
+      <ConflictDialog />
       <SettingsDialog open={settings} onOpenChange={setSettings} />
     </div>
   );
@@ -242,6 +246,8 @@ function viewTitle(v: View, t: ReturnType<typeof useT>["t"]): string {
       return t("bar.upgrade");
     case "menu":
       return t("bar.empire");
+    case "profile":
+      return t("account.title");
     case "empire":
       return t("map.nav.factories");
     default:
@@ -288,6 +294,8 @@ const ViewSwitch = memo(function ViewSwitch({ view, onSettings }: { view: View; 
       return <RacingView />;
     case "story":
       return <StoryView />;
+    case "profile":
+      return <ProfileView />;
     case "prestige":
       return <PrestigeView />;
   }

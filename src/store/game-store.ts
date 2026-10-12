@@ -32,7 +32,8 @@ import { checkAchievements, claimDaily, claimMilestone, recordHistory, refreshDa
 import { cloneState, createInitialState } from "@/game/engine/state";
 import { tick as engineTick } from "@/game/engine/tick";
 import { formatDuration, formatMoney, formatPercent } from "@/game/format";
-import { decodeSave, encodeSave, SaveManager, type CloudAccount } from "@/game/save";
+import { decodeSave, encodeSave, SaveManager } from "@/game/save";
+import { askSignIn, askStartChoice, useCloud } from "./cloud-store";
 import type { BuyAmount, CarId, CarRoute, DealerId, FacilityType, GameState, Lang, ManagerId, QualityMode, Specialization, StructureType, ZoneId } from "@/game/types";
 import { applyLanguage, detectLanguage, loadLanguage, translate, type MessageKey, type Vars } from "@/i18n";
 import { contentFor } from "@/i18n/content";
@@ -66,10 +67,14 @@ interface GameStore {
   state: GameState;
   snap: EconomySnapshot;
   backend: string;
-  /** The cloud account (null: saves stay on this device). */
-  cloud: CloudAccount | null;
   /** Saves to the cloud now. */
-  syncNow: () => void;
+  syncNow: () => Promise<void>;
+  /** The account's save changed on another device meanwhile: keep this game ("local") or play the cloud's. */
+  resolveConflict: (keep: "local" | "cloud") => Promise<void>;
+  /** Plays a backup kept on this device instead of the current game (which becomes a backup). */
+  restoreBackup: (key: string) => boolean;
+  /** The save manager (account actions for the profile screen). */
+  saves: SaveManager | null;
   init: () => Promise<void>;
   /** Runs a player action on a copy of the state and commits it if it succeeded. */
   act: <T>(fn: (s: GameState) => T) => T;
@@ -187,7 +192,7 @@ interface GameStore {
   resetGame: () => Promise<void>;
 }
 
-const saves = typeof window !== "undefined" ? new SaveManager() : null;
+const saves = typeof window !== "undefined" ? new SaveManager({ onSync: (sync) => useCloud.setState({ sync }) }) : null;
 let loop: ReturnType<typeof setInterval> | null = null;
 /** Set as init starts (it awaits the save): a second call meanwhile must not start a second loop. */
 let starting = false;
@@ -226,7 +231,7 @@ export const useGame = create<GameStore>((set, get) => {
     if (!saves) return;
     const s = get().state;
     lastSave = Date.now();
-    void saves.save({ ...s, lastActiveAt: Date.now() }, { force });
+    saves.save({ ...s, lastActiveAt: Date.now() }, force);
   }
 
   function runTick() {
@@ -350,16 +355,63 @@ export const useGame = create<GameStore>((set, get) => {
     ready: false,
     state: initial,
     snap: snapshot(initial),
-    backend: saves?.backend ?? "memory",
-    cloud: saves?.cloud ?? null,
-    syncNow: () => persist(true),
+    backend: saves?.backendName ?? "memory",
+    saves,
+    syncNow: async () => {
+      persist(true);
+      await saves?.flush();
+    },
+    resolveConflict: async (keep) => {
+      if (!saves) return;
+      const now = Date.now();
+      const state = await saves.resolveConflict(keep, now);
+      if (keep === "cloud" && state) {
+        settleOffline(state, now);
+        refreshDaily(state, now);
+        lastTick = Date.now();
+        commit(state);
+        persist();
+      }
+    },
+    restoreBackup: (key) => {
+      if (!saves || get().saves?.sync?.state.status === "conflict") return false;
+      const now = Date.now();
+      const state = saves.restoreBackup(key, get().state, now);
+      if (!state) return false;
+      refreshDaily(state, now);
+      lastTick = Date.now();
+      commit(state);
+      persist(true);
+      return true;
+    },
     act,
 
     init: async () => {
       if (get().ready || loop || starting) return;
       starting = true;
       const now = Date.now();
-      let state = (await saves?.load(now)) ?? null;
+      // the loading and sign-in screens in the player's language
+      const guess = detectLanguage();
+      await loadLanguage(guess).catch(() => {});
+      set({ state: { ...get().state, settings: { ...get().state.settings, lang: guess } } });
+      // the account and its save first: nothing starts (or gets saved) before they are known
+      const start = saves
+        ? await saves.start(now, { choose: (local, cloud, reason) => askStartChoice({ local, cloud, reason }), signIn: askSignIn })
+        : { state: null, mode: "local" as const };
+      useCloud.setState({ mode: start.mode, account: saves?.account ?? null, outdated: !!start.outdated, phase: "save" });
+      set({ backend: saves?.backendName ?? "memory" });
+      if (start.outdated) {
+        starting = false;
+        return;
+      }
+      // the profile too before the game shows (a slow answer does not hold it up: it follows in the background)
+      if (saves?.account) {
+        const loading = saves.profile().catch(() => null);
+        const profile = await Promise.race([loading, new Promise<null>((r) => setTimeout(() => r(null), 4_000))]);
+        if (profile) useCloud.setState({ profile });
+        else void loading.then((p) => p && useCloud.setState({ profile: p }));
+      }
+      let state = start.state;
       if (!state) {
         state = createInitialState(now);
         state.settings.lang = detectLanguage();
@@ -375,11 +427,18 @@ export const useGame = create<GameStore>((set, get) => {
       set({ ready: true, state, snap: snapshot(state) });
       loop = setInterval(runTick, TICK_MS);
 
-      const flush = () => persist(true);
+      useCloud.setState({ phase: "ready" });
+      // leaving or hiding the game: this device at once, the cloud right away (best effort: the
+      // periodic saves already keep it close, since unload events may not finish)
+      const flush = () => {
+        persist(true);
+        void saves?.flush();
+      };
       window.addEventListener("pagehide", flush);
       document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "hidden") flush();
       });
+      window.addEventListener("online", () => saves?.sync?.retryNow());
     },
 
     plantLevel: (plot) => {
@@ -738,7 +797,7 @@ export const useGame = create<GameStore>((set, get) => {
       }
     },
     resetGame: async () => {
-      await saves?.clear();
+      saves?.clearLocal();
       const state = createInitialState(Date.now());
       refreshDaily(state, Date.now());
       set({ state, snap: snapshot(state) });

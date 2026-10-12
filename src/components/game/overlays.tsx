@@ -323,7 +323,7 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
         </div>
 
         <div className="mt-4">
-          <CloudSection />
+          <CloudSection onOpen={() => onOpenChange(false)} />
         </div>
 
         <div className="mt-4 space-y-2">
