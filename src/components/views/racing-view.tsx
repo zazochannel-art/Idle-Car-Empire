@@ -472,6 +472,7 @@ function RaceCarCard({ id }: { id: number }) {
         <span className="text-[10px] text-white/45">
           🏁 {car.races} · 🏆 {car.wins}
         </span>
+        {car.limited && <span className="rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] font-bold text-violet-200 ring-1 ring-violet-300/30">🎟️ {t("pass.limited", { n: car.limited })}</span>}
         <span className="flex-1" />
         <button onClick={() => retireRaceCar(id)} disabled={racing} className="text-[10px] text-white/40 underline disabled:opacity-30">
           {t("racing.retire")}

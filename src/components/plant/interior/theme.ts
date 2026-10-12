@@ -150,6 +150,26 @@ const STYLES: Partial<Record<SkinId, { era: HallEra; look: Partial<EraLook>; flo
     walkway: "rgba(245,158,11,0.3)",
     stains: 1.8,
   },
+  // season pass: a polished steel hall, mirror floor, cool white light and blue lines
+  chrome: {
+    era: "hightech",
+    look: { wall: ["#9aa5b1", "#a9b3be"], dado: ["#5f6b78", "#6c7885"], lampColor: "#e6f0ff", lampStrength: 0.32, lines: "#38bdf8", column: ["#64748b", "#94a3b8"] },
+    floor: "#8d98a4",
+    k: 0.6,
+    haze: "rgba(186,230,253,0.06)",
+    walkway: "rgba(56,189,248,0.3)",
+    stains: 0,
+  },
+  // season pass: cream walls, black-and-gold trim, warm light on a polished floor
+  gold: {
+    era: "hightech",
+    look: { wall: ["#efe6d2", "#f5eedd"], dado: ["#2b2620", "#3a332a"], lampColor: "#ffe8b0", lampStrength: 0.45, lines: "#eab308", column: ["#a16207", "#ca8a04"] },
+    floor: "#cdbf9f",
+    k: 0.55,
+    haze: "rgba(250,204,21,0.05)",
+    walkway: "rgba(234,179,8,0.32)",
+    stains: 0,
+  },
 };
 
 const SKIN_ERA: Partial<Record<SkinId, HallEra>> = { retro: "workshop", modern: "factory", hightech: "hightech" };
