@@ -14,6 +14,8 @@ import { createDealers, createStats, emptyCarCounts } from "./state";
 export function resetRun(s: GameState, now: number) {
   s.cash = 0;
   s.dealers = createDealers();
+  // the charging stations stood at the old dealers
+  s.ev = { chargers: {} };
   s.carModels = emptyCarCounts();
   resetDesignLevels(s);
   s.logistics = createLogistics();

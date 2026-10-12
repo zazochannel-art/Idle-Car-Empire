@@ -241,6 +241,16 @@ export const RECIPES: Record<string, StationDef[]> = {
     qc("pack", "testBench"),
     store("goods", "goodsRack", "pack"),
   ]),
+  // server and sensor kits → code at the desks → trained on fleet data → simulated miles → flashed modules
+  softwareStudio: line7([
+    store("rawStore", "rawRack", "reel", "chips", ["binRack", "boxPallet"]),
+    { id: "coding", machine: "assemblyStand", variant: "bench", unlock: 1, upgrade: "speed", icon: "⌨️", robotsFrom: 3, part: "pcbBare", staff: 2, tool: "suction", robot: "reach", props: ["toolCabinet", "binRack"] },
+    { id: "training", machine: "smt", unlock: 2, upgrade: "speed", icon: "🧠", robotsFrom: 2, part: "pcb", staff: 1, tool: "suction", robot: "floor", fx: "scan", props: ["binRack", "binRack"] },
+    { id: "simulation", machine: "testBench", unlock: 1, upgrade: "automation", icon: "🖥️", robotsFrom: 1, part: "pcb", staff: 1, role: "inspector", tool: "suction", robot: "floor", fx: "scan", props: ["toolCabinet", "boxPallet"] },
+    { id: "flashing", machine: "smt", variant: "printer", unlock: 3, upgrade: "automation", icon: "💾", robotsFrom: 2, part: "module", staff: 1, tool: "suction", robot: "reach", props: ["partsCage", "binRack"] },
+    qc("module"),
+    store("goods", "goodsRack", "module"),
+  ]),
   // steel bars → cut gears → hardened → shafts assembled → tested gearboxes
   transmissionFactory: line7([
     store("rawStore", "rawRack", "bar", "bar", ["sheetPallet", "boxPallet"]),

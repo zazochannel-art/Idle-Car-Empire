@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { STRUCTURE_BY_ID, ZONE_BY_ID } from "@/game/config/city";
 import { plotOf } from "@/game/city/layout";
 import * as Co from "@/game/engine/construction";
 import { formatDuration, formatMoney } from "@/game/format";
+import type { GameState, StructureType } from "@/game/types";
 import type { MessageKey } from "@/i18n";
 import { useContent } from "@/i18n/content";
 import { useT } from "@/i18n/use-t";
@@ -50,6 +51,15 @@ function Row({ label, value, strong }: { label: string; value: string; strong?: 
   );
 }
 
+/** What the plot can take: what it is zoned for, plus alternatives whose research is done (an unresearched one stays out of sight). */
+function choicesOf(s: GameState, id: string): StructureType[] {
+  return Co.plotUses(id).filter((u, i) => {
+    if (i === 0) return true;
+    const lock = Co.landLock(s, id, u);
+    return !(lock?.kind === "chain" && lock.lock.kind === "research");
+  });
+}
+
 /** An empty plot: what it is zoned for, its size, prices, requirements, and BUY LAND / BUILD. */
 export function LandPanel({ id }: { id: string }) {
   const state = useGame((g) => g.state);
@@ -60,7 +70,10 @@ export function LandPanel({ id }: { id: string }) {
   const { t, lang } = useT();
   const n = useContent(lang);
   const plot = plotOf(id)!;
-  const use = Co.plotUse(id);
+  const choices = choicesOf(state, id);
+  const [picked, setPicked] = useState<StructureType | null>(null);
+  // the building to put up: what the plot is zoned for, or the alternative the player picked
+  const use = picked && choices.includes(picked) ? picked : Co.plotUse(id);
   // show the finished building on the plot while its details are open
   useEffect(() => {
     if (use) setPreview({ plot: id, type: use });
@@ -69,10 +82,10 @@ export function LandPanel({ id }: { id: string }) {
   if (!use) return null;
   const cfg = STRUCTURE_BY_ID[use];
   const status = Co.plotStatus(state, id);
-  const lock = Co.landLock(state, id);
+  const lock = Co.landLock(state, id, use);
   const land = Co.landCost(state, id);
-  const build = Co.constructionCost(state, id);
-  const time = Co.constructionTime(state, id);
+  const build = Co.constructionCost(state, id, use);
+  const time = Co.constructionTime(state, id, use);
   const owned = status === "owned";
   const zone = ZONE_BY_ID[plot.zone];
   const lockText =
@@ -92,12 +105,35 @@ export function LandPanel({ id }: { id: string }) {
         <Badge variant="muted">📍 {t(`zone.${plot.zone}`)}</Badge>
       </div>
 
+      {choices.length > 1 && (
+        <div className="space-y-1">
+          <div className="px-1 text-[10px] font-semibold uppercase tracking-wider text-white/40">{t("land.choose")}</div>
+          <div className="grid grid-cols-2 gap-1.5" role="radiogroup">
+            {choices.map((u) => (
+              <button
+                key={u}
+                role="radio"
+                aria-checked={u === use}
+                onClick={() => setPicked(u)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-xl px-2.5 py-2 text-left text-xs font-bold ring-1 transition",
+                  u === use ? "bg-gold/20 text-gold ring-gold" : "bg-white/[0.04] text-white/70 ring-white/10 hover:bg-white/[0.08]",
+                )}
+              >
+                <span className="text-base">{STRUCTURE_BY_ID[u].emoji}</span>
+                <span className="min-w-0 leading-tight">{t(`structure.${u}`)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center gap-3 rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.07]">
         <div className="flex size-12 shrink-0 items-center justify-center rounded-xl text-2xl ring-1 ring-white/10" style={{ background: `${cfg.roof}22` }}>
           {cfg.emoji}
         </div>
         <div className="min-w-0">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-white/40">{t("land.zonedFor")}</div>
+          {choices.length < 2 && <div className="text-[10px] font-semibold uppercase tracking-wider text-white/40">{t("land.zonedFor")}</div>}
           <div className="text-sm font-bold">{t(`structure.${use}`)}</div>
           <div className="text-[11px] leading-snug text-white/50">{t(`structureDesc.${use}`)}</div>
         </div>
@@ -122,7 +158,7 @@ export function LandPanel({ id }: { id: string }) {
       {owned ? (
         <>
           <p className="px-1 text-xs text-white/55">{t("land.ownedNote")}</p>
-          <CostButton className="w-full" size="lg" variant="gold" cost={build} locked={!!lock} label={`🏗️ ${t("land.build")}`} onBuy={() => startConstruction(id)} />
+          <CostButton className="w-full" size="lg" variant="gold" cost={build} locked={!!lock} label={`🏗️ ${t("land.build")}`} onBuy={() => startConstruction(id, use)} />
         </>
       ) : (
         <div className="grid grid-cols-2 gap-2">

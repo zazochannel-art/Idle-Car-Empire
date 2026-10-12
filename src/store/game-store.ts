@@ -40,6 +40,7 @@ import { uiEvents } from "./events";
 import * as Mk from "@/game/engine/market";
 import * as Lv from "@/game/engine/live";
 import * as Cl from "@/game/engine/classics";
+import * as Evc from "@/game/engine/ev";
 import * as Fl from "@/game/engine/floor";
 import * as Sy from "@/game/engine/story";
 import * as Cn from "@/game/engine/collection";
@@ -131,6 +132,7 @@ interface GameStore {
   assignManager: (id: ManagerId, plot: string | null) => void;
   buyDealer: (id: DealerId) => boolean;
   upgradeDealer: (id: DealerId) => boolean;
+  buildCharger: (id: DealerId) => boolean;
   upgradeCarModel: (id: CarId) => boolean;
   buyLogistics: (id: LogisticsUpgrade) => boolean;
   buyTransportTier: () => boolean;
@@ -141,7 +143,7 @@ interface GameStore {
   unlockZone: (id: ZoneId) => boolean;
   buildStructure: (plot: string, type: StructureType) => boolean;
   buyLand: (plot: string) => boolean;
-  startConstruction: (plot: string) => boolean;
+  startConstruction: (plot: string, type?: StructureType) => boolean;
   speedUp: (plot: string) => boolean;
   upgradeBuilding: (plot: string) => boolean;
   placeFacility: (plot: string, type: FacilityType, x: number, y: number, rot: 0 | 1) => boolean;
@@ -605,6 +607,15 @@ export const useGame = create<GameStore>((set, get) => {
       return ok;
     },
     upgradeDealer: (id) => act((s) => A.upgradeDealer(s, id)),
+    buildCharger: (id) => {
+      const ok = act((s) => Evc.buildCharger(s, id));
+      if (ok) {
+        const level = Evc.chargerLevel(get().state, id);
+        uiEvents.emit({ type: "toast", tone: "success", icon: "⚡", title: tr(level > 1 ? "ev.toastUp" : "ev.toastBuilt", { name: names().dealer(DEALER_BY_ID[id]), level }) });
+        persist(true);
+      }
+      return ok;
+    },
     upgradeCarModel: (id) => act((s) => A.upgradeCarModel(s, id)),
     buyLogistics: (id) => act((s) => L.buyLogistics(s, id, get().snap.gm.costMult)),
     unlockRacing: () => act((s) => Rc.unlockRacing(s)),
@@ -694,8 +705,8 @@ export const useGame = create<GameStore>((set, get) => {
       }
       return ok;
     },
-    startConstruction: (plot) => {
-      const ok = act((s) => Co.startConstruction(s, plot));
+    startConstruction: (plot, type) => {
+      const ok = act((s) => Co.startConstruction(s, plot, type));
       if (ok) {
         const site = get().state.city.sites[plot];
         if (site) uiEvents.emit({ type: "toast", tone: "info", icon: "🏗️", title: tr("toast.constructionStarted", { name: tr(`structure.${site.type}`) }), body: tr("toast.constructionBody", { time: formatDuration(site.dur) }) });

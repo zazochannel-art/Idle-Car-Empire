@@ -7,6 +7,7 @@
 // building keeps working. Nothing appears instantly; paying to finish early
 // is possible but never the default.
 import {
+  ALT_USES,
   BUILD_SIZE_MULT,
   BUILD_TIME,
   LAND_SHARE,
@@ -58,10 +59,23 @@ export function plotUse(plotId: string): StructureType | null {
   return p?.kind === "plot" ? (p.use ?? null) : null;
 }
 
-/** Why the plot cannot be bought or built on yet. */
-export function landLock(s: GameState, plotId: string): LandLock {
-  const plot = plotOf(plotId);
+/** Every kind of building the plot can take: what it is zoned for first, then its alternatives (config/city.ts ALT_USES). */
+export function plotUses(plotId: string): StructureType[] {
   const use = plotUse(plotId);
+  return use ? [use, ...(ALT_USES[use] ?? [])] : [];
+}
+
+/** `type` if the plot can take it (default: what the plot is zoned for), else null. */
+function buildTypeFor(plotId: string, type?: StructureType): StructureType | null {
+  const uses = plotUses(plotId);
+  const t = type ?? uses[0];
+  return t && uses.includes(t) ? t : null;
+}
+
+/** Why the plot cannot be bought or built on yet (for `type`, default: what it is zoned for). */
+export function landLock(s: GameState, plotId: string, type?: StructureType): LandLock {
+  const plot = plotOf(plotId);
+  const use = buildTypeFor(plotId, type);
   if (!plot || !use) return null;
   if (!isZoneUnlocked(s, plot.zone)) return { kind: "zone", zone: plot.zone };
   if (isPlantType(use)) {
@@ -72,6 +86,9 @@ export function landLock(s: GameState, plotId: string): LandLock {
   return null;
 }
 
+/** Something the plot can take is open to build (so its land can be bought). */
+const landOpen = (s: GameState, plotId: string) => plotUses(plotId).some((u) => !landLock(s, plotId, u));
+
 function siteInZone(s: GameState, zone: ZoneId, type: StructureType) {
   return Object.entries(s.city.sites).some(([id, st]) => st.type === type && plotOf(id)?.zone === zone);
 }
@@ -80,12 +97,12 @@ export function plotStatus(s: GameState, plotId: string): PlotStatus {
   if (s.city.buildings[plotId]) return "operational";
   if (s.city.sites[plotId]) return "construction";
   if (ownsLand(s, plotId)) return "owned";
-  return landLock(s, plotId) ? "locked" : "available";
+  return landOpen(s, plotId) ? "available" : "locked";
 }
 
 /** Price of the whole building on this plot (land + construction). */
-function fullPrice(s: GameState, plotId: string): number {
-  const use = plotUse(plotId);
+function fullPrice(s: GameState, plotId: string, type?: StructureType): number {
+  const use = buildTypeFor(plotId, type);
   return use ? structureCost(s, plotId, use) : Infinity;
 }
 
@@ -94,19 +111,20 @@ export function landCost(s: GameState, plotId: string): number {
   return fullPrice(s, plotId) * LAND_SHARE * LAND_SIZE_MULT[size];
 }
 
-export function constructionCost(s: GameState, plotId: string): number {
-  return fullPrice(s, plotId) * (1 - LAND_SHARE);
+/** The land is priced for what the plot is zoned for; the construction for what goes up on it. */
+export function constructionCost(s: GameState, plotId: string, type?: StructureType): number {
+  return fullPrice(s, plotId, type) * (1 - LAND_SHARE);
 }
 
 /**
  * How long the construction on this plot takes: from the building's price
  * and the plot's size.
  */
-export function constructionTime(s: GameState, plotId: string): number {
-  const use = plotUse(plotId);
+export function constructionTime(s: GameState, plotId: string, type?: StructureType): number {
+  const use = buildTypeFor(plotId, type);
   const plot = plotOf(plotId);
   if (!use || !plot) return BUILD_TIME.min;
-  return buildTime(fullPrice(s, plotId), plot.size);
+  return buildTime(fullPrice(s, plotId, use), plot.size);
 }
 
 function spend(s: GameState, cost: number): boolean {
@@ -116,30 +134,31 @@ function spend(s: GameState, cost: number): boolean {
 }
 
 export function buyLand(s: GameState, plotId: string): boolean {
-  if (!plotUse(plotId) || ownsLand(s, plotId) || landLock(s, plotId)) return false;
+  if (!plotUse(plotId) || ownsLand(s, plotId) || !landOpen(s, plotId)) return false;
   if (!spend(s, landCost(s, plotId))) return false;
   s.city.land.push(plotId);
   return true;
 }
 
-/** Starts building what the plot is zoned for, on land the player owns. */
-export function startConstruction(s: GameState, plotId: string): boolean {
-  const use = plotUse(plotId);
-  if (!use || !ownsLand(s, plotId) || s.city.buildings[plotId] || s.city.sites[plotId] || landLock(s, plotId)) return false;
-  const cost = constructionCost(s, plotId);
-  const dur = constructionTime(s, plotId);
+/** Starts building what the plot is zoned for (or `type`, one of its alternatives), on land the player owns. */
+export function startConstruction(s: GameState, plotId: string, type?: StructureType): boolean {
+  const use = buildTypeFor(plotId, type);
+  if (!use || !ownsLand(s, plotId) || s.city.buildings[plotId] || s.city.sites[plotId] || landLock(s, plotId, use)) return false;
+  const cost = constructionCost(s, plotId, use);
+  const dur = constructionTime(s, plotId, use);
   if (!spend(s, cost)) return false;
   s.city.sites[plotId] = { type: use, t: 0, dur, cost };
   return true;
 }
 
 /** Buys the land if needed and starts the construction: both or neither. */
-export function buyAndBuild(s: GameState, plotId: string): boolean {
-  if (!plotUse(plotId) || landLock(s, plotId) || s.city.buildings[plotId] || s.city.sites[plotId]) return false;
+export function buyAndBuild(s: GameState, plotId: string, type?: StructureType): boolean {
+  const use = buildTypeFor(plotId, type);
+  if (!use || landLock(s, plotId, use) || s.city.buildings[plotId] || s.city.sites[plotId]) return false;
   const land = ownsLand(s, plotId) ? 0 : landCost(s, plotId);
-  if (s.cash < land + constructionCost(s, plotId)) return false;
+  if (s.cash < land + constructionCost(s, plotId, use)) return false;
   if (land > 0 && !buyLand(s, plotId)) return false;
-  return startConstruction(s, plotId);
+  return startConstruction(s, plotId, use);
 }
 
 /** Pays for a level upgrade and starts building it (one job per building at a time). */
@@ -211,7 +230,7 @@ export function constructionTick(s: GameState, dt: number, events?: GameEvent[])
 export function freePlotFor(s: GameState, type: StructureType): string | null {
   let best: string | null = null;
   for (const p of plotsFor(type)) {
-    if (s.city.buildings[p] || s.city.sites[p] || landLock(s, p)) continue;
+    if (s.city.buildings[p] || s.city.sites[p] || landLock(s, p, type)) continue;
     if (ownsLand(s, p)) return p;
     best ??= p;
   }
@@ -219,12 +238,12 @@ export function freePlotFor(s: GameState, type: StructureType): string | null {
 }
 
 const PLOTS_FOR = new Map<StructureType, string[]>();
-/** Every plot zoned for `type`, nearest first. */
+/** Every plot zoned for `type` (or taking it as an alternative), nearest first. */
 export function plotsFor(type: StructureType): string[] {
   let hit = PLOTS_FOR.get(type);
   if (!hit) {
     hit = WORLD_MAP.plots
-      .filter((p) => p.use === type)
+      .filter((p) => p.use === type || (p.use && ALT_USES[p.use]?.includes(type)))
       .sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0))
       .map((p) => p.id);
     PLOTS_FOR.set(type, hit);

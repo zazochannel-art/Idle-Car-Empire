@@ -92,6 +92,7 @@ export function createInitialState(now: number): GameState {
     eventGoal: { start: 0, base: 0, claimed: false },
     brand: createBrand(),
     showroom: { campaignUntil: 0, campaigns: 0, sold: 0, revenue: 0 },
+    ev: { chargers: {} },
     story: createStory(),
     editions: createEditions(),
     research: [],

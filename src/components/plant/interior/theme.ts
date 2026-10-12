@@ -51,6 +51,7 @@ export const PLANT_THEMES: Record<string, PlantTheme> = {
     decor: ["drum", "can"],
   },
   electronicsFactory: { floor: "#d0d8de", bay: ["#d6dde3", "#c3ccd4"], walkway: "rgba(59,130,246,0.26)", stains: [], stainCount: 0, haze: "rgba(191,219,254,0.05)", decor: ["reel", "pcb"] },
+  softwareStudio: { floor: "#d3d7e2", bay: ["#d9dde8", "#c3c9d8"], walkway: "rgba(99,102,241,0.24)", stains: ["rgba(60,70,90,0.04)"], stainCount: 4, haze: "rgba(165,180,252,0.05)", decor: ["module", "reel"] },
   batteryFactory: { floor: "#c6cdd2", bay: ["#cdd4d9", "#b7c0c7"], walkway: "rgba(20,184,166,0.26)", stains: ["rgba(60,70,80,0.05)"], stainCount: 6, haze: "rgba(167,243,208,0.04)", decor: ["pack", "cell"] },
   transmissionFactory: { floor: "#98a0a8", bay: ["#97a0a9", "#838c96"], walkway: "rgba(34,197,94,0.3)", stains: ["rgba(30,34,40,0.11)", "rgba(80,60,30,0.07)"], stainCount: 30, decor: ["bar", "block"] },
   wheelFactory: { floor: "#a5a8ab", bay: ["#a3a8ad", "#8f959b"], walkway: "rgba(34,197,94,0.3)", stains: OIL, stainCount: 22, haze: "rgba(255,170,90,0.03)", decor: ["casting", "tire"] },

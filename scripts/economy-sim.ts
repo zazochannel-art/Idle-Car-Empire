@@ -28,7 +28,7 @@ const mark = (key: string, t: number, extra = "") => {
 };
 const fmtT = (t: number) => `${Math.floor(t / 3600)}h${String(Math.floor((t % 3600) / 60)).padStart(2, "0")}m`;
 
-const order: PlantType[] = PLANTS.map((p) => p.id).filter((id) => id !== "batteryFactory");
+const order: PlantType[] = PLANTS.map((p) => p.id).filter((id) => id !== "batteryFactory" && id !== "softwareStudio");
 let snap = snapshot(s);
 const freePlot = (type: StructureType) => freePlotFor(s, type) ?? undefined;
 let lastIncome = 0;

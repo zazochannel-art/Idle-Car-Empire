@@ -5,6 +5,7 @@ import { migrateQuality } from "../engine/market";
 import { migrateLive } from "../engine/live";
 import { migrateClassics } from "../engine/classics";
 import { migrateExpansion } from "../engine/expansion";
+import { migrateEv } from "../engine/ev";
 import { migrateCity, unlockOwnedZones } from "../engine/city";
 import { createInitialState, MAP_VERSION, SAVE_VERSION } from "../engine/state";
 import { ACHIEVEMENTS } from "../config/achievements";
@@ -100,6 +101,8 @@ export function migrate(raw: unknown, now: number): GameState {
     }
   }
   state.quality = migrateQuality(raw.quality);
+  // the charging stations are keyed by dealer (an open-ended record)
+  state.ev = migrateEv(raw.ev);
   migrateLive(raw, state);
   state.classics = migrateClassics(raw.classics);
   migrateExpansion(raw, state);

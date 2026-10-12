@@ -9,7 +9,7 @@ import type { Facing } from "./glb-car";
 
 type Three = typeof THREE_NS;
 
-export type BodyModel = "city" | "sedan" | "suv" | "sports" | "muscle" | "luxury" | "supercar" | "hypercar" | "electric" | "compact" | "minivan" | "offroad" | "pickup" | "wagon";
+export type BodyModel = "city" | "sedan" | "suv" | "sports" | "muscle" | "luxury" | "supercar" | "hypercar" | "electric" | "compact" | "minivan" | "offroad" | "pickup" | "wagon" | "robotaxi";
 
 /** Rim finish of the truck wheels. */
 type Rims = "silver" | "black" | "dark" | "chrome";
@@ -30,6 +30,7 @@ export const CAR_LENGTH: Record<BodyModel, number> = {
   offroad: 4.3,
   pickup: 5.3,
   wagon: 4.6,
+  robotaxi: 4.7,
 };
 
 /** How far the car is in the assembly process (assembly-line view). */
@@ -327,6 +328,8 @@ const HERO_FILES: Partial<Record<BodyModel, HeroFile>> = {
   offroad: { url: PACK, pick: "Offroad Body", facing: "-x" },
   pickup: { url: PACK, pick: "Pickup Body" },
   wagon: { url: PACK, pick: "Wagon Body", facing: "-x" },
+  // the Autonomous Lounge: the people-mover body with a sensor pod on the roof (sensors() below)
+  robotaxi: { url: PACK, pick: "minivan body" },
 };
 interface Hero {
   car: THREE_NS.Group;
@@ -490,10 +493,56 @@ export function buildCar(T: Three, look: CarLook): THREE_NS.Group {
   if (!hero) return new T.Group();
   const st = look.stage?.station ?? 8;
   const car = heroCopy(hero, st < 6 ? "#9aa3ad" : look.build?.color || (hero.ownPaint ? null : liveryOf(look.model).color));
-  if (!look.build?.wing || st < 6) return car;
+  const pod = look.model === "robotaxi" && st >= 6;
+  if ((!look.build?.wing || st < 6) && !pod) return car;
   const g = new T.Group();
   g.add(car);
-  g.add(spoiler(T, car, look.build.wing));
+  if (look.build?.wing && st >= 6) g.add(spoiler(T, car, look.build.wing));
+  if (pod) g.add(sensors(T, car));
+  return g;
+}
+
+/**
+ * The self-driving sensor pod of the Autonomous Lounge: a ray down at the
+ * middle of the car finds the roof; a low black pod with a teal band sits on
+ * it, the spinning lidar puck on top, and a camera block on each corner.
+ */
+function sensors(T: Three, car: THREE_NS.Object3D): THREE_NS.Group {
+  car.updateMatrixWorld(true);
+  const box = new T.Box3().setFromObject(car);
+  const L = box.max.x - box.min.x;
+  const W = box.max.z - box.min.z;
+  const H = box.max.y - box.min.y;
+  const cx = (box.min.x + box.max.x) / 2;
+  const cz = (box.min.z + box.max.z) / 2;
+  const hit = new T.Raycaster(new T.Vector3(cx, box.max.y + 1, cz), new T.Vector3(0, -1, 0)).intersectObject(car, true)[0];
+  const roof = hit ? hit.point.y : box.max.y;
+  const dark = new T.MeshStandardMaterial({ color: "#14171c", roughness: 0.35, metalness: 0.4 });
+  const band = new T.MeshStandardMaterial({ color: "#2dd4bf", roughness: 0.3, metalness: 0.2, emissive: "#0f766e", emissiveIntensity: 0.6 });
+  const g = new T.Group();
+  const podH = H * 0.035;
+  const pod = new T.Mesh(new T.BoxGeometry(L * 0.22, podH, W * 0.5), dark);
+  pod.position.set(cx, roof + podH / 2, cz);
+  g.add(pod);
+  const stripe = new T.Mesh(new T.BoxGeometry(L * 0.225, podH * 0.35, W * 0.505), band);
+  stripe.position.set(cx, roof + podH * 0.55, cz);
+  g.add(stripe);
+  // the lidar: a tall puck with a glowing window band
+  const r = W * 0.085;
+  const ph = H * 0.13;
+  const puck = new T.Mesh(new T.CylinderGeometry(r * 0.9, r, ph, 24), dark);
+  puck.position.set(cx, roof + podH + ph / 2, cz);
+  g.add(puck);
+  const ring = new T.Mesh(new T.CylinderGeometry(r * 0.93, r * 0.95, ph * 0.3, 24), band);
+  ring.position.set(cx, roof + podH + ph * 0.6, cz);
+  g.add(ring);
+  // a camera at each corner of the pod
+  for (const sx of [-1, 1])
+    for (const sz of [-1, 1]) {
+      const cam = new T.Mesh(new T.BoxGeometry(L * 0.03, podH * 1.5, W * 0.05), dark);
+      cam.position.set(cx + sx * L * 0.1, roof + podH * 0.75, cz + sz * W * 0.24);
+      g.add(cam);
+    }
   return g;
 }
 

@@ -45,6 +45,7 @@ export const ACHIEVEMENTS: AchievementConfig[] = [
   { id: "automotive_empire", name: "Automotive Empire", description: "Own every kind of plant.", icon: "👑", condition: { type: "metric", metric: "plantTypes", target: 9 }, reward: { rp: 50_000 } },
   { id: "trillionaire", name: "Ten-Billionaire", description: "Earn $10B.", icon: "🏦", condition: { type: "metric", metric: "moneyEarned", target: 1e10 }, reward: { incomeSeconds: 900 } },
   { id: "electric_era", name: "Electric Era", description: "Build an Electric Performance car.", icon: "⚡", condition: { type: "carType", car: "electric", target: 1 }, reward: { rp: 100_000 } },
+  { id: "autonomous_era", name: "Nobody at the Wheel", description: "Build an Autonomous Lounge.", icon: "🤖", condition: { type: "carType", car: "autonomous", target: 1 }, reward: { rp: 500_000 } },
   { id: "hypercar_legend", name: "Hypercar Legend", description: "Build 1,000 hypercars.", icon: "🏆", condition: { type: "carType", car: "hypercar", target: 1_000 }, reward: { rp: 250_000 } },
   { id: "flagship", name: "Global Flagship", description: "Raise a plant to level 15.", icon: "🌟", condition: { type: "metric", metric: "maxFactoryLevel", target: 15 }, reward: { rp: 100_000 } },
 ];

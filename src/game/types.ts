@@ -11,10 +11,11 @@ export type CarId =
   | "perfSuv"
   | "supercar"
   | "hypercar"
-  | "electric";
+  | "electric"
+  | "autonomous";
 
 /** Parts that plants make and the Car Assembly Plant puts together. */
-export type ComponentId = "body" | "engine" | "interior" | "suspension" | "glass" | "tires" | "paint" | "electronics" | "battery" | "transmission" | "wheels" | "brakes";
+export type ComponentId = "body" | "engine" | "interior" | "suspension" | "glass" | "tires" | "paint" | "electronics" | "battery" | "software" | "transmission" | "wheels" | "brakes";
 /** What trucks carry: a component, a motorized chassis (body + engine) or a car. */
 export type ItemId = ComponentId | "car" | "chassis";
 
@@ -32,6 +33,7 @@ export type PlantType =
   | "paintFactory"
   | "electronicsFactory"
   | "batteryFactory"
+  | "softwareStudio"
   | "assemblyPlant";
 
 export type DealerId = "local" | "city" | "premium" | "luxury" | "supercar" | "global";
@@ -57,7 +59,8 @@ export type ResearchCategory =
   | "ai"
   | "design"
   | "performance"
-  | "green";
+  | "green"
+  | "autonomy";
 
 /**
  * A single modifier. Research, managers, achievements and empire perks all
@@ -545,6 +548,8 @@ export interface GameState {
   brand: BrandState;
   /** Showroom sales of the collection and the marketing campaign (market clock). */
   showroom: { campaignUntil: number; campaigns: number; sold: number; revenue: number };
+  /** The electric late game: the charging station level at each dealer (engine/ev.ts). */
+  ev: { chargers: Partial<Record<DealerId, number>> };
   research: string[];
   achievements: string[];
   missions: {
