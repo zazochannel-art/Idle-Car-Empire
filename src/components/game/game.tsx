@@ -37,6 +37,8 @@ import { MissionsView } from "../views/missions-view";
 import { ImperiumView } from "../views/imperium-view";
 import { LeaderboardView } from "../views/leaderboard-view";
 import { AllianceView } from "../views/alliance-view";
+import { WinterView } from "../views/winter-view";
+import { winterWaiting } from "@/game/engine/winter";
 import { ResearchView } from "../views/research-view";
 import { StatsView } from "../views/stats-view";
 import { EconomyView } from "../views/economy-view";
@@ -85,7 +87,7 @@ function badgeCounts(state: ReturnType<typeof useGame.getState>["state"], snap: 
     managers: MANAGERS.filter((m) => !state.managers[m.id].hired && isManagerUnlocked(state, m.id) && state.cash >= m.cost).length + (idle > 0 ? 1 : 0),
     missions: claimableCount(state, snap),
     // the crown menu: an expansion ready, a decision on the desk or a chapter to close
-    imperium: (canImperium(state) ? 1 : 0) + (storyWaiting(state, snap) ? 1 : 0),
+    imperium: (canImperium(state) ? 1 : 0) + (storyWaiting(state, snap) ? 1 : 0) + (winterWaiting(state, state.lastActiveAt) ? 1 : 0),
     upgrade: upgrades,
   };
 }
@@ -305,6 +307,8 @@ const ViewSwitch = memo(function ViewSwitch({ view, onSettings }: { view: View; 
       return <LeaderboardView />;
     case "alliance":
       return <AllianceView />;
+    case "winter":
+      return <WinterView />;
   }
 });
 
@@ -318,7 +322,7 @@ export const PILLARS: { id: PillarId; icon: Icon; views: View[] }[] = [
   { id: "empire", icon: Factory, views: ["empire", "garages", "logistics", "research", "managers", "imperium"] },
   { id: "cars", icon: Car, views: ["cars"] },
   { id: "racing", icon: Flag, views: ["racing"] },
-  { id: "business", icon: Briefcase, views: ["dealers", "economy", "missions", "stats", "achievements", "story", "leaderboard", "alliance"] },
+  { id: "business", icon: Briefcase, views: ["dealers", "economy", "missions", "stats", "achievements", "story", "leaderboard", "alliance", "winter"] },
 ];
 export const pillarOf = (v: View | null) => (v ? (PILLARS.find((p) => p.views.includes(v))?.id ?? null) : null);
 

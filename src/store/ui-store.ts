@@ -31,6 +31,7 @@ export type View =
   | "imperium"
   | "leaderboard"
   | "alliance"
+  | "winter"
   | "build"
   | "upgrade"
   | "logistics"

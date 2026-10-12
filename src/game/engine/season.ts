@@ -9,6 +9,7 @@ export function seasonAt(now: number): Season | null {
   const m = d.getMonth();
   const day = d.getDate();
   if ((m === 9 && day >= 10) || (m === 10 && day <= 2)) return "halloween";
-  if ((m === 11 && day >= 10) || (m === 0 && day <= 6)) return "winter";
+  // all December and the first week of January: the winter festival's time (engine/winter.ts)
+  if (m === 11 || (m === 0 && day <= 6)) return "winter";
   return null;
 }
