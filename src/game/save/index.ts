@@ -16,7 +16,7 @@ export type { Account, AuthResult, CloudBackend, CloudCopy, LocalCopy, Profile, 
 export type { SaveSummary } from "./policy";
 export { summarize } from "./policy";
 export type { SyncInfo, SyncStatus } from "./sync";
-export type { BoardKind, BoardRow, EmpireCard, GiftResult } from "./social";
+export type { AllianceMember, AllianceSummary, BoardKind, BoardRow, ClaimTierResult, CreateAllianceResult, EmpireCard, GiftResult, JoinAllianceResult, MyAlliance } from "./social";
 export { GIFTS_PER_DAY } from "./social";
 export { encodeSave, decodeSave, migrate } from "./serialize";
 

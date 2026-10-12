@@ -528,6 +528,8 @@ export interface GameState {
   contracts: ContractsState;
   /** Daily login streak (1-7) and whether today's reward was taken. */
   login: { day: string; streak: number; claimed: boolean };
+  /** Duels with other players' ghosts today (engine/ghost.ts): the rivals raced. */
+  duels: { day: string; raced: string[] };
   /** Rival companies the player has overtaken. */
   rivalsBeaten: string[];
   /** Tutorial tips the player has dismissed. */

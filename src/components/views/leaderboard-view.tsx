@@ -4,11 +4,14 @@ import { Gift, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { CAR_BY_ID } from "@/game/config/cars";
 import { PLANT_BY_ID, isPlantType } from "@/game/config/chain";
 import { GIFT } from "@/game/engine/gifts";
+import { DUEL, duelBlock, duelCar, duelRating, duelsLeft, ghostRating, type DuelResult, type Ghost } from "@/game/engine/ghost";
 import { formatDuration, formatMoney, formatNumber } from "@/game/format";
 import { GIFTS_PER_DAY, type BoardKind, type BoardRow, type EmpireCard, type GiftResult } from "@/game/save";
 import type { MessageKey } from "@/i18n";
+import { useContent } from "@/i18n/content";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { useCloud } from "@/store/cloud-store";
@@ -247,6 +250,8 @@ function Visit({ userId, sent, onSent }: { userId: string; sent: number | null; 
             )}
           </div>
 
+          {c.ghost && !mine && <GhostDuel rival={c.userId} ghost={c.ghost} />}
+
           {c.updatedAt > 0 && <p className="text-[11px] text-white/45">{t("visit.updated", { when: t("account.ago", { time: formatDuration(Math.max(1, (at - c.updatedAt) / 1000)) }) })}</p>}
 
           {!mine && (
@@ -274,6 +279,56 @@ function Stat({ label, value }: { label: string; value: string }) {
     <div className="rounded-xl bg-white/[0.04] px-2.5 py-2 ring-1 ring-white/[0.07]">
       <div className="text-[10px] uppercase tracking-wide text-white/45">{label}</div>
       <div className="truncate text-sm font-black tabular-nums">{value}</div>
+    </div>
+  );
+}
+
+/** A one-against-one race with the visited player's ghost (their best car). */
+function GhostDuel({ rival, ghost }: { rival: string; ghost: Ghost }) {
+  const state = useGame((g) => g.state);
+  const { t, lang } = useT();
+  const n = useContent(lang);
+  const [now] = useState(Date.now);
+  const [result, setResult] = useState<DuelResult | null>(null);
+  const car = duelCar(state);
+  const block = duelBlock(state, rival, now);
+  const carName = (id: keyof typeof CAR_BY_ID) => `${CAR_BY_ID[id].emoji} ${n.car(CAR_BY_ID[id])}`;
+  const fmt = (sec: number) => `${sec.toFixed(2)}s`;
+  return (
+    <div className="space-y-2 rounded-2xl bg-sky-500/[0.07] p-3 ring-1 ring-sky-400/25">
+      <div className="text-[11px] font-bold uppercase tracking-wider text-sky-200/80">🏁 {t("duel.title")}</div>
+      <div className="grid grid-cols-2 gap-1.5 text-xs">
+        <Stat label={t("duel.theirs")} value={`${carName(ghost.model)} · ${Math.round(ghostRating(ghost))}`} />
+        <Stat label={t("duel.yours")} value={car ? `${carName(car.car)} · ${Math.round(duelRating(car))}` : "—"} />
+      </div>
+      {result ? (
+        <div className={cn("space-y-1.5 rounded-xl p-2.5 ring-1", result.won ? "bg-emerald-500/10 ring-emerald-400/30" : "bg-white/[0.04] ring-white/10")}>
+          <div className={cn("text-sm font-black", result.won ? "text-emerald-300" : "text-white/80")}>{t(result.won ? "duel.won" : "duel.lost", { gap: fmt(result.margin) })}</div>
+          <div className="text-[11px] text-white/55">{t(`race.track.${result.track}` as MessageKey)}</div>
+          <div className="grid grid-cols-[auto_1fr_1fr] gap-x-3 text-[11px] tabular-nums">
+            <span className="text-white/40">{t("duel.lap")}</span>
+            <span className="text-white/40">{t("duel.you")}</span>
+            <span className="text-white/40">{t("duel.ghost")}</span>
+            {result.mine.map((lap, i) => (
+              <span key={i} className="contents">
+                <span className="text-white/50">{i + 1}</span>
+                <span className={cn(lap <= result.theirs[i] ? "font-bold text-emerald-300" : "")}>{fmt(lap)}</span>
+                <span className={cn(result.theirs[i] < lap ? "font-bold text-rose-300" : "")}>{fmt(result.theirs[i])}</span>
+              </span>
+            ))}
+          </div>
+          <div className="text-[11px] text-gold">{t("duel.reward", { money: formatMoney(result.money), rep: result.rep })}</div>
+        </div>
+      ) : (
+        <>
+          <p className="text-[11px] leading-snug text-white/60">{t("duel.hint", { n: DUEL.perDay })}</p>
+          <Button variant={block ? "locked" : "gold"} className="w-full" disabled={!!block} onClick={() => setResult(useGame.getState().duel(rival, ghost))}>
+            🏁 {t("duel.race")}
+          </Button>
+          {block && <p className="text-center text-xs text-amber-300">{t(`duel.block.${block}` as MessageKey)}</p>}
+          {!block && <p className="text-center text-[11px] text-white/45">{t("duel.left", { n: duelsLeft(state, now), max: DUEL.perDay })}</p>}
+        </>
+      )}
     </div>
   );
 }

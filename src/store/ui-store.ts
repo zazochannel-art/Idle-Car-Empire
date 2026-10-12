@@ -30,6 +30,7 @@ export type View =
   | "racing"
   | "imperium"
   | "leaderboard"
+  | "alliance"
   | "build"
   | "upgrade"
   | "logistics"

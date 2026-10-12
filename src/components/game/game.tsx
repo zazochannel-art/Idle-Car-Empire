@@ -36,6 +36,7 @@ import { ManagersView } from "../views/managers-view";
 import { MissionsView } from "../views/missions-view";
 import { ImperiumView } from "../views/imperium-view";
 import { LeaderboardView } from "../views/leaderboard-view";
+import { AllianceView } from "../views/alliance-view";
 import { ResearchView } from "../views/research-view";
 import { StatsView } from "../views/stats-view";
 import { EconomyView } from "../views/economy-view";
@@ -302,6 +303,8 @@ const ViewSwitch = memo(function ViewSwitch({ view, onSettings }: { view: View; 
       return <ImperiumView />;
     case "leaderboard":
       return <LeaderboardView />;
+    case "alliance":
+      return <AllianceView />;
   }
 });
 
@@ -315,7 +318,7 @@ export const PILLARS: { id: PillarId; icon: Icon; views: View[] }[] = [
   { id: "empire", icon: Factory, views: ["empire", "garages", "logistics", "research", "managers", "imperium"] },
   { id: "cars", icon: Car, views: ["cars"] },
   { id: "racing", icon: Flag, views: ["racing"] },
-  { id: "business", icon: Briefcase, views: ["dealers", "economy", "missions", "stats", "achievements", "story", "leaderboard"] },
+  { id: "business", icon: Briefcase, views: ["dealers", "economy", "missions", "stats", "achievements", "story", "leaderboard", "alliance"] },
 ];
 export const pillarOf = (v: View | null) => (v ? (PILLARS.find((p) => p.views.includes(v))?.id ?? null) : null);
 

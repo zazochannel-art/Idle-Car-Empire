@@ -83,6 +83,7 @@ export function createInitialState(now: number): GameState {
     history: [],
     tips: [],
     login: { day: "", streak: 0, claimed: true },
+    duels: { day: "", raced: [] },
     rivalsBeaten: [],
     contracts: { offer: null, active: null, nextAt: 0, done: 0 },
     logistics: createLogistics(),
