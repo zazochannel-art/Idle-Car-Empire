@@ -66,6 +66,8 @@ export interface BuildLook {
   /** R&D: wind-tunnel aero (a bigger wing) and carbon body panels (a carbon bonnet). */
   aero?: boolean;
   carbon?: boolean;
+  /** Tuning garage: a spoiler on the tail. */
+  wing?: "lip" | "wing" | "gt";
 }
 
 // ───────────────────────────── materials ─────────────────────────────
@@ -487,7 +489,50 @@ export function buildCar(T: Three, look: CarLook): THREE_NS.Group {
   const hero = HEROES[look.model];
   if (!hero) return new T.Group();
   const st = look.stage?.station ?? 8;
-  return heroCopy(hero, st < 6 ? "#9aa3ad" : look.build?.color || (hero.ownPaint ? null : liveryOf(look.model).color));
+  const car = heroCopy(hero, st < 6 ? "#9aa3ad" : look.build?.color || (hero.ownPaint ? null : liveryOf(look.model).color));
+  if (!look.build?.wing || st < 6) return car;
+  const g = new T.Group();
+  g.add(car);
+  g.add(spoiler(T, car, look.build.wing));
+  return g;
+}
+
+/**
+ * A spoiler for the tail of a ready-made model: a ray down near the back
+ * finds the bodywork, the blade sits on it (a lip) or on two struts with end
+ * plates (a wing, a tall GT wing). Origin: the car's own (+X forward).
+ */
+function spoiler(T: Three, car: THREE_NS.Object3D, kind: "lip" | "wing" | "gt"): THREE_NS.Group {
+  car.updateMatrixWorld(true);
+  const box = new T.Box3().setFromObject(car);
+  const L = box.max.x - box.min.x;
+  const W = box.max.z - box.min.z;
+  const H = box.max.y - box.min.y;
+  const cz = (box.min.z + box.max.z) / 2;
+  const x = box.min.x + L * (kind === "lip" ? 0.05 : 0.08);
+  const hit = new T.Raycaster(new T.Vector3(x, box.max.y + 1, cz), new T.Vector3(0, -1, 0)).intersectObject(car, true)[0];
+  const deck = hit ? hit.point.y : box.min.y + H * 0.6;
+  const mat = new T.MeshStandardMaterial({ color: "#16181d", roughness: 0.45, metalness: 0.3 });
+  const g = new T.Group();
+  const span = W * (kind === "lip" ? 0.8 : 0.9);
+  const chord = L * (kind === "gt" ? 0.085 : kind === "wing" ? 0.065 : 0.05);
+  const rise = kind === "lip" ? 0 : H * (kind === "gt" ? 0.24 : 0.14);
+  const th = Math.max(0.015, H * 0.035);
+  const blade = new T.Mesh(new T.BoxGeometry(chord, th, span), mat);
+  blade.position.set(x, deck + rise + th / 2, cz);
+  // a little angle of attack: the leading edge down
+  blade.rotation.z = kind === "lip" ? 0.3 : -0.1;
+  g.add(blade);
+  if (rise > 0)
+    for (const sd of [-1, 1]) {
+      const strut = new T.Mesh(new T.BoxGeometry(chord * 0.4, rise, th), mat);
+      strut.position.set(x, deck + rise / 2, cz + sd * span * 0.3);
+      g.add(strut);
+      const plate = new T.Mesh(new T.BoxGeometry(chord * 1.2, th * 4, th * 0.7), mat);
+      plate.position.set(x, deck + rise + th, cz + sd * span * 0.5);
+      g.add(plate);
+    }
+  return g;
 }
 
 

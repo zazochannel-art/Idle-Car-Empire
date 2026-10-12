@@ -55,6 +55,7 @@ import { HOT_CLASS, RECALL } from "@/game/config/market";
 import { claimUnlock, openPlantTypes } from "@/game/engine/unlocks";
 import { restockLow } from "@/game/engine/insights";
 import { hasPlant as hasPlantType } from "@/game/engine/chain";
+import * as Tu from "@/game/engine/tuning";
 import * as Gf from "@/game/engine/gifts";
 
 const TICK_MS = 100;
@@ -185,6 +186,8 @@ interface GameStore {
   repairRaceCar: (id: number) => boolean;
   upgradeRaceCar: (id: number, u: RaceUpgrade, racingParts?: boolean) => boolean;
   setRaceSkin: (id: number, skin: string) => boolean;
+  /** Tuning garage: paint, rims or a spoiler for a race car. */
+  tuneCar: (id: number, choice: Tu.TuneChoice) => boolean;
   retireRaceCar: (id: number) => boolean;
   upgradeRacingGarage: () => boolean;
   signSponsor: (id: string | null) => boolean;
@@ -595,6 +598,11 @@ export const useGame = create<GameStore>((set, get) => {
     repairRaceCar: (id) => act((s) => Rc.repairCar(s, id)),
     upgradeRaceCar: (id, u, racingParts) => act((s) => Rc.upgradeRaceCar(s, id, u, racingParts)),
     setRaceSkin: (id, skin) => act((s) => Rc.setSkin(s, id, skin)),
+    tuneCar: (id, choice) => {
+      const ok = act((s) => Tu.tune(s, id, choice));
+      if (ok) persist(true);
+      return ok;
+    },
     retireRaceCar: (id) => act((s) => Rc.retireRaceCar(s, id) > 0),
     upgradeRacingGarage: () => act((s) => Rc.upgradeGarage(s)),
     signSponsor: (id) => act((s) => Rc.signSponsor(s, id)),

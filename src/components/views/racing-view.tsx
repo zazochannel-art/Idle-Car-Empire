@@ -52,6 +52,8 @@ import { formatDuration, formatMoney, formatNumber, formatPercent } from "@/game
 import type { GameState } from "@/game/types";
 import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
+import { PAINTS, RIMS, RIM_IDS, SPOILERS, SPOILER_IDS, type TuneEffect } from "@/game/config/tuning";
+import { tuneCost, tuningOf, type TuneChoice } from "@/game/engine/tuning";
 import { cn } from "@/lib/utils";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
@@ -59,7 +61,7 @@ import { CostButton } from "../game/cost-button";
 import { StatBars, lockText, raceName, trackName } from "../racing/race-viewer";
 import { ViewHeader } from "./section-title";
 
-type Tab = "races" | "garage" | "dev" | "team";
+type Tab = "races" | "garage" | "dev" | "tune" | "team";
 
 export function RacingView() {
   const state = useGame((g) => g.state);
@@ -94,9 +96,9 @@ export function RacingView() {
 
       <LiveBanner />
 
-      <div className="grid grid-cols-4 gap-1 rounded-2xl bg-white/[0.04] p-1 ring-1 ring-white/[0.07]">
-        {(["races", "garage", "dev", "team"] as Tab[]).map((k) => (
-          <button key={k} onClick={() => setTab(k)} className={cn("rounded-xl py-2 text-[11px] font-black uppercase tracking-wide", tab === k ? "bg-gold text-black" : "text-white/60")}>
+      <div className="grid grid-cols-5 gap-1 rounded-2xl bg-white/[0.04] p-1 ring-1 ring-white/[0.07]">
+        {(["races", "garage", "dev", "tune", "team"] as Tab[]).map((k) => (
+          <button key={k} onClick={() => setTab(k)} className={cn("truncate rounded-xl px-0.5 py-2 text-[10px] font-black uppercase tracking-wide sm:text-[11px]", tab === k ? "bg-gold text-black" : "text-white/60")}>
             {t(`racing.tab.${k}` as MessageKey)}
           </button>
         ))}
@@ -105,6 +107,7 @@ export function RacingView() {
       {tab === "races" && <Races />}
       {tab === "garage" && <Garage />}
       {tab === "dev" && <Development />}
+      {tab === "tune" && <Tuning />}
       {tab === "team" && <Team />}
     </div>
   );
@@ -568,6 +571,100 @@ function Development() {
         );
       })}
     </div>
+  );
+}
+
+// ───────────────────────────── tuning garage ─────────────────────────────
+
+function Tuning() {
+  const state = useGame((g) => g.state);
+  const { tuneCar } = useGame.getState();
+  const { t } = useT();
+  const car = raceCar(state, state.racing.selected);
+  if (!car) return <NoCarHint />;
+  const now = tuningOf(car);
+  const racing = state.racing.live?.car === car.id;
+  const effect = (e: TuneEffect) =>
+    Object.entries(e)
+      .map(([k, v]) => (k === "weight" ? `${v} kg` : `${v > 0 ? "+" : ""}${v} ${t(`race.stat.${k}` as MessageKey)}`))
+      .join(" · ") || t("tune.stock");
+  const price = (c: TuneChoice, on: boolean) => {
+    const cost = tuneCost(car, c);
+    const stock = c.kind === "paint" ? !c.id : (c.kind === "rims" ? RIMS[c.id] : SPOILERS[c.id]).cost === 0;
+    return on ? `✓ ${t("tune.fitted")}` : cost === 0 ? t(stock ? "tune.freeStock" : "tune.free") : cost === null ? "" : formatMoney(cost);
+  };
+  const can = (c: TuneChoice) => {
+    const cost = tuneCost(car, c);
+    return !racing && cost !== null && state.cash >= cost;
+  };
+  return (
+    <div className="space-y-2">
+      <StatBars state={state} id={car.id} type="circuit" />
+      <p className="px-1 text-[11px] text-white/50">{t("tune.hint")}</p>
+      {racing && <p className="rounded-xl bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200 ring-1 ring-amber-400/25">{t("tune.busy")}</p>}
+
+      <div className="rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.08]">
+        <div className="mb-2 flex items-baseline justify-between">
+          <span className="text-sm font-black">🎨 {t("tune.paint")}</span>
+          <span className="text-[10px] text-white/45">{t("tune.paintCost", { money: formatMoney(tuneCost(car, { kind: "paint", id: PAINTS.find((c) => c !== now.paint)! }) ?? 0) })}</span>
+        </div>
+        <div className="grid grid-cols-7 gap-1.5">
+          <button
+            disabled={!now.paint || !can({ kind: "paint", id: "" })}
+            onClick={() => tuneCar(car.id, { kind: "paint", id: "" })}
+            title={t("tune.livery")}
+            className={cn("flex aspect-square items-center justify-center rounded-xl text-base ring-2", !now.paint ? "ring-gold" : "ring-white/15 hover:ring-white/40")}
+          >
+            {SKINS[car.skin]?.emoji ?? "🏭"}
+          </button>
+          {PAINTS.map((c) => (
+            <button
+              key={c}
+              disabled={now.paint === c || !can({ kind: "paint", id: c })}
+              onClick={() => tuneCar(car.id, { kind: "paint", id: c })}
+              aria-label={c}
+              className={cn("aspect-square rounded-xl ring-2 transition disabled:cursor-default", now.paint === c ? "ring-gold" : "ring-white/15 hover:ring-white/50")}
+              style={{ background: c }}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.08]">
+        <div className="mb-2 text-sm font-black">🛞 {t("tune.rims")}</div>
+        <div className="grid grid-cols-2 gap-1.5">
+          {RIM_IDS.map((id) => (
+            <TunePart key={id} on={now.rims === id} enabled={can({ kind: "rims", id })} onPick={() => tuneCar(car.id, { kind: "rims", id })} emoji={RIMS[id].emoji} label={t(`tune.rim.${id}` as MessageKey)} effect={effect(RIMS[id].effect)} price={price({ kind: "rims", id }, now.rims === id)} />
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.08]">
+        <div className="mb-2 text-sm font-black">🪽 {t("tune.spoiler")}</div>
+        <div className="grid grid-cols-2 gap-1.5">
+          {SPOILER_IDS.map((id) => (
+            <TunePart key={id} on={now.spoiler === id} enabled={can({ kind: "spoiler", id })} onPick={() => tuneCar(car.id, { kind: "spoiler", id })} emoji={SPOILERS[id].emoji} label={t(`tune.spoilers.${id}` as MessageKey)} effect={effect(SPOILERS[id].effect)} price={price({ kind: "spoiler", id }, now.spoiler === id)} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** One part on offer: what it does, what it costs (or that it's on). */
+function TunePart({ on, enabled, onPick, emoji, label, effect, price }: { on: boolean; enabled: boolean; onPick: () => void; emoji: string; label: string; effect: string; price: string }) {
+  return (
+    <button
+      disabled={on || !enabled}
+      onClick={onPick}
+      className={cn("rounded-xl p-2 text-left text-[11px] ring-1 transition disabled:cursor-default", on ? "bg-gold/15 ring-gold/60" : "bg-white/[0.05] ring-white/10 hover:bg-white/[0.09] disabled:opacity-45")}
+    >
+      <div className="font-black">
+        {emoji} {label}
+      </div>
+      <div className="text-[10px] leading-tight text-emerald-200/80">{effect}</div>
+      <div className={cn("mt-0.5 text-[10px] font-bold", on ? "text-gold" : "text-white/70")}>{price}</div>
+    </button>
   );
 }
 

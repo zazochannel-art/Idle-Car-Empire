@@ -68,6 +68,7 @@ import { DRIVETRAIN_GRADE,
   type WearPart,
 } from "../config/racing";
 import { ZONE_BY_ID } from "../config/city";
+import { PAINTS, RIMS, RIM_IDS, SPOILERS, SPOILER_IDS, type RimId, type SpoilerId } from "../config/tuning";
 import { CAR_TECH, TECH_IDS, isTech, type TechId } from "../config/tech";
 import { DEALER_BY_ID } from "../config/dealerships";
 import { carListPrice } from "./costs";
@@ -288,25 +289,30 @@ export function statsOf(
   upgrades: RaceCarState["upgrades"],
   wear?: RaceCarState["wear"],
   tech: readonly TechId[] = [],
+  tuning?: RaceCarState["tuning"],
 ): RaceStats {
   const g = (c: ComponentId) => Math.max(0, grades[c] ?? 0);
   const up = (u: RaceUpgrade) => upgrades[u] ?? 0;
   const eff = (u: RaceUpgrade, k: keyof typeof RACE_UPGRADE_CONFIG.engine.effect) => up(u) * (RACE_UPGRADE_CONFIG[u].effect[k] ?? 0);
   // development levels plus the R&D technologies built into the car
   const all = (k: keyof typeof RACE_UPGRADE_CONFIG.engine.effect) => RACE_UPGRADES.reduce((a, u) => a + eff(u, k), 0) + tech.reduce((a, t) => a + (CAR_TECH[t]?.effect[k] ?? 0), 0);
+  // the tuning garage: rims and spoiler
+  const rims = RIMS[tuning?.rims ?? "standard"]?.effect ?? {};
+  const wing = SPOILERS[tuning?.spoiler ?? "none"]?.effect ?? {};
+  const tune = (k: "handling" | "accel" | "aero" | "speed") => (rims[k] ?? 0) + (wing[k] ?? 0);
 
   const engineGrade = Math.max(1, g("engine"));
   const hp = design.hp * ENGINE_GRADE_POWER[Math.min(ENGINE_GRADE_POWER.length - 1, engineGrade - 1)] * (1 + all("hp"));
   const bodyGrade = Math.max(1, g("body"));
-  const weight = BASE_WEIGHT[car] * (1 - BODY_GRADE_WEIGHT * (bodyGrade - 1)) * Math.max(0.6, 1 + all("weight"));
+  const weight = BASE_WEIGHT[car] * (1 - BODY_GRADE_WEIGHT * (bodyGrade - 1)) * Math.max(0.6, 1 + all("weight")) + (rims.weight ?? 0);
   const dyn = BODY_DYNAMICS[car];
-  const aero = clamp(dyn.aero + design.design / 10 + all("aero"));
-  const speed = clamp(100 * (1 - Math.exp((-hp * (0.85 + aero / 330)) / STAT_CURVE.speedHp)));
+  const aero = clamp(dyn.aero + design.design / 10 + all("aero") + tune("aero"));
+  const speed = clamp(100 * (1 - Math.exp((-hp * (0.85 + aero / 330)) / STAT_CURVE.speedHp)) + tune("speed"));
   // the gearbox puts the power down: each transmission grade shaves the launch
-  const accel = clamp(100 * (1 - Math.exp(-(hp / (weight / 1000)) / STAT_CURVE.accelPtw)) + all("accel") + DRIVETRAIN_GRADE.transmission * Math.max(0, g("transmission") - 1));
+  const accel = clamp(100 * (1 - Math.exp(-(hp / (weight / 1000)) / STAT_CURVE.accelPtw)) + all("accel") + DRIVETRAIN_GRADE.transmission * Math.max(0, g("transmission") - 1) + tune("accel"));
   const heavy = weight - STAT_CURVE.weightRef;
   const handling = clamp(
-    dyn.handling + TIRE_GRADE_GRIP * (g("tires") - 1) + SUSPENSION_GRADE_GRIP * Math.max(0, g("suspension") - 1) + DRIVETRAIN_GRADE.wheels * Math.max(0, g("wheels") - 1) + all("handling") - heavy * STAT_CURVE.handlingPerKg,
+    dyn.handling + TIRE_GRADE_GRIP * (g("tires") - 1) + SUSPENSION_GRADE_GRIP * Math.max(0, g("suspension") - 1) + DRIVETRAIN_GRADE.wheels * Math.max(0, g("wheels") - 1) + all("handling") + tune("handling") - heavy * STAT_CURVE.handlingPerKg,
   );
   const braking = clamp(40 + 3 * (g("tires") - 1) + 2 * Math.max(0, g("suspension") - 1) + DRIVETRAIN_GRADE.brakes * Math.max(0, g("brakes") - 1) + all("braking") - heavy * STAT_CURVE.brakingPerKg);
   const reliability = clamp(design.quality * 0.8 + 12 + all("reliability"));
@@ -327,7 +333,7 @@ export function statsOf(
   };
 }
 
-export const carStats = (rc: RaceCarState, wear = true) => statsOf(rc.car, rc.grades, rc, rc.upgrades, wear ? rc.wear : undefined, rc.tech);
+export const carStats = (rc: RaceCarState, wear = true) => statsOf(rc.car, rc.grades, rc, rc.upgrades, wear ? rc.wear : undefined, rc.tech, rc.tuning);
 
 /** The R&D technologies a car leaving the line now gets. */
 export const carTech = (s: GameState): TechId[] => TECH_IDS.filter((t) => s.research.includes(t));
@@ -457,6 +463,8 @@ const gauss = (r: () => number) => Math.sqrt(-2 * Math.log(Math.max(1e-9, r())))
 /** Colours a race car runs in: its livery, or the model's own paint. */
 export function liveryOf(s: GameState, rc: RaceCarState): { color: string; accent: string } {
   const sk = SKINS[rc.skin] ?? SKINS.factory;
+  // a respray from the tuning garage covers the livery's main colour
+  if (rc.tuning?.paint) return { color: rc.tuning.paint, accent: rc.skin === "factory" && s.brand?.name && s.brand.accent ? s.brand.accent : sk.accent };
   // the factory livery wears the brand's colours
   if (rc.skin === "factory" || !SKINS[rc.skin]) return { color: s.designs[rc.car]?.color || (s.brand?.name ? s.brand.color : "") || CAR_BY_ID[rc.car].color, accent: s.brand?.accent && s.brand.name ? s.brand.accent : sk.accent };
   return { color: sk.color || s.designs[rc.car]?.color || CAR_BY_ID[rc.car].color, accent: sk.accent };
@@ -543,7 +551,7 @@ export function runRace(s: GameState, setup: RaceSetup, rc: RaceCarState, startT
   const mine = wet ? wetPace(st) : 1;
   const theirs = wet ? 1 - RAIN.pace * (1 - RAIN.rivalGrip / 100) : 1;
   const field: Omit<RaceEntrant, "grid" | "laps" | "total">[] = [
-    { id: "player", team: null, driver: "", model: rc.car, color: look.color, accent: look.accent, rating: rating(st, type) * mine },
+    { id: "player", team: null, driver: "", model: rc.car, color: look.color, accent: look.accent, rating: rating(st, type) * mine, ...(rc.tuning?.spoiler && rc.tuning.spoiler !== "none" ? { wing: rc.tuning.spoiler } : {}) },
     ...rivals.map((x) => ({ id: x.id, team: x.team.id, driver: x.driver, model: x.model, color: x.team.color, accent: x.team.accent, rating: x.rating * theirs })),
   ];
   // the grid: the player starts from the back of the field the first time, then by rating (a qualifying run)
@@ -1009,6 +1017,17 @@ const num = (v: unknown, d = 0) => (typeof v === "number" && Number.isFinite(v) 
 const isCar = (v: unknown): v is CarId => typeof v === "string" && v in CAR_BY_ID;
 
 /** Rebuilds a valid RacingState from whatever a save contained (anything odd is dropped). */
+/** A car's tuning from a save: known parts and colours only. */
+function migrateTuning(t: Record<string, unknown>): NonNullable<RaceCarState["tuning"]> {
+  const owned = Array.isArray(t.owned) ? t.owned.filter((x): x is string => typeof x === "string" && /^(rims|spoiler):/.test(x)) : [];
+  return {
+    ...(typeof t.paint === "string" && PAINTS.includes(t.paint) ? { paint: t.paint } : {}),
+    ...(RIM_IDS.includes(t.rims as RimId) ? { rims: t.rims as RimId } : {}),
+    ...(SPOILER_IDS.includes(t.spoiler as SpoilerId) ? { spoiler: t.spoiler as SpoilerId } : {}),
+    owned: [...new Set(owned)],
+  };
+}
+
 export function migrateRacing(raw: unknown): RacingState {
   const R = createRacing();
   if (!isObj(raw)) return R;
@@ -1065,6 +1084,7 @@ export function migrateRacing(raw: unknown): RacingState {
         history: Array.isArray(c.history) ? c.history.filter(isObj).filter((h) => typeof h.event === "string").map((h) => ({ event: h.event as string, pos: Math.max(0, Math.floor(num(h.pos))) })).slice(-12) : [],
         ...(isObj(c.test) ? { test: c.test as unknown as RaceCarState["test"] } : {}),
         ...(isObj(c.install) && RACE_UPGRADES.includes(c.install.u as RaceUpgrade) ? { install: { u: c.install.u as RaceUpgrade, left: Math.max(0, num(c.install.left)), total: Math.max(1, num(c.install.total, 1)) } } : {}),
+        ...(isObj(c.tuning) ? { tuning: migrateTuning(c.tuning) } : {}),
       });
     }
   R.nextCar = Math.max(R.nextCar, ...R.cars.map((c) => c.id + 1));
