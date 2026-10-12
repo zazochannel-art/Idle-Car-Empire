@@ -11,7 +11,7 @@ import * as Sh from "./engine/showroom";
 import { carDemandMult, carPriceMult } from "./engine/market";
 import * as Br from "./engine/brand";
 import * as Ev from "./engine/events";
-import { prestigeReset } from "./engine/prestige";
+import { resetRun } from "./engine/reset";
 import { createInitialState } from "./engine/state";
 import { tick } from "./engine/tick";
 import { migrate } from "./save/serialize";
@@ -452,7 +452,7 @@ describe("events with objectives and sponsor contracts", () => {
     a.location = "transit";
     b.location = "showroom";
     b.listing = { price: 1, dealer: "local", since: 0 };
-    prestigeReset(s, T0);
+    resetRun(s, T0);
     expect([a.location, b.location]).toEqual(["factory", "factory"]);
     expect(b.listing).toBeUndefined();
   });

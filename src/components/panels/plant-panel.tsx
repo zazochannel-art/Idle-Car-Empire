@@ -7,13 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { CARS, CAR_BY_ID } from "@/game/config/cars";
-import { AUTOMATION, BASE_MAX_LEVEL, CHASSIS_BONUS, COMPONENTS, COMPONENT_BY_ID, GRADES, MAKER, OUTSOURCE, OUTSOURCED_PARTS, PLANT_BY_ID, PLANT_LEVELS, PLANT_TRUCKS, SPEED } from "@/game/config/chain";
+import { AUTOMATION, CHASSIS_BONUS, COMPONENTS, COMPONENT_BY_ID, GRADES, MAKER, OUTSOURCE, OUTSOURCED_PARTS, PLANT_BY_ID, PLANT_LEVELS, PLANT_TRUCKS, SPEED, plantLevelNeed } from "@/game/config/chain";
 import { DEALER_BY_ID, DEALER_SPECIALTY } from "@/game/config/dealerships";
 import { MANAGERS } from "@/game/config/managers";
 import { DEPOT, MARKET, plotOf } from "@/game/city/layout";
 import { MATERIALS } from "@/game/config/economy";
 import { debtVars, marketPrice, usedMaterials } from "@/game/engine/materials";
-import { REGIONS } from "@/game/config/regions";
 import { AUTO_UPGRADE_FROM, plantNetValue, plantProfitPerMin, plantUnitCost, automationCost, bestGrade, carLock, carValue, componentValue, dealerStats, trucksOf, gradeCost, levelCost, hasPlant, plantNumber, plantsOf, recipe, speedCost, supplied, suppliedGrade, supplierPrice } from "@/game/engine/chain";
 import { isManagerUnlocked } from "@/game/engine/actions";
 import { dealerUpgradeCost, managerUpgradeCost } from "@/game/engine/economy";
@@ -62,8 +61,7 @@ export function PlantPanel({ id, inside }: { id: string; inside?: boolean }) {
   const snap = useGame((g) => g.snap);
   const g = useGame.getState();
   const openFloor = useUi((u) => u.openFloor);
-  const { t, lang } = useT();
-  const n = useContent(lang);
+  const { t } = useT();
   const b = state.city.buildings[id];
   const st = snap.chain.plants[id];
   if (!b?.plant || !st) return null;
@@ -197,8 +195,8 @@ export function PlantPanel({ id, inside }: { id: string; inside?: boolean }) {
           cost={levelCost(b, gm)}
           onBuy={() => g.plantLevel(id)}
           gold
-          // levels 11+ open one per region: name the region that unlocks the next one
-          maxedLabel={b.works ? t("works.inProgress") : b.level < PLANT_LEVELS.length && b.level >= gm.maxPlantLevel ? `🔒 ${REGIONS[b.level + 1 - BASE_MAX_LEVEL].emoji} ${n.region(REGIONS[b.level + 1 - BASE_MAX_LEVEL])}` : undefined}
+          // levels 11+ open with total earnings: say how much opens the next one
+          maxedLabel={b.works ? t("works.inProgress") : b.level < PLANT_LEVELS.length && b.level >= gm.maxPlantLevel ? `🔒 ${t("plantLevel.lockedAt", { amount: formatMoney(plantLevelNeed(b.level + 1) ?? 0) })}` : undefined}
         />
         <UpgradeRow icon="⚡" title={t("plant.speed", { n: p.speed })} detail={t("plant.speedDetail", { pct: formatPercent(SPEED.mult - 1) })} cost={speedCost(b, gm)} onBuy={() => g.plantSpeed(id)} />
         <UpgradeRow

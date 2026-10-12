@@ -14,7 +14,7 @@ export function TransferImport() {
   const importSave = useGame((g) => g.importSave);
   const ready = useGame((g) => g.ready);
   const { t } = useT();
-  const [offer, setOffer] = useState<{ json: string; cash: number; cars: number; expansions: number } | null>(null);
+  const [offer, setOffer] = useState<{ json: string; cash: number; cars: number; plants: number } | null>(null);
   const [bad, setBad] = useState(false);
 
   useEffect(() => {
@@ -25,7 +25,7 @@ export function TransferImport() {
     decodeTransfer(code)
       .then((json) => {
         const s = decodeSave(json, Date.now());
-        setOffer({ json, cash: s.cash, cars: s.lifetime.carsProduced, expansions: s.prestigeCount });
+        setOffer({ json, cash: s.cash, cars: s.lifetime.carsProduced, plants: Object.values(s.city.buildings).filter((b) => b.plant).length });
       })
       .catch(() => setBad(true))
       .finally(clear);
@@ -37,7 +37,7 @@ export function TransferImport() {
         <div className="mb-3 text-5xl">📲</div>
         <DialogTitle>{t("transfer.title")}</DialogTitle>
         <DialogDescription className="mt-2">
-          {offer ? t("transfer.offer", { cash: formatMoney(offer.cash), cars: formatNumber(offer.cars), n: offer.expansions }) : t("transfer.bad")}
+          {offer ? t("transfer.offer", { cash: formatMoney(offer.cash), cars: formatNumber(offer.cars), n: offer.plants }) : t("transfer.bad")}
         </DialogDescription>
         <div className="mt-5 flex gap-2">
           <Button variant="secondary" className="flex-1" onClick={() => (setOffer(null), setBad(false))}>

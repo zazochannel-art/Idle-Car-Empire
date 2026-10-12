@@ -1,7 +1,7 @@
 // A "new player" that only does what the What's-next goals suggest.
 // Run: npx tsx scripts/goal-bot.ts [hours] [q = quiet] [race] [full] [sessions] [audit] [save.json]
 //   full: also uses every system a player would (research, sponsors, event
-//         objectives, marketing, prestige) and lives on the real clock (events)
+//         objectives, marketing, Reset Imperium) and lives on the real clock (events)
 //   sessions: plays 1 h, then is away 7 h (offline simulation), repeatedly
 import { writeFileSync } from "node:fs";
 import * as Ch from "../src/game/engine/chain";
@@ -23,7 +23,7 @@ import { SPONSORS } from "../src/game/config/racing";
 import { doResearch } from "../src/game/engine/actions";
 import { claimEventGoal } from "../src/game/engine/events";
 import { campaignCost, startCampaign } from "../src/game/engine/showroom";
-import { canPrestige, pendingPoints, prestige } from "../src/game/engine/prestige";
+import { canImperium, imperium, pendingStars } from "../src/game/engine/imperium";
 import { collectOffline, settleOffline } from "../src/game/engine/offline";
 import { brandScore } from "../src/game/engine/brand";
 
@@ -75,8 +75,8 @@ function raceStep(t: number) {
   }
   void t;
 }
-/** The rest of a player's toolbox (full mode): research, sponsors, event objectives, marketing, prestige. */
-/** FULL_SKIP=research,sponsor,event,campaign,prestige switches parts of the full player off (to measure each). */
+/** The rest of a player's toolbox (full mode): research, sponsors, event objectives, marketing, Reset Imperium. */
+/** FULL_SKIP=research,sponsor,event,campaign,imperium switches parts of the full player off (to measure each). */
 const skip = new Set((process.env.FULL_SKIP ?? "").split(",").filter(Boolean));
 function fullStep(t: number) {
   // research: the cheapest node open
@@ -88,11 +88,12 @@ function fullStep(t: number) {
   if (!skip.has("event") && claimEventGoal(s, s.lastActiveAt) !== null) counts.eventGoal = (counts.eventGoal ?? 0) + 1;
   // marketing when it is cheap next to the cash
   if (!skip.has("campaign") && s.cash > campaignCost(s) * 20 && startCampaign(s)) counts.campaign = (counts.campaign ?? 0) + 1;
-  // a new region once it brings a good handful of points
-  if (!skip.has("prestige") && canPrestige(s) && pendingPoints(s) >= Math.max(3, s.empirePointsEarned)) {
-    const pts = prestige(s, s.lastActiveAt);
-    console.log(`>> prestige at ${fmtT(t)}: +${pts} points`);
-    counts.prestige = (counts.prestige ?? 0) + 1;
+  // Reset Imperium as soon as it is allowed
+  if (!skip.has("imperium") && canImperium(s)) {
+    const stars = pendingStars(s);
+    imperium(s, s.lastActiveAt);
+    console.log(`>> imperium at ${fmtT(t)}: +${stars} stars`);
+    counts.imperium = (counts.imperium ?? 0) + 1;
   }
 }
 
@@ -102,7 +103,7 @@ function checkpoint(t: number) {
   const sn = snapshot(s);
   console.log(
     `@@ ${fmtT(t).padEnd(10)} earned ${formatMoney(s.lifetime.moneyEarned).padStart(9)} cash ${formatMoney(s.cash).padStart(9)} steady ${formatMoney(Math.max(0, s.chain.steady ?? s.chain.rate)).padStart(8)}/s` +
-      ` cars ${String(Math.floor(s.lifetime.carsProduced)).padStart(6)} plants ${Ch.plantsOf(s).length} research ${s.research.length} rp/s ${sn.rpPerSec.toFixed(1)} prestige ${s.prestigeCount}` +
+      ` cars ${String(Math.floor(s.lifetime.carsProduced)).padStart(6)} plants ${Ch.plantsOf(s).length} research ${s.research.length} rp/s ${sn.rpPerSec.toFixed(1)} levels ≤${sn.gm.maxPlantLevel} stars ${s.stars}` +
       ` race ${s.racing.stats.races}/${s.racing.stats.wins} rep ${Math.round(s.racing.rep)} brand ${brandScore(s)} owed ${formatMoney(s.chain.owed)}`,
   );
 }

@@ -25,7 +25,6 @@ import * as D from "../src/game/engine/design";
 import * as K from "../src/game/engine/contracts";
 import * as L from "../src/game/engine/logistics";
 import * as M from "../src/game/engine/materials";
-import * as P from "../src/game/engine/prestige";
 import * as I from "../src/game/engine/imperium";
 import * as Pr from "../src/game/engine/progress";
 import * as Rc from "../src/game/engine/racing";
@@ -148,7 +147,6 @@ const actions: [string, () => unknown][] = [
     Rt.updateLogin(s, now);
     return Rt.claimLogin(s, snapshot(s));
   }],
-  ["prestige", () => rnd() < 0.02 && P.prestige(s, now)],
   ["imperium", () => rnd() < 0.01 && I.imperium(s, now)],
   ["star", () => {
     s.stars += rnd() < 0.1 ? 50 : 0;
@@ -260,4 +258,4 @@ for (let step = 0; step < steps; step++) {
     }
   }
 }
-console.log(`\n${steps} steps, ${issues.size} distinct issues. cash ${s.cash.toExponential(2)} buildings ${Object.keys(s.city.buildings).length} prestige ${s.prestigeCount} race cars ${s.racing.cars.length} races ${s.racing.stats.races}`);
+console.log(`\n${steps} steps, ${issues.size} distinct issues. cash ${s.cash.toExponential(2)} buildings ${Object.keys(s.city.buildings).length} resets ${s.imperiumCount} race cars ${s.racing.cars.length} races ${s.racing.stats.races}`);

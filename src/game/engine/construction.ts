@@ -6,7 +6,6 @@
 // through its phases. Level upgrades are built the same way while the
 // building keeps working. Nothing appears instantly; paying to finish early
 // is possible but never the default.
-import { regionCostMult } from "../config/regions";
 import {
   BUILD_SIZE_MULT,
   BUILD_TIME,
@@ -101,14 +100,13 @@ export function constructionCost(s: GameState, plotId: string): number {
 
 /**
  * How long the construction on this plot takes: from the building's price
- * before the region's cost multiplier (a later region pays more, but does not
- * wait longer) and the plot's size.
+ * and the plot's size.
  */
 export function constructionTime(s: GameState, plotId: string): number {
   const use = plotUse(plotId);
   const plot = plotOf(plotId);
   if (!use || !plot) return BUILD_TIME.min;
-  return buildTime(fullPrice(s, plotId) / regionCostMult(s.prestigeCount), plot.size);
+  return buildTime(fullPrice(s, plotId), plot.size);
 }
 
 function spend(s: GameState, cost: number): boolean {
@@ -148,8 +146,8 @@ export function buyAndBuild(s: GameState, plotId: string): boolean {
 export function startWorks(s: GameState, plotId: string, cost: number | null): boolean {
   const b = s.city.buildings[plotId];
   if (!b || b.works || cost === null || !spend(s, cost)) return false;
-  // timed from the price before the region's cost multiplier
-  b.works = { to: b.level + 1, t: 0, dur: upgradeTime(cost / regionCostMult(s.prestigeCount)), cost };
+  // timed from the price
+  b.works = { to: b.level + 1, t: 0, dur: upgradeTime(cost), cost };
   return true;
 }
 

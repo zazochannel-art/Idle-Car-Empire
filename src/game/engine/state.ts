@@ -71,9 +71,6 @@ export function createInitialState(now: number): GameState {
     // starting capital: materials, the first upgrades, saving for the next plant
     cash: START_CASH,
     rp: 0,
-    empirePoints: 0,
-    empirePointsEarned: 0,
-    prestigeCount: 0,
     dealers: createDealers(),
     managers: createManagers(),
     carModels: emptyCarCounts(),

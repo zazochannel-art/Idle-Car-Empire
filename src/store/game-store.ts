@@ -27,7 +27,6 @@ import { snapshot, unlockedCarIds, type EconomySnapshot } from "@/game/engine/ec
 import { activeEvent } from "@/game/engine/events";
 import * as Ev from "@/game/engine/events";
 import { collectOffline, settleOffline } from "@/game/engine/offline";
-import { prestige as doPrestige } from "@/game/engine/prestige";
 import { checkAchievements, claimDaily, claimMilestone, recordHistory, refreshDaily } from "@/game/engine/progress";
 import { cloneState, createInitialState } from "@/game/engine/state";
 import { tick as engineTick } from "@/game/engine/tick";
@@ -161,7 +160,6 @@ interface GameStore {
   declineContract: () => void;
   claimContract: () => void;
   collectOffline: () => void;
-  prestige: () => void;
   imperium: () => void;
   buyStarUpgrade: (id: StarUpgradeId) => boolean;
   unlockRacing: () => boolean;
@@ -736,17 +734,10 @@ export const useGame = create<GameStore>((set, get) => {
       if (amount > 0) uiEvents.emit({ type: "toast", tone: "gold", icon: "💰", title: tr("toast.collected", { amount: formatMoney(amount) }), body: tr("toast.collectedBody") });
       persist(true);
     },
-    prestige: () => {
-      const gained = act((s) => doPrestige(s, Date.now()));
-      if (gained > 0) {
-        uiEvents.emit({ type: "prestige", points: gained });
-        persist(true);
-      }
-    },
     imperium: () => {
       const gained = act((s) => doImperium(s, Date.now()));
       if (gained > 0) {
-        uiEvents.emit({ type: "prestige", points: gained, stars: true });
+        uiEvents.emit({ type: "imperium", stars: gained });
         persist(true);
       }
     },

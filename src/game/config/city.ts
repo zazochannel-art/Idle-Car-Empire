@@ -72,8 +72,6 @@ export interface TerritoryConfig {
   zone?: ZoneId;
   /** Racing reputation needed. */
   rep?: number;
-  /** Empire Points earned (lifetime) needed. */
-  ep?: number;
   /** Effects on the whole empire once it is open. */
   effects: Effect[];
 }
@@ -86,7 +84,7 @@ export const TERRITORIES: TerritoryConfig[] = [
   { id: "mountain", emoji: "🏔️", cost: 8_000_000, rep: 800, effects: [{ kind: "rp", mult: 1.1 }] },
   { id: "boulevard", emoji: "💎", cost: 40_000_000, zone: "luxury", effects: [{ kind: "markup", add: 0.03 }] },
   { id: "port", emoji: "⚓", cost: 100_000_000, rep: 5_000, effects: [{ kind: "delivery", mult: 1.15 }] },
-  { id: "airport", emoji: "✈️", cost: 500_000_000, rep: 20_000, ep: 25, zone: "global", effects: [{ kind: "income", mult: 1.1 }] },
+  { id: "airport", emoji: "✈️", cost: 500_000_000, rep: 20_000, zone: "global", effects: [{ kind: "income", mult: 1.1 }] },
 ];
 export const TERRITORY_BY_ID = Object.fromEntries(TERRITORIES.map((t) => [t.id, t])) as Record<TerritoryId, TerritoryConfig>;
 /** Territories the player buys (the campus opens with its district, racing with its own unlock). */

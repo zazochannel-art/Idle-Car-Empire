@@ -1,7 +1,7 @@
 "use client";
 
 import { ProfileButton } from "./account";
-import { Car, Factory, Globe2, Moon, Settings, Star, Sun, Sunset, SunMoon, TrendingUp } from "lucide-react";
+import { Car, Factory, Moon, Settings, Star, Sun, Sunset, SunMoon, TrendingUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { TIME_MODES } from "@/components/map/lighting";
 import { formatMoney, formatNumber } from "@/game/format";
@@ -15,7 +15,7 @@ import { AnimatedNumber } from "./animated-number";
 
 const money = (n: number) => formatMoney(n);
 
-/** Top bar floating over the map: cash, profit/s, production rate, factories, Empire Points. */
+/** Top bar floating over the map: cash, profit/s, production rate, factories, ⭐ Stars. */
 export function Hud({ onSettings }: { onSettings: () => void }) {
   // the bar re-renders only when a number it shows changes (the cash counter has its own component)
   const income = useGame((g) => formatMoney(g.snap.incomePerSec));
@@ -24,7 +24,6 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
   const partsRate = useGame((g) => (g.snap.carsPerSec > 0 ? "" : formatNumber(Object.values(g.snap.chain.plants).reduce((a, p) => (p.type === "assemblyPlant" ? a : a + p.unitsPerSec), 0) * 60)));
   const owned = useGame((g) => plantsOf(g.state).length);
   const trucks = useGame((g) => g.state.chain.shipments.length);
-  const ep = useGame((g) => g.state.empirePoints);
   const stars = useGame((g) => g.state.stars);
   const setView = useUi((u) => u.setView);
   const { t } = useT();
@@ -41,19 +40,12 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
           <div className="hidden md:block">
             <Pill icon={<Factory className="size-3.5 text-cyan-300" />} label={t("hud.factories")} value={`${owned} · 🚚${trucks}`} />
           </div>
+          <div className="hidden md:block"><EventChip /></div>
           <div className="hidden md:block">
-            <button onClick={() => setView("prestige")} className="text-left">
-              <Pill icon={<Globe2 className="size-4 stroke-[2.5] text-gold" />} label={t("hud.prestige")} value={formatNumber(ep)} gold />
+            <button onClick={() => setView("imperium")} className="text-left">
+              <Pill icon={<Star className="size-3.5 fill-gold text-gold" />} label={t("imperium.stars")} value={formatNumber(stars)} gold />
             </button>
           </div>
-          <div className="hidden md:block"><EventChip /></div>
-          {stars > 0 && (
-            <div className="hidden md:block">
-              <button onClick={() => setView("prestige")} className="text-left">
-                <Pill icon={<Star className="size-3.5 fill-gold text-gold" />} label={t("imperium.stars")} value={formatNumber(stars)} gold />
-              </button>
-            </div>
-          )}
         </div>
         <div className="pointer-events-auto flex shrink-0 flex-col gap-1.5 md:flex-row">
           <ProfileButton />

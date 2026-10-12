@@ -1,6 +1,6 @@
 // Territories (config/city.ts TERRITORIES): the land around the districts,
 // bought as the empire grows. Each has a price and requirements (a district,
-// racing reputation, Empire Points) and an effect on the whole business.
+// racing reputation) and an effect on the whole business.
 import { BUYABLE_TERRITORIES, TERRITORY_BY_ID, type TerritoryId } from "../config/city";
 import type { GameState, ZoneId } from "../types";
 
@@ -14,14 +14,13 @@ export function unlockedAreas(s: GameState): Set<string> {
 
 export const isTerritoryOpen = (s: GameState, id: TerritoryId) => unlockedAreas(s).has(id);
 
-export type TerritoryLock = { kind: "zone"; zone: ZoneId } | { kind: "rep"; need: number } | { kind: "ep"; need: number } | { kind: "cash"; cost: number } | null;
+export type TerritoryLock = { kind: "zone"; zone: ZoneId } | { kind: "rep"; need: number } | { kind: "cash"; cost: number } | null;
 
 /** What stands between the player and a territory (null: it can be bought now). */
 export function territoryLock(s: GameState, id: TerritoryId): TerritoryLock {
   const t = TERRITORY_BY_ID[id];
   if (t.zone && !s.city.zones.includes(t.zone)) return { kind: "zone", zone: t.zone };
   if (t.rep && s.racing.rep < t.rep) return { kind: "rep", need: t.rep };
-  if (t.ep && s.empirePointsEarned < t.ep) return { kind: "ep", need: t.ep };
   if (s.cash < t.cost) return { kind: "cash", cost: t.cost };
   return null;
 }

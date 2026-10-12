@@ -4,8 +4,7 @@ import type { CarId, MetricId, Reward } from "../types";
 export type Condition =
   | { type: "metric"; metric: MetricId; target: number }
   | { type: "carType"; car: CarId; target: number }
-  | { type: "income"; target: number }
-  | { type: "empirePoints"; target: number };
+  | { type: "income"; target: number };
 
 export interface AchievementConfig {
   id: string;
@@ -42,12 +41,12 @@ export const ACHIEVEMENTS: AchievementConfig[] = [
   { id: "supercar_maker", name: "Supercar Manufacturer", description: "Build your first supercar.", icon: "🏁", condition: { type: "carType", car: "supercar", target: 1 }, reward: { rp: 5_000 } },
   { id: "money_printer", name: "Money Printer", description: "Reach $10K profit per second.", icon: "📈", condition: { type: "income", target: 1e4 }, reward: { incomeSeconds: 300 } },
   { id: "hypercar_first", name: "Hypercar Maker", description: "Build your first hypercar.", icon: "💎", condition: { type: "carType", car: "hypercar", target: 1 }, reward: { rp: 20_000 } },
-  { id: "first_expansion", name: "Going Global", description: "Complete your first Global Expansion.", icon: "🌍", condition: { type: "metric", metric: "prestigeCount", target: 1 }, reward: { rp: 1_000 } },
+  { id: "beyond_limits", name: "Beyond the Limit", description: "Raise a plant to level 11.", icon: "🏗️", condition: { type: "metric", metric: "maxFactoryLevel", target: 11 }, reward: { rp: 10_000 } },
   { id: "automotive_empire", name: "Automotive Empire", description: "Own every kind of plant.", icon: "👑", condition: { type: "metric", metric: "plantTypes", target: 9 }, reward: { rp: 50_000 } },
   { id: "trillionaire", name: "Ten-Billionaire", description: "Earn $10B.", icon: "🏦", condition: { type: "metric", metric: "moneyEarned", target: 1e10 }, reward: { incomeSeconds: 900 } },
   { id: "electric_era", name: "Electric Era", description: "Build an Electric Performance car.", icon: "⚡", condition: { type: "carType", car: "electric", target: 1 }, reward: { rp: 100_000 } },
   { id: "hypercar_legend", name: "Hypercar Legend", description: "Build 1,000 hypercars.", icon: "🏆", condition: { type: "carType", car: "hypercar", target: 1_000 }, reward: { rp: 250_000 } },
-  { id: "empire_100", name: "Dynasty", description: "Hold 100 Empire Points.", icon: "⭐", condition: { type: "empirePoints", target: 100 }, reward: { rp: 100_000 } },
+  { id: "flagship", name: "Global Flagship", description: "Raise a plant to level 15.", icon: "🌟", condition: { type: "metric", metric: "maxFactoryLevel", target: 15 }, reward: { rp: 100_000 } },
 ];
 
 export const ACHIEVEMENT_BY_ID: Record<string, AchievementConfig> = Object.fromEntries(ACHIEVEMENTS.map((a) => [a.id, a]));

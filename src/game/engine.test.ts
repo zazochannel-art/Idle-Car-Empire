@@ -5,7 +5,6 @@ import { COMPONENT_TIME, DEALER_FEE, PARTS_MARGIN, SALES_TAX, START_CASH } from 
 import * as M from "./engine/materials";
 import { componentStdCost } from "./engine/costs";
 import { MANAGER_BY_ID } from "./config/managers";
-import { PRESTIGE } from "./config/prestige";
 import { DEPOT, MARKET, STARTER_PLOT } from "./city/layout";
 import * as A from "./engine/actions";
 import * as Ch from "./engine/chain";
@@ -28,7 +27,7 @@ import * as I from "./engine/imperium";
 import * as L from "./engine/logistics";
 import { geometricCost, maxAffordable, snapshot } from "./engine/economy";
 import { collectOffline, settleOffline } from "./engine/offline";
-import { canPrestige, pendingPoints, prestige } from "./engine/prestige";
+import { resetRun } from "./engine/reset";
 import { incomeStalled } from "./engine/insights";
 import { checkAchievements, claimDaily, claimMilestone, dailyProgress, recordHistory, refreshDaily } from "./engine/progress";
 import { currentTip } from "./engine/tips";
@@ -649,9 +648,8 @@ describe("logistics center", () => {
     for (let i = 0; i < 3; i++) expect(L.buyTier(s)).toBe(true);
     expect(L.buyTier(s)).toBe(false);
     expect(L.logisticsMods(s).cars).toBeGreaterThan(0);
-    // Global Expansion starts the logistics over
-    s.run.moneyEarned = s.lifetime.moneyEarned = 1e11;
-    prestige(s, T0 + 1);
+    // a reset starts the logistics over
+    resetRun(s, T0 + 1);
     expect(s.logistics.tier).toBe(0);
   });
 });
@@ -676,9 +674,8 @@ describe("design studio", () => {
     expect(s.designs.city.name).toBe("MC Rocket");
     expect(D.setDesignColor(s, "city", "#1b46b8")).toBe(true);
     expect(D.setDesignColor(s, "city", "#123456")).toBe(false);
-    // Global Expansion keeps the name and colour, the options start over
-    s.run.moneyEarned = s.lifetime.moneyEarned = 1e11;
-    prestige(s, T0 + 1);
+    // a reset keeps the name and colour, the options start over
+    resetRun(s, T0 + 1);
     expect(s.designs.city).toMatchObject({ name: "MC Rocket", color: "#1b46b8", engine: 0 });
   });
 });
@@ -767,24 +764,18 @@ describe("offline progress", () => {
   });
 });
 
-describe("prestige", () => {
-  it("resets the company but keeps permanent progress", () => {
+describe("run reset", () => {
+  it("resets the company but keeps managers and lifetime progress", () => {
     const s = createInitialState(T0);
-    expect(canPrestige(s)).toBe(false);
-    s.run.moneyEarned = PRESTIGE.minRunEarnings;
-    s.lifetime.moneyEarned = PRESTIGE.minRunEarnings;
+    s.lifetime.moneyEarned = 1e8;
     build(s, P("engineFactory"), "engineFactory");
-    s.research.push("advanced_engines");
     s.managers.mike = { hired: true, level: 3, assignedTo: STARTER_PLOT };
-    const expected = pendingPoints(s);
-    expect(expected).toBeGreaterThan(0);
-    expect(prestige(s, T0 + 1)).toBe(expected);
-    expect(s.empirePoints).toBe(expected);
+    resetRun(s, T0 + 1);
+    expect(s.cash).toBe(0);
     expect(Ch.plantsOf(s)).toHaveLength(1);
     expect(s.chain.shipments).toHaveLength(0);
-    expect(s.research).toContain("advanced_engines");
     expect(s.managers.mike).toMatchObject({ hired: true, level: 3, assignedTo: null });
-    expect(snapshot(s).gm.income).toBeGreaterThan(1);
+    expect(s.lifetime.moneyEarned).toBe(1e8);
   });
 });
 
@@ -822,11 +813,11 @@ describe("save system", () => {
     expect(back.chain.shipments.map((sh) => [sh.from, sh.to, sh.qty])).toEqual(s.chain.shipments.map((sh) => [sh.from, sh.to, sh.qty]));
   });
 
-  it("saves from the old economy start a new company but keep Empire Points", () => {
+  it("saves from the old economy start a new company but keep research and settings", () => {
     const old = { version: 2, cash: 5e9, empirePoints: 42, empirePointsEarned: 42, prestigeCount: 3, research: ["advanced_engines"], settings: { lang: "ro", buyAmount: 10 }, factories: { garage: { owned: true, level: 80 } } };
     const s = migrate(old, T0);
     expect(s.cash).toBeLessThan(1e9);
-    expect(s.empirePoints).toBe(42);
+    expect("empirePoints" in s).toBe(false);
     expect(s.settings.lang).toBe("ro");
     expect(s.research).toEqual(["advanced_engines"]);
     expect(s.city.buildings[STARTER_PLOT].type).toBe("bodyWorks");
@@ -834,43 +825,46 @@ describe("save system", () => {
   });
 });
 
-describe("global expansion regions", () => {
-  it("moves the empire region by region with bigger income and costs", () => {
-    const s = createInitialState(0);
-    const local = snapshot(s).gm.income;
-    const cost = Ch.plantBuildCost(s, "engineFactory");
-    s.prestigeCount = 2; // Germany
-    expect(snapshot(s).gm.income).toBeCloseTo(local * 2);
-    expect(Ch.plantBuildCost(s, "engineFactory")).toBeCloseTo(cost * 1.25);
-    s.prestigeCount = 99; // capped at Global Empire
-    expect(snapshot(s).gm.costMult).toBeCloseTo(2);
+describe("saves from when Global Expansion existed", () => {
+  it("turn each expansion made into a Star and drop Empire Points and the retired achievements", () => {
+    const s = createInitialState(T0);
+    s.stars = 2;
+    s.achievements = ["first_body", "first_expansion", "empire_100"];
+    const saved = { ...JSON.parse(JSON.stringify(s)), empirePoints: 120, empirePointsEarned: 150, prestigeCount: 4 };
+    const back = migrate(saved, T0);
+    expect(back.stars).toBe(6);
+    expect(back.achievements).toEqual(["first_body"]);
+    expect("prestigeCount" in back || "empirePoints" in back).toBe(false);
+    // saved again, it converts nothing twice
+    expect(migrate(JSON.parse(JSON.stringify(back)), T0).stars).toBe(6);
+    // costs and income no longer depend on any region
+    const fresh = createInitialState(T0);
+    expect(snapshot(fresh).gm.costMult).toBe(1);
   });
 });
 
 describe("reset imperium", () => {
-  it("trades Empire Points, region and research for permanent Stars", () => {
+  it("trades the run and research for permanent Stars", () => {
     const s = createInitialState(0);
     expect(I.canImperium(s)).toBe(false);
-    s.prestigeCount = 6;
-    s.empirePoints = 500;
-    s.empirePointsEarned = 500;
     s.research = ["x"];
     s.run.moneyEarned = 1e12;
     s.lifetime.moneyEarned = 1e14;
     expect(I.canImperium(s)).toBe(true);
+    expect(I.pendingStars(s)).toBe(15);
     const gained = I.imperium(s, 1);
-    expect(gained).toBe(9);
-    expect(s.stars).toBe(9);
-    expect(s.empirePoints).toBe(0);
-    expect(s.prestigeCount).toBe(0);
+    expect(gained).toBe(15);
+    expect(s.stars).toBe(15);
+    expect(s.imperiumCount).toBe(1);
     expect(s.research).toEqual([]);
-    // Empire Points count again from the reset
-    expect(pendingPoints(s)).toBe(0);
+    expect(I.canImperium(s)).toBe(false);
+    // the next reset's Stars count from here
+    expect(I.earnedSinceImperium(s)).toBe(0);
 
     const speed = snapshot(s).gm.speed;
     expect(I.buyStarUpgrade(s, "production")).toBe(true);
     expect(I.buyStarUpgrade(s, "production")).toBe(true);
-    expect(s.stars).toBe(6);
+    expect(s.stars).toBe(12);
     expect(snapshot(s).gm.speed).toBeCloseTo(speed * 1.2);
   });
 });
@@ -932,15 +926,21 @@ describe("save transfer", () => {
 });
 
 describe("late-game depth", () => {
-  it("opens plant levels 11-15 one region at a time", () => {
+  it("opens plant levels 11-15 as total earnings grow (and keeps them through a reset)", () => {
     const { s, assembly } = fullChain();
     const b = s.city.buildings[assembly];
     b.level = 10;
     expect(Ch.levelCost(b, snapshot(s).gm)).toBeNull();
-    s.prestigeCount = 2; // Germany → up to level 12
+    s.lifetime.moneyEarned = 2.5e8; // levels 11 and 12
+    expect(snapshot(s).gm.maxPlantLevel).toBe(12);
     expect(Ch.levelCost(b, snapshot(s).gm)).not.toBeNull();
     b.level = 12;
     expect(Ch.levelCost(b, snapshot(s).gm)).toBeNull();
+    s.lifetime.moneyEarned = 1e12;
+    expect(snapshot(s).gm.maxPlantLevel).toBe(15);
+    s.run.moneyEarned = 1e12;
+    I.imperium(s, 1);
+    expect(snapshot(s).gm.maxPlantLevel).toBe(15);
   });
 
   it("auto-upgrade buys cheap upgrades on automated plants only", () => {

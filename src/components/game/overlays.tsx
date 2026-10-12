@@ -7,11 +7,9 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { formatDuration, formatHours, formatMoney, formatNumber } from "@/game/format";
-import { REGIONS, regionIndex } from "@/game/config/regions";
 import { STRUCTURE_BY_ID } from "@/game/config/city";
 import { transferLink } from "@/game/save/transfer";
 import { LANGS } from "@/i18n";
-import { useContent } from "@/i18n/content";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { uiEvents, type UiEvent, type UiToastAction } from "@/store/events";
@@ -217,20 +215,15 @@ export function Toasts() {
   );
 }
 
-/** Full-screen celebration after a Global Expansion. */
-export function PrestigeOverlay() {
-  const { t, lang } = useT();
-  const n = useContent(lang);
-  const count = useGame((g) => g.state.prestigeCount);
-  const region = REGIONS[regionIndex(count)];
+/** Full-screen celebration after a Reset Imperium. */
+export function ImperiumOverlay() {
+  const { t } = useT();
   const [points, setPoints] = useState<number | null>(null);
-  const [stars, setStars] = useState(false);
   useEffect(
     () =>
       uiEvents.on((e) => {
-        if (e.type !== "prestige") return;
-        setPoints(e.points);
-        setStars(!!e.stars);
+        if (e.type !== "imperium") return;
+        setPoints(e.stars);
         setTimeout(() => setPoints(null), 2600);
       }),
     [],
@@ -253,16 +246,13 @@ export function PrestigeOverlay() {
             className="text-center"
           >
             <motion.div animate={{ rotate: 360 }} transition={{ duration: 6, repeat: Infinity, ease: "linear" }} className="mx-auto text-8xl">
-              {stars ? "👑" : "🌍"}
+              👑
             </motion.div>
-            <div className="mt-4 text-xs font-semibold uppercase tracking-[0.3em] text-gold/80">{stars ? t("imperium.title") : t("nav.prestige")}</div>
+            <div className="mt-4 text-xs font-semibold uppercase tracking-[0.3em] text-gold/80">{t("imperium.title")}</div>
             <div className="mt-1 text-5xl font-black text-gradient-gold">
-              +{formatNumber(points)} {stars ? "⭐" : t("unit.ep")}
+              +{formatNumber(points)} ⭐
             </div>
-            <div className="mt-3 text-2xl font-black">
-              {region.emoji} {n.region(region)}
-            </div>
-            <div className="mt-1 text-sm text-white/60">{t("prestige.restart")}</div>
+            <div className="mt-1 text-sm text-white/60">{t("imperium.restart")}</div>
           </motion.div>
           {Array.from({ length: 18 }).map((_, i) => (
             <motion.span

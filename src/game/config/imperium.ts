@@ -20,13 +20,11 @@ export const STAR_UPGRADES: StarUpgradeConfig[] = [
 export const STAR_UPGRADE_BY_ID = Object.fromEntries(STAR_UPGRADES.map((u) => [u.id, u])) as Record<StarUpgradeId, StarUpgradeConfig>;
 
 export const IMPERIUM = {
-  /** Expansions needed first: the empire must reach the Global Empire region. */
-  minExpansions: 6,
   /** Run earnings needed for the reset. */
   minRunEarnings: 5e9,
-  /** Stars = max(1, floor(perDecade × log10(earned since last reset / base))). */
+  /** Stars = max(1, floor(perDecade × log10(earned since last reset / base))): 2 at $5B, 3 at $10B, 6 at $100B. */
   perDecade: 3,
-  base: 1e11,
+  base: 1e9,
 };
 
 /** Stars cost one more for every level: 1, 2, 3 … */
