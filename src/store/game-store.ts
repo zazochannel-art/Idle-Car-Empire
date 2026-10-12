@@ -55,11 +55,15 @@ import { HOT_CLASS, RECALL } from "@/game/config/market";
 import { claimUnlock, openPlantTypes } from "@/game/engine/unlocks";
 import { restockLow } from "@/game/engine/insights";
 import { hasPlant as hasPlantType } from "@/game/engine/chain";
+import * as Gf from "@/game/engine/gifts";
 
 const TICK_MS = 100;
 const SAVE_MS = 5_000;
 /** A gap this long between ticks (sleeping laptop, frozen tab) counts as being away. */
 const AWAY_GAP_S = 30;
+/** Gifts from other players: first looked for this long after the start, then this often. */
+const GIFT_FIRST_MS = 8_000;
+const GIFT_EVERY_MS = 10 * 60_000;
 
 interface GameStore {
   ready: boolean;
@@ -74,6 +78,10 @@ interface GameStore {
   restoreBackup: (key: string) => boolean;
   /** The save manager (account actions for the profile screen). */
   saves: SaveManager | null;
+  /** Collects the gifts other players sent (on the server) and pays them: how many there were. */
+  claimGifts: () => Promise<number>;
+  /** Pays the thank-you for a gift the server accepted. */
+  giftSent: () => void;
   init: () => Promise<void>;
   /** Runs a player action on a copy of the state and commits it if it succeeded. */
   act: <T>(fn: (s: GameState) => T) => T;
@@ -383,6 +391,24 @@ export const useGame = create<GameStore>((set, get) => {
       return true;
     },
     act,
+    claimGifts: async () => {
+      const social = saves?.social;
+      // not while two saves wait for the player's choice: the one paid might be dropped
+      if (!social || !get().ready || saves?.sync?.state.status === "conflict") return 0;
+      const n = await social.claimGifts().catch(() => 0);
+      if (!n) return 0;
+      let money = 0;
+      act((s) => (money = Gf.receiveGifts(s, n, get().snap)) > 0);
+      persist(true);
+      uiEvents.emit({ type: "toast", tone: "gold", icon: "🎁", title: tr("gift.received", { n }), body: tr("gift.receivedBody", { money: formatMoney(money) }) });
+      return n;
+    },
+    giftSent: () => {
+      let money = 0;
+      act((s) => (money = Gf.giftSent(s, get().snap)) > 0);
+      persist(true);
+      uiEvents.emit({ type: "toast", tone: "success", icon: "🎁", title: tr("gift.sent"), body: tr("gift.sentBody", { money: formatMoney(money) }) });
+    },
 
     init: async () => {
       if (get().ready || loop || starting) return;
@@ -437,6 +463,11 @@ export const useGame = create<GameStore>((set, get) => {
         if (document.visibilityState === "hidden") flush();
       });
       window.addEventListener("online", () => saves?.sync?.retryNow());
+      // gifts from other players: soon after the start, then now and then
+      if (saves?.social) {
+        setTimeout(() => void get().claimGifts(), GIFT_FIRST_MS);
+        setInterval(() => void get().claimGifts(), GIFT_EVERY_MS);
+      }
     },
 
     plantLevel: (plot) => {

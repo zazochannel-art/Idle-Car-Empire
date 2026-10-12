@@ -5,6 +5,7 @@
 // project's public (publishable) key.
 import type { AuthError as SbAuthError, SupabaseClient, User } from "@supabase/supabase-js";
 import type { GameState } from "../types";
+import { Social } from "./social";
 import type { Account, AuthError, AuthResult, CloudBackend, CloudCopy, Profile } from "./types";
 
 function account(u: User | null | undefined): Account | null {
@@ -107,17 +108,17 @@ export class SupabaseBackend implements CloudBackend {
   async profile(): Promise<Profile | null> {
     const c = await this.client;
     const id = await this.uid();
-    const { data, error } = await c.from("profiles").select("id, username, avatar").eq("id", id).maybeSingle();
+    const { data, error } = await c.from("profiles").select("id, username, avatar, listed").eq("id", id).maybeSingle();
     if (error) throw error;
     if (data) return data as Profile;
     // a rare name clash at sign-up left the player without one: the server makes it
     const made = await c.rpc("ensure_profile");
     if (made.error) throw made.error;
     const row = (made.data as Profile[] | null)?.[0];
-    return row ? { id: row.id, username: row.username, avatar: row.avatar } : null;
+    return row ? { id: row.id, username: row.username, avatar: row.avatar, listed: row.listed } : null;
   }
 
-  async updateProfile(p: { username?: string; avatar?: string }): Promise<AuthResult> {
+  async updateProfile(p: { username?: string; avatar?: string; listed?: boolean }): Promise<AuthResult> {
     const c = await this.client;
     const id = await this.uid();
     const { error } = await c.from("profiles").update(p).eq("id", id);
@@ -125,6 +126,16 @@ export class SupabaseBackend implements CloudBackend {
     if (error.code === "23505") return { ok: false, error: "taken", detail: error.message };
     if (error.code === "23514" || error.code === "22001") return { ok: false, error: "invalid", detail: error.message };
     return { ok: false, error: "unknown", detail: error.message };
+  }
+
+  /** The leaderboard, visits and gifts, on this player's session. */
+  social(): Social {
+    return new Social(async (fn, args) => {
+      const c = await this.client;
+      const { data, error } = await c.rpc(fn, args);
+      if (error) throw error;
+      return data;
+    });
   }
 
   async load(): Promise<CloudCopy> {
