@@ -58,6 +58,7 @@ import { hasPlant as hasPlantType } from "@/game/engine/chain";
 import * as Gf from "@/game/engine/gifts";
 import * as Gh from "@/game/engine/ghost";
 import { allianceReward } from "@/game/engine/alliance";
+import * as Wt from "@/game/engine/winter";
 
 const TICK_MS = 100;
 const SAVE_MS = 5_000;
@@ -88,6 +89,9 @@ interface GameStore {
   publishGhost: () => Promise<void>;
   /** Races another player's ghost (pays and records it): the race, or null if not allowed now. */
   duel: (rival: string, ghost: Gh.Ghost) => Gh.DuelResult | null;
+  /** Winter festival: opens an advent door (1–24) / takes a finished goal's reward. */
+  openAdventDoor: (day: number) => boolean;
+  claimWinterGoal: (goal: Wt.WinterGoal) => boolean;
   /** Takes a reward tier of the alliance's weekly goal (the server decides): its answer. */
   claimAllianceTier: (tier: number) => Promise<import("@/game/save").ClaimTierResult | "error">;
   init: () => Promise<void>;
@@ -331,6 +335,7 @@ export const useGame = create<GameStore>((set, get) => {
     const eng = Ex.engineersTick(next, now, dt);
     if (eng === "candidate") uiEvents.emit({ type: "toast", tone: "info", icon: "👩‍🔬", title: tr("eng.candidateToast", { name: ENGINEER_BY_ID[next.engineers.candidate!.id].name }) });
     else if (eng === "lost") uiEvents.emit({ type: "toast", tone: "warn", icon: "🕵️", title: tr("eng.lostToast") });
+    if (Wt.winterTick(next, snap, now)) uiEvents.emit({ type: "toast", tone: "gold", icon: "🎄", title: tr("winter.startToast"), body: tr("winter.startToastBody"), action: { label: tr("winter.open"), view: "winter" } });
     const fo = Ex.fleetOrderTick(next, now);
     if (fo === "offer") uiEvents.emit({ type: "toast", tone: "info", icon: "🚌", title: tr("fleet.offerToast") });
     else if (fo === "failed") uiEvents.emit({ type: "toast", tone: "warn", icon: "⌛", title: tr("fleet.failed") });
@@ -433,6 +438,25 @@ export const useGame = create<GameStore>((set, get) => {
       act((s) => !!(result = Gh.duel(s, rival, ghost, get().snap, Date.now())));
       if (result) persist(true);
       return result;
+    },
+    openAdventDoor: (day) => {
+      let money: number | null = null;
+      const ok = act((s) => (money = Wt.openDoor(s, day, get().snap, Date.now())) !== null);
+      if (ok) {
+        persist(true);
+        const r = Wt.ADVENT[day - 1];
+        uiEvents.emit({ type: "toast", tone: "gold", icon: day === 24 ? "🎁" : "🎄", title: tr("winter.doorToast", { day }), body: tr(r.stars ? "winter.doorStars" : "winter.doorBody", { money: formatMoney(money ?? 0), stars: r.stars ?? 0 }) });
+      }
+      return ok;
+    },
+    claimWinterGoal: (goal) => {
+      let money: number | null = null;
+      const ok = act((s) => (money = Wt.claimWinterGoal(s, goal, get().snap, Date.now())) !== null);
+      if (ok) {
+        persist(true);
+        uiEvents.emit({ type: "toast", tone: "gold", icon: "⭐", title: tr("winter.goalToast"), body: tr("winter.doorStars", { money: formatMoney(money ?? 0), stars: Wt.WINTER.goalReward.stars ?? 0 }) });
+      }
+      return ok;
     },
     claimAllianceTier: async (tier) => {
       const social = saves?.social;
