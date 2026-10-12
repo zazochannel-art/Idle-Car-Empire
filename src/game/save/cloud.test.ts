@@ -4,7 +4,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SAVE_VERSION, createInitialState } from "../engine/state";
 import type { GameState } from "../types";
-import { SIGNED_OUT_KEY, SaveManager, type StartHooks } from "./index";
+import { SIGNED_OUT_KEY, SaveManager, WELCOMED_KEY, type StartHooks } from "./index";
 import { LocalStore, LOCAL_SAVE_KEY, memoryStorage, type KeyValue } from "./local";
 import { decideStart, summarize, trustedLastActive } from "./policy";
 import { CloudSync, type SyncInfo } from "./sync";
@@ -278,6 +278,85 @@ describe("saving while playing", () => {
   });
 });
 
+// ───────────────────────── the welcome page ─────────────────────────
+
+describe("the welcome page before the game", () => {
+  it("a new player creates an account (name, email, password) and the game starts with it", async () => {
+    const server = new Server();
+    const alice = device(server);
+    await alice.saves.start(T0, hooks());
+    await alice.saves.updateProfile({ username: "Alice" });
+
+    const pc = device(server);
+    const signIn = vi.fn(async (returning: boolean) => {
+      expect(returning).toBe(false);
+      // a name that is taken: nothing else happens, and the next try goes on with the same account
+      expect(await pc.saves.welcomeRegister("alice", "b@test.dev", "secret1", "")).toMatchObject({ ok: false, error: "taken", field: "name" });
+      const first = pc.cloud.user;
+      expect(await pc.saves.welcomeRegister("Bob", "b@test.dev", "secret1", "")).toEqual({ ok: true });
+      expect(pc.cloud.user).toBe(first);
+      return "account" as const;
+    });
+    const res = await pc.saves.start(T0, hooks({ signIn }));
+    expect(signIn).toHaveBeenCalledOnce();
+    expect(res.mode).toBe("cloud");
+    expect(pc.saves.account).toMatchObject({ guest: false, email: "b@test.dev" });
+    expect(server.profiles.get(pc.cloud.user!)?.username).toBe("Bob");
+    expect(server.users.size).toBe(2); // Alice and Bob: no stray account
+
+    // the next visit on this device goes straight into the game
+    pc.saves.save(game(7), true);
+    await vi.advanceTimersByTimeAsync(2_100);
+    const again = device(server, pc.storage);
+    again.cloud.user = pc.cloud.user;
+    const notAgain = vi.fn(async () => "guest" as const);
+    expect((await again.saves.start(T0 + 60_000, hooks({ signIn: notAgain }))).state?.cash).toBe(7);
+    expect(notAgain).not.toHaveBeenCalled();
+  });
+
+  it("signing in on the welcome page plays the account's game (and makes no guest account)", async () => {
+    const server = new Server();
+    const pc = device(server);
+    await pc.saves.start(T0, hooks());
+    pc.saves.save(game(321), true);
+    await vi.advanceTimersByTimeAsync(2_100);
+    await pc.saves.register("a@test.dev", "secret1", "");
+
+    const phone = device(server);
+    const signIn = vi.fn(async () => {
+      expect(await phone.saves.welcomeLogin("a@test.dev", "wrong")).toMatchObject({ ok: false, error: "credentials" });
+      expect(await phone.saves.welcomeLogin("a@test.dev", "secret1")).toEqual({ ok: true });
+      return "account" as const;
+    });
+    const res = await phone.saves.start(T0 + 60_000, hooks({ signIn }));
+    expect(res.state?.cash).toBe(321);
+    expect(phone.cloud.user).toBe(pc.cloud.user);
+    expect(server.users.size).toBe(1);
+  });
+
+  it("shows again for a guest that left it while registering; a guest with a game goes straight in", async () => {
+    const server = new Server();
+    const pc = device(server);
+    await pc.cloud.signInGuest(); // the account made by a registration that was never finished
+    const id = pc.cloud.user;
+    const signIn = vi.fn(async () => "guest" as const);
+    const res = await pc.saves.start(T0, hooks({ signIn }));
+    expect(signIn).toHaveBeenCalledExactlyOnceWith(false);
+    expect(res.mode).toBe("cloud");
+    expect(pc.cloud.user).toBe(id); // playing without an account keeps that guest, no new one
+    pc.saves.save(game(5), true);
+    await vi.advanceTimersByTimeAsync(2_100);
+
+    // a guest who already plays on this device (as before the welcome page existed): no page
+    flags.removeItem(WELCOMED_KEY);
+    const again = device(server, pc.storage);
+    again.cloud.user = id;
+    const notAgain = vi.fn(async () => "guest" as const);
+    expect((await again.saves.start(T0 + 60_000, hooks({ signIn: notAgain }))).state?.cash).toBe(5);
+    expect(notAgain).not.toHaveBeenCalled();
+  });
+});
+
 // ───────────────────────── players and devices ─────────────────────────
 
 describe("players and devices", () => {
@@ -393,7 +472,7 @@ describe("players and devices", () => {
     const next = device(server, pc.storage);
     const signIn = vi.fn(async () => "guest" as const);
     await next.saves.start(T0, hooks({ signIn }));
-    expect(signIn).toHaveBeenCalledOnce();
+    expect(signIn).toHaveBeenCalledExactlyOnceWith(true); // the welcome page, opened on "sign in"
     expect(next.cloud.user).not.toBe(id);
   });
 

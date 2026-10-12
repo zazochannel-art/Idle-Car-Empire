@@ -14,7 +14,7 @@ import { summarize, type AuthResult, type SaveSummary } from "@/game/save";
 import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
-import { answerStartChoice, continueAsGuest, useCloud } from "@/store/cloud-store";
+import { answerStartChoice, enterGame, useCloud } from "@/store/cloud-store";
 import { uiEvents } from "@/store/events";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
@@ -477,7 +477,7 @@ export function ChooseSave({ local, cloud, reason, onKeep }: { local: SaveSummar
 export function StartGate() {
   const phase = useCloud((c) => c.phase);
   const choice = useCloud((c) => c.startChoice);
-  const needSignIn = useCloud((c) => c.needSignIn);
+  const welcome = useCloud((c) => c.welcome);
   const outdated = useCloud((c) => c.outdated);
   const { t } = useT();
   if (outdated)
@@ -490,19 +490,137 @@ export function StartGate() {
       </div>
     );
   if (choice) return <ChooseSave {...choice} onKeep={answerStartChoice} />;
-  if (needSignIn)
+  if (welcome) return <WelcomeGate returning={welcome === "returning"} />;
+  return <div className="text-xs font-semibold text-white/45">{t(phase === "account" ? "account.loadingAccount" : "account.loadingSave")}</div>;
+}
+
+/** Before the game: create an account or sign in (or, at the bottom, play without one). */
+function WelcomeGate({ returning }: { returning: boolean }) {
+  const saves = useGame((g) => g.saves);
+  const { t } = useT();
+  const [tab, setTab] = useState<"register" | "login">(returning ? "login" : "register");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null);
+  /** Registered, the email still to confirm: the game can start meanwhile. */
+  const [pending, setPending] = useState<string | null>(null);
+  if (!saves) return null;
+
+  const nameOk = name.trim().length >= 3 && name.trim().length <= 20;
+  const canSubmit = !busy && validEmail(email) && password.length >= 6 && (tab === "login" || nameOk);
+
+  const run = async (fn: () => Promise<void>) => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      await fn();
+    } catch {
+      setMsg({ text: t("account.err.network"), bad: true });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submit = () =>
+    run(async () => {
+      if (tab === "register") {
+        const r = await saves.welcomeRegister(name.trim(), email.trim(), password, here());
+        if (!r.ok) return setMsg({ text: r.field === "name" ? t(r.error === "taken" ? "account.err.nameTaken" : r.error === "invalid" ? "account.err.nameInvalid" : "account.err.unknown") : errorText(t, r), bad: true });
+        if (r.pending) return setPending(email.trim());
+      } else {
+        const r = await saves.welcomeLogin(email.trim(), password);
+        if (!r.ok) return setMsg({ text: errorText(t, r), bad: true });
+      }
+      enterGame("account");
+    });
+
+  const card = "w-full max-w-sm space-y-3 rounded-2xl bg-[#2b2b2e] p-4 ring-1 ring-white/10";
+  if (pending)
     return (
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-sm space-y-3 rounded-2xl bg-[#2b2b2e] p-4 ring-1 ring-white/10">
-        <div className="text-center text-lg font-black">{t("account.welcomeBack")}</div>
-        <AccountForms initial="login" guest={false} />
-        <div className="border-t border-white/10 pt-3">
-          <Button variant="secondary" className="w-full" onClick={continueAsGuest}>
-            {t("account.playGuest")}
-          </Button>
-        </div>
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={cn(card, "text-center")}>
+        <div className="text-3xl">📬</div>
+        <div className="text-lg font-black">{t("welcome.pendingTitle")}</div>
+        <p className="text-xs leading-snug text-white/65">{t("welcome.pendingBody", { email: pending })}</p>
+        <Button variant="gold" className="w-full" onClick={() => enterGame("account")}>
+          {t("welcome.enter")}
+        </Button>
       </motion.div>
     );
-  return <div className="text-xs font-semibold text-white/45">{t(phase === "account" ? "account.loadingAccount" : "account.loadingSave")}</div>;
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={card}>
+      <div className="text-center">
+        <div className="text-lg font-black leading-tight">{t(returning ? "account.welcomeBack" : "welcome.title")}</div>
+        <p className="mt-1 text-[11px] leading-snug text-white/60">{t("welcome.subtitle")}</p>
+        <div className="mt-2 flex justify-center gap-3 text-[10px] font-bold text-white/55">
+          <span>☁️ {t("welcome.perkCloud")}</span>
+          <span>📱 {t("welcome.perkDevices")}</span>
+          <span>🏁 {t("welcome.perkName")}</span>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-1 rounded-xl bg-white/[0.04] p-1 ring-1 ring-white/[0.07]">
+        {(["register", "login"] as const).map((k) => (
+          <button
+            key={k}
+            onClick={() => {
+              setTab(k);
+              setMsg(null);
+            }}
+            className={cn("rounded-lg py-1.5 text-[11px] font-black uppercase tracking-wide", tab === k ? "bg-gold text-black" : "text-white/60")}
+          >
+            {t(k === "register" ? "account.tab.register" : "account.tab.login")}
+          </button>
+        ))}
+      </div>
+      <form
+        className="space-y-2.5"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (canSubmit) void submit();
+        }}
+      >
+        {tab === "register" && <Field label={t("account.username")} autoComplete="nickname" maxLength={20} value={name} onChange={(e) => setName(e.target.value)} />}
+        <Field label={t("account.email")} type="email" inputMode="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <Field label={t("account.password")} type="password" autoComplete={tab === "register" ? "new-password" : "current-password"} value={password} onChange={(e) => setPassword(e.target.value)} />
+        <Button type="submit" variant="gold" className="w-full" disabled={!canSubmit}>
+          {tab === "register" ? (
+            <>
+              <UserPlus /> {t("welcome.start")}
+            </>
+          ) : (
+            <>
+              <LogIn /> {t("account.login")}
+            </>
+          )}
+        </Button>
+      </form>
+      {tab === "login" && (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="w-full"
+          disabled={!validEmail(email) || busy}
+          onClick={() =>
+            run(async () => {
+              const r = await saves.sendLink(email.trim(), here());
+              setMsg(r.ok ? { text: t("account.linkSent") } : { text: errorText(t, r), bad: true });
+            })
+          }
+        >
+          <Mail /> {t("account.sendLink")}
+        </Button>
+      )}
+      {msg && <p className={cn("text-center text-xs", msg.bad ? "text-rose-300" : "text-sky-300")}>{msg.text}</p>}
+      <div className="border-t border-white/10 pt-2.5 text-center">
+        <button className="text-[11px] font-bold text-white/55 underline-offset-2 hover:text-white/80 hover:underline" disabled={busy} onClick={() => enterGame("guest")}>
+          {t("welcome.noAccount")}
+        </button>
+        <p className="mt-0.5 text-[10px] leading-snug text-white/35">{t("welcome.noAccountHint")}</p>
+      </div>
+    </motion.div>
+  );
 }
 
 /** During play: the account's save changed on another device too. */
