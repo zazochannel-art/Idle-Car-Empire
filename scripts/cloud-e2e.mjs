@@ -1,8 +1,8 @@
 // End-to-end check of the cloud save against the real Supabase project, with
 // only the public (publishable) key, exactly as the game's browser code
 // talks to it: two players A and B (anonymous accounts), saving, restoring,
-// revision conflicts, session restore, what each may (not) reach, and the
-// leaderboard, visits and gifts.
+// revision conflicts, session restore, what each may (not) reach, the
+// leaderboard, visits and gifts, ghosts and alliances.
 //
 //   NEXT_PUBLIC_SUPABASE_URL=… NEXT_PUBLIC_SUPABASE_ANON_KEY=… node scripts/cloud-e2e.mjs
 //
@@ -133,6 +133,37 @@ const giftsTable = await b.client.from("gifts").insert({ from_user: idB, to_user
 check(!!giftsTable.error, "the gifts table can't be written directly", giftsTable.error?.code);
 check((await a.client.rpc("claim_gifts")).data === 1, "A collects the gift");
 check((await a.client.rpc("claim_gifts")).data === 0, "a gift is collected once");
+
+// ── ghosts (0005): A's best race car, raced by visitors ──
+const ghostA = { model: "sports", color: "#ff0000", accent: "#000000", stats: { speed: 60, accel: 55, handling: 50, braking: 45, aero: 40, reliability: 70, hp: 300, weight: 1300 } };
+check((await a.client.rpc("publish_ghost", { p_ghost: ghostA })).data === true, "A publishes a ghost");
+const seenGhost = one(await b.client.rpc("visit_empire", { p_user: idA }))?.card?.ghost;
+check(seenGhost?.model === "sports" && seenGhost.stats?.speed === 60 && seenGhost.color === "#ff0000", "B sees A's ghost on the card", JSON.stringify(seenGhost));
+const badGhost = await a.client.rpc("publish_ghost", { p_ghost: { model: "<x>" } });
+check(!!badGhost.error, "an invalid ghost is refused", badGhost.error?.code);
+
+// ── alliances (0005): founded, joined, rewards gated, left (and so closed again) ──
+// (only when the test players can leave again: an alliance left behind would show to real players)
+const canLeave = await a.client.rpc("leave_alliance");
+check(canLeave.data === "none", "leaving works (0005 fully applied)", canLeave.error?.message ?? canLeave.data);
+if (canLeave.data === "none") {
+  const allianceTag = `E${Date.now().toString(36).slice(-3).toUpperCase()}`;
+  const founded = await a.client.rpc("create_alliance", { p_name: tag, p_tag: allianceTag, p_emblem: "🏁" });
+  check(founded.data === "ok", "A founds an alliance", founded.error?.message ?? founded.data);
+  const found = ((await b.client.rpc("list_alliances", { p_search: tag })).data ?? [])[0];
+  check(found?.tag === allianceTag && found.members === 1, "B finds it by name", JSON.stringify(found));
+  check(found && (await b.client.rpc("join_alliance", { p_id: found.id })).data === "ok", "B joins");
+  const mineB = (await b.client.rpc("my_alliance")).data;
+  check(mineB?.members?.length === 2 && mineB.leader === false && mineB.tiers?.length === 3, "B sees the alliance, its members and goal", JSON.stringify(mineB)?.slice(0, 160));
+  check((await b.client.rpc("claim_alliance_tier", { p_tier: 1 })).data === "new", "a new member can't take rewards yet");
+  const membersTable = await b.client.from("alliance_members").select("user_id");
+  check(!!membersTable.error || (membersTable.data ?? []).length === 0, "the alliance tables are closed", membersTable.error?.code);
+  check((await b.client.rpc("kick_member", { p_user: idA })).data === "leader", "only the leader removes members");
+  check((await a.client.rpc("kick_member", { p_user: idB })).data === "ok", "the leader removes B");
+  check((await b.client.rpc("my_alliance")).data === null, "B is out");
+  check((await a.client.rpc("leave_alliance")).data === "ok", "A leaves");
+  check(((await b.client.rpc("list_alliances", { p_search: tag })).data ?? []).length === 0, "an empty alliance is closed");
+}
 
 // A leaves the board: hidden from B, not visitable, no gifts; A still sees their own rank
 const listB = await b.client.from("profiles").update({ listed: false }).eq("id", idA).select("id");

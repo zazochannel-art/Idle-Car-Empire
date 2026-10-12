@@ -443,7 +443,7 @@ export function bestEventFor(s: GameState, rc: RaceCarState): RaceEventConfig | 
 
 // ───────────────────────────── the race ─────────────────────────────
 
-function rng(seed: number) {
+export function rng(seed: number) {
   let a = seed >>> 0 || 1;
   return () => {
     a = (a + 0x6d2b79f5) | 0;
@@ -452,7 +452,7 @@ function rng(seed: number) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-const gauss = (r: () => number) => Math.sqrt(-2 * Math.log(Math.max(1e-9, r()))) * Math.cos(2 * Math.PI * r());
+export const gauss = (r: () => number) => Math.sqrt(-2 * Math.log(Math.max(1e-9, r()))) * Math.cos(2 * Math.PI * r());
 
 /** Colours a race car runs in: its livery, or the model's own paint. */
 export function liveryOf(s: GameState, rc: RaceCarState): { color: string; accent: string } {

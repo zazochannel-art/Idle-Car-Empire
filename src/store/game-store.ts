@@ -56,14 +56,16 @@ import { claimUnlock, openPlantTypes } from "@/game/engine/unlocks";
 import { restockLow } from "@/game/engine/insights";
 import { hasPlant as hasPlantType } from "@/game/engine/chain";
 import * as Gf from "@/game/engine/gifts";
+import * as Gh from "@/game/engine/ghost";
+import { allianceReward } from "@/game/engine/alliance";
 
 const TICK_MS = 100;
 const SAVE_MS = 5_000;
 /** A gap this long between ticks (sleeping laptop, frozen tab) counts as being away. */
 const AWAY_GAP_S = 30;
-/** Gifts from other players: first looked for this long after the start, then this often. */
-const GIFT_FIRST_MS = 8_000;
-const GIFT_EVERY_MS = 10 * 60_000;
+/** Gifts from other players and the player's ghost: first this long after the start, then this often. */
+const SOCIAL_FIRST_MS = 8_000;
+const SOCIAL_EVERY_MS = 10 * 60_000;
 
 interface GameStore {
   ready: boolean;
@@ -82,6 +84,12 @@ interface GameStore {
   claimGifts: () => Promise<number>;
   /** Pays the thank-you for a gift the server accepted. */
   giftSent: () => void;
+  /** Publishes the player's ghost (their best race car) if it changed since it was last published. */
+  publishGhost: () => Promise<void>;
+  /** Races another player's ghost (pays and records it): the race, or null if not allowed now. */
+  duel: (rival: string, ghost: Gh.Ghost) => Gh.DuelResult | null;
+  /** Takes a reward tier of the alliance's weekly goal (the server decides): its answer. */
+  claimAllianceTier: (tier: number) => Promise<import("@/game/save").ClaimTierResult | "error">;
   init: () => Promise<void>;
   /** Runs a player action on a copy of the state and commits it if it succeeded. */
   act: <T>(fn: (s: GameState) => T) => T;
@@ -204,6 +212,8 @@ let loop: ReturnType<typeof setInterval> | null = null;
 let starting = false;
 let lastTick = 0;
 let lastSave = 0;
+/** The ghost last published (JSON), so an unchanged one isn't sent again. */
+let lastGhost = "";
 
 const initial = createInitialState(0);
 
@@ -409,6 +419,32 @@ export const useGame = create<GameStore>((set, get) => {
       persist(true);
       uiEvents.emit({ type: "toast", tone: "success", icon: "🎁", title: tr("gift.sent"), body: tr("gift.sentBody", { money: formatMoney(money) }) });
     },
+    publishGhost: async () => {
+      const social = saves?.social;
+      if (!social || !get().ready) return;
+      const ghost = Gh.ghostOf(get().state);
+      const json = JSON.stringify(ghost);
+      if (json === lastGhost) return;
+      // (false while the player has no card yet: tried again next time)
+      if (await social.publishGhost(ghost).catch(() => false)) lastGhost = json;
+    },
+    duel: (rival, ghost) => {
+      let result: Gh.DuelResult | null = null;
+      act((s) => !!(result = Gh.duel(s, rival, ghost, get().snap, Date.now())));
+      if (result) persist(true);
+      return result;
+    },
+    claimAllianceTier: async (tier) => {
+      const social = saves?.social;
+      if (!social) return "error";
+      const r = await social.claimAllianceTier(tier).catch(() => "error" as const);
+      if (r !== "ok") return r;
+      let money = 0;
+      act((s) => (money = allianceReward(s, tier, get().snap)) > 0);
+      persist(true);
+      uiEvents.emit({ type: "toast", tone: "gold", icon: "🤝", title: tr("alliance.claimed", { tier }), body: tr("alliance.claimedBody", { money: formatMoney(money) }) });
+      return r;
+    },
 
     init: async () => {
       if (get().ready || loop || starting) return;
@@ -463,10 +499,14 @@ export const useGame = create<GameStore>((set, get) => {
         if (document.visibilityState === "hidden") flush();
       });
       window.addEventListener("online", () => saves?.sync?.retryNow());
-      // gifts from other players: soon after the start, then now and then
+      // gifts from other players, and the player's ghost: soon after the start, then now and then
       if (saves?.social) {
-        setTimeout(() => void get().claimGifts(), GIFT_FIRST_MS);
-        setInterval(() => void get().claimGifts(), GIFT_EVERY_MS);
+        const social = () => {
+          void get().claimGifts();
+          void get().publishGhost();
+        };
+        setTimeout(social, SOCIAL_FIRST_MS);
+        setInterval(social, SOCIAL_EVERY_MS);
       }
     },
 

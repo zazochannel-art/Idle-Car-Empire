@@ -1,7 +1,8 @@
-// The players' world on Supabase (supabase/migrations/0004): the global
-// leaderboard, visits to other empires and daily gifts. Everything goes
-// through the server's functions: another player's save is never read, only
-// the public card the server builds from it.
+// The players' world on Supabase (supabase/migrations/0004, 0005): the
+// global leaderboard, visits to other empires, daily gifts, ghosts to race
+// and alliances. Everything goes through the server's functions: another
+// player's save is never read, only the public card the server builds from it.
+import { parseGhost, type Ghost } from "../engine/ghost";
 
 export type BoardKind = "all" | "week";
 
@@ -31,9 +32,58 @@ export interface EmpireCard {
   wins: number;
   resets: number;
   updatedAt: number;
+  /** Their best race car, to race one against one (null: none published). */
+  ghost: Ghost | null;
 }
 
 export type GiftResult = "sent" | "already" | "limit" | "full" | "self" | "unknown";
+
+export interface AllianceSummary {
+  id: string;
+  name: string;
+  tag: string;
+  emblem: string;
+  members: number;
+  /** This week's points (see MyAlliance). */
+  points: number;
+  mine: boolean;
+}
+
+export interface AllianceMember {
+  userId: string;
+  username: string;
+  avatar: string;
+  /** Growth this week in % of the week's start (0–100). */
+  points: number;
+  leader: boolean;
+  me: boolean;
+}
+
+export interface MyAlliance {
+  id: string;
+  name: string;
+  tag: string;
+  emblem: string;
+  /** The player leads it. */
+  leader: boolean;
+  size: number;
+  /** The week (Monday, UTC) the goal is for. */
+  week: string;
+  points: number;
+  /** Points for reward tiers 1–3. */
+  tiers: number[];
+  /** Tiers the player took this week. */
+  claimed: number[];
+  /** From when the player may take rewards (a day after joining), on the server's clock … */
+  claimFrom: number;
+  /** … whose time it was when this was read. */
+  serverNow: number;
+  members: AllianceMember[];
+}
+
+export type CreateAllianceResult = "ok" | "member" | "invalid" | "name" | "tag";
+export type JoinAllianceResult = "ok" | "member" | "full" | "unknown";
+export type ClaimTierResult = "ok" | "none" | "new" | "short" | "claimed" | "invalid";
 
 /** Gifts a player may send each day (supabase: gifts_per_day()). */
 export const GIFTS_PER_DAY = 5;
@@ -84,7 +134,69 @@ export class Social {
       wins: num(card.wins),
       resets: num(card.resets),
       updatedAt: Date.parse(str(r.updated_at)) || 0,
+      ghost: parseGhost(card.ghost),
     };
+  }
+
+  /** Publishes the player's ghost (null withdraws it); false while they have no card yet. */
+  async publishGhost(ghost: Ghost | null): Promise<boolean> {
+    return (await this.call("publish_ghost", { p_ghost: ghost })) === true;
+  }
+
+  // ───────────────────────── alliances ─────────────────────────
+
+  async listAlliances(search = ""): Promise<AllianceSummary[]> {
+    const rows = (await this.call("list_alliances", { p_search: search })) as unknown[] | null;
+    return (rows ?? []).map(obj).map((r) => ({ id: str(r.id), name: str(r.name), tag: str(r.tag), emblem: str(r.emblem), members: num(r.members), points: num(r.points), mine: r.mine === true }));
+  }
+
+  /** The player's alliance (null: in none). */
+  async myAlliance(): Promise<MyAlliance | null> {
+    const raw = await this.call("my_alliance");
+    if (!raw || typeof raw !== "object") return null;
+    const r = obj(raw);
+    const list = (v: unknown) => (Array.isArray(v) ? v : []);
+    return {
+      id: str(r.id),
+      name: str(r.name),
+      tag: str(r.tag),
+      emblem: str(r.emblem),
+      leader: r.leader === true,
+      size: num(r.size),
+      week: str(r.week),
+      points: num(r.points),
+      tiers: list(r.tiers).map(num),
+      claimed: list(r.claimed).map(num),
+      claimFrom: Date.parse(str(r.claimFrom)) || 0,
+      serverNow: Date.parse(str(r.serverNow)) || 0,
+      members: list(r.members)
+        .map(obj)
+        .map((m) => ({ userId: str(m.userId), username: str(m.username), avatar: str(m.avatar), points: num(m.points), leader: m.leader === true, me: m.me === true })),
+    };
+  }
+
+  async createAlliance(name: string, tag: string, emblem: string): Promise<CreateAllianceResult> {
+    const r = str(await this.call("create_alliance", { p_name: name, p_tag: tag, p_emblem: emblem }));
+    return r === "ok" || r === "member" || r === "name" || r === "tag" ? r : "invalid";
+  }
+
+  async joinAlliance(id: string): Promise<JoinAllianceResult> {
+    const r = str(await this.call("join_alliance", { p_id: id }));
+    return r === "ok" || r === "member" || r === "full" ? r : "unknown";
+  }
+
+  async leaveAlliance(): Promise<boolean> {
+    return str(await this.call("leave_alliance")) === "ok";
+  }
+
+  /** The leader removes a member. */
+  async kickMember(userId: string): Promise<boolean> {
+    return str(await this.call("kick_member", { p_user: userId })) === "ok";
+  }
+
+  async claimAllianceTier(tier: number): Promise<ClaimTierResult> {
+    const r = str(await this.call("claim_alliance_tier", { p_tier: tier }));
+    return r === "ok" || r === "none" || r === "new" || r === "short" || r === "claimed" ? r : "invalid";
   }
 
   async sendGift(userId: string): Promise<GiftResult> {

@@ -140,6 +140,31 @@ a **gift** once a day.
   not for resets).
 - A deleted save takes its card off the board.
 
+## Ghost duels and alliances
+
+- **Ghosts**: the game publishes the player's best race car at the track
+  (model, colours and its performance figures, unworn) on their card, at
+  the start and every 10 minutes when it changed (`publish_ghost`; the
+  server keeps only those fields, numbers in range). Visiting a player with a
+  ghost offers a **duel**: one against one on one of the visitor's tracks,
+  three laps, decided in the visitor's game like every race, with no wear.
+  A win pays 2 minutes of income and 5 reputation, a loss 30 seconds and 1;
+  one duel a day with each player, 5 a day in all. Nothing about the duel is
+  stored on the server: it only pays the visitor.
+- **Alliances**: up to 20 players. Anyone can found one (name 3–24
+  characters, tag of 2–4 letters or digits, both unique, and an emblem) or
+  join an open one; a player is in one alliance at a time. The leader can
+  remove members; when the leader leaves, the longest-standing member leads,
+  and the last member leaving closes the alliance.
+- **The weekly goal**: each member brings points for their own growth this
+  week, from their card: money earned since Monday (UTC) in % of what they
+  had at its start (at least $1M), at most 100 each. The alliance's points
+  open three tiers (100, 250, 500 points). Each member takes each tier once a
+  week, a day after joining at the earliest, and once per week whatever
+  alliance they are in (so hopping between alliances pays nothing more).
+  Rewards: 15 minutes of income, 45 minutes, and 2 hours plus ⭐ 1.
+  Rewards don't count as money earned.
+
 ## Database
 
 Migrations in `supabase/migrations/`, in order:
@@ -157,6 +182,8 @@ Migrations in `supabase/migrations/`, in order:
    leaderboard, visits and gifts (see "Leaderboard, visits and gifts").
    Independent of 0003. Players who saved before it get their card at their
    next save.
+5. `0005_ghosts_and_alliances.sql` — ghosts on the cards, and alliances (see
+   "Ghost duels and alliances"). Safe to run again.
 
 `profiles`: `id` (= the auth user, deleted with it), `username` (unique on
 `lower(username)`, 3–20 characters, no control characters), `avatar`,
@@ -186,9 +213,22 @@ Functions (all for signed-in players only, `search_path` pinned):
   or `'unknown'`; `claim_gifts()` → how many gifts were waiting (each
   counted once); `gifts_sent_today()`.
 
-`empires` (the public cards) and `gifts` have Row Level Security on and no
-policies, and no table rights for players: they are reached only through the
-functions above. A trigger on `game_saves` writes the card after every save
+- `publish_ghost(p_ghost)` → whether the caller's card took it (null
+  withdraws it).
+- `list_alliances(p_search)` → up to 30 alliances (the strongest this week,
+  or matching the search): `id, name, tag, emblem, members, points, mine`.
+- `my_alliance()` → the caller's alliance as JSON (members and their points,
+  the week's tiers and the ones taken, from when they may take them), or null.
+- `create_alliance(p_name, p_tag, p_emblem)` → `'ok'`, `'member'`,
+  `'invalid'`, `'name'` or `'tag'`; `join_alliance(p_id)` → `'ok'`,
+  `'member'`, `'full'` or `'unknown'`; `leave_alliance()` → `'ok'` or
+  `'none'`; `kick_member(p_user)` (leader) → `'ok'`, `'leader'` or
+  `'unknown'`; `claim_alliance_tier(p_tier)` → `'ok'`, `'none'`, `'new'`,
+  `'short'`, `'claimed'` or `'invalid'`.
+
+`empires` (the public cards), `gifts`, `alliances`, `alliance_members` and
+`alliance_claims` have Row Level Security on and no policies, and no table
+rights for players: they are reached only through the functions above. A trigger on `game_saves` writes the card after every save
 and removes it with the save.
 
 Apply them in the Supabase dashboard → SQL Editor (paste each file, run), or
@@ -250,6 +290,10 @@ Level Security. The game doesn't need it.
 - `supabase/tests/social_rules.sql` — the same for the leaderboard, visits
   and gifts (plausibility limits, leaving the board, the gift limits, a new
   week, a deleted save). Ends with "all social checks passed".
+- `supabase/tests/alliance_rules.sql` — ghosts and alliances (cleaned
+  ghosts, names and tags, joining, the week's points, who may take which
+  reward, removing a member, the leader leaving, an empty alliance closed).
+  Ends with "all alliance checks passed".
 - `scripts/cloud-e2e.mjs` — the same checks against the real project through
   its public API, exactly as the browser does (two anonymous test players;
   they appear on the board for a few seconds, under `e2e-…` names, until
