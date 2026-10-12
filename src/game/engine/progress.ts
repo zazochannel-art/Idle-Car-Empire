@@ -14,6 +14,8 @@ import { passiveIncome, snapshot, unlockedCarIds, type EconomySnapshot } from ".
 import { formatMoney, formatNumber } from "../format";
 import { ledgerNet, payReward } from "./materials";
 import { isMoneyMetric } from "../config/missions";
+import { PASS } from "../config/pass";
+import { addPassXp, passTick } from "./pass";
 
 export { isMoneyMetric };
 
@@ -189,6 +191,9 @@ export function claimDaily(s: GameState, id: string): boolean {
   if (dailyProgress(s, m, snap) < m.target) return false;
   m.claimed = true;
   grantReward(s, m.reward, snap);
+  // every daily mission taken counts toward the season pass
+  passTick(s, snap, s.lastActiveAt);
+  addPassXp(s, PASS.xp.daily);
   return true;
 }
 

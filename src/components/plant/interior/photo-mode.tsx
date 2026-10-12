@@ -31,11 +31,12 @@ export function SkinPicker({ plotId, onClose }: { plotId: string; onClose: () =>
           const open = skinUnlocked(state, k.id);
           const on = current === k.id;
           const u = k.unlock;
+          const lock = !u ? "" : u.type === "achievements" ? t("skin.lockAch", { n: u.n }) : u.type === "pass" ? t("skin.lockPass") : t("skin.lockChapter", { n: u.n });
           return (
             <button
               key={k.id}
               disabled={!open}
-              title={open ? t(`skin.${k.id}` as MessageKey) : u?.type === "achievements" ? t("skin.lockAch", { n: u.n }) : t("skin.lockChapter", { n: u?.n ?? 0 })}
+              title={open ? t(`skin.${k.id}` as MessageKey) : lock}
               onClick={() => {
                 if (setSkin(plotId, k.id)) cue("buy");
               }}
@@ -46,7 +47,7 @@ export function SkinPicker({ plotId, onClose }: { plotId: string; onClose: () =>
             >
               <span className="text-lg leading-none">{open ? k.icon : <Lock className="size-4" />}</span>
               <span className="leading-tight">{t(`skin.${k.id}` as MessageKey)}</span>
-              {!open && u && <span className="text-[9px] font-semibold leading-tight text-white/45">{u.type === "achievements" ? t("skin.lockAch", { n: u.n }) : t("skin.lockChapter", { n: u.n })}</span>}
+              {!open && u && <span className="text-[9px] font-semibold leading-tight text-white/45">{lock}</span>}
             </button>
           );
         })}

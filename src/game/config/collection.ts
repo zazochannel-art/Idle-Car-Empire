@@ -2,13 +2,13 @@
 // limited editions that roll off the assembly lines now and then.
 
 /** A plant's hall style: "auto" follows its level (workshop, factory, high-tech). */
-export type SkinId = "auto" | "retro" | "modern" | "hightech" | "neon" | "industrial";
+export type SkinId = "auto" | "retro" | "modern" | "hightech" | "neon" | "industrial" | "chrome" | "gold";
 
 export interface SkinConfig {
   id: SkinId;
   icon: string;
   /** What opens it (none: always open). */
-  unlock?: { type: "achievements"; n: number } | { type: "chapters"; n: number };
+  unlock?: { type: "achievements"; n: number } | { type: "chapters"; n: number } | { type: "pass" };
 }
 
 export const SKINS: SkinConfig[] = [
@@ -18,6 +18,9 @@ export const SKINS: SkinConfig[] = [
   { id: "hightech", icon: "🔬" },
   { id: "industrial", icon: "⚙️", unlock: { type: "chapters", n: 2 } },
   { id: "neon", icon: "🌃", unlock: { type: "achievements", n: 15 } },
+  // won on the season pass (config/pass.ts)
+  { id: "chrome", icon: "🪞", unlock: { type: "pass" } },
+  { id: "gold", icon: "🥇", unlock: { type: "pass" } },
 ];
 
 export const SKIN_BY_ID = Object.fromEntries(SKINS.map((k) => [k.id, k])) as Record<SkinId, SkinConfig>;

@@ -18,6 +18,7 @@ export function skinUnlocked(s: GameState, id: SkinId): boolean {
   const u = SKIN_BY_ID[id]?.unlock;
   if (!SKIN_BY_ID[id]) return false;
   if (!u) return true;
+  if (u.type === "pass") return !!s.pass?.halls.includes(id);
   return u.type === "achievements" ? s.achievements.length >= u.n : s.story.chapter >= u.n;
 }
 

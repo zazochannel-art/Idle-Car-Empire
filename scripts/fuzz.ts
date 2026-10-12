@@ -37,6 +37,7 @@ import * as Mk from "../src/game/engine/market";
 import * as Lv from "../src/game/engine/live";
 import * as Cl from "../src/game/engine/classics";
 import * as Ex from "../src/game/engine/expansion";
+import * as Ps from "../src/game/engine/pass";
 import { CLASSICS } from "../src/game/config/classics";
 import { restockLow } from "../src/game/engine/insights";
 import { nextGoals } from "../src/game/engine/insights";
@@ -139,6 +140,11 @@ const actions: [string, () => unknown][] = [
     Pr.refreshDaily(s, now, snapshot(s));
     return s.missions.daily.length && Pr.claimDaily(s, pick(s.missions.daily).id);
   }],
+  ["passTick", () => Ps.passTick(s, snapshot(s), now + Math.floor(rnd() * 120) * 86_400_000)],
+  ["passXp", () => Ps.addPassXp(s, Math.floor(rnd() * 2000))],
+  ["passTier", () => Ps.claimTier(s, Math.floor(rnd() * 34) - 1, snapshot(s), now)],
+  ["passAll", () => Ps.claimAllTiers(s, snapshot(s), now).tiers],
+  ["passWeekly", () => s.pass.weekly.length && Ps.claimWeekly(s, pick(s.pass.weekly).id)],
   ["milestone", () => {
     const m = Pr.openMilestones(s, 3);
     return m.length && Pr.claimMilestone(s, pick(m).id);
