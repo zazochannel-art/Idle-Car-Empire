@@ -636,6 +636,8 @@ export interface RaceCarState {
   tech?: import("./config/tech").TechId[];
   /** Racing Garage: a development level being fitted (seconds left of total). */
   install?: { u: import("./config/racing").RaceUpgrade; left: number; total: number };
+  /** Tuning garage: paint ("" = the livery), rims, spoiler, and the parts already paid for ("rims:sport"). */
+  tuning?: { paint?: string; rims?: import("./config/tuning").RimId; spoiler?: import("./config/tuning").SpoilerId; owned?: string[] };
 }
 
 export interface RaceEntrant {
@@ -647,6 +649,8 @@ export interface RaceEntrant {
   color: string;
   accent: string;
   rating: number;
+  /** The player's car: its spoiler, as it shows (tuning garage). */
+  wing?: import("./config/tuning").SpoilerId;
   /** Starting slot (0 = pole). */
   grid: number;
   /** Shown lap times (seconds). */

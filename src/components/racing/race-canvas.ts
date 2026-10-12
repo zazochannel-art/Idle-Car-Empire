@@ -459,7 +459,7 @@ export class RaceCanvas {
       const [x, y, lift] = spots[i];
       const pop = Math.min(1, Math.max(0, this.t * 1.5 - (2 - i) * 0.5));
       if (pop <= 0) return;
-      drawModel(p, x, y, 0, CAR_MODEL_FOR[e.model], e.color, 0.5 * pop, { yaw: Math.PI * 0.75, lift, paint: true, noShadow: true });
+      drawModel(p, x, y, 0, CAR_MODEL_FOR[e.model], e.color, 0.5 * pop, { yaw: Math.PI * 0.75, lift, paint: true, noShadow: true, ...(e.id === "player" ? { build: { color: e.color, wing: e.wing === "none" ? undefined : e.wing } } : {}) });
     });
     // confetti
     const cols = ["#facc15", "#ef4444", "#22c55e", "#3b82f6", "#f8fafc", "#ec4899"];
