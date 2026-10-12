@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { DEPOT, WORLD_MAP } from "./city/layout";
 import { CAR_BY_ID } from "./config/cars";
 import { RACE_EVENTS } from "./config/racing";
@@ -235,7 +235,10 @@ describe("the showroom", () => {
     expect(Ch.sendCar(s, rc.id, "showroom", fair)).toBe(true);
     expect(rc.location).toBe("transit");
     expect(Ch.carEta(s, rc.id)?.to).toBe("showroom");
+    // no buyer on the way (the tick that delivers the car also rolls for one)
+    const noBuyer = vi.spyOn(Math, "random").mockReturnValue(0.999);
     for (let i = 0; i < 2000 && rc.location === "transit"; i++) tick(s, 0.5);
+    noBuyer.mockRestore();
     expect(rc.location).toBe("showroom");
     expect(R.atTrack(rc)).toBe(false);
     // a buyer comes: the car is sold at the asking price
