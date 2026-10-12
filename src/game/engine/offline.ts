@@ -1,4 +1,4 @@
-import { OFFLINE } from "../config/prestige";
+import { OFFLINE } from "../config/offline";
 import type { GameState, OfflineReport } from "../types";
 import { simulateChain } from "./chain";
 import { offlineRacing } from "./racing";

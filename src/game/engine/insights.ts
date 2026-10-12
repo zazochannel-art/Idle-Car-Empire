@@ -18,8 +18,7 @@ import { canOpenDealers, isManagerUnlocked } from "./actions";
 import { bestGrade, carLock, carTrip, gradeCost, hasPlant, levelCost, plantLock, plantsOf, speedCost } from "./chain";
 import { isPlotUnlocked, nextZone, zoneBlocker } from "./city";
 import { dealerUpgradeCost, type EconomySnapshot } from "./economy";
-import { PRESTIGE } from "../config/prestige";
-import { canPrestige, pendingPoints } from "./prestige";
+import { canImperium, pendingStars } from "./imperium";
 
 export type Requirement =
   | { kind: "research"; research: string }
@@ -52,7 +51,7 @@ export type Goal =
   | { kind: "car"; icon: string; cost?: number; car: CarId; plot: string | null; requirement: Requirement | null }
   | { kind: "manager"; icon: string; cost: number; manager: ManagerId }
   /** gain: extra income share the points add; stalled: income stopped growing. */
-  | { kind: "prestige"; icon: string; points: number; gain: number; stalled: boolean }
+  | { kind: "imperium"; icon: string; stars: number; stalled: boolean }
   | { kind: "facility"; icon: string; plot: string }
   | { kind: "worker"; icon: string; plot: string; idle: number }
   | { kind: "zone"; icon: string; cost: number; zone: ZoneId }
@@ -294,13 +293,11 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
   const nextManager = MANAGERS.find((m) => !s.managers[m.id].hired && isManagerUnlocked(s, m.id));
   if (nextManager && !firstCarFocus) goals.push({ kind: "manager", icon: nextManager.avatar, cost: nextManager.cost, manager: nextManager.id });
 
-  if (canPrestige(s)) {
-    const points = pendingPoints(s);
-    const gain = (1 + (s.empirePoints + points) * PRESTIGE.incomePerPoint) / (1 + s.empirePoints * PRESTIGE.incomePerPoint) - 1;
+  if (canImperium(s)) {
     const stalled = incomeStalled(s);
-    const g: Goal = { kind: "prestige", icon: "⭐", points, gain, stalled };
-    // worth it now (growth stalled or a big jump) → first; otherwise a quiet option
-    if (stalled || gain >= 0.5) goals.unshift(g);
+    const g: Goal = { kind: "imperium", icon: "⭐", stars: pendingStars(s), stalled };
+    // worth it now (growth stalled) → first; otherwise a quiet option
+    if (stalled) goals.unshift(g);
     else goals.splice(Math.min(goals.length, max - 1), 0, g);
   }
   // a plant going up: shown once nothing more urgent needs doing (it only needs waiting)
@@ -312,7 +309,7 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
   // over the account's limit: say so first, and suggest nothing that spends money it doesn't have
   if (s.chain.suspended) {
     const limit = debtLimit(s);
-    const spending: Goal["kind"][] = ["plant", "upgrade", "warehouse", "dealer", "dealerFull", "zone", "territory", "manager", "car", "racing", "prestige"];
+    const spending: Goal["kind"][] = ["plant", "upgrade", "warehouse", "dealer", "dealerFull", "zone", "territory", "manager", "car", "racing", "imperium"];
     const keep = goals.filter((g) => !spending.includes(g.kind) && !(g.kind === "shortage" && g.what));
     return [{ kind: "debt" as const, icon: "⛔", owed: s.chain.owed, limit, resume: limit * DEBT.resume }, ...keep].slice(0, max);
   }

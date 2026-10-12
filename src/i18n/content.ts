@@ -6,9 +6,7 @@ import type { CarConfig } from "@/game/config/cars";
 import type { DealerConfig } from "@/game/config/dealerships";
 import type { ManagerBonus, ManagerConfig } from "@/game/config/managers";
 import { isMoneyMetric, type MilestoneMission } from "@/game/config/missions";
-import type { EmpirePerk } from "@/game/config/prestige";
 import type { MarketEvent } from "@/game/config/events";
-import type { RegionConfig } from "@/game/config/regions";
 import type { ResearchCategoryConfig, ResearchNode } from "@/game/config/research";
 import { RESEARCH_BY_ID } from "@/game/config/research";
 import type { CarLock, PlantLock } from "@/game/engine/chain";
@@ -63,13 +61,9 @@ export function contentFor(lang: Lang) {
     achievement: (x: AchievementConfig) => c(lang, `achievement.${x.id}.name`, x.name),
     achievementDesc: (x: AchievementConfig) => c(lang, `achievement.${x.id}.desc`, x.description),
     milestone: (x: MilestoneMission) => c(lang, `milestone.${x.id}`, x.title),
-    perk: (x: EmpirePerk) => c(lang, `perk.${x.points}.name`, x.name),
-    perkDesc: (x: EmpirePerk) => c(lang, `perk.${x.points}.desc`, x.description),
     event: (x: MarketEvent) => c(lang, `event.${x.id}.name`, x.name),
     eventDesc: (x: MarketEvent) => c(lang, `event.${x.id}.desc`, x.description),
-    region: (x: RegionConfig) => c(lang, `region.${x.id}.name`, x.name),
     raceEvent: (id: string) => t(`race.ev.${id}` as Parameters<typeof translate>[1]),
-    regionFlavor: (x: RegionConfig) => c(lang, `region.${x.id}.flavor`, x.flavor),
     /** Daily missions are stored with an English title; rebuild it per language. */
     daily: (m: MissionState) => {
       const n = isMoneyMetric(m.metric) ? formatMoney(m.target) : formatNumber(m.target);

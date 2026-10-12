@@ -68,10 +68,10 @@ export function goalText(g: Goal, t: (k: MessageKey, v?: Vars) => string, n: Con
       const m = MANAGER_BY_ID[g.manager];
       return { title: t("goal.manager", { name: m.name }), detail: n.role(m) };
     }
-    case "prestige":
+    case "imperium":
       return {
-        title: g.stalled ? t("goal.prestigeStalled", { pct: formatPercent(g.gain) }) : t("goal.prestige", { n: g.points }),
-        detail: g.stalled ? t("goal.prestigeStalledDetail", { n: g.points }) : t("goal.prestigeDetail", { pct: formatPercent(g.gain) }),
+        title: t(g.stalled ? "goal.imperiumStalled" : "goal.imperium", { n: g.stars }),
+        detail: t(g.stalled ? "goal.imperiumStalledDetail" : "goal.imperiumDetail"),
       };
     case "facility":
       return { title: t("goal.facility"), detail: t("goal.facilityDetail") };
@@ -162,8 +162,8 @@ export function runGoal(g: Goal, ready: boolean) {
         ui.selectPlot(g.plot);
       } else ui.setView("research");
       break;
-    case "prestige":
-      ui.setView("prestige");
+    case "imperium":
+      ui.setView("imperium");
       break;
     case "manager":
       ui.setView("managers");

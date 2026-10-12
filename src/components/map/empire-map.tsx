@@ -456,9 +456,7 @@ function TerritoryInfo({ id }: { id: TerritoryId }) {
       ? t("map.requires", { name: t(`zone.${lock.zone}`) })
       : lock?.kind === "rep"
         ? t("territory.needRep", { n: lock.need.toLocaleString() })
-        : lock?.kind === "ep"
-          ? t("territory.needEp", { n: lock.need })
-          : null;
+        : null;
   return (
     <>
       <div className="px-5 text-xs font-black uppercase tracking-wide">

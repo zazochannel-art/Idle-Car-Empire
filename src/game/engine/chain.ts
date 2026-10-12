@@ -5,7 +5,6 @@
 // when a load is sold at the market or a customer buys a car.
 import { startWorks } from "./construction";
 import { receiveRaceCar } from "./racing";
-import { regionCostMult } from "../config/regions";
 import { CARS, CAR_BY_ID, CAR_MODEL, type CarConfig } from "../config/cars";
 import {
   AUTOMATION,
@@ -71,7 +70,7 @@ import {
   warehouseCost,
 } from "./materials";
 import { MANAGERS } from "../config/managers";
-import { OFFLINE } from "../config/prestige";
+import { OFFLINE } from "../config/offline";
 import { DEPOT, MARKET, RACING, plotOf, roadRoute } from "../city/layout";
 import type {
   BuildingState,
@@ -261,7 +260,7 @@ export function hireBodyWorker(s: GameState, plotId: string): boolean {
 export function plantBuildCost(s: GameState, type: PlantType): number {
   const cfg = PLANT_BY_ID[type];
   const n = plantCount(s, type);
-  return (n === 0 && cfg.firstCost ? cfg.firstCost : cfg.cost * Math.pow(PLANT_COPY_COST, n)) * regionCostMult(s.prestigeCount);
+  return n === 0 && cfg.firstCost ? cfg.firstCost : cfg.cost * Math.pow(PLANT_COPY_COST, n);
 }
 
 const base = (b: BuildingState) => PLANT_BY_ID[b.type as PlantType].cost;

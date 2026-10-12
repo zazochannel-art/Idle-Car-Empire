@@ -15,7 +15,7 @@ export function FeedbackBridge() {
     () =>
       uiEvents.on((e) => {
         if (e.type === "sale" && e.item === "car") cue("coin");
-        else if (e.type === "firstCar" || e.type === "prestige") cue("fanfare");
+        else if (e.type === "firstCar" || e.type === "imperium") cue("fanfare");
       }),
     [],
   );

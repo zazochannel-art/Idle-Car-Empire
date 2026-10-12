@@ -91,7 +91,9 @@ npm run simulate -- 3   # balance bot: plays 3 hours and logs milestones
    - **research** with points from every part and car;
    - follow the objectives (Produce 100 car bodies → Build your second
      factory → … → Build your automotive empire);
-   - run **Global Expansion** after $10B for permanent **Empire Points**.
+   - open plant levels 11–15 as your total earnings grow ($50M → $25B);
+   - run **Reset Imperium** after earning $5B in a run, for ⭐ **Stars** and
+     permanent upgrades.
    - Garages, car washes and other city buildings are a side business.
 
 Drag to pan, pinch or scroll to zoom, tap buildings; the minimap jumps the
@@ -119,7 +121,8 @@ src/game/
     tick.ts       advances time in small steps
     actions.ts    player actions (buy, hire, research…)
     offline.ts    plays out the time away, report + collect
-    prestige.ts   Empire Points, Global Expansion
+    reset.ts      clears a run (used by Reset Imperium)
+    imperium.ts   Reset Imperium, ⭐ Stars and their upgrades
     progress.ts   achievements, daily & milestone missions
     insights.ts   "next goal" hints and lock reasons for the UI
     city.ts       districts, plot buildings, garages: placement rules,

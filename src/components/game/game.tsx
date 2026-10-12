@@ -11,7 +11,7 @@ import { canResearch, isManagerUnlocked } from "@/game/engine/actions";
 import { buildingUpgradeCost } from "@/game/engine/city";
 import { levelCost } from "@/game/engine/chain";
 import { nextGoals, type Goal } from "@/game/engine/insights";
-import { canPrestige } from "@/game/engine/prestige";
+import { canImperium } from "@/game/engine/imperium";
 import { storyWaiting } from "@/game/engine/story";
 import { claimableCount } from "@/game/engine/progress";
 import { formatDuration, formatMoney, formatNumber } from "@/game/format";
@@ -34,7 +34,7 @@ import { DealersView } from "../views/dealers-view";
 import { ProductionView } from "../views/production-view";
 import { ManagersView } from "../views/managers-view";
 import { MissionsView } from "../views/missions-view";
-import { PrestigeView } from "../views/prestige-view";
+import { ImperiumView } from "../views/imperium-view";
 import { ResearchView } from "../views/research-view";
 import { StatsView } from "../views/stats-view";
 import { EconomyView } from "../views/economy-view";
@@ -49,7 +49,7 @@ import { TransferImport } from "./transfer-import";
 import { LoginDialog } from "./login-dialog";
 import { goalText, runGoal } from "./goals";
 import { Hud } from "./hud";
-import { OfflineDialog, PrestigeOverlay, SettingsDialog, Toasts } from "./overlays";
+import { ImperiumOverlay, OfflineDialog, SettingsDialog, Toasts } from "./overlays";
 import { FirstCarOverlay } from "./first-car";
 import { Onboarding } from "./onboarding";
 import { UnlockCard } from "./unlock-card";
@@ -83,7 +83,7 @@ function badgeCounts(state: ReturnType<typeof useGame.getState>["state"], snap: 
     managers: MANAGERS.filter((m) => !state.managers[m.id].hired && isManagerUnlocked(state, m.id) && state.cash >= m.cost).length + (idle > 0 ? 1 : 0),
     missions: claimableCount(state, snap),
     // the crown menu: an expansion ready, a decision on the desk or a chapter to close
-    prestige: (canPrestige(state) ? 1 : 0) + (storyWaiting(state, snap) ? 1 : 0),
+    imperium: (canImperium(state) ? 1 : 0) + (storyWaiting(state, snap) ? 1 : 0),
     upgrade: upgrades,
   };
 }
@@ -93,7 +93,7 @@ function useBadges() {
   // component rerenders only when one of the five visible badge counts changes.
   const badgeKey = useGame((g) => {
     const b = badgeCounts(g.state, g.snap);
-    return `${b.research}|${b.managers}|${b.missions}|${b.prestige}|${b.upgrade}`;
+    return `${b.research}|${b.managers}|${b.missions}|${b.imperium}|${b.upgrade}`;
   });
   void badgeKey;
   return badgeCounts(useGame.getState().state, useGame.getState().snap);
@@ -228,7 +228,7 @@ function Shell() {
       <TransferImport />
       <LoginDialog />
       <OfflineDialog />
-      <PrestigeOverlay />
+      <ImperiumOverlay />
       <RaceViewer />
       <ConflictDialog />
       <SettingsDialog open={settings} onOpenChange={setSettings} />
@@ -296,8 +296,8 @@ const ViewSwitch = memo(function ViewSwitch({ view, onSettings }: { view: View; 
       return <StoryView />;
     case "profile":
       return <ProfileView />;
-    case "prestige":
-      return <PrestigeView />;
+    case "imperium":
+      return <ImperiumView />;
   }
 });
 
@@ -308,7 +308,7 @@ const ViewSwitch = memo(function ViewSwitch({ view, onSettings }: { view: View; 
  */
 export type PillarId = "empire" | "cars" | "racing" | "business";
 export const PILLARS: { id: PillarId; icon: Icon; views: View[] }[] = [
-  { id: "empire", icon: Factory, views: ["empire", "garages", "logistics", "research", "managers", "prestige"] },
+  { id: "empire", icon: Factory, views: ["empire", "garages", "logistics", "research", "managers", "imperium"] },
   { id: "cars", icon: Car, views: ["cars"] },
   { id: "racing", icon: Flag, views: ["racing"] },
   { id: "business", icon: Briefcase, views: ["dealers", "economy", "missions", "stats", "achievements", "story"] },
@@ -364,12 +364,12 @@ function LeftRail() {
   );
 }
 
-const DOCK: { id: View; icon: Icon; label: "bar.build" | "bar.upgrade" | "bar.missions" | "bar.employees" | "bar.empire"; badge: "upgrade" | "missions" | "managers" | "prestige" | null }[] = [
+const DOCK: { id: View; icon: Icon; label: "bar.build" | "bar.upgrade" | "bar.missions" | "bar.employees" | "bar.empire"; badge: "upgrade" | "missions" | "managers" | "imperium" | null }[] = [
   { id: "build", icon: Hammer, label: "bar.build", badge: null },
   { id: "upgrade", icon: TrendingUp, label: "bar.upgrade", badge: "upgrade" },
   { id: "missions", icon: ListChecks, label: "bar.missions", badge: "missions" },
   { id: "managers", icon: Users, label: "bar.employees", badge: "managers" },
-  { id: "menu", icon: Crown, label: "bar.empire", badge: "prestige" },
+  { id: "menu", icon: Crown, label: "bar.empire", badge: "imperium" },
 ];
 
 function BottomDock() {
@@ -401,7 +401,7 @@ function BottomDock() {
                 <d.icon className="size-5 stroke-[2.5]" />
                 {t(d.label)}
               </span>
-              <NavBadge n={badge} gold={d.badge === "prestige"} className="absolute right-1 top-0.5 skew-x-[9deg]" />
+              <NavBadge n={badge} gold={d.badge === "imperium"} className="absolute right-1 top-0.5 skew-x-[9deg]" />
             </button>
           );
         })}

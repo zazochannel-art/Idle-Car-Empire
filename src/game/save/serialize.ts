@@ -6,8 +6,8 @@ import { migrateLive } from "../engine/live";
 import { migrateClassics } from "../engine/classics";
 import { migrateExpansion } from "../engine/expansion";
 import { migrateCity, unlockOwnedZones } from "../engine/city";
-import { applyStartPerks } from "../engine/prestige";
 import { createInitialState, MAP_VERSION, SAVE_VERSION } from "../engine/state";
+import { ACHIEVEMENTS } from "../config/achievements";
 import type { GameState } from "../types";
 
 type Json = Record<string, unknown>;
@@ -37,17 +37,16 @@ function mergeDefaults<T>(defaults: T, saved: unknown): T {
 /**
  * Saves from before the supply chain (v1–v2) described a different economy:
  * the company starts over from the Small Car Body Works, keeping the
- * settings, Empire Points and research.
+ * settings and research.
  */
 function fromOldEconomy(raw: Json, now: number): GameState {
   const state = createInitialState(now);
   const kept = mergeDefaults(
-    { settings: state.settings, empirePoints: 0, empirePointsEarned: 0, prestigeCount: 0, research: [] as string[], createdAt: now },
+    { settings: state.settings, research: [] as string[], createdAt: now },
     raw,
   );
   Object.assign(state, kept);
   state.research = kept.research.filter((r) => typeof r === "string");
-  applyStartPerks(state);
   return state;
 }
 
@@ -70,6 +69,13 @@ export function migrate(raw: unknown, now: number): GameState {
   if (raw.mapVersion !== MAP_VERSION) return fromOldMap(raw, now);
   const state = mergeDefaults(fresh, raw);
   state.mapVersion = MAP_VERSION;
+  // Global Expansion is gone (its regions, Empire Points and perks): each expansion
+  // already made becomes a ⭐ Star; the old fields are not carried over
+  const expansions = typeof raw.prestigeCount === "number" && Number.isFinite(raw.prestigeCount) ? Math.max(0, Math.min(6, Math.floor(raw.prestigeCount))) : 0;
+  state.stars += expansions;
+  // achievements that no longer exist (the Global Expansion ones) don't count toward the income bonus
+  const known = new Set(ACHIEVEMENTS.map((a) => a.id));
+  state.achievements = state.achievements.filter((id) => typeof id === "string" && known.has(id));
   // Nullable fields have no typed default to merge against.
   state.pendingOffline = isObject(raw.pendingOffline) ? (raw.pendingOffline as unknown as GameState["pendingOffline"]) : null;
   // The city has open-ended keys (plot ids), so it is validated on its own.

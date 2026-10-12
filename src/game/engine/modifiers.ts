@@ -3,9 +3,8 @@ import { ACHIEVEMENT_INCOME_BONUS } from "../config/achievements";
 import { ENGINEER_BY_ID } from "../config/expansion";
 import { CARS, CAR_MODEL } from "../config/cars";
 import { MANAGERS, type ManagerConfig } from "../config/managers";
-import { EMPIRE_PERKS, OFFLINE, PRESTIGE } from "../config/prestige";
-import { BASE_MAX_LEVEL, PLANT_MAX_LEVEL } from "../config/chain";
-import { REGIONS, regionIndex } from "../config/regions";
+import { OFFLINE } from "../config/offline";
+import { PLANT_MAX_LEVEL, plantLevelCap } from "../config/chain";
 import { activeEvent } from "./events";
 import { SEASON_BONUS, seasonAt } from "./season";
 import { starMods } from "./imperium";
@@ -29,7 +28,7 @@ export interface GlobalMods {
   markup: number;
   rp: number;
   costMult: number;
-  /** Highest plant level allowed: 10, plus one per region reached. */
+  /** Highest plant level allowed: 10, plus the levels opened by total earnings. */
   maxPlantLevel: number;
   unlockedCars: Set<CarId>;
   unlockedPlants: Set<PlantType>;
@@ -102,7 +101,7 @@ export function computeGlobalMods(s: GameState): GlobalMods {
     markup: 0,
     rp: 1,
     costMult: 1,
-    maxPlantLevel: Math.min(PLANT_MAX_LEVEL, BASE_MAX_LEVEL + regionIndex(s.prestigeCount)),
+    maxPlantLevel: Math.min(PLANT_MAX_LEVEL, plantLevelCap(s.lifetime.moneyEarned)),
     unlockedCars: new Set(),
     unlockedPlants: new Set(),
   };
@@ -112,15 +111,8 @@ export function computeGlobalMods(s: GameState): GlobalMods {
     if (node) node.effects.forEach((e) => applyEffect(m, e));
   }
 
-  for (const perk of EMPIRE_PERKS) {
-    if (s.empirePoints >= perk.points) perk.effects.forEach((e) => applyEffect(m, e));
-  }
-
   // Territories bought around the districts.
   for (const t of BUYABLE_TERRITORIES) if (s.city.territories?.includes(t.id)) t.effects.forEach((e) => applyEffect(m, e));
-
-  // The region the empire has expanded to.
-  REGIONS[regionIndex(s.prestigeCount)].effects.forEach((e) => applyEffect(m, e));
 
   // Seasons (Halloween, winter holidays) add a little income.
   if (seasonAt(s.lastActiveAt)) m.income *= 1 + SEASON_BONUS;
@@ -191,7 +183,6 @@ export function computeGlobalMods(s: GameState): GlobalMods {
   m.income *= city.income;
 
   m.income *= 1 + s.achievements.length * ACHIEVEMENT_INCOME_BONUS;
-  m.income *= 1 + s.empirePoints * PRESTIGE.incomePerPoint;
   // permanent boosts from milestones, and the limited editions collected
   m.income *= 1 + s.boost;
   m.income *= 1 + editionBonus(s);

@@ -8,8 +8,7 @@ import * as C from "./engine/city";
 import * as Co from "./engine/construction";
 import { snapshot } from "./engine/economy";
 import { computeOffline } from "./engine/offline";
-import { prestige } from "./engine/prestige";
-import { PRESTIGE } from "./config/prestige";
+import { resetRun } from "./engine/reset";
 import { createInitialState } from "./engine/state";
 import { tick } from "./engine/tick";
 import { decodeSave, encodeSave, migrate } from "./save/serialize";
@@ -122,7 +121,7 @@ describe("world layout", () => {
 });
 
 describe("territories", () => {
-  it("cost money and need their district, reputation and Empire Points; then they pay off", () => {
+  it("cost money and need their district and reputation; then they pay off", () => {
     const s = createInitialState(T0);
     expect(T.isTerritoryOpen(s, "raw")).toBe(false);
     expect(T.territoryLock(s, "raw")).toEqual({ kind: "zone", zone: "industrial" });
@@ -138,7 +137,8 @@ describe("territories", () => {
     s.racing.rep = 30_000;
     s.city.zones.push("global");
     s.cash = 1e12;
-    expect(T.territoryLock(s, "airport")).toEqual({ kind: "ep", need: 25 });
+    // the airport needs its district and reputation only
+    expect(T.territoryLock(s, "airport")).toBeNull();
     // the campus opens with its district, racing with the Racing District
     expect(T.isTerritoryOpen(s, "campus")).toBe(false);
     s.city.zones.push("automotive");
@@ -269,12 +269,10 @@ describe("zones and plots", () => {
     expect(report.money).toBeGreaterThan(0);
     expect(report.serviced).toBeGreaterThan(0);
 
-    // just enough for a first expansion (more would unlock start-of-run perks that build plants)
-    s.run.moneyEarned = PRESTIGE.minRunEarnings;
-    s.lifetime.moneyEarned = PRESTIGE.minRunEarnings;
+    // a reset (Reset Imperium) clears the map back to the first district
     s.cash += 1e6;
     C.unlockZone(s, "industrial");
-    expect(prestige(s, T0)).toBeGreaterThan(0);
+    resetRun(s, T0);
     expect(s.city.zones).toEqual(["town"]);
     expect(s.city.buildings[GAR]).toBeUndefined();
     expect(s.city.buildings[STARTER_PLOT].type).toBe("bodyWorks");

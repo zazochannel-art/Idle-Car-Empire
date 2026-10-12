@@ -113,7 +113,6 @@ export type MetricId =
   | "factoriesOwned"
   | "dealersOwned"
   | "maxFactoryLevel"
-  | "prestigeCount"
   | "carsUnlocked"
   | "bodiesProduced"
   | "enginesProduced"
@@ -509,10 +508,6 @@ export interface GameState {
   version: number;
   cash: number;
   rp: number;
-  empirePoints: number;
-  /** Total empire points ever earned — the prestige formula subtracts it. */
-  empirePointsEarned: number;
-  prestigeCount: number;
   dealers: Record<DealerId, DealerState>;
   managers: Record<ManagerId, ManagerState>;
   carModels: Record<CarId, number>;
@@ -525,7 +520,7 @@ export interface GameState {
   starUpgrades: Partial<Record<StarUpgradeId, number>>;
   /** Times the empire did a Reset Imperium. */
   imperiumCount: number;
-  /** Lifetime earnings at the last Reset Imperium: Empire Points count from here. */
+  /** Lifetime earnings at the last Reset Imperium: the next reset's Stars count from here. */
   epBase: number;
   /** Income samples (one a minute, last 4 hours) for the chart and the stall hint. */
   history: { t: number; income: number }[];

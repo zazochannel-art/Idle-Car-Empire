@@ -447,7 +447,7 @@ export function MenuPanel({ onSettings }: { onSettings: () => void }) {
     { icon: "📖", label: t("nav.story"), go: () => setView("story"), gold: true, badge: waiting },
     { icon: "📊", label: t("nav.economy"), go: () => setView("economy"), gold: true },
     { icon: "🏁", label: t("nav.racing"), go: () => setView("racing"), gold: true },
-    { icon: "⭐", label: t("nav.prestige"), go: () => setView("prestige"), gold: true },
+    { icon: "👑", label: t("imperium.title"), go: () => setView("imperium"), gold: true },
     { icon: "🚗", label: t("nav.cars"), go: () => setView("cars") },
     // research has no other way in (only a goal can open it)
     { icon: "🔬", label: t("nav.research"), go: () => setView("research") },

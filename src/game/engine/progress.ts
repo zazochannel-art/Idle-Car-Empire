@@ -31,8 +31,6 @@ export function metric(s: GameState, id: MetricId, snap?: EconomySnapshot): numb
       return s.lifetime.researchDone;
     case "managersHired":
       return s.lifetime.managersHired;
-    case "prestigeCount":
-      return s.prestigeCount;
     case "factoriesOwned":
       return plantsOf(s).length;
     case "dealersOwned":
@@ -76,8 +74,6 @@ export function conditionProgress(s: GameState, c: Condition, snap: EconomySnaps
       return { value: s.lifetime.carsByType[c.car], target: c.target };
     case "income":
       return { value: snap.incomePerSec, target: c.target };
-    case "empirePoints":
-      return { value: s.empirePoints, target: c.target };
   }
 }
 
@@ -87,7 +83,7 @@ export function rewardCash(r: Reward, snap: EconomySnapshot): number {
   return (r.cash ?? 0) + (r.incomeSeconds ?? 0) * income;
 }
 
-/** Rewards go straight to the wallet; they are not "earned" (no prestige credit). */
+/** Rewards go straight to the wallet; they are not "earned" (they count toward no reset). */
 export function grantReward(s: GameState, r: Reward, snap: EconomySnapshot) {
   payReward(s, rewardCash(r, snap));
   if (r.rp) s.rp += r.rp;

@@ -46,10 +46,10 @@ export const MILESTONES: MilestoneMission[] = [
   { id: "m_cars_10000", title: "Produce 10,000 cars", metric: "carsProduced", target: 10_000, reward: { stars: 2 } },
   { id: "m_empire", title: "Build your automotive empire", metric: "plantTypes", target: 10, reward: { rp: 50_000 } },
   { id: "m_bodies_100000", title: "Produce 100,000 car bodies", metric: "bodiesProduced", target: 100_000, reward: { boost: 0.05 } },
-  { id: "m_prestige_1", title: "Complete a Global Expansion", metric: "prestigeCount", target: 1, reward: { stars: 3 } },
+  { id: "m_level_11", title: "Raise a plant to level 11", metric: "maxFactoryLevel", target: 11, reward: { stars: 3 } },
   { id: "m_cars_100k", title: "Produce 100,000 cars", metric: "carsProduced", target: 100_000, reward: { stars: 5 } },
   { id: "m_earn_1t", title: "Earn $10B", metric: "moneyEarned", target: 1e10, reward: { boost: 0.1 } },
-  { id: "m_prestige_5", title: "Complete 5 Global Expansions", metric: "prestigeCount", target: 5, reward: { stars: 10 } },
+  { id: "m_level_15", title: "Raise a plant to level 15", metric: "maxFactoryLevel", target: 15, reward: { stars: 10 } },
 ];
 
 /**

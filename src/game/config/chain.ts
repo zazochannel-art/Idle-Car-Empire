@@ -147,16 +147,28 @@ export const PLANT_LEVELS: LevelConfig[] = [
   { lines: 8, storage: 4.5, cost: 0 },
   { lines: 9, storage: 5, cost: 0 },
   { lines: 10, storage: 5.5, cost: 0 },
-  // 11-15: one more level for every region the empire has expanded to
+  // 11-15: open as the company's total earnings grow (PLANT_LEVEL_UNLOCKS)
   { lines: 12, storage: 6.5, cost: 0 },
   { lines: 14, storage: 7.5, cost: 0 },
   { lines: 16, storage: 8.5, cost: 0 },
   { lines: 18, storage: 9.5, cost: 0 },
   { lines: 20, storage: 10.5, cost: 0 },
 ];
-/** Levels every player can reach; the rest open one per region. */
+/** Levels every player can reach; the rest open with total earnings. */
 export const BASE_MAX_LEVEL = 10;
 export const PLANT_MAX_LEVEL = PLANT_LEVELS.length;
+/** Total money earned (lifetime, across resets) that opens plant levels 11, 12, 13, 14 and 15. */
+export const PLANT_LEVEL_UNLOCKS = [5e7, 2.5e8, 1e9, 5e9, 2.5e10];
+
+/** Highest plant level the company can build to with this much earned in total. */
+export function plantLevelCap(lifetimeEarned: number): number {
+  return BASE_MAX_LEVEL + PLANT_LEVEL_UNLOCKS.filter((need) => lifetimeEarned >= need).length;
+}
+
+/** What must be earned in total to open this plant level (null: open from the start, or no such level). */
+export function plantLevelNeed(level: number): number | null {
+  return PLANT_LEVEL_UNLOCKS[level - BASE_MAX_LEVEL - 1] ?? null;
+}
 
 /** Speed upgrades: each makes production this much faster. */
 export const SPEED = { mult: 1.06, firstCost: 0.08, growth: 1.5, max: 40 };

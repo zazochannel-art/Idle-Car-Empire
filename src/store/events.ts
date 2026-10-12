@@ -9,7 +9,7 @@ export type UiEvent =
   | { type: "sale"; plot: string; item: ItemId; count: number; amount: number }
   | { type: "firstCar"; plot: string; car: CarId }
   | { type: "toast"; tone: "success" | "gold" | "info" | "warn"; title: string; body?: string; icon?: string; action?: UiToastAction }
-  | { type: "prestige"; points: number; stars?: boolean }
+  | { type: "imperium"; stars: number }
   | { type: "race"; id: number }
   | { type: "unlock"; kind: "car" | "plant"; id: string };
 

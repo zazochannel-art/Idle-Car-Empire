@@ -28,7 +28,7 @@ export type View =
   | "stats"
   | "economy"
   | "racing"
-  | "prestige"
+  | "imperium"
   | "build"
   | "upgrade"
   | "logistics"

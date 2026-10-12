@@ -1,6 +1,6 @@
 import { IMPERIUM, STAR_UPGRADE_BY_ID, starUpgradeCost, type StarUpgradeId } from "../config/imperium";
 import type { GameState } from "../types";
-import { prestigeReset } from "./prestige";
+import { resetRun } from "./reset";
 
 /** Lifetime earnings since the last Reset Imperium. */
 export function earnedSinceImperium(s: GameState): number {
@@ -13,27 +13,24 @@ export function pendingStars(s: GameState): number {
 }
 
 export function canImperium(s: GameState): boolean {
-  return s.prestigeCount >= IMPERIUM.minExpansions && s.run.moneyEarned >= IMPERIUM.minRunEarnings;
+  return s.run.moneyEarned >= IMPERIUM.minRunEarnings;
 }
 
 /**
- * Reset Imperium: the end-game reset. On top of a Global Expansion it also
- * clears Empire Points, the region (back to Local Factory) and research.
- * Keeps ⭐ Stars and their upgrades, milestone boosts, managers,
- * achievements and statistics.
+ * Reset Imperium: the end-game reset. Starts the company over (resetRun) and
+ * clears research too. Keeps ⭐ Stars and their upgrades, milestone boosts,
+ * managers, achievements, statistics and the plant levels opened by total
+ * earnings.
  */
 export function imperium(s: GameState, now: number): number {
   if (!canImperium(s)) return 0;
   const gained = pendingStars(s);
   s.stars += gained;
   s.imperiumCount += 1;
-  s.empirePoints = 0;
-  s.empirePointsEarned = 0;
   s.epBase = s.lifetime.moneyEarned;
-  s.prestigeCount = 0;
   s.research = [];
   s.rp = 0;
-  prestigeReset(s, now);
+  resetRun(s, now);
   return gained;
 }
 
