@@ -1,0 +1,234 @@
+# Google Play: listing, forms and publication
+
+Everything Play Console asks for, prepared from what the game actually
+does. Items marked **(you)** depend on your developer account, your choices or
+manual approval. They can't be done from the repository.
+
+## Before the first upload: open items
+
+1. **(you) Supabase migrations.** In the SQL Editor run, in order:
+   - `0005_ghosts_and_alliances.sql` (still not fully applied: leaving an
+     alliance fails);
+   - `0007_delete_account.sql` (the in-game *Delete account* button needs it).
+
+   The `cloud-e2e` workflow checks both.
+2. **(you) Contact email.** Replace `CONTACT_EMAIL` in
+   `public/privacy/index.html` and `public/delete-account/index.html`. Use the
+   address you will also show on the store listing.
+3. **(you) 3D car model licences.** Three car models are **CC BY-NC-SA 4.0
+   (non-commercial)**: `sports-1975.glb`, `electric-survolt.glb` and
+   `hypercar-dmc12.glb` (`public/models/CREDITS.txt`).
+   - A free app with no ads and no purchases is arguably non-commercial.
+   - With ads or purchases it is not.
+
+   They also recreate real cars and film cars (Porsche 911, DeLorean "Back to
+   the Future", Nissan R34 "Fast & Furious", Citroën). The badges are hidden,
+   but the shapes are recognisable, and Google Play's
+   [intellectual property policy](https://support.google.com/googleplay/android-developer/answer/9888072)
+   lets the owners file complaints. For a store release, the safest path is to
+   replace those models with original or permissively licensed ones, or to
+   fall back to the game's own procedural car bodies. That decision is yours.
+4. **(you) Upload key.** Create it and give it to the build ([signing.md](signing.md)).
+5. **(you) Supabase plan.** The free plan pauses a project after a week
+   without activity. Paused, the cloud save and the leaderboards stop, and
+   the game falls back to saving on the device.
+   - Supabase Pro (paid) avoids the pause.
+   - Free alternatives: keep the project active (any visit or the CI checks
+     count) and restore it from the dashboard if it pauses.
+6. **(you) Auth redirect URLs.** Email confirmations from the app link to
+   `https://zazochannel-art.github.io/Idle-Car-Empire/`. It must be listed
+   under Supabase → Authentication → URL Configuration → Redirect URLs (it
+   already is if confirmations work on the web game).
+
+## Store listing
+
+**App name** (30 characters max): `Idle Car Empire`
+
+**Short description** (80 max):
+> Build car factories, run the supply chain and grow your own car empire.
+
+**Full description** (4000 max):
+
+> Start with one small workshop and build a car empire of your own.
+>
+> Idle Car Empire is a tycoon game about making cars from the ground up. Build
+> body works, engine factories, tire, glass, interior and battery plants, and
+> an assembly line that turns their parts into finished cars. Trucks carry
+> every part across a living 3D city. Sell the cars through your dealers and
+> watch the money roll in, even while you're away.
+>
+> BUILD THE WHOLE SUPPLY CHAIN
+> • Over a dozen kinds of factories, each one feeding the next
+> • Buy land, construct buildings and upgrade every plant through 15 levels
+> • Step inside your factories: machines, workers and assembly lines at work
+> • Logistics: trucks and transport upgrades keep the parts flowing
+>
+> DESIGN AND SELL YOUR CARS
+> • Unlock car models from city cars to supercars, hypercars and electric cars
+> • Paint and tune them in the garage
+> • Dealers with real demand, market events and client contracts
+>
+> GROW YOUR EMPIRE
+> • Research new technology, up to electric and self-driving cars
+> • Hire managers to run your plants
+> • Missions, milestones, achievements and a free season pass
+> • Race your cars on the circuit and against other players' ghost cars
+> • Reset your empire for Stars and permanent bonuses
+>
+> PLAY YOUR WAY
+> • Your factories keep producing while you're offline
+> • Plays offline: no connection needed after installing
+> • Optional account with cloud save to continue on another device or on the web
+> • Leaderboards, alliances and daily gifts with other players
+> • Battery saver and low-graphics mode for older phones
+> • English, Română, Русский
+>
+> No ads. No in-app purchases.
+
+Check that the description still matches the build you upload: if a feature
+is removed (for example a car model), update the text.
+
+**Category**: Game → Simulation. **Tags** (pick up to 5 in Play Console):
+Tycoon, Idle, Business, Management, Simulation.
+
+**Contact details (you)**: email (required, public), website
+`https://zazochannel-art.github.io/Idle-Car-Empire/` (optional).
+
+**Privacy policy URL**:
+`https://zazochannel-art.github.io/Idle-Car-Empire/privacy/`. It is live once
+this branch is merged and Pages has deployed. It is also linked in the game:
+Settings → Privacy policy.
+
+### Graphics (in `docs/android/store/`)
+
+| Asset | Required | File |
+| --- | --- | --- |
+| App icon, 512×512 PNG, 32-bit, ≤1 MB | yes | `docs/android/store/icon-512.png` |
+| Feature graphic, 1024×500 PNG/JPEG, no transparency | yes | `docs/android/store/feature-graphic.png` |
+| Phone screenshots, 2–8, 16:9 or 9:16, 320–3840 px per side | yes (min 2; 4+ at 1080 px or more recommended for games) | `docs/android/store/phone-1…6-*.jpg` (1080×1920) |
+| 7" and 10" tablet screenshots | optional (recommended if you list for tablets) | not made |
+| Promo video (YouTube link) | optional | not made |
+
+The screenshots come from the real game (a late-game save, the 3D map
+rendered in software), captured at 1080×1920.
+
+### Release notes (1.0.0)
+
+> First release of Idle Car Empire for Android: build factories, run the car
+> supply chain, race, and grow your empire, online or offline.
+
+## App content (Policy → App content)
+
+**Privacy policy**: the URL above.
+
+**Ads**: *No, my app does not contain ads.*
+
+**App access**: *All functionality is available without special access.*
+Reviewers can tap "Play without an account" on the welcome page.
+
+**Content rating** (IARC questionnaire), as the game is today:
+- Category: Game.
+- Violence, fear, sexuality, language, controlled substances, crude humour: **none**.
+- Gambling or simulated gambling: **none** (no casino games, no paid random items).
+- **Users can interact / share content: yes.** Other players see player names,
+  company names and alliance names chosen by players, on leaderboards, visits
+  and alliances. There is no chat.
+- Shares the user's location: no.
+- Digital purchases: no.
+
+The likely outcome is *Everyone / PEGI 3* with a "Users Interact" notice. The
+rating authority decides.
+
+**Target audience (you)**: the game is not designed for children.
+- Recommended: **13 and over**.
+- If you include under-13 age groups, the
+  [Families policy](https://support.google.com/googleplay/android-developer/answer/9893335)
+  applies (stricter rules for accounts, data and any future ads).
+
+**Data safety** form. Answers that match the code and the privacy policy:
+
+- Does the app collect or share user data? **Yes, collects; does not share.**
+  Supabase processes data on your behalf, which is not "sharing".
+- Is all data encrypted in transit? **Yes** (HTTPS).
+- Can users request deletion? **Yes**. In the app (Profile → Delete account)
+  and at `https://zazochannel-art.github.io/Idle-Car-Empire/delete-account/`.
+
+| Data type | Collected | Optional? | Purpose |
+| --- | --- | --- | --- |
+| Personal info → **Email address** | yes | optional (only with an account) | Account management |
+| Personal info → **Name** (player nickname) | yes | required (a generated name, can be changed) | App functionality |
+| Personal info → **User IDs** (account id) | yes | required when online (guest accounts too) | App functionality, Account management |
+| App activity → **Other actions** (game progress / save) | yes | required when online | App functionality |
+| App activity → **Other user-generated content** (company and alliance names) | yes | optional | App functionality |
+| App activity → **App interactions** (anonymous beginner steps) | yes | optional (Settings → Anonymous statistics) | Analytics |
+
+Not collected: location, contacts, photos/files, messages, financial info,
+health, web history, device or advertising IDs, audio, calendar. The
+"Android · Chrome" device label stored with saves is a type, not an
+identifier.
+
+**Other declarations**:
+- News app: no.
+- COVID-19 apps: no.
+- Government app: no.
+- Financial features: none.
+- Health: no.
+- Data used for ads: no.
+
+## Publishing, step by step
+
+1. **(you) Developer account**:
+   [play.google.com/console/signup](https://play.google.com/console/signup).
+   - A one-time US$25 fee, identity verification, and a choice between a
+     *personal* and an *organization* account.
+   - The fee is Google Play's only cost. Without it, the alternatives are to
+     share the APK yourself or publish on other stores. Both are free, but
+     players see "unknown app" warnings and get no automatic updates.
+2. **(you) Create the app**: All apps → Create app → name *Idle Car Empire*,
+   default language, **Game**, **Free**, accept the declarations.
+3. **Store listing**: paste the texts above and upload the graphics from
+   `docs/android/store/`.
+4. **App content**: the forms above (privacy policy, ads, app access, content
+   rating, target audience, data safety, the other declarations).
+5. **Signed bundle**: run *Actions → Android* on `main` (with the key in the
+   secrets) and download `idle-car-empire-release-aab`, or build it locally
+   ([signing.md](signing.md)). Check the log line `release bundle: SIGNED`.
+6. **Testing track.** Testing → Internal testing → Create release, upload
+   `app-release.aab`, accept Play App Signing, add release notes, save,
+   review, roll out. Internal testing (up to 100 testers by email) takes
+   minutes and is the quickest way to try the store build.
+7. **(you) Closed testing, if your account needs it.** For **personal
+   accounts created after 13 November 2023**, Google requires a closed test
+   with **at least 12 testers opted in for 14 days in a row** before
+   Production can be requested
+   ([Play Console Help](https://support.google.com/googleplay/android-developer/answer/14151465)).
+   - Testing → Closed testing → create a track, upload the bundle, and add a
+     list of testers' Google accounts (or a Google Group).
+   - Send them the opt-in link. They install from Play and play during the
+     14 days.
+   - If testers opt out before 14 days, they don't count. Google may ask for
+     more testing if engagement is low.
+   - Organization accounts don't have this requirement.
+8. **(you) Apply for production**: Dashboard → *Apply for production* (after
+   the closed test). Answer the questions about the test; approval usually
+   takes a few days.
+9. **Pre-launch report and warnings**: Play tests the bundle on real devices
+   (Testing → Pre-launch report). Fix crashes and errors. Warnings such as
+   accessibility contrast are advice, not blockers.
+10. **(you) Production release**: Production → Create release → the same (or
+    a newer) bundle, the countries, release notes → *Send for review*. Google
+    reviews it, often within a few days, sometimes longer for new accounts.
+11. **(you) Publish**: when approved, the release goes live (or wait for
+    *Managed publishing* if you turned it on). The app is published only when
+    Play Console shows it as *Available on Google Play*.
+
+## Updates
+
+1. Raise `versionCode`/`versionName` in `android/version.properties`.
+2. Build a signed bundle and upload it to the track you want.
+3. Write the release notes and roll it out.
+
+Google Play requires each new upload to target the API level current at the
+time. It is Android 16 (API 36) for new apps and updates since 31 August 2026,
+and rises about every August. Capacitor's next major versions bring the next
+target.
