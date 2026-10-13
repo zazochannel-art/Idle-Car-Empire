@@ -15,6 +15,13 @@ import { useUi } from "@/store/ui-store";
 /** How long the camera follows the car out of the plant before the card shows. */
 const ROLL_OUT_MS = 4200;
 
+function closeCelebration() {
+  const u = useUi.getState();
+  u.setCelebrate(null);
+  // show the Local Dealer the first car just opened
+  u.selectPlot("d:local");
+}
+
 /**
  * FIRST CAR COMPLETED: the camera follows the car as it rolls out of the
  * assembly plant (the map draws that), then a card shows what it is worth.
@@ -42,17 +49,23 @@ export function FirstCarOverlay() {
     return () => clearTimeout(id);
   }, [celebrate]);
 
+  // Escape (and the phone's Back button) does what Continue does, unless a dialog over it used it
+  useEffect(() => {
+    if (!celebrate) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      e.preventDefault();
+      closeCelebration();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [celebrate]);
+
   if (!celebrate) return null;
   const car = CAR_BY_ID[celebrate.car];
   const { state, snap } = useGame.getState();
   const cost = carPartsValue(car);
   const value = carValue(state, car, snap.gm);
-  const close = () => {
-    setCelebrate(null);
-    // show the Local Dealer the first car just opened
-    useUi.getState().selectPlot("d:local");
-  };
-
   return (
     <div className="pointer-events-none fixed inset-0 z-50 flex items-start justify-center pt-[18vh]">
       <motion.div initial={{ opacity: 0, y: -20, scale: 0.8 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="absolute inset-x-4 top-[calc(env(safe-area-inset-top)+7.5rem)] text-center md:top-[8vh]">
@@ -79,7 +92,7 @@ export function FirstCarOverlay() {
               <Cell label={t("cars.profit")} value={formatMoney(value - cost)} gold />
             </div>
             <p className="mt-3 text-xs text-white/55">{t("firstCar.next")}</p>
-            <Button variant="gold" size="lg" className="mt-4 w-full" onClick={close}>
+            <Button variant="gold" size="lg" className="mt-4 w-full" onClick={closeCelebration}>
               {t("firstCar.continue")}
             </Button>
           </motion.div>

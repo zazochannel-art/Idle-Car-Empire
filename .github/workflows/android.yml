@@ -79,7 +79,12 @@ jobs:
           echo "::group::debug APK"
           "$BT/aapt2" dump badging "$APK" | grep -E "^(package|sdkVersion|targetSdkVersion|application-label|uses-permission)"
           echo "::endgroup::"
-          gh release download --repo google/bundletool --pattern 'bundletool-all-*.jar' --dir "$RUNNER_TEMP" --clobber
+          # (GitHub's release downloads answer 500 now and then: a few tries before giving up)
+          for i in 1 2 3 4; do
+            gh release download --repo google/bundletool --pattern 'bundletool-all-*.jar' --dir "$RUNNER_TEMP" --clobber && break
+            [ "$i" = 4 ] && exit 1
+            sleep $((i * 10))
+          done
           BUNDLETOOL=$(ls "$RUNNER_TEMP"/bundletool-all-*.jar | tail -1)
           echo "::group::release bundle ($(basename "$BUNDLETOOL"))"
           java -jar "$BUNDLETOOL" validate --bundle "$AAB"
