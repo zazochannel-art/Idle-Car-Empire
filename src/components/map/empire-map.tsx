@@ -357,7 +357,7 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
           </div>
         </div>
       )}
-      <div className="pointer-events-none absolute right-[calc(env(safe-area-inset-right)+0.5rem)] top-[9.25rem] z-20 md:right-[calc(env(safe-area-inset-right)+0.75rem)] md:top-[5.5rem]">
+      <div className="pointer-events-none absolute right-[calc(env(safe-area-inset-right)+0.5rem)] top-[calc(env(safe-area-inset-top)+9.25rem)] z-20 md:right-[calc(env(safe-area-inset-right)+0.75rem)] md:top-[calc(env(safe-area-inset-top)+5.5rem)]">
         <Minimap engine={engineRef} />
       </div>
       <Showcase />

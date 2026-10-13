@@ -1,0 +1,48 @@
+// The Android app's link to the phone (loaded only inside the app, see
+// components/game/native-app.tsx): the system Back button, and the app going
+// to the background and coming back.
+import { App } from "@capacitor/app";
+import { useGame } from "@/store/game-store";
+import { useUi } from "@/store/ui-store";
+
+/** Something the Back button can close: a dialog, or one of the game's screens over the map. */
+function somethingOpen(): boolean {
+  if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return true;
+  const u = useUi.getState();
+  return !!(u.view || u.plot || u.zone || u.garage || u.floor || u.race || u.preview || u.showcase || u.celebrate);
+}
+
+/**
+ * Back closes what is on top, the same way Escape does on a keyboard (every dialog,
+ * sheet, factory floor and the garage already answers it); the race viewer has only
+ * its close button, so Back does what that does. With nothing open, Back puts the app
+ * in the background like the Home button: the company keeps running and the game is
+ * where it was when the player returns.
+ */
+function back() {
+  const u = useUi.getState();
+  const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]');
+  if (!dialog && u.race) {
+    u.setRace(null);
+    return;
+  }
+  if (!somethingOpen()) {
+    void App.minimizeApp();
+    return;
+  }
+  const target = document.activeElement instanceof HTMLElement ? document.activeElement : document.body;
+  target.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", keyCode: 27, bubbles: true, cancelable: true }));
+}
+
+let started = false;
+
+export async function startNative() {
+  if (started) return;
+  started = true;
+  await App.addListener("backButton", back);
+  // Leaving the app (Home, another app, the screen turning off): save now and stop
+  // ticking, since Android may close a background app at any moment and a stopped
+  // game uses no battery. Coming back settles the time away like any absence.
+  await App.addListener("pause", () => useGame.getState().suspend());
+  await App.addListener("resume", () => useGame.getState().resume());
+}

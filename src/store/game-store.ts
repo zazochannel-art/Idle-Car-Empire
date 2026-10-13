@@ -116,6 +116,10 @@ interface GameStore {
   /** Takes a reward tier of the alliance's weekly goal (the server decides): its answer. */
   claimAllianceTier: (tier: number) => Promise<import("@/game/save").ClaimTierResult | "error">;
   init: () => Promise<void>;
+  /** The app went to the background (Android): saves at once and stops ticking until it is back. */
+  suspend: () => void;
+  /** Back in front: ticks again, the time away settled like any absence. */
+  resume: () => void;
   /** Runs a player action on a copy of the state and commits it if it succeeded. */
   act: <T>(fn: (s: GameState) => T) => T;
 
@@ -239,6 +243,8 @@ const saves = typeof window !== "undefined" ? new SaveManager({ onSync: (sync) =
 let loop: ReturnType<typeof setInterval> | null = null;
 /** Set as init starts (it awaits the save): a second call meanwhile must not start a second loop. */
 let starting = false;
+/** The app is in the background (Android): the loop stays stopped until it is back. */
+let away = false;
 let lastTick = 0;
 let lastView = 0;
 let lastSave = 0;
@@ -607,7 +613,7 @@ export const useGame = create<GameStore>((set, get) => {
         const snap = snapshot(state);
         set({ ready: true, state, snap, view: { state, snap } });
       }
-      loop = setInterval(runTick, TICK_MS);
+      if (!away) loop = setInterval(runTick, TICK_MS);
       // the battery saver: the setting, then the battery (auto turns it on when low)
       setSaverSetting(state.settings.saver);
       startPower();
@@ -1011,6 +1017,20 @@ export const useGame = create<GameStore>((set, get) => {
       } catch {
         return false;
       }
+    },
+    suspend: () => {
+      away = true;
+      if (!loop) return;
+      clearInterval(loop);
+      loop = null;
+      persist(true);
+      void saves?.flush();
+    },
+    resume: () => {
+      away = false;
+      if (loop || !get().ready) return;
+      runTick();
+      loop = setInterval(runTick, TICK_MS);
     },
     resetGame: async () => {
       saves?.clearLocal();
