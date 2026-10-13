@@ -43,23 +43,30 @@ jobs:
           # the same public Supabase project and key as the web build (pages.yml)
           NEXT_PUBLIC_SUPABASE_URL: https://orffhhsogoymalyogfzl.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_hqGfNt6uaNbq0AgGyp0I8g_QLjjFaJ-
+      # The upload key signs the release bundle on main and on manual runs, never on pull
+      # requests (their code could read it). Without the secrets the bundle is unsigned.
       - name: Upload key (when the repository has it)
+        if: github.event_name != 'pull_request'
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
             echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.jks"
-            echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
-            echo "Release bundle will be signed with the upload key."
+            {
+              echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/upload.jks"
+              echo "ANDROID_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD"
+              echo "ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS"
+              echo "ANDROID_KEY_PASSWORD=$ANDROID_KEY_PASSWORD"
+            } >> "$GITHUB_ENV"
+            echo "The release bundle will be signed with the upload key."
           else
             echo "No ANDROID_KEYSTORE_BASE64 secret: the release bundle will be unsigned."
           fi
       - name: Gradle build (debug APK, release bundle, lint)
         working-directory: android
-        env:
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: ./gradlew --no-daemon --stacktrace assembleDebug bundleRelease lintDebug
       - name: Inspect the APK and the bundle
         env:
@@ -138,6 +145,12 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
           script: node scripts/android-device-check.mjs android/app/build/outputs/apk/debug/app-debug.apk --reboot --out android-check
+      # a small JPEG of the game on the emulator, in the log (base64), to look at without downloading
+      - name: Game screen thumbnail
+        if: always()
+        run: |
+          f=android-check/1-game.png
+          if [ -f "$f" ]; then node -e "require('sharp')(process.argv[1]).resize(360).jpeg({ quality: 55 }).toBuffer().then((b) => console.log(b.toString('base64')))" "$f" || true; fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:

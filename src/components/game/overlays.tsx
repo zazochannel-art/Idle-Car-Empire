@@ -13,7 +13,7 @@ import { LANGS } from "@/i18n";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { batteryState, isSaving, powerVersion, watchPower, type SaverSetting } from "@/lib/power";
-import { publicPageUrl } from "@/lib/platform";
+import { publicPageUrl, WEB_URL } from "@/lib/platform";
 import { uiEvents, type UiEvent, type UiToastAction } from "@/store/events";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
@@ -408,6 +408,11 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
             </a>{" · "}
             <a className="underline" href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">
               CC BY 4.0
+            </a>
+          </p>
+          <p className="mt-1.5">
+            <a className="underline" href={`${WEB_URL}privacy/`} target="_blank" rel="noreferrer">
+              {t("settings.privacy")}
             </a>
           </p>
         </div>

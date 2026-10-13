@@ -30,7 +30,7 @@ const PORT = 9333;
 fs.mkdirSync(outDir, { recursive: true });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const adb = (...a) => execFileSync("adb", a, { encoding: "utf8", maxBuffer: 64 << 20 }).trim();
+const adb = (...a) => execFileSync("adb", a, { encoding: "utf8", maxBuffer: 64 << 20, stdio: ["ignore", "pipe", "pipe"] }).trim();
 const results = [];
 function check(ok, what, detail = "") {
   results.push({ ok, what, detail });
@@ -58,8 +58,11 @@ async function connect(timeoutMs = 120_000) {
         }
         adb("forward", `tcp:${PORT}`, `localabstract:${name}`);
         const pages = await (await fetch(`http://127.0.0.1:${PORT}/json`)).json();
-        const page = pages.find((p) => p.type === "page" && p.url.startsWith("https://localhost"));
+        const games = pages.filter((p) => p.type === "page" && p.url.startsWith("https://localhost"));
+        const page = games[0];
         if (page) {
+          // (one game page per app: more would mean two copies of the game running)
+          console.log(`      devtools: ${pages.length} target(s): ${pages.map((p) => `${p.type} ${p.url} ${p.id.slice(0, 8)}`).join(" | ")}`);
           ws?.close();
           ws = new WebSocket(page.webSocketDebuggerUrl);
           await new Promise((res, rej) => {
@@ -82,11 +85,12 @@ async function connect(timeoutMs = 120_000) {
   throw new Error("the app's WebView never became inspectable");
 }
 
-async function evaluate(expression) {
+// (generous: on an emulator without a GPU the first 3D frames keep the page busy for a while)
+async function evaluate(expression, timeoutMs = 120_000) {
   const id = nextId++;
   const reply = new Promise((res) => pending.set(id, res));
   ws.send(JSON.stringify({ id, method: "Runtime.evaluate", params: { expression, awaitPromise: true, returnByValue: true } }));
-  const msg = await Promise.race([reply, sleep(30_000).then(() => ({ error: { message: "timeout" } }))]);
+  const msg = await Promise.race([reply, sleep(timeoutMs).then(() => ({ error: { message: `no answer from the page in ${timeoutMs / 1000} s` } }))]);
   if (msg.error) throw new Error(msg.error.message);
   if (msg.result.exceptionDetails) throw new Error(msg.result.exceptionDetails.text);
   return msg.result.result.value;
@@ -110,11 +114,34 @@ const GAME_UP = `(document.querySelector("header .race-type")?.getBoundingClient
 const DIALOG_OPEN = `!!document.querySelector('[role="dialog"], [role="alertdialog"]')`;
 const SAVED = `(() => { const r = localStorage.getItem(${JSON.stringify(SAVE)}); if (!r) return null; const d = JSON.parse(r); return { createdAt: d.state.createdAt, lang: d.state.settings.lang, savedAt: d.savedAt }; })()`;
 
+/** What Android and the WebView said (the app's lifecycle, console errors, crashes), kept in the output folder. */
+function dumpLogcat(name, tail) {
+  try {
+    const log = adb("logcat", "-d", "-v", "time")
+      .split("\n")
+      .filter((l) => /Capacitor|chromium|AndroidRuntime|idlecarempire|WebView/.test(l) && !/Handling local request|Loading app at/.test(l));
+    fs.writeFileSync(path.join(outDir, `${name}.txt`), log.join("\n"));
+    console.log(`\n${name} (${log.length} lines, last ${tail}):\n${log.slice(-tail).join("\n")}\n`);
+  } catch (e) {
+    console.log(`${name}:`, e.message);
+  }
+}
+
 const inFront = () =>
   adb("shell", "dumpsys", "window")
     .split("\n")
     .some((l) => /mCurrentFocus|mFocusedApp/.test(l) && l.includes(PKG));
 const shot = (name) => fs.writeFileSync(path.join(outDir, `${name}.png`), execFileSync("adb", ["exec-out", "screencap", "-p"], { maxBuffer: 64 << 20 }));
+
+/** Waits until the page answers quickly again (the map's first frames are heavy without a GPU). */
+async function settle() {
+  const end = Date.now() + 300_000;
+  while (Date.now() < end) {
+    const t = Date.now();
+    await evaluate("1", 120_000).catch(() => {});
+    if (Date.now() - t < 3000) return;
+  }
+}
 
 async function launch() {
   adb("shell", "am", "start", "-W", "-n", `${PKG}/${ACTIVITY}`);
@@ -122,7 +149,12 @@ async function launch() {
   // a no-cloud build goes straight in; a cloud build shows the welcome page to a new player
   const end = Date.now() + 240_000;
   while (Date.now() < end) {
-    if (await evaluate(GAME_UP).catch(() => false)) return;
+    if (await evaluate(GAME_UP).catch(() => false)) {
+      await settle();
+      const t = await evaluate("performance.timeOrigin").catch(() => 0);
+      console.log(`      page started ${new Date(t).toISOString()}`);
+      return;
+    }
     const guest = await evaluate(`(() => { const b = [...document.querySelectorAll("button")].find((x) => /without an account/i.test(x.textContent)); if (b) { b.click(); return true; } return false; })()`).catch(() => false);
     if (guest) console.log("      (welcome page: played without an account)");
     await sleep(1500);
@@ -182,10 +214,17 @@ try {
   check(!inFront(), "Back with nothing open puts the app in the background");
   const after = await evaluate(SAVED);
   check(after.savedAt > before, "leaving the app saved the game at once", `${new Date(before).toISOString()} → ${new Date(after.savedAt).toISOString()}`);
-  // while it plays, the game saves every 5 s: in the background nothing more is written
-  await sleep(8000);
+  // while it plays, the game saves every 5 s; in the background, after the save of leaving (and
+  // the page's own one when it is hidden), nothing more is written
+  await sleep(4000);
+  const quiet = await evaluate(SAVED);
+  await sleep(12_000);
   const later = await evaluate(SAVED);
-  check(later.savedAt === after.savedAt, "the game stops ticking in the background (no battery use)", later.savedAt === after.savedAt ? "no saves for 8 s" : "still saving");
+  check(
+    later.savedAt === quiet.savedAt,
+    "the game stops ticking in the background (no battery use)",
+    later.savedAt === quiet.savedAt ? "no saves for 12 s" : `still saving: ${new Date(quiet.savedAt).toISOString()} → ${new Date(later.savedAt).toISOString()}`,
+  );
 
   // 5. back to the app: it continues where it was
   adb("shell", "am", "start", "-W", "-n", `${PKG}/${ACTIVITY}`);
@@ -210,6 +249,7 @@ try {
 
   // 8. the phone restarts
   if (reboot) {
+    dumpLogcat("logcat-before-reboot", 80);
     await sleep(6000);
     adb("shell", "input", "keyevent", "KEYCODE_HOME");
     await sleep(3000);
@@ -232,6 +272,7 @@ try {
   }
 }
 ws?.close();
+dumpLogcat("logcat", 60);
 const failed = results.filter((r) => !r.ok);
 console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
 fs.writeFileSync(path.join(outDir, "results.json"), JSON.stringify(results, null, 1));

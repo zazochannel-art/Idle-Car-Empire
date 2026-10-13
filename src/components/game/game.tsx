@@ -32,7 +32,8 @@ import { ConflictDialog, ProfileView, StartGate } from "./account";
 import { Coach } from "./coach";
 import { AwayNotifier, FeedbackBridge } from "./feedback-bridge";
 import { NativeApp } from "./native-app";
-import { ServiceWorker } from "./service-worker";
+import { retry, ScreenBoundary } from "./screen-boundary";
+import { pruneOfflineCache, ServiceWorker } from "./service-worker";
 import { TransferImport } from "./transfer-import";
 import { LoginDialog } from "./login-dialog";
 import { goalText, runGoal } from "./goals";
@@ -73,27 +74,27 @@ const SCREENS = {
   floor: () => import("../plant/plant-floor"),
   interior: () => import("../plant/interior/factory-interior"),
 };
-const GarageView = lazy(() => SCREENS.garage().then((m) => ({ default: m.GarageView })));
-const AchievementsView = lazy(() => SCREENS.achievements().then((m) => ({ default: m.AchievementsView })));
-const CarsView = lazy(() => SCREENS.cars().then((m) => ({ default: m.CarsView })));
-const LogisticsView = lazy(() => SCREENS.logistics().then((m) => ({ default: m.LogisticsView })));
-const DealersView = lazy(() => SCREENS.dealers().then((m) => ({ default: m.DealersView })));
-const ProductionView = lazy(() => SCREENS.production().then((m) => ({ default: m.ProductionView })));
-const ManagersView = lazy(() => SCREENS.managers().then((m) => ({ default: m.ManagersView })));
-const MissionsView = lazy(() => SCREENS.missions().then((m) => ({ default: m.MissionsView })));
-const ImperiumView = lazy(() => SCREENS.imperium().then((m) => ({ default: m.ImperiumView })));
-const LeaderboardView = lazy(() => SCREENS.leaderboard().then((m) => ({ default: m.LeaderboardView })));
-const AllianceView = lazy(() => SCREENS.alliance().then((m) => ({ default: m.AllianceView })));
-const WinterView = lazy(() => SCREENS.winter().then((m) => ({ default: m.WinterView })));
-const PassView = lazy(() => SCREENS.pass().then((m) => ({ default: m.PassView })));
-const ResearchView = lazy(() => SCREENS.research().then((m) => ({ default: m.ResearchView })));
-const StatsView = lazy(() => SCREENS.stats().then((m) => ({ default: m.StatsView })));
-const EconomyView = lazy(() => SCREENS.economy().then((m) => ({ default: m.EconomyView })));
-const RacingView = lazy(() => SCREENS.racing().then((m) => ({ default: m.RacingView })));
-const StoryView = lazy(() => SCREENS.story().then((m) => ({ default: m.StoryView })));
-const RaceViewerScreen = lazy(() => SCREENS.raceViewer().then((m) => ({ default: m.RaceViewer })));
-const PlantFloor = lazy(() => SCREENS.floor().then((m) => ({ default: m.PlantFloor })));
-const FactoryInterior = lazy(() => SCREENS.interior().then((m) => ({ default: m.FactoryInterior })));
+const GarageView = lazy(() => retry(SCREENS.garage).then((m) => ({ default: m.GarageView })));
+const AchievementsView = lazy(() => retry(SCREENS.achievements).then((m) => ({ default: m.AchievementsView })));
+const CarsView = lazy(() => retry(SCREENS.cars).then((m) => ({ default: m.CarsView })));
+const LogisticsView = lazy(() => retry(SCREENS.logistics).then((m) => ({ default: m.LogisticsView })));
+const DealersView = lazy(() => retry(SCREENS.dealers).then((m) => ({ default: m.DealersView })));
+const ProductionView = lazy(() => retry(SCREENS.production).then((m) => ({ default: m.ProductionView })));
+const ManagersView = lazy(() => retry(SCREENS.managers).then((m) => ({ default: m.ManagersView })));
+const MissionsView = lazy(() => retry(SCREENS.missions).then((m) => ({ default: m.MissionsView })));
+const ImperiumView = lazy(() => retry(SCREENS.imperium).then((m) => ({ default: m.ImperiumView })));
+const LeaderboardView = lazy(() => retry(SCREENS.leaderboard).then((m) => ({ default: m.LeaderboardView })));
+const AllianceView = lazy(() => retry(SCREENS.alliance).then((m) => ({ default: m.AllianceView })));
+const WinterView = lazy(() => retry(SCREENS.winter).then((m) => ({ default: m.WinterView })));
+const PassView = lazy(() => retry(SCREENS.pass).then((m) => ({ default: m.PassView })));
+const ResearchView = lazy(() => retry(SCREENS.research).then((m) => ({ default: m.ResearchView })));
+const StatsView = lazy(() => retry(SCREENS.stats).then((m) => ({ default: m.StatsView })));
+const EconomyView = lazy(() => retry(SCREENS.economy).then((m) => ({ default: m.EconomyView })));
+const RacingView = lazy(() => retry(SCREENS.racing).then((m) => ({ default: m.RacingView })));
+const StoryView = lazy(() => retry(SCREENS.story).then((m) => ({ default: m.StoryView })));
+const RaceViewerScreen = lazy(() => retry(SCREENS.raceViewer).then((m) => ({ default: m.RaceViewer })));
+const PlantFloor = lazy(() => retry(SCREENS.floor).then((m) => ({ default: m.PlantFloor })));
+const FactoryInterior = lazy(() => retry(SCREENS.interior).then((m) => ({ default: m.FactoryInterior })));
 
 /** Loads every on-demand screen once the game has settled, one after another, when the browser is idle. */
 function usePrefetchScreens() {
@@ -102,12 +103,18 @@ function usePrefetchScreens() {
     const idle = (fn: () => void) => ("requestIdleCallback" in window ? window.requestIdleCallback(fn, { timeout: 4000 }) : setTimeout(fn, 200));
     const timer = setTimeout(() => {
       const queue = Object.values(SCREENS);
+      let failed = false;
       const next = () => {
         const load = queue.shift();
-        if (cancelled || !load) return;
+        if (cancelled) return;
+        // all of this version's screens are here: the offline cache can let go of older versions' files
+        if (!load) return void (!failed && pruneOfflineCache());
         load().then(
           () => idle(next),
-          () => idle(next),
+          () => {
+            failed = true;
+            idle(next);
+          },
         );
       };
       idle(next);
@@ -124,9 +131,11 @@ function RaceViewer() {
   const race = useUi((u) => !!u.race);
   if (!race) return null;
   return (
-    <Suspense fallback={null}>
-      <RaceViewerScreen />
-    </Suspense>
+    <ScreenBoundary onClose={() => useUi.getState().setRace(null)}>
+      <Suspense fallback={null}>
+        <RaceViewerScreen />
+      </Suspense>
+    </ScreenBoundary>
   );
 }
 
@@ -276,9 +285,11 @@ function Shell() {
   } else if (view) {
     title = viewTitle(view, t);
     body = (
-      <Suspense fallback={<ScreenLoading />}>
-        <ViewSwitch view={view} onSettings={openSettings} />
-      </Suspense>
+      <ScreenBoundary onClose={closeAll}>
+        <Suspense fallback={<ScreenLoading />}>
+          <ViewSwitch view={view} onSettings={openSettings} />
+        </Suspense>
+      </ScreenBoundary>
     );
     key = `view:${view}`;
   }
@@ -303,16 +314,18 @@ function Shell() {
 
       <AnimatePresence>
         {garage && (
-          <Suspense key={garage} fallback={null}>
-            <GarageView plotId={garage} />
-          </Suspense>
+          <ScreenBoundary key={garage} onClose={() => useUi.getState().exitGarage()}>
+            <Suspense fallback={null}>
+              <GarageView plotId={garage} />
+            </Suspense>
+          </ScreenBoundary>
         )}
       </AnimatePresence>
       <AnimatePresence>
         {floor && (
-          <Suspense key={floor} fallback={null}>
-            {HAS_INTERIOR.has(useGame.getState().state.city.buildings[floor]?.type ?? "") ? <FactoryInterior plotId={floor} /> : <PlantFloor plotId={floor} />}
-          </Suspense>
+          <ScreenBoundary key={floor} onClose={() => useUi.getState().openFloor(null)}>
+            <Suspense fallback={null}>{HAS_INTERIOR.has(useGame.getState().state.city.buildings[floor]?.type ?? "") ? <FactoryInterior plotId={floor} /> : <PlantFloor plotId={floor} />}</Suspense>
+          </ScreenBoundary>
         )}
       </AnimatePresence>
       <FirstCarOverlay />

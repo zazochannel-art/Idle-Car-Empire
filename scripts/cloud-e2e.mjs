@@ -2,12 +2,13 @@
 // only the public (publishable) key, exactly as the game's browser code
 // talks to it: two players A and B (anonymous accounts), saving, restoring,
 // revision conflicts, session restore, what each may (not) reach, the
-// leaderboard, visits and gifts, ghosts and alliances.
+// leaderboard, visits and gifts, ghosts and alliances, and a third player C
+// deleting their account.
 //
 //   NEXT_PUBLIC_SUPABASE_URL=… NEXT_PUBLIC_SUPABASE_ANON_KEY=… node scripts/cloud-e2e.mjs
 //
-// It leaves no save behind (each test player deletes its own); the two
-// anonymous accounts stay, named "e2e-…" (see docs/cloud-save.md to clear them).
+// It leaves no save behind (each test player deletes its own); the anonymous
+// accounts of A and B stay, named "e2e-…" (see docs/cloud-save.md to clear them).
 import { createClient } from "@supabase/supabase-js";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -196,6 +197,29 @@ const [, unknownStep] = await track(`${tag}-nonsense`);
 check(unknownStep === "unknown", "an unknown funnel step is turned away", JSON.stringify(unknownStep));
 const funnelRead = await anon.client.from("funnel_steps").select("id");
 check(!!funnelRead.error, "the funnel's table is out of the API's reach", funnelRead.error?.code);
+
+// ── account deletion (0007): a third test player deletes their account, and everything with it ──
+const c = browser();
+const signC = await c.client.auth.signInAnonymously();
+const idC = signC.data.user?.id;
+await c.client.from("profiles").update({ username: `${tag}-C` }).eq("id", idC);
+one(await c.client.rpc("save_game", { p_data: { cash: 5, createdAt: 3 }, p_save_version: 3, p_base_revision: 0, p_device: "e2e" }));
+const giftC = await c.client.rpc("send_gift", { p_to: idB });
+check(((await a.client.rpc("leaderboard", { p_kind: "all" })).data ?? []).some((r) => r.user_id === idC) && giftC.data === "sent", "C saves, is on the board and sends B a gift");
+const delC = await c.client.rpc("delete_my_account");
+check(delC.data === "ok", "a player deletes their account (0007 applied)", delC.error?.message ?? delC.data);
+if (delC.data === "ok") {
+  check(!((await a.client.rpc("leaderboard", { p_kind: "all" })).data ?? []).some((r) => r.user_id === idC), "the deleted player is off the board");
+  check(((await a.client.rpc("visit_empire", { p_user: idC })).data ?? []).length === 0, "and can't be visited");
+  check((await b.client.rpc("claim_gifts")).data === 0, "their gift went with them");
+  const gone = one(await c.client.rpc("load_game"));
+  check(gone?.data == null, "their save is gone (even with the old token)", JSON.stringify(gone?.data));
+  check(!!(await c.client.auth.refreshSession()).error, "their session can't be renewed");
+} else {
+  // 0007 not applied yet: clean up C like the others
+  await c.client.from("game_saves").delete().not("user_id", "is", null);
+  await c.client.auth.signOut();
+}
 
 // ── clean up: each test player deletes its own save (and so its card) ──
 for (const p of [a, b]) {
