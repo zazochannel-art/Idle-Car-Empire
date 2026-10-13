@@ -65,6 +65,7 @@ import * as Ps from "@/game/engine/pass";
 import { funnelDue, funnelMinutes } from "@/game/engine/funnel";
 import { browserOptOut, sendStep } from "@/game/save/funnel";
 import { PASS, type WeeklyId } from "@/game/config/pass";
+import { batteryState, isIdle, isSaving, minTickMs, onSaverChange, setSaverSetting, startPower, type SaverSetting } from "@/lib/power";
 
 const TICK_MS = 100;
 const SAVE_MS = 5_000;
@@ -219,6 +220,7 @@ interface GameStore {
   setAutoRepair: (on: boolean) => void;
   setBuyAmount: (a: BuyAmount) => void;
   setPref: (key: "lowGraphics" | "sound" | "haptics" | "notify" | "stats", on: boolean) => void;
+  setSaver: (saver: SaverSetting) => void;
   setLang: (lang: Lang) => void;
   exportSave: () => string;
   importSave: (text: string) => boolean;
@@ -274,6 +276,8 @@ export const useGame = create<GameStore>((set, get) => {
 
   function runTick() {
     const now = Date.now();
+    // the battery saver ticks less often (the engine runs on elapsed time, so nothing is lost)
+    if (isSaving() && now - lastTick < minTickMs(true, isIdle()) - 5) return;
     const dt = (now - lastTick) / 1000;
     lastTick = now;
     const { state, snap } = get();
@@ -580,6 +584,17 @@ export const useGame = create<GameStore>((set, get) => {
       lastSave = lastTick;
       set({ ready: true, state, snap: snapshot(state) });
       loop = setInterval(runTick, TICK_MS);
+      // the battery saver: the setting, then the battery (auto turns it on when low)
+      setSaverSetting(state.settings.saver);
+      startPower();
+      onSaverChange((on) => {
+        if (!on || get().state.settings.saver !== "auto") return;
+        // a moment later: at start the battery is read before the game screen listens for toasts
+        setTimeout(() => {
+          const b = batteryState();
+          if (isSaving() && get().state.settings.saver === "auto" && b) uiEvents.emit({ type: "toast", tone: "info", icon: "🔋", title: tr("saver.autoOn"), body: tr("saver.autoOnBody", { n: Math.round(b.level * 100) }) });
+        }, 2000);
+      });
 
       useCloud.setState({ phase: "ready" });
       // leaving or hiding the game: this device at once, the cloud right away (best effort: the
@@ -932,6 +947,13 @@ export const useGame = create<GameStore>((set, get) => {
       });
       persist(true);
     },
+    setSaver: (saver) => {
+      act((s) => {
+        s.settings.saver = saver;
+        return true;
+      });
+      persist(true);
+    },
     setBuyAmount: (a) => {
       act((s) => {
         s.settings.buyAmount = a;
@@ -978,4 +1000,9 @@ export const useGame = create<GameStore>((set, get) => {
       persist(true);
     },
   };
+});
+
+// the battery saver follows the setting, whichever way the state changed (a load, a reset)
+useGame.subscribe((s, prev) => {
+  if (s.state.settings.saver !== prev.state.settings.saver) setSaverSetting(s.state.settings.saver);
 });

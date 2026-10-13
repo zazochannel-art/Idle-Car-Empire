@@ -3,7 +3,7 @@
 import { CloudSection, NotifyToggle } from "./cloud-section";
 import { AnimatePresence, motion } from "framer-motion";
 import { Clock, Download, RotateCcw, Smartphone, Upload } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { formatDuration, formatHours, formatMoney, formatNumber } from "@/game/format";
@@ -12,6 +12,7 @@ import { transferLink } from "@/game/save/transfer";
 import { LANGS } from "@/i18n";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
+import { batteryState, isSaving, powerVersion, watchPower, type SaverSetting } from "@/lib/power";
 import { uiEvents, type UiEvent, type UiToastAction } from "@/store/events";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
@@ -305,6 +306,8 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
           </div>
         </div>
 
+        <SaverPicker />
+
         <div className="mt-4 space-y-1.5">
           <Toggle label={t("settings.lowGraphics")} hint={t("settings.lowGraphicsHint")} k="lowGraphics" />
           <Toggle label={t("settings.sound")} k="sound" />
@@ -409,6 +412,34 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+const SAVER_OPTIONS: SaverSetting[] = ["auto", "on", "off"];
+
+/** The battery saver: auto (on when the battery is low), on or off, and what it does now. */
+function SaverPicker() {
+  const { t } = useT();
+  const saver = useGame((g) => g.state.settings.saver);
+  const setSaver = useGame((g) => g.setSaver);
+  useSyncExternalStore(watchPower, powerVersion, powerVersion);
+  const battery = batteryState();
+  const active = isSaving();
+  const level = battery ? Math.round(battery.level * 100) : null;
+  const status = level === null ? t(active ? "saver.statusOn" : "saver.statusOff") : t(active ? "saver.statusOnBattery" : "saver.statusOffBattery", { n: level, charging: battery?.charging ? t("saver.charging") : "" });
+  return (
+    <div className="mt-4">
+      <div className="mb-1.5 text-xs font-semibold text-white/60">{t("saver.title")}</div>
+      <div role="radiogroup" aria-label={t("saver.title")} className="grid grid-cols-3 gap-1.5">
+        {SAVER_OPTIONS.map((id) => (
+          <Button key={id} role="radio" aria-checked={id === saver} size="sm" variant={id === saver ? "default" : "secondary"} onClick={() => setSaver(id)}>
+            {t(`saver.${id}`)}
+          </Button>
+        ))}
+      </div>
+      <div className="mt-1.5 text-[11px] text-white/45">{t(`saver.hint.${saver}`)}</div>
+      <div className={cn("mt-1 text-[11px] font-semibold", active ? "text-emerald-300" : "text-white/55")}>{status}</div>
+    </div>
   );
 }
 
