@@ -26,8 +26,8 @@ import { useContent } from "@/i18n/content";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
-import * as THREE from "three";
-import { buildCar, loadHeroes, type BodyModel } from "@/components/three/car-models";
+import type * as THREE_NS from "three";
+import type { BodyModel } from "@/components/three/car-models";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { CostButton } from "../game/cost-button";
@@ -59,8 +59,8 @@ export function processSteps(type: PlantType, t: T): string[] {
 
 /** A plant's controls; `inside` when shown in the factory itself (no "enter the factory" button there). */
 export function PlantPanel({ id, inside }: { id: string; inside?: boolean }) {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  const state = useGame((g) => g.view.state);
+  const snap = useGame((g) => g.view.snap);
   const g = useGame.getState();
   const openFloor = useUi((u) => u.openFloor);
   const { t } = useT();
@@ -236,8 +236,8 @@ export function PlantPanel({ id, inside }: { id: string; inside?: boolean }) {
  * The game recommends one from your body and engine output.
  */
 function EngineStrategy({ id }: { id: string }) {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  const state = useGame((g) => g.view.state);
+  const snap = useGame((g) => g.view.snap);
   const setCombine = useGame((g) => g.setCombine);
   const { t } = useT();
   const st = snap.chain.plants[id];
@@ -299,7 +299,7 @@ const STATION_PART: (ComponentId | null)[] = ["body", "engine", "suspension", "i
  * whether that part is in stock, missing, or not used by this model.
  */
 function AssemblyLine({ id, steps, step }: { id: string; steps: string[]; step: number }) {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const st = useGame((g) => g.snap.chain.plants[id]);
   const { t } = useT();
   const p = state.city.buildings[id]?.plant;
@@ -338,7 +338,7 @@ function AssemblyLine({ id, steps, step }: { id: string; steps: string[]; step: 
 
 /** The factory's manager: who runs it, or hire / assign one right here. */
 function ManagerSlot({ id }: { id: string }) {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const { hireManager, assignManager, upgradeManager } = useGame.getState();
   const setView = useUi((u) => u.setView);
   const { t, lang } = useT();
@@ -434,7 +434,7 @@ function EmergencyParts({ id, parts }: { id: string; parts: ComponentId[] }) {
 }
 
 function StatusLine({ id }: { id: string }) {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const st = useGame((g) => g.snap.chain.plants[id]);
   const { t } = useT();
   const b = state.city.buildings[id];
@@ -476,9 +476,10 @@ function StatusLine({ id }: { id: string }) {
 }
 
 const CAR_THUMB_CACHE = new Map<string, string>();
-let carThumbRenderer: THREE.WebGLRenderer | null = null;
+let carThumbRenderer: THREE_NS.WebGLRenderer | null = null;
 let carThumbCanvas: HTMLCanvasElement | null = null;
-let carThumbReady: Promise<void> | null = null;
+/** three.js and the car models load with the first thumbnail (they stay out of the first download). */
+let carThumbReady: Promise<{ THREE: typeof THREE_NS; buildCar: typeof import("@/components/three/car-models").buildCar }> | null = null;
 
 async function renderCarThumbnail(model: (typeof CARS)[number]["id"], color: string): Promise<string | null> {
   if (typeof window === "undefined") return null;
@@ -486,8 +487,11 @@ async function renderCarThumbnail(model: (typeof CARS)[number]["id"], color: str
   const cached = CAR_THUMB_CACHE.get(key);
   if (cached) return cached;
 
-  carThumbReady ??= loadHeroes(THREE);
-  await carThumbReady;
+  carThumbReady ??= Promise.all([import("three"), import("@/components/three/car-models")]).then(async ([THREE, models]) => {
+    await models.loadHeroes(THREE);
+    return { THREE, buildCar: models.buildCar };
+  });
+  const { THREE, buildCar } = await carThumbReady;
 
   carThumbCanvas ??= document.createElement("canvas");
   carThumbCanvas.width = 192;
@@ -552,8 +556,8 @@ function CarThumbnail({ model, color }: { model: (typeof CARS)[number]["id"]; co
 }
 
 function ModelPicker({ id }: { id: string }) {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  const state = useGame((g) => g.view.state);
+  const snap = useGame((g) => g.view.snap);
   const setPlantCar = useGame((g) => g.setPlantCar);
   const { t, lang } = useT();
   const n = useContent(lang);
@@ -665,8 +669,8 @@ function Stat({ label, value, gold }: { label: string; value: string; gold?: boo
 // ───────────────────────────── market & depot ─────────────────────────────
 
 export function MarketPanel() {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  const state = useGame((g) => g.view.state);
+  const snap = useGame((g) => g.view.snap);
   const { t } = useT();
   const onRoad = state.chain.shipments.filter((sh) => sh.to === MARKET && !sh.back);
   return (
@@ -697,7 +701,7 @@ export function MarketPanel() {
 }
 
 export function DepotPanel() {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const { t } = useT();
   const out = state.chain.shipments.filter((sh) => sh.from === DEPOT && !sh.back);
   return (
@@ -731,8 +735,8 @@ export function DepotPanel() {
 
 /** `inList`: shown under the dealer's own title, so its description is already on screen. */
 export function DealerPanel({ id, inList }: { id: DealerId; inList?: boolean }) {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  const state = useGame((g) => g.view.state);
+  const snap = useGame((g) => g.view.snap);
   const { buyDealer, upgradeDealer } = useGame.getState();
   const { t, lang } = useT();
   const n = useContent(lang);
@@ -801,7 +805,7 @@ export function DealerPanel({ id, inList }: { id: DealerId; inList?: boolean }) 
 
 /** The dealer's charging station (Charging Network research): its level, the cars the network charges and what it earns. */
 function ChargerCard({ id }: { id: DealerId }) {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const income = useGame((g) => g.snap.city.ev);
   const buildCharger = useGame((g) => g.buildCharger);
   const { t } = useT();
@@ -835,7 +839,7 @@ function ChargerCard({ id }: { id: DealerId }) {
 
 /** Over-the-Air Updates: the Autonomous Lounges on the road, the subscriptions the studios keep running, and what they pay. */
 function SubscriptionCard() {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const subs = useGame((g) => g.snap.city.ev.subs);
   const { t } = useT();
   const sub = subscriptions(state);

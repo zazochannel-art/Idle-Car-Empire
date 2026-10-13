@@ -6,32 +6,14 @@
 import type * as THREE_NS from "three";
 import { liveryOf } from "./livery";
 import type { Facing } from "./glb-car";
+import { CAR_LENGTH, type BodyModel } from "./car-sizes";
+
+export { CAR_LENGTH, type BodyModel };
 
 type Three = typeof THREE_NS;
 
-export type BodyModel = "city" | "sedan" | "suv" | "sports" | "muscle" | "luxury" | "supercar" | "hypercar" | "electric" | "compact" | "minivan" | "offroad" | "pickup" | "wagon" | "robotaxi";
-
 /** Rim finish of the truck wheels. */
 type Rims = "silver" | "black" | "dark" | "chrome";
-
-/** Bumper-to-bumper length of each body, metres: its ready-made model is scaled to it. */
-export const CAR_LENGTH: Record<BodyModel, number> = {
-  city: 3.98,
-  sedan: 4.35,
-  suv: 4.8,
-  sports: 4.25,
-  muscle: 4.65,
-  luxury: 4.5,
-  supercar: 4.55,
-  hypercar: 4.6,
-  electric: 4.5,
-  compact: 3.9,
-  minivan: 4.9,
-  offroad: 4.3,
-  pickup: 5.3,
-  wagon: 4.6,
-  robotaxi: 4.7,
-};
 
 /** How far the car is in the assembly process (assembly-line view). */
 export interface BuildStage {

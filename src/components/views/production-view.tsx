@@ -25,8 +25,8 @@ import { SectionTitle } from "./section-title";
  * customers, with what each link makes per minute and where it is stuck.
  */
 export function ProductionView() {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  const state = useGame((g) => g.view.state);
+  const snap = useGame((g) => g.view.snap);
   const selectPlot = useUi((u) => u.selectPlot);
   const setView = useUi((u) => u.setView);
   const { t, lang } = useT();

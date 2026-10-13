@@ -125,6 +125,24 @@ export function createInitialState(now: number): GameState {
   };
 }
 
+/**
+ * A deep copy of plain data (objects, arrays, numbers, strings, booleans, null,
+ * undefined): what the game state is made of, since it is saved as JSON. About
+ * three times faster than structuredClone, which matters at ten ticks a second.
+ */
+function copy<T>(v: T): T {
+  if (v === null || typeof v !== "object") return v;
+  if (Array.isArray(v)) {
+    const n = v.length;
+    const out = new Array(n);
+    for (let i = 0; i < n; i++) out[i] = copy(v[i]);
+    return out as T;
+  }
+  const out: Record<string, unknown> = {};
+  for (const k in v) out[k] = copy((v as Record<string, unknown>)[k]);
+  return out as T;
+}
+
 export function cloneState(s: GameState): GameState {
-  return structuredClone(s);
+  return copy(s);
 }

@@ -70,7 +70,7 @@ export function EventCard() {
 
 /** The running event's objective: what to do before it ends, and its reward. */
 export function EventGoalCard() {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const claim = useGame((g) => g.claimEventGoal);
   const { t } = useT();
   const g = eventGoal(state, state.lastActiveAt);

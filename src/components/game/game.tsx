@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, Briefcase, Car, Crown, Factory, Flag, Hammer, ListChecks, Map as MapIcon, TrendingUp, Users } from "lucide-react";
-import { memo, useEffect, useState, useSyncExternalStore } from "react";
+import { lazy, memo, Suspense, useEffect, useState, useSyncExternalStore } from "react";
 import { Progress } from "@/components/ui/progress";
 import { MANAGERS } from "@/game/config/managers";
 import { RESEARCH } from "@/game/config/research";
@@ -23,31 +23,12 @@ import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { useGame } from "@/store/game-store";
 import { useUi, type View } from "@/store/ui-store";
-import { GarageView } from "../garage/garage-view";
 import { EmpireMap } from "../map/empire-map";
 import { BuildPanel, GaragesView, MechanicsSummary, MenuPanel, PlotPanel, UpgradePanel, ZonePanel, plotTitle } from "../panels/map-panels";
 import { Sheet } from "../panels/sheet";
-import { AchievementsView } from "../views/achievements-view";
-import { CarsView } from "../views/cars-view";
-import { LogisticsView } from "../views/logistics-view";
-import { DealersView } from "../views/dealers-view";
-import { ProductionView } from "../views/production-view";
-import { ManagersView } from "../views/managers-view";
-import { MissionsView } from "../views/missions-view";
-import { ImperiumView } from "../views/imperium-view";
-import { LeaderboardView } from "../views/leaderboard-view";
-import { AllianceView } from "../views/alliance-view";
-import { WinterView } from "../views/winter-view";
-import { PassView } from "../views/pass-view";
 import { passWaiting } from "@/game/engine/pass";
 import { winterWaiting } from "@/game/engine/winter";
-import { ResearchView } from "../views/research-view";
-import { StatsView } from "../views/stats-view";
-import { EconomyView } from "../views/economy-view";
-import { RacingView } from "../views/racing-view";
-import { StoryView } from "../views/story-view";
 import { ConflictDialog, ProfileView, StartGate } from "./account";
-import { RaceViewer } from "../racing/race-viewer";
 import { Coach } from "./coach";
 import { AwayNotifier, FeedbackBridge } from "./feedback-bridge";
 import { ServiceWorker } from "./service-worker";
@@ -61,10 +42,101 @@ import { Onboarding } from "./onboarding";
 import { UnlockCard } from "./unlock-card";
 import { RecallDialog } from "./recall-dialog";
 import { PoachDialog } from "../views/expansion-cards";
-import { PlantFloor } from "../plant/plant-floor";
-import { FactoryInterior, HAS_INTERIOR } from "../plant/interior/factory-interior";
+import { HAS_INTERIOR } from "../plant/interior/layout";
 
 type Icon = React.ComponentType<{ className?: string }>;
+
+// Screens that open on demand load the first time they are needed (a smaller first download and a
+// faster start, above all on phones), and in the background a little after the game has started,
+// so opening one is still instant.
+const SCREENS = {
+  garage: () => import("../garage/garage-view"),
+  achievements: () => import("../views/achievements-view"),
+  cars: () => import("../views/cars-view"),
+  logistics: () => import("../views/logistics-view"),
+  dealers: () => import("../views/dealers-view"),
+  production: () => import("../views/production-view"),
+  managers: () => import("../views/managers-view"),
+  missions: () => import("../views/missions-view"),
+  imperium: () => import("../views/imperium-view"),
+  leaderboard: () => import("../views/leaderboard-view"),
+  alliance: () => import("../views/alliance-view"),
+  winter: () => import("../views/winter-view"),
+  pass: () => import("../views/pass-view"),
+  research: () => import("../views/research-view"),
+  stats: () => import("../views/stats-view"),
+  economy: () => import("../views/economy-view"),
+  racing: () => import("../views/racing-view"),
+  story: () => import("../views/story-view"),
+  raceViewer: () => import("../racing/race-viewer"),
+  floor: () => import("../plant/plant-floor"),
+  interior: () => import("../plant/interior/factory-interior"),
+};
+const GarageView = lazy(() => SCREENS.garage().then((m) => ({ default: m.GarageView })));
+const AchievementsView = lazy(() => SCREENS.achievements().then((m) => ({ default: m.AchievementsView })));
+const CarsView = lazy(() => SCREENS.cars().then((m) => ({ default: m.CarsView })));
+const LogisticsView = lazy(() => SCREENS.logistics().then((m) => ({ default: m.LogisticsView })));
+const DealersView = lazy(() => SCREENS.dealers().then((m) => ({ default: m.DealersView })));
+const ProductionView = lazy(() => SCREENS.production().then((m) => ({ default: m.ProductionView })));
+const ManagersView = lazy(() => SCREENS.managers().then((m) => ({ default: m.ManagersView })));
+const MissionsView = lazy(() => SCREENS.missions().then((m) => ({ default: m.MissionsView })));
+const ImperiumView = lazy(() => SCREENS.imperium().then((m) => ({ default: m.ImperiumView })));
+const LeaderboardView = lazy(() => SCREENS.leaderboard().then((m) => ({ default: m.LeaderboardView })));
+const AllianceView = lazy(() => SCREENS.alliance().then((m) => ({ default: m.AllianceView })));
+const WinterView = lazy(() => SCREENS.winter().then((m) => ({ default: m.WinterView })));
+const PassView = lazy(() => SCREENS.pass().then((m) => ({ default: m.PassView })));
+const ResearchView = lazy(() => SCREENS.research().then((m) => ({ default: m.ResearchView })));
+const StatsView = lazy(() => SCREENS.stats().then((m) => ({ default: m.StatsView })));
+const EconomyView = lazy(() => SCREENS.economy().then((m) => ({ default: m.EconomyView })));
+const RacingView = lazy(() => SCREENS.racing().then((m) => ({ default: m.RacingView })));
+const StoryView = lazy(() => SCREENS.story().then((m) => ({ default: m.StoryView })));
+const RaceViewerScreen = lazy(() => SCREENS.raceViewer().then((m) => ({ default: m.RaceViewer })));
+const PlantFloor = lazy(() => SCREENS.floor().then((m) => ({ default: m.PlantFloor })));
+const FactoryInterior = lazy(() => SCREENS.interior().then((m) => ({ default: m.FactoryInterior })));
+
+/** Loads every on-demand screen once the game has settled, one after another, when the browser is idle. */
+function usePrefetchScreens() {
+  useEffect(() => {
+    let cancelled = false;
+    const idle = (fn: () => void) => ("requestIdleCallback" in window ? window.requestIdleCallback(fn, { timeout: 4000 }) : setTimeout(fn, 200));
+    const timer = setTimeout(() => {
+      const queue = Object.values(SCREENS);
+      const next = () => {
+        const load = queue.shift();
+        if (cancelled || !load) return;
+        load().then(
+          () => idle(next),
+          () => idle(next),
+        );
+      };
+      idle(next);
+    }, 6000);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, []);
+}
+
+/** The race viewer's code loads when a race is shown. */
+function RaceViewer() {
+  const race = useUi((u) => !!u.race);
+  if (!race) return null;
+  return (
+    <Suspense fallback={null}>
+      <RaceViewerScreen />
+    </Suspense>
+  );
+}
+
+/** While a screen's code is on its way (only the first time, and only on a slow connection). */
+function ScreenLoading() {
+  return (
+    <div className="flex justify-center py-10" aria-busy="true">
+      <span className="size-6 animate-spin rounded-full border-2 border-white/15 border-t-white/70" />
+    </div>
+  );
+}
 
 function useDesktop() {
   return useSyncExternalStore(
@@ -167,6 +239,7 @@ function Shell() {
   const n = useContent(lang);
 
   const open = !!(view || plot || zone);
+  usePrefetchScreens();
 
   useEffect(() => {
     if (garage || floor) return;
@@ -196,7 +269,11 @@ function Shell() {
     key = `zone:${zone}`;
   } else if (view) {
     title = viewTitle(view, t);
-    body = <ViewSwitch view={view} onSettings={openSettings} />;
+    body = (
+      <Suspense fallback={<ScreenLoading />}>
+        <ViewSwitch view={view} onSettings={openSettings} />
+      </Suspense>
+    );
     key = `view:${view}`;
   }
 
@@ -218,9 +295,19 @@ function Shell() {
         </AnimatePresence>
       </Sheet>
 
-      <AnimatePresence>{garage && <GarageView key={garage} plotId={garage} />}</AnimatePresence>
       <AnimatePresence>
-        {floor && (HAS_INTERIOR.has(useGame.getState().state.city.buildings[floor]?.type ?? "") ? <FactoryInterior key={floor} plotId={floor} /> : <PlantFloor key={floor} plotId={floor} />)}
+        {garage && (
+          <Suspense key={garage} fallback={null}>
+            <GarageView plotId={garage} />
+          </Suspense>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {floor && (
+          <Suspense key={floor} fallback={null}>
+            {HAS_INTERIOR.has(useGame.getState().state.city.buildings[floor]?.type ?? "") ? <FactoryInterior plotId={floor} /> : <PlantFloor plotId={floor} />}
+          </Suspense>
+        )}
       </AnimatePresence>
       <FirstCarOverlay />
       <Onboarding />

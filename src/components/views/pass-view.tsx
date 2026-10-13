@@ -29,8 +29,8 @@ function tierIcon(t: PassTier): string {
 
 /** The free season pass: the season's tiers, the XP bar and this week's challenges. */
 export function PassView() {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  const state = useGame((g) => g.view.state);
+  const snap = useGame((g) => g.view.snap);
   const { claimPassTier, claimPassAll, claimPassWeekly } = useGame.getState();
   const { t, lang } = useT();
   const n = useContent(lang);

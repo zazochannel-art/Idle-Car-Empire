@@ -15,8 +15,8 @@ import { ViewHeader } from "./section-title";
 
 
 export function ResearchView() {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  const state = useGame((g) => g.view.state);
+  const snap = useGame((g) => g.view.snap);
   const research = useGame((g) => g.research);
   const { t, lang } = useT();
   const n = useContent(lang);

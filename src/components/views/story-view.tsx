@@ -64,8 +64,8 @@ function plantName(state: GameState, plot: string, t: T) {
 
 /** The decision on the CEO's desk: what happened, and two choices with their consequences. */
 function DilemmaCard() {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  const state = useGame((g) => g.view.state);
+  const snap = useGame((g) => g.view.snap);
   const decide = useGame((g) => g.decide);
   const { t } = useT();
   const st = state.story;
@@ -135,8 +135,8 @@ function goalText(state: GameState, i: number, t: T): string {
 
 /** Otto Kaiser and the campaign: what he says, the chapter's goal, its reward. */
 function RivalCard() {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  const state = useGame((g) => g.view.state);
+  const snap = useGame((g) => g.view.snap);
   const claim = useGame((g) => g.claimChapter);
   const { t } = useT();
   const i = state.story.chapter;

@@ -25,7 +25,7 @@ const colorDot = (c: string) => <span className="inline-block size-3 rounded-ful
 
 /** 💎 A famous client's order: a few cars of one model, in their colour. */
 export function VipCard() {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const { acceptVip, declineVip, claimVip, setDesignColor } = useGame.getState();
   const { t, lang } = useT();
   const n = useContent(lang);
@@ -96,7 +96,7 @@ export function VipCard() {
 
 /** 🏆 The week's racing table and last week's prize. */
 export function SeasonCard() {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const claimSeason = useGame((g) => g.claimSeason);
   const { t } = useT();
   const now = state.lastActiveAt;
@@ -136,8 +136,8 @@ export function SeasonCard() {
 
 /** 🎪 The weekend Auto Show: enter one model, the judges vote. */
 export function ShowCard() {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  const state = useGame((g) => g.view.state);
+  const snap = useGame((g) => g.view.snap);
   const { enterShow, claimShow } = useGame.getState();
   const { t, lang } = useT();
   const n = useContent(lang);
@@ -201,7 +201,7 @@ export function ShowCard() {
 
 /** 🏛️ Barn finds restored in the garage, shown in the museum. */
 export function ClassicsPanel() {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const restore = useGame((g) => g.restoreClassic);
   const setView = useUi((u) => u.setView);
   const { t } = useT();

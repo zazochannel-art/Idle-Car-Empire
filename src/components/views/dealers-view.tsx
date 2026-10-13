@@ -14,10 +14,10 @@ import { DealerPanel } from "../panels/plant-panel";
 import { ViewHeader } from "./section-title";
 
 export function DealersView() {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   // finished cars waiting at the plants because every dealer lot is full
   const waiting = plantsOf(state).reduce((a, [, b]) => (b.type === "assemblyPlant" && b.plant.status === "full" ? a + Math.floor(b.plant.out) : a), 0);
-  const snap = useGame((g) => g.snap);
+  const snap = useGame((g) => g.view.snap);
   const selectPlot = useUi((u) => u.selectPlot);
   const { t, lang } = useT();
   const n = useContent(lang);

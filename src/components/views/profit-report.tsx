@@ -15,8 +15,8 @@ import { useUi } from "@/store/ui-store";
  * sees where the chain is held up.
  */
 export function ProfitReport() {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  const state = useGame((g) => g.view.state);
+  const snap = useGame((g) => g.view.snap);
   const selectPlot = useUi((u) => u.selectPlot);
   const { t } = useT();
   const rows = Object.values(snap.chain.plants)

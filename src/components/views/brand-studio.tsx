@@ -23,7 +23,7 @@ const ATTRS: { id: BrandAttr; emoji: string }[] = [
 ];
 
 export function BrandStudio() {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const setBrand = useGame((g) => g.setBrand);
   const { t, lang } = useT();
   const n = useContent(lang);

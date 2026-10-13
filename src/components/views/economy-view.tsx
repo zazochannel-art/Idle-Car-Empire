@@ -22,8 +22,8 @@ import { LEDGER_ICON, LedgerTable } from "./ledger-table";
 import { SectionTitle } from "./section-title";
 
 export function EconomyView() {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  const state = useGame((g) => g.view.state);
+  const snap = useGame((g) => g.view.snap);
   const selectPlot = useUi((u) => u.selectPlot);
   const { t } = useT();
   const rate = state.chain.ledger.rate;

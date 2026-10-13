@@ -20,8 +20,8 @@ const STEPS = [10, 100, 1_000, 10_000];
 export const materialName = (m: MaterialId, t: (k: MessageKey) => string) => t(`mat.${m}` as MessageKey);
 
 export function MaterialsPanel({ id }: { id: string }) {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  const state = useGame((g) => g.view.state);
+  const snap = useGame((g) => g.view.snap);
   const g = useGame.getState();
   const { t } = useT();
   const b = state.city.buildings[id];
@@ -91,7 +91,7 @@ export function MaterialsPanel({ id }: { id: string }) {
 }
 
 function MaterialRow({ id, m, per }: { id: string; m: MaterialId; per: number }) {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const buy = useGame((g) => g.buyMaterial);
   const { t } = useT();
   const [qty, setQty] = useState(100);
@@ -157,8 +157,8 @@ const stepDown = (q: number) => [...STEPS].reverse().find((s) => s < q) ?? Math.
 
 /** Running costs: crew, robots, power, and the ⚡ Power System upgrade. */
 export function RunningCosts({ id }: { id: string }) {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  const state = useGame((g) => g.view.state);
+  const snap = useGame((g) => g.view.snap);
   const g = useGame.getState();
   const { t } = useT();
   const b = state.city.buildings[id];

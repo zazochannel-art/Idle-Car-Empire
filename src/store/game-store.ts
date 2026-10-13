@@ -33,7 +33,7 @@ import { tick as engineTick } from "@/game/engine/tick";
 import { formatDuration, formatMoney, formatPercent } from "@/game/format";
 import { decodeSave, encodeSave, SaveManager } from "@/game/save";
 import { askStartChoice, askWelcome, useCloud } from "./cloud-store";
-import type { BuyAmount, CarId, CarRoute, DealerId, FacilityType, GameState, Lang, ManagerId, QualityMode, Specialization, StructureType, ZoneId } from "@/game/types";
+import type { BuyAmount, CarId, CarRoute, DealerId, FacilityType, GameState, Lang, ManagerId, PlantType, QualityMode, Specialization, StructureType, ZoneId } from "@/game/types";
 import { applyLanguage, detectLanguage, loadLanguage, translate, type MessageKey, type Vars } from "@/i18n";
 import { contentFor } from "@/i18n/content";
 import { uiEvents } from "./events";
@@ -68,6 +68,8 @@ import { PASS, type WeeklyId } from "@/game/config/pass";
 import { batteryState, isIdle, isSaving, minTickMs, onSaverChange, setSaverSetting, startPower, type SaverSetting } from "@/lib/power";
 
 const TICK_MS = 100;
+/** How often the ticks refresh the screens' view of the state (ms). */
+const VIEW_MS = 250;
 const SAVE_MS = 5_000;
 /** How often the funnel steps are looked at (and any not sent yet are sent). */
 const FUNNEL_MS = 30_000;
@@ -81,6 +83,12 @@ interface GameStore {
   ready: boolean;
   state: GameState;
   snap: EconomySnapshot;
+  /**
+   * The state for screens that show it in detail (lists, cards, panels): the player's actions
+   * reach it at once, the ticks about four times a second, which reads the same and is far less
+   * work than redrawing a whole screen ten times a second.
+   */
+  view: { state: GameState; snap: EconomySnapshot };
   backend: string;
   /** Saves to the cloud now. */
   syncNow: () => Promise<void>;
@@ -232,9 +240,12 @@ let loop: ReturnType<typeof setInterval> | null = null;
 /** Set as init starts (it awaits the save): a second call meanwhile must not start a second loop. */
 let starting = false;
 let lastTick = 0;
+let lastView = 0;
 let lastSave = 0;
 /** The ghost last published (JSON), so an unchanged one isn't sent again. */
 let lastGhost = "";
+/** The cars and plants open at the last commit (unlock moments compare against them). */
+let opened: { state: GameState; cars: Set<CarId>; plants: Set<PlantType> } | null = null;
 /** The anonymous funnel: when its steps were last looked at, and whether a send is under way. */
 let lastFunnel = 0;
 let funnelBusy = false;
@@ -246,7 +257,7 @@ export const useGame = create<GameStore>((set, get) => {
   const names = () => contentFor(get().state.settings.lang);
 
   /** Recomputes derived data, unlocks achievements and publishes the new state. */
-  function commit(next: GameState, prevSnap?: EconomySnapshot) {
+  function commit(next: GameState, prevSnap?: EconomySnapshot, fromTick = false) {
     let snap = snapshot(next);
     const fresh = checkAchievements(next, snap);
     if (fresh.length) {
@@ -257,14 +268,20 @@ export const useGame = create<GameStore>((set, get) => {
       }
     }
     const prev = get().state;
-    // unlock moments (not across a new run: everything "unlocks" again then)
+    // unlock moments (not across a new run: everything "unlocks" again then); what was open
+    // before is usually what the last commit found, so each tick works it out once
     if (prevSnap && prev.runStartedAt === next.runStartedAt) {
-      const before = unlockedCarIds(prev, prevSnap.gm);
-      for (const id of unlockedCarIds(next, snap.gm)) if (!before.has(id)) uiEvents.emit({ type: "unlock", kind: "car", id });
-      const open = openPlantTypes(prev);
-      for (const id of openPlantTypes(next)) if (!open.has(id) && !hasPlantType(prev, id)) uiEvents.emit({ type: "unlock", kind: "plant", id });
+      const before = opened?.state === prev ? opened : { cars: unlockedCarIds(prev, prevSnap.gm), plants: openPlantTypes(prev) };
+      const cars = unlockedCarIds(next, snap.gm);
+      const plants = openPlantTypes(next);
+      for (const id of cars) if (!before.cars.has(id)) uiEvents.emit({ type: "unlock", kind: "car", id });
+      for (const id of plants) if (!before.plants.has(id) && !hasPlantType(prev, id)) uiEvents.emit({ type: "unlock", kind: "plant", id });
+      opened = { state: next, cars, plants };
     }
-    set({ state: next, snap });
+    const now = Date.now();
+    const keep = fromTick && now - lastView < VIEW_MS;
+    if (!keep) lastView = now;
+    set({ state: next, snap, view: keep ? get().view : { state: next, snap } });
   }
 
   function persist(force = false) {
@@ -386,7 +403,7 @@ export const useGame = create<GameStore>((set, get) => {
     if (trend.hot && trend.block !== Mk.trendOf(state).block) {
       uiEvents.emit({ type: "toast", tone: "info", icon: "📰", title: tr("news.toast"), body: tr("news.hot", { cls: tr(`class.${trend.hot}` as MessageKey), price: formatPercent(HOT_CLASS.price), demand: formatPercent(HOT_CLASS.demand - 1) }) });
     }
-    commit(next, snap);
+    commit(next, snap, true);
     if (now - lastSave > SAVE_MS) persist();
     if (now - lastFunnel > FUNNEL_MS) {
       lastFunnel = now;
@@ -424,6 +441,7 @@ export const useGame = create<GameStore>((set, get) => {
     ready: false,
     state: initial,
     snap: snapshot(initial),
+    view: { state: initial, snap: snapshot(initial) },
     backend: saves?.backendName ?? "memory",
     saves,
     syncNow: async () => {
@@ -551,7 +569,10 @@ export const useGame = create<GameStore>((set, get) => {
       // the loading and sign-in screens in the player's language
       const guess = detectLanguage();
       await loadLanguage(guess).catch(() => {});
-      set({ state: { ...get().state, settings: { ...get().state.settings, lang: guess } } });
+      {
+        const state = { ...get().state, settings: { ...get().state.settings, lang: guess } };
+        set({ state, view: { state, snap: get().snap } });
+      }
       // the account and its save first: nothing starts (or gets saved) before they are known
       const start = saves
         ? await saves.start(now, { choose: (local, cloud, reason) => askStartChoice({ local, cloud, reason }), signIn: askWelcome })
@@ -582,7 +603,10 @@ export const useGame = create<GameStore>((set, get) => {
       applyLanguage(state.settings.lang);
       lastTick = Date.now();
       lastSave = lastTick;
-      set({ ready: true, state, snap: snapshot(state) });
+      {
+        const snap = snapshot(state);
+        set({ ready: true, state, snap, view: { state, snap } });
+      }
       loop = setInterval(runTick, TICK_MS);
       // the battery saver: the setting, then the battery (auto turns it on when low)
       setSaverSetting(state.settings.saver);
@@ -996,7 +1020,8 @@ export const useGame = create<GameStore>((set, get) => {
       state.funnel = [...old.funnel];
       state.settings.stats = old.settings.stats;
       refreshDaily(state, Date.now());
-      set({ state, snap: snapshot(state) });
+      const snap = snapshot(state);
+      set({ state, snap, view: { state, snap } });
       persist(true);
     },
   };

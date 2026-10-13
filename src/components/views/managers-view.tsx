@@ -19,7 +19,7 @@ import { plantName } from "../panels/plant-panel";
 import { ViewHeader } from "./section-title";
 
 export function ManagersView() {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const { t, lang } = useT();
   const n = useContent(lang);
   const { hireManager, upgradeManager, assignManager } = useGame.getState();

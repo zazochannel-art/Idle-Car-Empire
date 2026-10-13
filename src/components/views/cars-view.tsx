@@ -33,8 +33,8 @@ import { ViewHeader } from "./section-title";
  * studio to rename it, paint it and develop its options.
  */
 export function CarsView() {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  const state = useGame((g) => g.view.state);
+  const snap = useGame((g) => g.view.snap);
   const { t } = useT();
   const unlocked = unlockedCarIds(state, snap.gm);
   const [open, setOpen] = useState<string | null>(null);
@@ -73,8 +73,8 @@ export function CarsView() {
 }
 
 function ModelCard({ car, unlocked, open, onToggle }: { car: CarConfig; unlocked: boolean; open: boolean; onToggle: () => void }) {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  const state = useGame((g) => g.view.state);
+  const snap = useGame((g) => g.view.snap);
   const upgradeCarModel = useGame((g) => g.upgradeCarModel);
   const { t, lang } = useT();
   const n = useContent(lang);
@@ -169,8 +169,8 @@ function ModelCard({ car, unlocked, open, onToggle }: { car: CarConfig; unlocked
 
 /** Rename, paint and develop the model's options. */
 function DesignStudio({ car }: { car: CarConfig }) {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  const state = useGame((g) => g.view.state);
+  const snap = useGame((g) => g.view.snap);
   const { developDesign, renameDesign, setDesignColor } = useGame.getState();
   const { t } = useT();
   const d = state.designs[car.id];

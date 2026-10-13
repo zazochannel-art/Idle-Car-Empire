@@ -16,7 +16,7 @@ import { useGame } from "@/store/game-store";
 
 /** Reset Imperium (the reset for ⭐ Stars), the Star upgrades shop, and the plant levels opened by total earnings. */
 export function ImperiumView() {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const { imperium, buyStarUpgrade } = useGame.getState();
   const [confirm, setConfirm] = useState(false);
   const { t } = useT();

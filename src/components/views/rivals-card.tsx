@@ -8,7 +8,7 @@ import { useGame } from "@/store/game-store";
 
 /** The earnings table against the computer-run car makers. */
 export function RivalsCard() {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const { t } = useT();
   const rows = leaderboard(state, state.lastActiveAt);
   const total = rows.reduce((a, r) => a + r.earned, 0);
