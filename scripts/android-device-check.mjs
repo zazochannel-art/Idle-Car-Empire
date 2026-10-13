@@ -256,9 +256,12 @@ try {
   check(left, "Back with nothing open puts the app in the background", left ? "" : `still in front after 30 s: ${focus().join(" · ")}; dialog open: ${await evaluate(DIALOG_OPEN).catch(() => "?")}`);
   const after = await evaluate(SAVED);
   check(after.savedAt > before, "leaving the app saved the game at once", `${new Date(before).toISOString()} → ${new Date(after.savedAt).toISOString()}`);
-  // while it plays, the game saves every 5 s; in the background, after the save of leaving (and
-  // the page's own one when it is hidden), nothing more is written
-  await sleep(4000);
+  // while it plays, the game saves every 5 s; in the background, after the save of leaving (the
+  // app's pause) and the page's own one when Android hides it (on a slow phone, seconds later),
+  // nothing more is written
+  const hidden = await until(() => evaluate(`document.visibilityState === "hidden"`).catch(() => false), 30_000);
+  if (!hidden) console.log("      (the page never reported itself hidden)");
+  await sleep(2000);
   const quiet = await evaluate(SAVED);
   await sleep(12_000);
   const later = await evaluate(SAVED);
