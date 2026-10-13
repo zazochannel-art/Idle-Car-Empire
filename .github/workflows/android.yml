@@ -138,6 +138,12 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
           script: node scripts/android-device-check.mjs android/app/build/outputs/apk/debug/app-debug.apk --reboot --out android-check
+      # a small JPEG of the game on the emulator, in the log (base64), to look at without downloading
+      - name: Game screen thumbnail
+        if: always()
+        run: |
+          f=android-check/1-game.png
+          if [ -f "$f" ]; then convert "$f" -resize 360x -quality 55 jpg:- | base64 -w0 || true; echo; fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:

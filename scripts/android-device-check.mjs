@@ -30,7 +30,7 @@ const PORT = 9333;
 fs.mkdirSync(outDir, { recursive: true });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const adb = (...a) => execFileSync("adb", a, { encoding: "utf8", maxBuffer: 64 << 20 }).trim();
+const adb = (...a) => execFileSync("adb", a, { encoding: "utf8", maxBuffer: 64 << 20, stdio: ["ignore", "pipe", "pipe"] }).trim();
 const results = [];
 function check(ok, what, detail = "") {
   results.push({ ok, what, detail });
@@ -82,11 +82,12 @@ async function connect(timeoutMs = 120_000) {
   throw new Error("the app's WebView never became inspectable");
 }
 
-async function evaluate(expression) {
+// (generous: on an emulator without a GPU the first 3D frames keep the page busy for a while)
+async function evaluate(expression, timeoutMs = 120_000) {
   const id = nextId++;
   const reply = new Promise((res) => pending.set(id, res));
   ws.send(JSON.stringify({ id, method: "Runtime.evaluate", params: { expression, awaitPromise: true, returnByValue: true } }));
-  const msg = await Promise.race([reply, sleep(30_000).then(() => ({ error: { message: "timeout" } }))]);
+  const msg = await Promise.race([reply, sleep(timeoutMs).then(() => ({ error: { message: `no answer from the page in ${timeoutMs / 1000} s` } }))]);
   if (msg.error) throw new Error(msg.error.message);
   if (msg.result.exceptionDetails) throw new Error(msg.result.exceptionDetails.text);
   return msg.result.result.value;
@@ -116,13 +117,26 @@ const inFront = () =>
     .some((l) => /mCurrentFocus|mFocusedApp/.test(l) && l.includes(PKG));
 const shot = (name) => fs.writeFileSync(path.join(outDir, `${name}.png`), execFileSync("adb", ["exec-out", "screencap", "-p"], { maxBuffer: 64 << 20 }));
 
+/** Waits until the page answers quickly again (the map's first frames are heavy without a GPU). */
+async function settle() {
+  const end = Date.now() + 300_000;
+  while (Date.now() < end) {
+    const t = Date.now();
+    await evaluate("1", 120_000).catch(() => {});
+    if (Date.now() - t < 3000) return;
+  }
+}
+
 async function launch() {
   adb("shell", "am", "start", "-W", "-n", `${PKG}/${ACTIVITY}`);
   await connect();
   // a no-cloud build goes straight in; a cloud build shows the welcome page to a new player
   const end = Date.now() + 240_000;
   while (Date.now() < end) {
-    if (await evaluate(GAME_UP).catch(() => false)) return;
+    if (await evaluate(GAME_UP).catch(() => false)) {
+      await settle();
+      return;
+    }
     const guest = await evaluate(`(() => { const b = [...document.querySelectorAll("button")].find((x) => /without an account/i.test(x.textContent)); if (b) { b.click(); return true; } return false; })()`).catch(() => false);
     if (guest) console.log("      (welcome page: played without an account)");
     await sleep(1500);
