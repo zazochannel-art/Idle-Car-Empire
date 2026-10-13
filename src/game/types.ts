@@ -588,7 +588,7 @@ export interface GameState {
   pass: import("./engine/pass").PassState;
   /** Unlock bonuses already claimed this run ("car:sedan", "plant:engineFactory"). */
   unlocks: string[];
-  settings: { buyAmount: BuyAmount; lang: Lang; lowGraphics: boolean; sound: boolean; haptics: boolean; notify: boolean };
+  settings: { buyAmount: BuyAmount; lang: Lang; lowGraphics: boolean; sound: boolean; haptics: boolean; notify: boolean; /** Battery saver: "auto" (on when the battery is low), "on" or "off". */ saver: "auto" | "on" | "off" };
   createdAt: number;
   runStartedAt: number;
   lastActiveAt: number;

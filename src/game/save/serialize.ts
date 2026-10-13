@@ -21,6 +21,12 @@ const isObject = (v: unknown): v is Json => typeof v === "object" && v !== null 
  * about (added in newer versions) keep their defaults; values with the wrong
  * type are ignored, so a corrupted field cannot crash the game.
  */
+/** A setting with a fixed set of values: anything else from a save is the default. */
+function cleanSettings(state: GameState): GameState {
+  if (!["auto", "on", "off"].includes(state.settings.saver)) state.settings.saver = "auto";
+  return state;
+}
+
 function mergeDefaults<T>(defaults: T, saved: unknown): T {
   if (Array.isArray(defaults)) return (Array.isArray(saved) ? saved : defaults) as T;
   if (isObject(defaults)) {
@@ -49,7 +55,7 @@ function fromOldEconomy(raw: Json, now: number): GameState {
   );
   Object.assign(state, kept);
   state.research = kept.research.filter((r) => typeof r === "string");
-  return state;
+  return cleanSettings(state);
 }
 
 /**
@@ -60,7 +66,7 @@ function fromOldEconomy(raw: Json, now: number): GameState {
 function fromOldMap(raw: Json, now: number): GameState {
   const state = createInitialState(now);
   state.settings = mergeDefaults(state.settings, raw.settings);
-  return state;
+  return cleanSettings(state);
 }
 
 export function migrate(raw: unknown, now: number): GameState {
@@ -115,7 +121,7 @@ export function migrate(raw: unknown, now: number): GameState {
   if (!(state.createdAt > 0 && state.createdAt <= now)) state.createdAt = Math.min(now, state.lastActiveAt > 0 ? state.lastActiveAt : now);
   unlockOwnedZones(state);
   state.version = SAVE_VERSION;
-  return state;
+  return cleanSettings(state);
 }
 
 export function encodeSave(state: GameState): string {

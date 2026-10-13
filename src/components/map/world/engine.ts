@@ -4,6 +4,7 @@
 // the HTML cards pinned over the districts. React feeds it the game state
 // and listens to its callbacks; it loads its world files on its own.
 import * as THREE from "three";
+import { isSaving, shouldDraw } from "@/lib/power";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { DEPOT, MARKET, RACING_AREA, STARTER_PLOT, WORLD_MAP, type Plot } from "@/game/city/layout";
 import { SPEC_BY_ID, STRUCTURE_BY_ID, ZONES, type TerritoryId } from "@/game/config/city";
@@ -178,7 +179,10 @@ export class MapEngine {
   private dpr = 1;
   private maxDpr = 2;
   private low: boolean;
-  private skip = 0;
+  /** When the last frame was drawn, frames drawn so far (battery saver: lib/power.ts), and whether the saver was on. */
+  private lastDraw = 0;
+  frames = 0;
+  private saving = false;
   private slow = { frames: 0, time: 0 };
   private lastAdaptiveAt = 0;
 
@@ -462,12 +466,20 @@ export class MapEngine {
         this.last = now;
         return;
       }
-      // battery saver: draw every other frame (~30 FPS)
-      if (this.low && (this.skip ^= 1)) return;
-      const dt = Math.min(0.1, (now - this.last) / 1000);
+      // low graphics: ~30 FPS; battery saver: 30 FPS while playing, a few frames a second when nobody touches the screen
+      if (!shouldDraw(now, this.lastDraw, this.low)) return;
+      this.lastDraw = now;
+      const saving = isSaving();
+      if (saving !== this.saving) {
+        this.saving = saving;
+        this.maxDpr = this.low ? 1 : saving ? 1.5 : 2;
+        this.resize();
+      }
+      const dt = Math.min(saving ? 0.25 : 0.1, (now - this.last) / 1000);
       this.last = now;
       this.render(dt);
-      this.adaptQuality(dt);
+      this.frames++;
+      if (!saving) this.adaptQuality(dt);
     };
     this.raf = requestAnimationFrame(loop);
   }
@@ -481,7 +493,7 @@ export class MapEngine {
     if (this.low === on) return;
     this.low = on;
     if (this.trafficLayer) this.trafficLayer.density = on ? 0.5 : 1;
-    this.maxDpr = on ? 1 : 2;
+    this.maxDpr = on ? 1 : this.saving ? 1.5 : 2;
     this.renderer.shadowMap.enabled = !on;
     this.scene.traverse((o) => {
       const m = (o as THREE.Mesh).material;
@@ -647,7 +659,8 @@ export class MapEngine {
         }
       }
       this.plots!.frame(this.t, live.state);
-      this.trafficLayer!.update(dt);
+      // in steps of at most 0.1 s, as at full speed: the saver's rarer frames keep the same yielding and turns
+      for (let left = dt; left > 1e-6; left -= 0.1) this.trafficLayer!.update(Math.min(0.1, left));
       this.race!.update(live.state, this.t);
       this.scenery!.animate(dt, this.t);
       const waves = this.terrain!.waves;

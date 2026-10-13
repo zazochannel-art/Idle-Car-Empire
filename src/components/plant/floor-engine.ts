@@ -4,6 +4,7 @@
 // assembly plant the car body travels through nine stations and gains its
 // engine, wheels and paint on the way.
 import { attachControls, Camera } from "../map/camera";
+import { isSaving, shouldDraw } from "@/lib/power";
 import { Painter, sx, sy } from "../map/iso";
 import { forklift, robotArm, tireStack } from "../map/props";
 import { drawModel, drawTruck, type CarModel } from "../map/vehicles";
@@ -54,6 +55,8 @@ export class FloorEngine {
   private raf = 0;
   private running = false;
   private last = 0;
+  /** When the last frame was drawn (battery saver: lib/power.ts). */
+  private lastDraw = 0;
   private t = 0;
   /** Smoothed conveyor position so the line glides between ticks. */
   private belt = 0;
@@ -138,9 +141,14 @@ export class FloorEngine {
         this.last = now;
         return;
       }
-      const dt = Math.min(0.1, (now - this.last) / 1000);
+      // battery saver: fewer frames (lib/power.ts); the resolution stays put meanwhile
+      if (!shouldDraw(now, this.lastDraw, false)) return;
+      this.lastDraw = now;
+      const saving = isSaving();
+      const dt = Math.min(saving ? 0.25 : 0.1, (now - this.last) / 1000);
       this.last = now;
       this.render(dt);
+      if (saving) return;
       this.perfFrames++;
       this.perfTime += dt;
       if (this.perfFrames >= 90) {
