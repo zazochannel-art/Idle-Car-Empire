@@ -5,24 +5,26 @@ import { App } from "@capacitor/app";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 
+/** A dialog on screen (one already closing doesn't count: a second Back acts on what is under it). */
+const openDialog = () => document.querySelector('[role="dialog"]:not([data-state="closed"]), [role="alertdialog"]:not([data-state="closed"])');
+
 /** Something the Back button can close: a dialog, or one of the game's screens over the map. */
 function somethingOpen(): boolean {
-  if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return true;
+  if (openDialog()) return true;
   const u = useUi.getState();
   return !!(u.view || u.plot || u.zone || u.garage || u.floor || u.race || u.preview || u.showcase || u.celebrate);
 }
 
 /**
  * Back closes what is on top, the same way Escape does on a keyboard (every dialog,
- * sheet, factory floor and the garage already answers it); the race viewer has only
- * its close button, so Back does what that does. With nothing open, Back puts the app
- * in the background like the Home button: the company keeps running and the game is
- * where it was when the player returns.
+ * sheet, card, factory floor and the garage already answers it); the race viewer has
+ * only its close button, so Back does what that does. With nothing open, Back puts the
+ * app in the background like the Home button: the company keeps running and the game
+ * is where it was when the player returns.
  */
 function back() {
   const u = useUi.getState();
-  const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]');
-  if (!dialog && u.race) {
+  if (!openDialog() && u.race) {
     u.setRace(null);
     return;
   }

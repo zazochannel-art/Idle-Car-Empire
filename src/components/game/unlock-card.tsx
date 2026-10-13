@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CAR_BY_ID } from "@/game/config/cars";
 import { PLANT_BY_ID } from "@/game/config/chain";
@@ -53,6 +53,20 @@ export function UnlockCard() {
     then?.();
   };
 
+  // Escape (and the phone's Back button) takes the bonus and closes the card, like Claim,
+  // unless a dialog over it used it
+  const onEscape = useEffectEvent(() => claim());
+  useEffect(() => {
+    if (!cur) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      e.preventDefault();
+      onEscape();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [cur]);
+
   let body: { emoji: string; kicker: string; name: string; desc: string; action: string; go: () => void } | null = null;
   if (cur?.kind === "car") {
     const car = CAR_BY_ID[cur.id as CarId];
@@ -89,6 +103,9 @@ export function UnlockCard() {
       {cur && body && (
         <motion.div
           key={unlockKey(cur.kind, cur.id)}
+          role="dialog"
+          aria-modal="true"
+          aria-label={body.name}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

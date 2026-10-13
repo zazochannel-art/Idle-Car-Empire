@@ -111,7 +111,8 @@ async function waitFor(expression, timeoutMs, what) {
 
 // the game screen is up: the HUD's cash counter is on screen
 const GAME_UP = `(document.querySelector("header .race-type")?.getBoundingClientRect().width ?? 0) > 0`;
-const DIALOG_OPEN = `!!document.querySelector('[role="dialog"], [role="alertdialog"]')`;
+// (a dialog already closing doesn't count, as for the app's own Back button)
+const DIALOG_OPEN = `!!document.querySelector('[role="dialog"]:not([data-state="closed"]), [role="alertdialog"]:not([data-state="closed"])')`;
 const SAVED = `(() => { const r = localStorage.getItem(${JSON.stringify(SAVE)}); if (!r) return null; const d = JSON.parse(r); return { createdAt: d.state.createdAt, lang: d.state.settings.lang, savedAt: d.savedAt }; })()`;
 
 /** What Android and the WebView said (the app's lifecycle, console errors, crashes), kept in the output folder. */
@@ -119,7 +120,7 @@ function dumpLogcat(name, tail) {
   try {
     const log = adb("logcat", "-d", "-v", "time")
       .split("\n")
-      .filter((l) => /Capacitor|chromium|AndroidRuntime|idlecarempire|WebView/.test(l) && !/Handling local request|Loading app at/.test(l));
+      .filter((l) => /Capacitor|chromium|AndroidRuntime|idlecarempire|WebView/.test(l) && !/Handling local request|Loading app at|AppsFilter/.test(l));
     fs.writeFileSync(path.join(outDir, `${name}.txt`), log.join("\n"));
     console.log(`\n${name} (${log.length} lines, last ${tail}):\n${log.slice(-tail).join("\n")}\n`);
   } catch (e) {
@@ -127,10 +128,37 @@ function dumpLogcat(name, tail) {
   }
 }
 
-const inFront = () =>
+const focus = () =>
   adb("shell", "dumpsys", "window")
     .split("\n")
-    .some((l) => /mCurrentFocus|mFocusedApp/.test(l) && l.includes(PKG));
+    .filter((l) => /mCurrentFocus|mFocusedApp/.test(l))
+    .map((l) => l.trim());
+const inFront = () => focus().some((l) => l.includes(PKG));
+const noDialog = () => evaluate(`!(${DIALOG_OPEN})`).catch(() => false);
+
+/** Polls until the condition holds or the time is up, and returns its last value. On an emulator
+ * without a GPU the page can be busy for many seconds, so what Back starts may finish late. */
+async function until(fn, timeoutMs) {
+  const end = Date.now() + timeoutMs;
+  let v = await fn();
+  while (!v && Date.now() < end) {
+    await sleep(1000);
+    v = await fn();
+  }
+  return v;
+}
+
+/** The app's lifecycle as Android and Capacitor logged it (pauses, resumes, a WebView recreated). */
+function lifecycle() {
+  try {
+    const lines = adb("logcat", "-d", "-v", "time")
+      .split("\n")
+      .filter((l) => /Starting BridgeActivity|App (started|restarted|resumed|paused|stopped|destroyed)|Notifying listeners for event|destroyed WebView/.test(l));
+    console.log(`\nlifecycle (last 40 of ${lines.length}):\n${lines.slice(-40).join("\n")}\n`);
+  } catch (e) {
+    console.log("lifecycle:", e.message);
+  }
+}
 const shot = (name) => fs.writeFileSync(path.join(outDir, `${name}.png`), execFileSync("adb", ["exec-out", "screencap", "-p"], { maxBuffer: 64 << 20 }));
 
 /** Waits until the page answers quickly again (the map's first frames are heavy without a GPU). */
@@ -192,26 +220,25 @@ try {
   shot("2-settings");
   // 3. Back closes the dialog and the app stays open
   adb("shell", "input", "keyevent", "KEYCODE_BACK");
-  await sleep(1500);
-  check(!(await evaluate(DIALOG_OPEN)) && inFront(), "Back closes the dialog (the app stays open)");
+  const closed = await until(noDialog, 30_000);
+  const stayed = inFront();
+  check(closed && stayed, "Back closes the dialog (the app stays open)", closed ? (stayed ? "" : `the app left: ${focus().join(" · ")}`) : "the dialog is still open after 30 s");
 
   await evaluate(`[...document.querySelectorAll("header button")].at(-1).click()`);
   await waitFor(DIALOG_OPEN, 15_000, "the Settings dialog");
   await evaluate(`[...document.querySelectorAll('[role="dialog"] button')].find((b) => /Română/.test(b.textContent)).click()`);
   await waitFor(`(${SAVED})?.lang === "ro"`, 20_000, "the language in the save");
+  // Back closes Settings (pressed again only if it is still open a while later)
   adb("shell", "input", "keyevent", "KEYCODE_BACK");
-  await sleep(1000);
+  for (let i = 0; i < 2 && !(await until(noDialog, 20_000)); i++) adb("shell", "input", "keyevent", "KEYCODE_BACK");
 
   // 4. Back with nothing open: the app goes to the background, and leaving saves the game
-  for (let i = 0; i < 3 && (await evaluate(DIALOG_OPEN)); i++) {
-    adb("shell", "input", "keyevent", "KEYCODE_BACK");
-    await sleep(1200);
-  }
+  await settle();
   const before = (await evaluate(SAVED)).savedAt;
   await sleep(1500);
   adb("shell", "input", "keyevent", "KEYCODE_BACK");
-  await sleep(2500);
-  check(!inFront(), "Back with nothing open puts the app in the background");
+  const left = await until(() => !inFront(), 30_000);
+  check(left, "Back with nothing open puts the app in the background", left ? "" : `still in front after 30 s: ${focus().join(" · ")}; dialog open: ${await evaluate(DIALOG_OPEN).catch(() => "?")}`);
   const after = await evaluate(SAVED);
   check(after.savedAt > before, "leaving the app saved the game at once", `${new Date(before).toISOString()} → ${new Date(after.savedAt).toISOString()}`);
   // while it plays, the game saves every 5 s; in the background, after the save of leaving (and
@@ -225,6 +252,7 @@ try {
     "the game stops ticking in the background (no battery use)",
     later.savedAt === quiet.savedAt ? "no saves for 12 s" : `still saving: ${new Date(quiet.savedAt).toISOString()} → ${new Date(later.savedAt).toISOString()}`,
   );
+  lifecycle();
 
   // 5. back to the app: it continues where it was
   adb("shell", "am", "start", "-W", "-n", `${PKG}/${ACTIVITY}`);
