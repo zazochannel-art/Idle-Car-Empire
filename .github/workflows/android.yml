@@ -1,0 +1,146 @@
+name: Android
+
+# Builds the Android app from the same game code as the web version:
+# - a debug APK (install it on a phone to test: docs/android/README.md),
+# - a release App Bundle (.aab) for Google Play, signed with the upload key when the
+#   repository has it in its secrets (docs/android/signing.md), unsigned otherwise,
+# and runs the app on an Android emulator (scripts/android-device-check.mjs).
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: APK and App Bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # the Gradle wrapper in the repository is Gradle's own (not a tampered jar)
+      - uses: gradle/actions/wrapper-validation@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+          cache-dependency-path: android/**/*.gradle*
+      - run: npm ci
+      - name: Build the game for the app
+        run: npm run build:android
+        env:
+          # the same public Supabase project and key as the web build (pages.yml)
+          NEXT_PUBLIC_SUPABASE_URL: https://orffhhsogoymalyogfzl.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_hqGfNt6uaNbq0AgGyp0I8g_QLjjFaJ-
+      - name: Upload key (when the repository has it)
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+            echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/upload.jks" >> "$GITHUB_ENV"
+            echo "Release bundle will be signed with the upload key."
+          else
+            echo "No ANDROID_KEYSTORE_BASE64 secret: the release bundle will be unsigned."
+          fi
+      - name: Gradle build (debug APK, release bundle, lint)
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon --stacktrace assembleDebug bundleRelease lintDebug
+      - name: Inspect the APK and the bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          BT="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          AAB=android/app/build/outputs/bundle/release/app-release.aab
+          echo "::group::debug APK"
+          "$BT/aapt2" dump badging "$APK" | grep -E "^(package|sdkVersion|targetSdkVersion|application-label|uses-permission)"
+          echo "::endgroup::"
+          gh release download --repo google/bundletool --pattern 'bundletool-all-*.jar' --dir "$RUNNER_TEMP" --clobber
+          BUNDLETOOL=$(ls "$RUNNER_TEMP"/bundletool-all-*.jar | tail -1)
+          echo "::group::release bundle ($(basename "$BUNDLETOOL"))"
+          java -jar "$BUNDLETOOL" validate --bundle "$AAB"
+          java -jar "$BUNDLETOOL" dump manifest --bundle "$AAB" > "$RUNNER_TEMP/manifest.xml"
+          grep -oE '(package|android:versionCode|android:versionName)="[^"]*"' "$RUNNER_TEMP/manifest.xml" | head -3
+          grep -E "minSdkVersion|targetSdkVersion|uses-permission|screenOrientation" "$RUNNER_TEMP/manifest.xml"
+          echo "::endgroup::"
+          ls -la "$APK" "$AAB"
+          if jarsigner -verify "$AAB" | grep -q "jar verified"; then echo "release bundle: SIGNED"; else echo "release bundle: unsigned (Google Play needs it signed with the upload key)"; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: idle-car-empire-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: idle-car-empire-release-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-lint-report
+          path: android/app/build/reports/lint-results-debug.html
+          if-no-files-found: ignore
+
+  device:
+    name: Runs on an Android emulator
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+          cache-dependency-path: android/**/*.gradle*
+      - run: npm ci
+      # Without the Supabase settings: the checks play without an account, and a test run must
+      # not create players on the live server. Cloud saves are checked by cloud-e2e.yml.
+      - name: Build the game for the app (no cloud)
+        run: npm run build:android
+      - name: Debug APK
+        working-directory: android
+        run: ./gradlew --no-daemon assembleDebug
+      - name: Enable KVM (hardware-accelerated emulator)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install, play, Back button, background, kill, update, reboot
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: node scripts/android-device-check.mjs android/app/build/outputs/apk/debug/app-debug.apk --reboot --out android-check
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-emulator-check
+          path: android-check
+          if-no-files-found: ignore
