@@ -10,6 +10,7 @@
 // plant's real batch: a part walks the whole line in one production cycle,
 // and the line stands still whenever the plant does.
 import { liveryOf } from "../../three/livery";
+import { isSaving, shouldDraw } from "@/lib/power";
 import { attachControls, Camera } from "../../map/camera";
 import { mix, Painter, raceFont, shade, sx, sy, toTile } from "../../map/iso";
 import { skyAt, worldClock, type TimeMode } from "../../map/lighting";
@@ -129,7 +130,8 @@ export class InteriorEngine {
   onSelect: (s: StationPick | null) => void = () => {};
   /** Low graphics: fewer frames, no people animation. */
   low = false;
-  private skip = 0;
+  /** When the last frame was drawn (battery saver: lib/power.ts). */
+  private lastDraw = 0;
   /**
    * The hall's still layer (floor, markings, walls, windows, daylight), drawn
    * once around the view and reused until the camera leaves it or zooms.
@@ -259,11 +261,13 @@ export class InteriorEngine {
     this.last = performance.now();
     const loop = (now: number) => {
       if (!this.running) return;
-      const dt = Math.min(0.1, (now - this.last) / 1000);
-      this.last = now;
-      // low graphics: every other frame
-      if (!this.low || (this.skip = this.skip ^ 1)) this.render(dt * (this.low ? 2 : 1));
       this.raf = requestAnimationFrame(loop);
+      // low graphics: ~30 FPS; battery saver: 30 FPS while playing, a few frames a second when idle
+      if (document.hidden || !shouldDraw(now, this.lastDraw, this.low)) return;
+      this.lastDraw = now;
+      const dt = Math.min(isSaving() ? 0.25 : 0.1, (now - this.last) / 1000);
+      this.last = now;
+      this.render(dt);
     };
     this.raf = requestAnimationFrame(loop);
   }

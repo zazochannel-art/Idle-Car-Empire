@@ -1,6 +1,7 @@
 // Runs the garage interior canvas: camera, facilities, mechanics, cars
 // cycling through the stations, and the placement ghost.
 import { FACILITY_BY_ID } from "@/game/config/city";
+import { isSaving, shouldDraw } from "@/lib/power";
 import { footprint, type StationStats } from "@/game/engine/city";
 import type { FacilityType, PlacedFacility } from "@/game/types";
 import { attachControls, Camera } from "../map/camera";
@@ -121,12 +122,16 @@ export class GarageEngine {
     if (this.running) return;
     this.running = true;
     this.last = performance.now();
+    let lastDraw = 0;
     const loop = (now: number) => {
       if (!this.running) return;
-      const dt = Math.min(0.1, (now - this.last) / 1000);
+      this.raf = requestAnimationFrame(loop);
+      // battery saver: fewer frames (lib/power.ts)
+      if (document.hidden || !shouldDraw(now, lastDraw, false)) return;
+      lastDraw = now;
+      const dt = Math.min(isSaving() ? 0.25 : 0.1, (now - this.last) / 1000);
       this.last = now;
       this.render(dt);
-      this.raf = requestAnimationFrame(loop);
     };
     this.raf = requestAnimationFrame(loop);
   }
