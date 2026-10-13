@@ -37,7 +37,7 @@ function OfflineReport() {
 
   return (
     <Dialog open onOpenChange={(o) => !o && collect()}>
-      <DialogContent hideClose className="max-h-[92dvh] overflow-y-auto text-center">
+      <DialogContent hideClose className="text-center">
         <motion.div initial={{ scale: 0.6, rotate: -8 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring", stiffness: 260, damping: 14 }} className="mx-auto mb-2 text-6xl">
           🏭
         </motion.div>

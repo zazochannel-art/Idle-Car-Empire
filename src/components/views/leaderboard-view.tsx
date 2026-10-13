@@ -154,7 +154,7 @@ function Row({ r, onVisit }: { r: BoardRow; onVisit: () => void }) {
 function VisitDialog({ userId, sent, onSent, onClose }: { userId: string | null; sent: number | null; onSent: () => void; onClose: () => void }) {
   return (
     <Dialog open={userId !== null} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto">{userId && <Visit key={userId} userId={userId} sent={sent} onSent={onSent} />}</DialogContent>
+      <DialogContent>{userId && <Visit key={userId} userId={userId} sent={sent} onSent={onSent} />}</DialogContent>
     </Dialog>
   );
 }

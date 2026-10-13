@@ -18,12 +18,13 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "dialog-content glass-strong fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl p-6 outline-none",
+        "dialog-content glass-strong fixed left-1/2 z-50 flex w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 flex-col rounded-2xl outline-none",
         className,
       )}
       {...props}
     >
-      {children}
+      {/* (taller than the screen: the content scrolls inside the box, the close button stays in its corner) */}
+      <div className="min-h-0 overflow-y-auto overscroll-contain p-6">{children}</div>
       {!hideClose && (
         <DialogPrimitive.Close className="absolute -right-2 -top-2 flex size-10 items-center justify-center rounded-full bg-stop text-white shadow-[0_3px_0_0_#a82424] transition hover:brightness-110 active:translate-y-[2px]">
           <X className="size-5 stroke-[3.5]" />
