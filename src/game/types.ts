@@ -584,6 +584,8 @@ export interface GameState {
   story: import("./engine/story").StoryState;
   /** Limited editions found on the assembly lines (kept through every reset). */
   editions: import("./engine/collection").EditionsState;
+  /** The free season pass (engine/pass.ts). */
+  pass: import("./engine/pass").PassState;
   /** Unlock bonuses already claimed this run ("car:sedan", "plant:engineFactory"). */
   unlocks: string[];
   settings: { buyAmount: BuyAmount; lang: Lang; lowGraphics: boolean; sound: boolean; haptics: boolean; notify: boolean };
@@ -651,6 +653,8 @@ export interface RaceCarState {
   install?: { u: import("./config/racing").RaceUpgrade; left: number; total: number };
   /** Tuning garage: paint ("" = the livery), rims, spoiler, and the parts already paid for ("rims:sport"). */
   tuning?: { paint?: string; rims?: import("./config/tuning").RimId; spoiler?: import("./config/tuning").SpoilerId; owned?: string[] };
+  /** A limited edition from the season pass: the season it came from. */
+  limited?: number;
 }
 
 export interface RaceEntrant {

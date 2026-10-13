@@ -1085,6 +1085,7 @@ export function migrateRacing(raw: unknown): RacingState {
         ...(isObj(c.test) ? { test: c.test as unknown as RaceCarState["test"] } : {}),
         ...(isObj(c.install) && RACE_UPGRADES.includes(c.install.u as RaceUpgrade) ? { install: { u: c.install.u as RaceUpgrade, left: Math.max(0, num(c.install.left)), total: Math.max(1, num(c.install.total, 1)) } } : {}),
         ...(isObj(c.tuning) ? { tuning: migrateTuning(c.tuning) } : {}),
+        ...(num(c.limited, 0) >= 1 ? { limited: Math.floor(num(c.limited)) } : {}),
       });
     }
   R.nextCar = Math.max(R.nextCar, ...R.cars.map((c) => c.id + 1));

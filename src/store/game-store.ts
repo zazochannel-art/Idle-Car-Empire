@@ -61,6 +61,8 @@ import * as Gf from "@/game/engine/gifts";
 import * as Gh from "@/game/engine/ghost";
 import { allianceReward } from "@/game/engine/alliance";
 import * as Wt from "@/game/engine/winter";
+import * as Ps from "@/game/engine/pass";
+import { PASS, type WeeklyId } from "@/game/config/pass";
 
 const TICK_MS = 100;
 const SAVE_MS = 5_000;
@@ -94,6 +96,10 @@ interface GameStore {
   /** Winter festival: opens an advent door (1–24) / takes a finished goal's reward. */
   openAdventDoor: (day: number) => boolean;
   claimWinterGoal: (goal: Wt.WinterGoal) => boolean;
+  /** Season pass: takes a reached tier / every reached tier / a finished weekly challenge. */
+  claimPassTier: (tier: number) => boolean;
+  claimPassAll: () => boolean;
+  claimPassWeekly: (id: WeeklyId) => boolean;
   /** Takes a reward tier of the alliance's weekly goal (the server decides): its answer. */
   claimAllianceTier: (tier: number) => Promise<import("@/game/save").ClaimTierResult | "error">;
   init: () => Promise<void>;
@@ -340,6 +346,10 @@ export const useGame = create<GameStore>((set, get) => {
     const eng = Ex.engineersTick(next, now, dt);
     if (eng === "candidate") uiEvents.emit({ type: "toast", tone: "info", icon: "👩‍🔬", title: tr("eng.candidateToast", { name: ENGINEER_BY_ID[next.engineers.candidate!.id].name }) });
     else if (eng === "lost") uiEvents.emit({ type: "toast", tone: "warn", icon: "🕵️", title: tr("eng.lostToast") });
+    // the season pass: a new season (paying what was left untaken), new weekly challenges
+    const pass = Ps.passTick(next, snap, now);
+    if (pass.leftover) uiEvents.emit({ type: "toast", tone: "gold", icon: "🎟️", title: tr("pass.leftoverToast", { n: pass.leftover }) });
+    if (pass.season && next.pass.season > 1 && next.lifetime.playTime > 600) uiEvents.emit({ type: "toast", tone: "gold", icon: "🎟️", title: tr("pass.newSeason", { n: next.pass.season }), action: { label: tr("pass.open"), view: "pass" } });
     if (Wt.winterTick(next, snap, now)) uiEvents.emit({ type: "toast", tone: "gold", icon: "🎄", title: tr("winter.startToast"), body: tr("winter.startToastBody"), action: { label: tr("winter.open"), view: "winter" } });
     const fo = Ex.fleetOrderTick(next, now);
     if (fo === "offer") uiEvents.emit({ type: "toast", tone: "info", icon: "🚌", title: tr("fleet.offerToast") });
@@ -460,6 +470,32 @@ export const useGame = create<GameStore>((set, get) => {
       if (ok) {
         persist(true);
         uiEvents.emit({ type: "toast", tone: "gold", icon: "⭐", title: tr("winter.goalToast"), body: tr("winter.doorStars", { money: formatMoney(money ?? 0), stars: Wt.WINTER.goalReward.stars ?? 0 }) });
+      }
+      return ok;
+    },
+    claimPassTier: (tier) => {
+      let money: number | null = null;
+      const ok = act((s) => (money = Ps.claimTier(s, tier, get().snap, Date.now())) !== null);
+      if (ok) {
+        persist(true);
+        uiEvents.emit({ type: "toast", tone: "gold", icon: "🎟️", title: tr("pass.tierToast", { n: tier }), body: tr("pass.tierBody", { money: formatMoney(money ?? 0) }) });
+      }
+      return ok;
+    },
+    claimPassAll: () => {
+      let got = { tiers: 0, money: 0 };
+      const ok = act((s) => (got = Ps.claimAllTiers(s, get().snap, Date.now())).tiers > 0);
+      if (ok) {
+        persist(true);
+        uiEvents.emit({ type: "toast", tone: "gold", icon: "🎟️", title: tr("pass.allToast", { n: got.tiers }), body: tr("pass.tierBody", { money: formatMoney(got.money) }) });
+      }
+      return ok;
+    },
+    claimPassWeekly: (id) => {
+      const ok = act((s) => Ps.claimWeekly(s, id));
+      if (ok) {
+        persist(true);
+        uiEvents.emit({ type: "toast", tone: "success", icon: "📅", title: tr("pass.weeklyToast", { xp: PASS.xp.weekly }) });
       }
       return ok;
     },
