@@ -58,8 +58,11 @@ async function connect(timeoutMs = 120_000) {
         }
         adb("forward", `tcp:${PORT}`, `localabstract:${name}`);
         const pages = await (await fetch(`http://127.0.0.1:${PORT}/json`)).json();
-        const page = pages.find((p) => p.type === "page" && p.url.startsWith("https://localhost"));
+        const games = pages.filter((p) => p.type === "page" && p.url.startsWith("https://localhost"));
+        const page = games[0];
         if (page) {
+          // (one game page per app: more would mean two copies of the game running)
+          console.log(`      devtools: ${pages.length} target(s): ${pages.map((p) => `${p.type} ${p.url} ${p.id.slice(0, 8)}`).join(" | ")}`);
           ws?.close();
           ws = new WebSocket(page.webSocketDebuggerUrl);
           await new Promise((res, rej) => {
@@ -111,6 +114,19 @@ const GAME_UP = `(document.querySelector("header .race-type")?.getBoundingClient
 const DIALOG_OPEN = `!!document.querySelector('[role="dialog"], [role="alertdialog"]')`;
 const SAVED = `(() => { const r = localStorage.getItem(${JSON.stringify(SAVE)}); if (!r) return null; const d = JSON.parse(r); return { createdAt: d.state.createdAt, lang: d.state.settings.lang, savedAt: d.savedAt }; })()`;
 
+/** What Android and the WebView said (the app's lifecycle, console errors, crashes), kept in the output folder. */
+function dumpLogcat(name, tail) {
+  try {
+    const log = adb("logcat", "-d", "-v", "time")
+      .split("\n")
+      .filter((l) => /Capacitor|chromium|AndroidRuntime|idlecarempire|WebView/.test(l) && !/Handling local request|Loading app at/.test(l));
+    fs.writeFileSync(path.join(outDir, `${name}.txt`), log.join("\n"));
+    console.log(`\n${name} (${log.length} lines, last ${tail}):\n${log.slice(-tail).join("\n")}\n`);
+  } catch (e) {
+    console.log(`${name}:`, e.message);
+  }
+}
+
 const inFront = () =>
   adb("shell", "dumpsys", "window")
     .split("\n")
@@ -135,6 +151,8 @@ async function launch() {
   while (Date.now() < end) {
     if (await evaluate(GAME_UP).catch(() => false)) {
       await settle();
+      const t = await evaluate("performance.timeOrigin").catch(() => 0);
+      console.log(`      page started ${new Date(t).toISOString()}`);
       return;
     }
     const guest = await evaluate(`(() => { const b = [...document.querySelectorAll("button")].find((x) => /without an account/i.test(x.textContent)); if (b) { b.click(); return true; } return false; })()`).catch(() => false);
@@ -196,10 +214,17 @@ try {
   check(!inFront(), "Back with nothing open puts the app in the background");
   const after = await evaluate(SAVED);
   check(after.savedAt > before, "leaving the app saved the game at once", `${new Date(before).toISOString()} → ${new Date(after.savedAt).toISOString()}`);
-  // while it plays, the game saves every 5 s: in the background nothing more is written
-  await sleep(8000);
+  // while it plays, the game saves every 5 s; in the background, after the save of leaving (and
+  // the page's own one when it is hidden), nothing more is written
+  await sleep(4000);
+  const quiet = await evaluate(SAVED);
+  await sleep(12_000);
   const later = await evaluate(SAVED);
-  check(later.savedAt === after.savedAt, "the game stops ticking in the background (no battery use)", later.savedAt === after.savedAt ? "no saves for 8 s" : "still saving");
+  check(
+    later.savedAt === quiet.savedAt,
+    "the game stops ticking in the background (no battery use)",
+    later.savedAt === quiet.savedAt ? "no saves for 12 s" : `still saving: ${new Date(quiet.savedAt).toISOString()} → ${new Date(later.savedAt).toISOString()}`,
+  );
 
   // 5. back to the app: it continues where it was
   adb("shell", "am", "start", "-W", "-n", `${PKG}/${ACTIVITY}`);
@@ -224,6 +249,7 @@ try {
 
   // 8. the phone restarts
   if (reboot) {
+    dumpLogcat("logcat-before-reboot", 80);
     await sleep(6000);
     adb("shell", "input", "keyevent", "KEYCODE_HOME");
     await sleep(3000);
@@ -246,6 +272,7 @@ try {
   }
 }
 ws?.close();
+dumpLogcat("logcat", 60);
 const failed = results.filter((r) => !r.ok);
 console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
 fs.writeFileSync(path.join(outDir, "results.json"), JSON.stringify(results, null, 1));

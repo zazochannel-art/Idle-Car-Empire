@@ -150,7 +150,7 @@ jobs:
         if: always()
         run: |
           f=android-check/1-game.png
-          if [ -f "$f" ]; then convert "$f" -resize 360x -quality 55 jpg:- | base64 -w0 || true; echo; fi
+          if [ -f "$f" ]; then node -e "require('sharp')(process.argv[1]).resize(360).jpeg({ quality: 55 }).toBuffer().then((b) => console.log(b.toString('base64')))" "$f" || true; fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
