@@ -15,6 +15,7 @@ export const RESEARCH_CATEGORIES: ResearchCategoryConfig[] = [
   { id: "design", name: "Design", emoji: "🎨", color: "#f472b6" },
   { id: "performance", name: "Performance", emoji: "🏎️", color: "#fb923c" },
   { id: "green", name: "Green Technology", emoji: "🌱", color: "#4ade80" },
+  { id: "autonomy", name: "Autonomous Driving", emoji: "🛰️", color: "#2dd4bf" },
 ];
 
 export interface ResearchNode {
@@ -48,6 +49,8 @@ export const RESEARCH: ResearchNode[] = [
   { id: "electric_motors", category: "electric", name: "Electric Motors", description: "Unlocks the Battery Factory and Electric Performance cars", cost: 20_000, requires: ["battery_cells", "advanced_engines"], effects: [{ kind: "unlockCar", car: "electric" }, { kind: "unlockPlant", plant: "batteryFactory" }] },
   { id: "regen_braking", category: "electric", name: "Regenerative Braking", description: "New cars: +4 braking, +2 reliability", cost: 2_000, requires: ["battery_cells"], effects: [{ kind: "tech", tech: "regen_braking" }] },
   { id: "solid_state", category: "electric", name: "Solid-State Batteries", description: "+100% Electric Performance value", cost: 400_000, requires: ["electric_motors"], effects: [{ kind: "value", mult: 2, minTier: 9, maxTier: 9 }] },
+  { id: "charging_network", category: "electric", name: "Charging Network", description: "Charging stations at your dealers: electric cars sell faster and drivers pay to charge", cost: 250_000, requires: ["electric_motors"], effects: [] },
+  { id: "fast_charging", category: "electric", name: "Fast Charging", description: "Every charging station serves twice as many cars", cost: 1_500_000, requires: ["charging_network", "solid_state"], effects: [] },
 
   // 🤖 AI Manufacturing
   { id: "ai_factory", category: "ai", name: "AI Factory", description: "+50% offline income", cost: 1_200, requires: ["robotic_assembly"], effects: [{ kind: "offline", add: 0.5 }] },
@@ -73,6 +76,14 @@ export const RESEARCH: ResearchNode[] = [
   { id: "ceramic_coatings", category: "green", name: "Ceramic Coatings", description: "New cars: +6 reliability", cost: 1_000, requires: ["recycled_materials"], effects: [{ kind: "tech", tech: "ceramic_coatings" }] },
   { id: "solar_plants", category: "green", name: "Solar Plants", description: "+20% speed, +25% offline income", cost: 4_000, requires: ["recycled_materials"], effects: [{ kind: "speed", mult: 1.2 }, { kind: "offline", add: 0.25 }] },
   { id: "carbon_neutral", category: "green", name: "Carbon Neutral", description: "+30% global income, +4h offline limit", cost: 150_000, requires: ["solar_plants"], effects: [{ kind: "income", mult: 1.3 }, { kind: "offlineCap", hours: 4 }] },
+
+  // 🛰️ Autonomous Driving (late game: after the electric cars)
+  { id: "driving_software", category: "autonomy", name: "Driving Software", description: "Unlocks the Software Studio", cost: 500_000, requires: ["electric_motors", "ai_factory"], effects: [{ kind: "unlockPlant", plant: "softwareStudio" }] },
+  { id: "sensor_fusion", category: "autonomy", name: "Sensor Fusion", description: "New cars: +4 handling, +4 braking", cost: 900_000, requires: ["driving_software"], effects: [{ kind: "tech", tech: "sensor_fusion" }] },
+  { id: "self_driving", category: "autonomy", name: "Self-Driving Cars", description: "Unlocks the Autonomous Lounge", cost: 2_000_000, requires: ["driving_software", "charging_network"], effects: [{ kind: "unlockCar", car: "autonomous" }] },
+  { id: "fleet_learning", category: "autonomy", name: "Fleet Learning", description: "+100% Autonomous Lounge value", cost: 3_000_000, requires: ["self_driving"], effects: [{ kind: "value", mult: 2, minTier: 10, maxTier: 10 }] },
+  { id: "ota_updates", category: "autonomy", name: "Over-the-Air Updates", description: "Every Autonomous Lounge sold pays a software subscription", cost: 5_000_000, requires: ["self_driving"], effects: [] },
+  { id: "robotaxi", category: "autonomy", name: "Robotaxi Fleet", description: "×2 Autonomous Lounge value", cost: 20_000_000, requires: ["ota_updates", "neural_design"], effects: [{ kind: "value", mult: 2, minTier: 10, maxTier: 10 }] },
 ];
 
 export const RESEARCH_BY_ID: Record<string, ResearchNode> = Object.fromEntries(

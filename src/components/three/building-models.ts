@@ -406,6 +406,22 @@ export function buildPlant(T: Three, kit: MaterialKit, spec: PlantSpec, W: numbe
       g.add(new T.Mesh(new T.SphereGeometry(0.05, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), white));
       (g.children[g.children.length - 1] as THREE_NS.Mesh).position.set(hx + 0.3, H + 0.02, hy + 0.2);
       break;
+    case "softwareStudio": {
+      // two satellite dishes on the roof (the fleet's data comes in) and server containers with status lights in the yard
+      for (const [i, r] of [0.07, 0.05].entries()) {
+        const dish = new T.Mesh(new T.SphereGeometry(r, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2.6), white);
+        dish.rotation.x = -0.9;
+        dish.position.set(hx + 0.18 + i * 0.22, H + 0.06, hy + 0.18);
+        g.add(dish);
+        g.add(cyl(T, steel, hx + 0.18 + i * 0.22, H, hy + 0.18, 0.008, 0.06, 6));
+      }
+      const led = new T.MeshStandardMaterial({ color: "#a5b4fc", emissive: "#6366f1", emissiveIntensity: 1.4 });
+      for (let i = 0; i < 2; i++) {
+        g.add(box(T, std(T, "#1e1b4b", 0.4, 0.4), W - 0.62 + i * 0.3, 0.012, yardZ, 0.26, 0.13, 0.22));
+        g.add(box(T, led, W - 0.6 + i * 0.3, 0.1, yardZ + 0.222, 0.22, 0.008, 0.002));
+      }
+      break;
+    }
     case "batteryFactory":
       for (let i = 0; i < 3; i++) {
         g.add(box(T, std(T, "#d9f99d", 0.3, 0.5), W - 0.75 + i * 0.22, 0.012, yardZ, 0.18, 0.14, 0.3));
@@ -466,6 +482,8 @@ export interface DealerSpec {
   tier: number;
   /** Brand colour of the fascia and the pylon. */
   brand: string;
+  /** Charging station level (0–5): posts on the front bays, a solar canopy from level 3. */
+  chargers?: number;
 }
 
 /**
@@ -581,6 +599,32 @@ export function buildDealer(T: Three, kit: MaterialKit, spec: DealerSpec, W: num
   }
   // the tower of a global flagship
   if (tier >= 5) g.add(office(T, kit, mull, white, x0 + 0.05, z0 + 0.05, 0.5, 0.45, H + 0.85));
+
+  // the charging station: green bays on the right front, a post per bay, a solar canopy over them from level 3
+  const chargers = Math.max(0, Math.min(5, spec.chargers ?? 0));
+  if (chargers > 0) {
+    const cx0 = Math.min(W - 0.7, 1.72);
+    const posts = Math.min(4, chargers);
+    const bay = std(T, "#16a34a", 0, 0.7);
+    const body = std(T, "#f8fafc", 0.2, 0.35);
+    const screen = new T.MeshStandardMaterial({ color: "#5eead4", emissive: "#14b8a6", emissiveIntensity: 0.9, roughness: 0.3 });
+    for (let i = 0; i < posts; i++) {
+      const z = 1.42 + i * 0.2;
+      g.add(box(T, bay, cx0, 0.011, z, 0.42, 0.002, 0.16));
+      g.add(box(T, body, cx0 + 0.46, 0.011, z + 0.05, 0.06, 0.17, 0.06));
+      g.add(box(T, screen, cx0 + 0.455, 0.12, z + 0.06, 0.008, 0.04, 0.04));
+      g.add(box(T, darkFrame, cx0 + 0.47, 0.06, z + 0.11, 0.01, 0.01, 0.06));
+    }
+    if (chargers >= 3) {
+      const ch = 0.34;
+      const solar = std(T, "#1e3a5f", 0.6, 0.25);
+      const z1 = 1.42 + posts * 0.2;
+      g.add(box(T, white, cx0 - 0.04, ch, 1.36, 0.62, 0.025, z1 - 1.36 + 0.04));
+      g.add(box(T, solar, cx0 - 0.02, ch + 0.025, 1.38, 0.58, 0.008, z1 - 1.38));
+      for (const z of [1.38, z1 - 0.02]) g.add(cyl(T, frame, cx0 + 0.56, 0.01, z, 0.012, ch, 8));
+      g.add(box(T, std(T, "#16a34a", 0.2, 0.4), cx0 - 0.04, ch - 0.02, z1 + 0.035, 0.62, 0.02, 0.006));
+    }
+  }
 
   // sign pylon by the road
   const ph = 0.5 + tier * 0.08;

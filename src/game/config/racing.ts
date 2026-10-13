@@ -33,6 +33,7 @@ export const RACE_CLASS_OF: Record<CarId, RaceClass> = {
   supercar: "A",
   hypercar: "S",
   electric: "S",
+  autonomous: "S",
 };
 
 // ───────────────────────────── performance ─────────────────────────────
@@ -48,6 +49,7 @@ export const BASE_WEIGHT: Record<CarId, number> = {
   supercar: 1_450,
   hypercar: 1_320,
   electric: 1_900,
+  autonomous: 2_050,
 };
 
 /** Base handling and aerodynamics of each body shape. */
@@ -61,6 +63,7 @@ export const BODY_DYNAMICS: Record<CarId, { handling: number; aero: number }> = 
   supercar: { handling: 64, aero: 64 },
   hypercar: { handling: 70, aero: 74 },
   electric: { handling: 62, aero: 66 },
+  autonomous: { handling: 58, aero: 70 },
 };
 
 /** Engine output by the grade the Engine Factory makes (Economy, Turbo, V6, V8, V12). */

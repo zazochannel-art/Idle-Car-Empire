@@ -100,9 +100,9 @@ export function plantModel(look: PlantLook, W: number, D: number) {
   return cached(`plant|${look.type}|${look.level}|${look.big}|${W}|${D}`, () => bake(buildPlant(THREE, kit(), { ...look, dockFront: true }, W - 2 * MARGIN, D - 2 * MARGIN)));
 }
 
-export function dealerModel(tier: number, W: number, D: number) {
+export function dealerModel(tier: number, W: number, D: number, chargers = 0) {
   const brand = tier >= 3 ? "#eab308" : "#2563eb";
-  return cached(`dealer|${tier}|${W}|${D}`, () => bake(buildDealer(THREE, kit(), { tier, brand }, W - 2 * MARGIN, D - 2 * MARGIN)));
+  return cached(`dealer|${tier}|${W}|${D}|${chargers}`, () => bake(buildDealer(THREE, kit(), { tier, brand, chargers }, W - 2 * MARGIN, D - 2 * MARGIN)));
 }
 
 export function garageModel(level: number, color: string, W: number, D: number) {
