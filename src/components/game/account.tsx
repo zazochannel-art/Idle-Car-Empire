@@ -15,6 +15,7 @@ import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { answerStartChoice, enterGame, useCloud } from "@/store/cloud-store";
+import { trackGate } from "@/game/save/funnel";
 import { uiEvents } from "@/store/events";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
@@ -513,6 +514,10 @@ export function StartGate() {
 function WelcomeGate({ returning }: { returning: boolean }) {
   const saves = useGame((g) => g.saves);
   const { t } = useT();
+  // the anonymous funnel's first step: a new visitor saw the welcome page
+  useEffect(() => {
+    if (!returning) trackGate();
+  }, [returning]);
   const [tab, setTab] = useState<"register" | "login">(returning ? "login" : "register");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");

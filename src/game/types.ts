@@ -583,7 +583,10 @@ export interface GameState {
   pass: import("./engine/pass").PassState;
   /** Unlock bonuses already claimed this run ("car:sedan", "plant:engineFactory"). */
   unlocks: string[];
-  settings: { buyAmount: BuyAmount; lang: Lang; lowGraphics: boolean; sound: boolean; haptics: boolean; notify: boolean };
+  /** stats: send the anonymous new-player funnel steps (engine/funnel.ts). */
+  settings: { buyAmount: BuyAmount; lang: Lang; lowGraphics: boolean; sound: boolean; haptics: boolean; notify: boolean; stats: boolean };
+  /** Funnel steps already sent for this company ("legacy": a company from before the funnel, never counted). */
+  funnel: string[];
   createdAt: number;
   runStartedAt: number;
   lastActiveAt: number;
