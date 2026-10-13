@@ -171,20 +171,33 @@ async function settle() {
   }
 }
 
+/** The game's pages in the app's WebView: one expected (more would be copies of the game running side by side). */
+async function gamePages() {
+  const pages = await (await fetch(`http://127.0.0.1:${PORT}/json`)).json();
+  return pages.filter((p) => p.type === "page" && p.url.startsWith("https://localhost"));
+}
+
 async function launch() {
   adb("shell", "am", "start", "-W", "-n", `${PKG}/${ACTIVITY}`);
   await connect();
   // a no-cloud build goes straight in; a cloud build shows the welcome page to a new player
   const end = Date.now() + 240_000;
+  let since = Date.now();
   while (Date.now() < end) {
-    if (await evaluate(GAME_UP).catch(() => false)) {
+    if (await evaluate(GAME_UP, 30_000).catch(() => false)) {
       await settle();
       const t = await evaluate("performance.timeOrigin").catch(() => 0);
       console.log(`      page started ${new Date(t).toISOString()}`);
       return;
     }
-    const guest = await evaluate(`(() => { const b = [...document.querySelectorAll("button")].find((x) => /without an account/i.test(x.textContent)); if (b) { b.click(); return true; } return false; })()`).catch(() => false);
+    const guest = await evaluate(`(() => { const b = [...document.querySelectorAll("button")].find((x) => /without an account/i.test(x.textContent)); if (b) { b.click(); return true; } return false; })()`, 30_000).catch(() => false);
     if (guest) console.log("      (welcome page: played without an account)");
+    // Android can recreate the activity as it starts (a new WebView, the first page dropped):
+    // after a while without the game, follow the newest page
+    if (Date.now() - since > 30_000) {
+      await connect();
+      since = Date.now();
+    }
     await sleep(1500);
   }
   throw new Error("the game never appeared");
@@ -212,6 +225,8 @@ try {
   shot("1-game");
   const first = await evaluate(SAVED);
   check(!!first?.createdAt, "a save exists on the phone", JSON.stringify(first));
+  const copies = (await gamePages()).length;
+  check(copies === 1, "one copy of the game runs in the app", `${copies} game page(s)`);
 
   // 2. a setting changed through the game's own screen (Settings → Română)
   const opened = await evaluate(`(() => { const b = [...document.querySelectorAll("header button")].at(-1); b.click(); return true; })()`);
@@ -289,6 +304,8 @@ try {
     await launch();
     const rebooted = await evaluate(SAVED);
     check(rebooted?.createdAt === first.createdAt && rebooted?.lang === "ro", "after the phone restarts: same company, same settings", JSON.stringify(rebooted));
+    const copiesNow = (await gamePages()).length;
+    check(copiesNow === 1, "after the phone restarts: one copy of the game", `${copiesNow} game page(s)`);
     shot("4-after-reboot");
   }
 } catch (e) {
