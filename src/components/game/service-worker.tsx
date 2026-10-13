@@ -4,6 +4,20 @@ import { useEffect } from "react";
 import { isNativeApp } from "@/lib/platform";
 
 /**
+ * Tells the offline cache which build files this version uses (every screen has loaded by now),
+ * so it can drop those of older versions.
+ */
+export function pruneOfflineCache() {
+  const sw = typeof navigator !== "undefined" ? navigator.serviceWorker?.controller : null;
+  if (!sw || !navigator.onLine) return;
+  const urls = performance
+    .getEntriesByType("resource")
+    .map((e) => e.name)
+    .filter((u) => u.includes("/_next/static/"));
+  if (urls.length) sw.postMessage({ type: "keep", urls });
+}
+
+/**
  * Registers the offline cache in production web builds. The Android app carries
  * its files inside it (offline by nature), so there a cache would only risk
  * serving the last version's files after an app update: it never registers one,

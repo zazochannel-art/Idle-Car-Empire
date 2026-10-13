@@ -897,6 +897,8 @@ export const ro: Record<MessageKey, string> = {
   "goal.site": "{name} în construcție",
   "goal.siteDetail": "{pct}% · gata în {time}",
   "common.back": "Înapoi",
+  "screen.failed": "Ecranul nu a putut fi încărcat (jocul s-a actualizat sau conexiunea s-a întrerupt). Jocul tău e salvat.",
+  "screen.reload": "Reîncarcă",
   "hud.parts": "Piese produse",
   "cars.onLine": "Pe o linie de asamblare acum",
   "chain.title": "Lanțul de producție",

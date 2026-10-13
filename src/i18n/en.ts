@@ -898,6 +898,8 @@ export const en = {
   "goal.site": "{name} under construction",
   "goal.siteDetail": "{pct}% · ready in {time}",
   "common.back": "Back",
+  "screen.failed": "This screen couldn't be loaded (the game was updated, or the connection dropped). Your game is saved.",
+  "screen.reload": "Reload",
   "hud.parts": "Parts made",
   "cars.onLine": "On an assembly line right now",
   "chain.title": "Supply chain",

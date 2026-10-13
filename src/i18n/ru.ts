@@ -897,6 +897,8 @@ export const ru: Record<MessageKey, string> = {
   "goal.site": "{name}: идёт стройка",
   "goal.siteDetail": "{pct}% · готово через {time}",
   "common.back": "Назад",
+  "screen.failed": "Не удалось загрузить экран (игра обновилась или прервалось соединение). Ваша игра сохранена.",
+  "screen.reload": "Перезагрузить",
   "hud.parts": "Деталей сделано",
   "cars.onLine": "Сейчас на сборочной линии",
   "chain.title": "Цепочка поставок",
