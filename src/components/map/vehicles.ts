@@ -1,5 +1,5 @@
 import { liveryOf } from "../three/livery";
-import { CAR_LENGTH } from "../three/car-models";
+import { CAR_LENGTH } from "../three/car-sizes";
 import type { CarId } from "@/game/types";
 import { sprites3d, tierFor, type SpriteSize } from "../three/sprites";
 import { shade, sx, sy, type Painter } from "./iso";

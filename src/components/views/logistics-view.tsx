@@ -17,8 +17,8 @@ import { ViewHeader } from "./section-title";
  * warehouse, and the transport ladder Truck → Train → Port → Export.
  */
 export function LogisticsView() {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  const state = useGame((g) => g.view.state);
+  const snap = useGame((g) => g.view.snap);
   const { buyLogistics, buyTransportTier } = useGame.getState();
   const { t } = useT();
   const l = state.logistics;

@@ -73,59 +73,96 @@ export function Minimap({ engine }: { engine: RefObject<MapEngine | null> }) {
     let island: HTMLImageElement | null = null;
     let areas: HTMLImageElement | null = null;
     let fog: { key: string; cv: HTMLCanvasElement } | null = null;
-    load(`${base}/minimap.webp`).then((i) => (island = i), () => {});
-    load(`${base}/areas.png`).then((i) => (areas = i), () => {});
-    let raf = 0;
-    let frame = 0;
-    const draw = () => {
-      raf = requestAnimationFrame(draw);
-      if (frame++ % 3) return; // 20 fps is plenty
-      const s = stateRef.current;
-      const unlocked = unlockedAreas(s);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.fillStyle = "#3a9be0";
-      ctx.fillRect(0, 0, W, H);
-      if (island) ctx.drawImage(island, 0, 0, W, H);
+    // the island, the veil, the locks and the dots are a still picture, redrawn only when they change
+    // (a plot built, an area opened); each frame only checks the camera's view
+    const layer = document.createElement("canvas");
+    layer.width = canvas.width;
+    layer.height = canvas.height;
+    const lctx = layer.getContext("2d")!;
+    let images = 0;
+    load(`${base}/minimap.webp`).then((i) => ((island = i), images++), () => {});
+    load(`${base}/areas.png`).then((i) => ((areas = i), images++), () => {});
+    let seen: unknown = null;
+    let imagesSeen = -1;
+    let layerKey = "";
+    let viewKey = "";
+    const paintLayer = (unlocked: ReadonlySet<string>, dots: [number, number, number, string][]) => {
+      const g = lctx;
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      g.fillStyle = "#3a9be0";
+      g.fillRect(0, 0, W, H);
+      if (island) g.drawImage(island, 0, 0, W, H);
       if (areas) {
         const key = [...unlocked].sort().join();
         if (fog?.key !== key) fog = { key, cv: veil(areas, unlocked) };
-        ctx.drawImage(fog.cv, 0, 0, W, H);
+        g.drawImage(fog.cv, 0, 0, W, H);
       }
-      ctx.font = "8px sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
+      g.font = "8px sans-serif";
+      g.textAlign = "center";
+      g.textBaseline = "middle";
       for (const z of ZONES) {
         if (unlocked.has(z.id)) continue;
         const c = zoneCenterTile(z.id);
         const [cx, cy] = mm(c.x, c.y);
-        ctx.fillText("🔒", cx, cy);
+        g.fillText("🔒", cx, cy);
       }
-      for (const p of WORLD_MAP.plots) {
-        if (!unlocked.has(p.zone)) continue;
-        const b = s.city.buildings[p.id];
-        let color: string | null = null;
-        if (p.kind === "racing") color = s.racing.unlocked ? "#f5c451" : null;
-        else if (p.kind === "market") color = "#22c55e";
-        else if (p.kind === "depot") color = "#a16207";
-        else if (b?.plant) color = "#fb923c";
-        else if (p.kind === "dealer" && s.dealers[p.dealer!].owned) color = "#facc15";
-        else if (b?.type === "garage") color = "#60a5fa";
-        else if (b) color = STRUCTURE_BY_ID[b.type].roof;
-        if (!color) continue;
-        const [x, y] = mm(p.x, p.y);
-        ctx.fillStyle = color;
-        ctx.strokeStyle = "rgba(0,0,0,0.5)";
-        ctx.lineWidth = 0.6;
-        ctx.beginPath();
-        ctx.arc(x, y, p.big ? 2.6 : 2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
+      g.strokeStyle = "rgba(0,0,0,0.5)";
+      g.lineWidth = 0.6;
+      for (const [x, y, r, color] of dots) {
+        g.fillStyle = color;
+        g.beginPath();
+        g.arc(x, y, r, 0, Math.PI * 2);
+        g.fill();
+        g.stroke();
+      }
+    };
+    // 20 checks a second on a timer (not every frame: a still minimap asks for no frames at all)
+    const draw = () => {
+      if (document.hidden) return;
+      const s = stateRef.current;
+      let dirty = false;
+      // a new state (or an image that arrived): the dots again, the layer only if they differ
+      if (s !== seen || images !== imagesSeen) {
+        seen = s;
+        imagesSeen = images;
+        const unlocked = unlockedAreas(s);
+        const dots: [number, number, number, string][] = [];
+        for (const p of WORLD_MAP.plots) {
+          if (!unlocked.has(p.zone)) continue;
+          const b = s.city.buildings[p.id];
+          let color: string | null = null;
+          if (p.kind === "racing") color = s.racing.unlocked ? "#f5c451" : null;
+          else if (p.kind === "market") color = "#22c55e";
+          else if (p.kind === "depot") color = "#a16207";
+          else if (b?.plant) color = "#fb923c";
+          else if (p.kind === "dealer" && s.dealers[p.dealer!].owned) color = "#facc15";
+          else if (b?.type === "garage") color = "#60a5fa";
+          else if (b) color = STRUCTURE_BY_ID[b.type].roof;
+          if (!color) continue;
+          const [x, y] = mm(p.x, p.y);
+          dots.push([x, y, p.big ? 2.6 : 2, color]);
+        }
+        const key = `${images}|${[...unlocked].sort().join()}|${dots.map((d) => d[3]).join()}`;
+        if (key !== layerKey) {
+          layerKey = key;
+          paintLayer(unlocked, dots);
+          dirty = true;
+        }
       }
       const e = engine.current;
+      let v: [number, number][] | null = null;
       if (e) {
         const now = e.zoomTier();
         setTier((old) => (old === now ? old : now));
-        const v = e.viewQuad().map(([x, y]) => mm(x, y));
+        v = e.viewQuad().map(([x, y]) => mm(x, y));
+      }
+      const vk = v ? v.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(";") : "";
+      if (!dirty && vk === viewKey) return;
+      viewKey = vk;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(layer, 0, 0);
+      if (v) {
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.beginPath();
         v.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
         ctx.closePath();
@@ -136,8 +173,9 @@ export function Minimap({ engine }: { engine: RefObject<MapEngine | null> }) {
         ctx.fill();
       }
     };
-    raf = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(raf);
+    const timer = setInterval(draw, 50);
+    draw();
+    return () => clearInterval(timer);
   }, [engine]);
 
   const onTap = (e: React.PointerEvent<HTMLCanvasElement>) => {

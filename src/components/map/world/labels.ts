@@ -10,26 +10,58 @@ export interface TagStyle {
   icon?: string;
 }
 
-/** A rounded tag whose bottom centre sits at (x, y). */
-export function tag(c: CanvasRenderingContext2D, text: string, x: number, y: number, opts: TagStyle = {}) {
-  const size = opts.size ?? 10;
-  c.font = raceFont(800, size * 1.12);
-  const label = opts.icon ? `${opts.icon} ${text}` : text;
-  const w = c.measureText(label).width + size * 1.2;
-  const h = size * 1.75;
-  const px = x - w / 2;
-  const py = y - h;
+/**
+ * The tags drawn ready, by text, style and pixel ratio: the labels are redrawn ~30 times a second
+ * while the camera moves, and measuring and painting text (emoji above all) each time is costly on
+ * phones, while copying a small picture is not. Oldest first, so the least used ones go first.
+ */
+const TAGS = new Map<string, { img: HTMLCanvasElement; w: number; h: number }>();
+const TAGS_MAX = 400;
+
+function paintTag(c: CanvasRenderingContext2D, label: string, w: number, h: number, size: number, opts: TagStyle) {
   c.beginPath();
-  c.roundRect(px, py, w, h, h * 0.28);
+  c.roundRect(0.5, 0.5, w - 1, h - 1, h * 0.28);
   c.fillStyle = opts.bg ?? "rgba(32,32,36,0.86)";
   c.fill();
   c.strokeStyle = "rgba(255,255,255,0.18)";
   c.lineWidth = 1;
   c.stroke();
+  c.font = raceFont(800, size * 1.12);
   c.fillStyle = opts.fg ?? "#fff";
   c.textAlign = "center";
   c.textBaseline = "middle";
-  c.fillText(label, px + w / 2, py + h / 2 + 0.5);
+  c.fillText(label, w / 2, h / 2 + 0.5);
+}
+
+/** A rounded tag whose bottom centre sits at (x, y). */
+export function tag(c: CanvasRenderingContext2D, text: string, x: number, y: number, opts: TagStyle = {}) {
+  const size = opts.size ?? 10;
+  const label = opts.icon ? `${opts.icon} ${text}` : text;
+  const dpr = c.getTransform().a || 1;
+  const key = `${dpr}|${size}|${opts.bg ?? ""}|${opts.fg ?? ""}|${label}`;
+  let t = TAGS.get(key);
+  if (t) {
+    // used again: to the back of the line
+    TAGS.delete(key);
+    TAGS.set(key, t);
+  } else {
+    c.font = raceFont(800, size * 1.12);
+    const w = Math.ceil(c.measureText(label).width + size * 1.2) + 1;
+    const h = Math.ceil(size * 1.75) + 1;
+    const img = document.createElement("canvas");
+    img.width = Math.ceil(w * dpr);
+    img.height = Math.ceil(h * dpr);
+    const g = img.getContext("2d")!;
+    g.scale(dpr, dpr);
+    paintTag(g, label, w, h, size, opts);
+    t = { img, w, h };
+    TAGS.set(key, t);
+    if (TAGS.size > TAGS_MAX) TAGS.delete(TAGS.keys().next().value!);
+  }
+  // whole device pixels, so the copy stays sharp
+  const px = Math.round((x - t.w / 2) * dpr) / dpr;
+  const py = Math.round((y - t.h) * dpr) / dpr;
+  c.drawImage(t.img, px, py, t.w, t.h);
 }
 
 /** A floating "+$123" rising from (x, y); k runs 0..1 over its life. */

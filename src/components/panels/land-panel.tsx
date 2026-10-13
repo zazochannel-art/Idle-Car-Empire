@@ -62,7 +62,7 @@ function choicesOf(s: GameState, id: string): StructureType[] {
 
 /** An empty plot: what it is zoned for, its size, prices, requirements, and BUY LAND / BUILD. */
 export function LandPanel({ id }: { id: string }) {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const buyLand = useGame((g) => g.buyLand);
   const startConstruction = useGame((g) => g.startConstruction);
   const buildStructure = useGame((g) => g.buildStructure);

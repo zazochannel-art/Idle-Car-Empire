@@ -74,7 +74,7 @@ export function AllianceView() {
 
 function AllianceHome({ a, onChange }: { a: MyAlliance; onChange: () => void }) {
   const saves = useGame((g) => g.saves);
-  const snap = useGame((g) => g.snap);
+  const snap = useGame((g) => g.view.snap);
   const { t } = useT();
   const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null);
   const [leaving, setLeaving] = useState(false);

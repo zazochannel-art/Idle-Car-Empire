@@ -20,8 +20,8 @@ function untilMidnight() {
 }
 
 export function MissionsView() {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  const state = useGame((g) => g.view.state);
+  const snap = useGame((g) => g.view.snap);
   const { claimDaily, claimMilestone } = useGame.getState();
   const { t, lang } = useT();
   const n = useContent(lang);

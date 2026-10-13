@@ -11,8 +11,8 @@ import { useGame } from "@/store/game-store";
 import { ViewHeader } from "./section-title";
 
 export function AchievementsView() {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  const state = useGame((g) => g.view.state);
+  const snap = useGame((g) => g.view.snap);
   const count = state.achievements.length;
   const { t, lang } = useT();
   const n = useContent(lang);

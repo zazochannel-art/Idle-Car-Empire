@@ -28,10 +28,10 @@ import { gradeName, itemName, plantName, PlantPanel } from "../../panels/plant-p
 import { Sheet } from "../../panels/sheet";
 import { InteriorEngine, type InteriorScene, type StationPick } from "./interior-engine";
 import { PHOTO_FILTERS, PhotoMode, SkinPicker, type PhotoFilter } from "./photo-mode";
-import { interiorLayout, RECIPES, recipeFor, type PlacedStation, type StationId } from "./layout";
+import { HAS_INTERIOR, interiorLayout, recipeFor, type PlacedStation, type StationId } from "./layout";
 
 /** Plants with a walk-in interior (every plant with a recipe; others keep the factory floor view). */
-export const HAS_INTERIOR = new Set(Object.keys(RECIPES));
+export { HAS_INTERIOR };
 
 /**
  * Inside a plant: the halls and lines live, with the money, income and

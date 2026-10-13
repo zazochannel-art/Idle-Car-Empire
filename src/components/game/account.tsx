@@ -289,7 +289,7 @@ export function ProfileView() {
   const sync = useCloud((c) => c.sync);
   const saves = useGame((g) => g.saves);
   const syncNow = useGame((g) => g.syncNow);
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const { t } = useT();
   const { text, tone } = useSaveStatus();
   const [switching, setSwitching] = useState(false);
@@ -645,13 +645,18 @@ function WelcomeGate({ returning }: { returning: boolean }) {
 
 /** During play: the account's save changed on another device too. */
 export function ConflictDialog() {
-  const status = useCloud((c) => c.sync.status);
+  // only the sync status while there is no conflict: the dialog (and the game state it compares) mount with one
+  const open = useCloud((c) => c.sync.status === "conflict");
+  return open ? <ConflictChoice /> : null;
+}
+
+function ConflictChoice() {
   const saves = useGame((g) => g.saves);
   const resolve = useGame((g) => g.resolveConflict);
   const state = useGame((g) => g.state);
   const [cloud, setCloud] = useState<SaveSummary | null>(null);
   const [busy, setBusy] = useState(false);
-  const open = status === "conflict";
+  const open = true;
   const { t } = useT();
   useEffect(() => {
     if (!open || !saves) return;

@@ -285,7 +285,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 /** A one-against-one race with the visited player's ghost (their best car). */
 function GhostDuel({ rival, ghost }: { rival: string; ghost: Ghost }) {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const { t, lang } = useT();
   const n = useContent(lang);
   const [now] = useState(Date.now);

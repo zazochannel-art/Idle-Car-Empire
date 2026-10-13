@@ -42,8 +42,8 @@ const Choice = ({ on, onClick, title, sub, disabled }: { on?: boolean; onClick: 
 
 /** 🧪 Concept → wind tunnel → track test → launch campaign. */
 export function PrototypeLab() {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  const state = useGame((g) => g.view.state);
+  const snap = useGame((g) => g.view.snap);
   const { startPrototype, windTunnel, trackTest, launchProto } = useGame.getState();
   const { t, lang } = useT();
   const n = useContent(lang);
@@ -147,7 +147,7 @@ export function PrototypeLab() {
 
 /** 🚢 Markets overseas: open them, route an assembly line there, follow the ships. */
 export function ExportCard() {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const openMarket = useGame((g) => g.openMarket);
   const { t, lang } = useT();
   const n = useContent(lang);
@@ -203,8 +203,8 @@ export function ExportCard() {
 
 /** 🚌 What the division builds, what it earns, and the fleet order. */
 export function FleetPanel() {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  const state = useGame((g) => g.view.state);
+  const snap = useGame((g) => g.view.snap);
   const { setFleetProduct, acceptFleetOrder, declineFleetOrder, finishFleetOrder } = useGame.getState();
   const { t } = useT();
   const F = state.fleet;
@@ -292,7 +292,7 @@ const PAYS: PayLevel[] = ["low", "fair", "generous"];
 
 /** 👩‍🔬 The team of star engineers: hire, set their pay, and keep them. */
 export function EngineersCard() {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const { hireEngineer, setEngineerPay, letGoEngineer } = useGame.getState();
   const { t } = useT();
   const E = state.engineers;

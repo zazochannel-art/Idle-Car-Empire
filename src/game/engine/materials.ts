@@ -165,13 +165,25 @@ export function orderCost(s: GameState, m: MaterialId, qty: number): number {
 // ───────────────────────────── recipes ─────────────────────────────
 
 /** Materials one finished unit of this plant uses (empty for the assembly plant). */
+/** What one unit takes, by plant and grade (worked out once each, shared: never change it). */
+const UNIT_MATERIALS: Partial<Record<PlantType, { need: MaterialStock; list: readonly (readonly [MaterialId, number])[] }[]>> = {};
+function unitNeed(type: PlantType, grade: number) {
+  const byGrade = (UNIT_MATERIALS[type] ??= []);
+  let u = byGrade[grade];
+  if (!u) {
+    const need: MaterialStock = {};
+    const item = PLANT_BY_ID[type].item;
+    if (item) {
+      const mult = GRADE_MATERIAL[Math.max(0, Math.min(GRADE_MATERIAL.length - 1, grade - 1))];
+      for (const [m, n] of Object.entries(COMPONENT_RECIPE[item]) as [MaterialId, number][]) need[m] = Math.ceil(n * mult);
+    }
+    const list = Object.freeze((Object.entries(need) as [MaterialId, number][]).map((e) => Object.freeze(e)));
+    u = byGrade[grade] = { need: Object.freeze(need), list };
+  }
+  return u;
+}
 export function unitMaterials(type: PlantType, grade: number): MaterialStock {
-  const item = PLANT_BY_ID[type].item;
-  if (!item) return {};
-  const mult = GRADE_MATERIAL[Math.max(0, Math.min(GRADE_MATERIAL.length - 1, grade - 1))];
-  const out: MaterialStock = {};
-  for (const [m, n] of Object.entries(COMPONENT_RECIPE[item]) as [MaterialId, number][]) out[m] = Math.ceil(n * mult);
-  return out;
+  return unitNeed(type, grade).need;
 }
 
 /** Materials this plant type buys. */
@@ -373,11 +385,11 @@ export function autoRestock(s: GameState, plotId: string, unitsPerSec: number) {
   const p = b?.plant;
   if (!p?.autoBuy || !b || !isPlantType(b.type) || !supplierOf(s).autoBuy) return;
   if (s.chain.shipments.some((sh) => !sh.back && sh.to === plotId && sh.materials)) return;
-  const need = unitMaterials(b.type, p.grade);
+  const { need, list } = unitNeed(b.type, p.grade);
   const per = stockTotal(need);
   if (per <= 0) return;
   const cap = warehouseCap(p);
-  for (const [m, n] of Object.entries(need) as [MaterialId, number][]) {
+  for (const [m, n] of list) {
     // each material's share of the warehouse follows the recipe
     const share = (cap * n) / per;
     const low = Math.min(share, n * Math.max(1, unitsPerSec * 60 * AUTO_BUY.belowMin));

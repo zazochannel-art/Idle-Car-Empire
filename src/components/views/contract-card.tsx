@@ -15,8 +15,8 @@ import { useUi } from "@/store/ui-store";
 
 /** The customer contract: an offer to accept, a running order, or a payout. */
 export function ContractCard() {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  const state = useGame((g) => g.view.state);
+  const snap = useGame((g) => g.view.snap);
   const { acceptContract, declineContract, claimContract } = useGame.getState();
   const { t, lang } = useT();
   const n = useContent(lang);

@@ -64,7 +64,7 @@ import { ViewHeader } from "./section-title";
 type Tab = "races" | "garage" | "dev" | "tune" | "team";
 
 export function RacingView() {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const { t } = useT();
   const [tab, setTab] = useState<Tab>("races");
   const R = state.racing;
@@ -125,7 +125,7 @@ function Metric({ label, value, sub, gold }: { label: string; value: string; sub
 
 /** Before the district is built: what it is and what it takes. */
 function Locked() {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const unlock = useGame((g) => g.unlockRacing);
   const { t } = useT();
   const blocker = racingBlocker(state);
@@ -168,7 +168,7 @@ function LiveBanner() {
 // ───────────────────────────── races ─────────────────────────────
 
 function Races() {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const { t } = useT();
   const specials = specialsNow();
   const ch = state.racing.championship;
@@ -202,7 +202,7 @@ const specialsNow = () => activeSpecials(new Date().getTime());
 
 /** The weather at the circuits: rain takes pace, less from a car with grip. */
 function Forecast() {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const { t } = useT();
   const w = weatherAt(state);
   const car = raceCar(state, state.racing.selected);
@@ -217,7 +217,7 @@ function Forecast() {
 }
 
 function NoCarHint() {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const sendCar = useGame((g) => g.sendCar);
   const { t } = useT();
   const cars = state.racing.cars;
@@ -240,7 +240,7 @@ function NoCarHint() {
 }
 
 function EventCard({ ev, special }: { ev: RaceEventConfig; special?: string }) {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const setRace = useUi((u) => u.setRace);
   const { t } = useT();
   const car = raceCar(state, state.racing.selected);
@@ -296,7 +296,7 @@ function EventCard({ ev, special }: { ev: RaceEventConfig; special?: string }) {
 }
 
 function ChampionshipCard() {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const setRace = useUi((u) => u.setRace);
   const { t } = useT();
   const ch = state.racing.championship!;
@@ -336,7 +336,7 @@ function ChampionshipCard() {
 // ───────────────────────────── garage ─────────────────────────────
 
 function Garage() {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const { upgradeRacingGarage, orderRaceCar, cancelRaceOrder, sendCar } = useGame.getState();
   const { t } = useT();
   const R = state.racing;
@@ -452,7 +452,7 @@ function Garage() {
 }
 
 function RaceCarCard({ id }: { id: number }) {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const { repairRaceCar, selectRaceCar, setRaceSkin, retireRaceCar } = useGame.getState();
   const { t } = useT();
   const car = raceCar(state, id)!;
@@ -498,7 +498,7 @@ function RaceCarCard({ id }: { id: number }) {
 // ───────────────────────────── development ─────────────────────────────
 
 function Development() {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const { upgradeRaceCar } = useGame.getState();
   const { t } = useT();
   const car = raceCar(state, state.racing.selected);
@@ -578,7 +578,7 @@ function Development() {
 // ───────────────────────────── tuning garage ─────────────────────────────
 
 function Tuning() {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const { tuneCar } = useGame.getState();
   const { t } = useT();
   const car = raceCar(state, state.racing.selected);
@@ -672,7 +672,7 @@ function TunePart({ on, enabled, onPick, emoji, label, effect, price }: { on: bo
 // ───────────────────────────── team ─────────────────────────────
 
 function Team() {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const { signSponsor, setAutoRacing, setAutoRepair } = useGame.getState();
   const contract = contractStatus(state);
   const { t } = useT();

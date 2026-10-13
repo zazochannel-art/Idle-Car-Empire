@@ -144,11 +144,19 @@ export function plantsOf(s: GameState): PlantEntry[] {
   return Object.entries(s.city.buildings).filter((e): e is PlantEntry => !!e[1].plant && isPlantType(e[1].type));
 }
 
+// counted in place (no list built): these run for every car and part, many times a tick
 export function plantCount(s: GameState, type: PlantType): number {
-  return plantsOf(s).filter(([, b]) => b.type === type).length;
+  const all = s.city.buildings;
+  let n = 0;
+  for (const id in all) if (all[id].plant && all[id].type === type) n++;
+  return n;
 }
 
-export const hasPlant = (s: GameState, type: PlantType) => plantCount(s, type) > 0;
+export function hasPlant(s: GameState, type: PlantType): boolean {
+  const all = s.city.buildings;
+  for (const id in all) if (all[id].plant && all[id].type === type) return true;
+  return false;
+}
 
 /** Plants are numbered per type in build order: Engine Factory #2… */
 export function plantNumber(s: GameState, plotId: string): number {
@@ -303,8 +311,15 @@ export function gradeCost(b: BuildingState, gm: GlobalMods): number | null {
 
 // ───────────────────────────── cars ─────────────────────────────
 
+/** The parts a car is made of (one list per model, shared: never change it). */
+const RECIPES = new Map<CarConfig, readonly ComponentId[]>();
 export function recipe(car: CarConfig): ComponentId[] {
-  return [...BASE_RECIPE, ...car.extras];
+  let r = RECIPES.get(car);
+  if (!r) {
+    r = Object.freeze([...BASE_RECIPE, ...car.extras]);
+    RECIPES.set(car, r);
+  }
+  return r as ComponentId[];
 }
 
 /**
@@ -385,8 +400,13 @@ function orderParts(s: GameState, plot: string, p: PlantData, st: PlantStats, c:
 
 /** Best grade available for a component across all plants that make it. */
 export function bestGrade(s: GameState, c: ComponentId): number {
+  const all = s.city.buildings;
+  const maker = MAKER[c];
   let g = 0;
-  for (const [, b] of plantsOf(s)) if (b.type === MAKER[c]) g = Math.max(g, b.plant.grade);
+  for (const id in all) {
+    const b = all[id];
+    if (b.plant && b.type === maker) g = Math.max(g, b.plant.grade);
+  }
   return g;
 }
 
@@ -401,8 +421,10 @@ export function carLock(s: GameState, car: CarConfig, gm: GlobalMods): CarLock {
   if (car.requiresResearch && !gm.unlockedCars.has(car.id)) return { kind: "research", research: car.requiresResearch };
   if (!hasPlant(s, "assemblyPlant")) return { kind: "plant", plant: "assemblyPlant" };
   // missing plants first (the bigger step), then grades
-  for (const c of recipe(car)) if (bestGrade(s, c) === 0 && !supplierCovers(s, c, car)) return { kind: "plant", plant: MAKER[c] };
-  for (const c of recipe(car)) if (bestGrade(s, c) < car.grade && !supplierCovers(s, c, car)) return { kind: "grade", plant: MAKER[c], grade: car.grade };
+  const parts = recipe(car);
+  const grades = parts.map((c) => bestGrade(s, c));
+  for (let i = 0; i < parts.length; i++) if (grades[i] === 0 && !supplierCovers(s, parts[i], car)) return { kind: "plant", plant: MAKER[parts[i]] };
+  for (let i = 0; i < parts.length; i++) if (grades[i] < car.grade && !supplierCovers(s, parts[i], car)) return { kind: "grade", plant: MAKER[parts[i]], grade: car.grade };
   return null;
 }
 
@@ -637,11 +659,18 @@ export function chainSnapshot(s: GameState, gm: GlobalMods): ChainSnapshot {
 // ───────────────────────────── travel ─────────────────────────────
 
 /** Road distance between two lots, in tiles: the route the trucks drive on the map. */
+/** Road distances between lots (the map never changes: each pair is worked out once). */
+const DISTANCES = new Map<string, number>();
 export function distance(from: string, to: string): number {
-  const a = plotOf(from)?.entry;
-  const b = plotOf(to)?.entry;
-  if (!a || !b) return 20;
-  return roadRoute(a, b).length;
+  const key = `${from}>${to}`;
+  let d = DISTANCES.get(key);
+  if (d === undefined) {
+    const a = plotOf(from)?.entry;
+    const b = plotOf(to)?.entry;
+    d = !a || !b ? 20 : roadRoute(a, b).length;
+    DISTANCES.set(key, d);
+  }
+  return d;
 }
 
 function legTime(from: string, to: string, pace: number, dock = 1) {
@@ -651,7 +680,6 @@ function legTime(from: string, to: string, pace: number, dock = 1) {
 const incoming = (s: GameState, to: string, item: Shipment["item"]) =>
   s.chain.shipments.reduce((n, sh) => (!sh.back && sh.to === to && sh.item === item ? n + sh.qty : n), 0);
 
-const busyTrucks = (s: GameState, from: string) => s.chain.shipments.reduce((n, sh) => (sh.from === from ? n + 1 : n), 0);
 
 function ship(s: GameState, sh: Omit<Shipment, "id" | "t" | "back">) {
   s.chain.shipments.push({ ...sh, id: s.chain.nextShip++, t: 0, back: false });
@@ -812,7 +840,30 @@ export function chainTick(
     out.earned += amount;
   };
 
-  for (const [id, b] of plantsOf(s)) {
+  // the plants with a manager (a lookup per plant below, not a search)
+  const managedPlots = new Set<string>();
+  for (const m of Object.values(s.managers)) if (m.hired && m.assignedTo) managedPlots.add(m.assignedTo);
+
+  // the trucks each plant has on the road (counted once, then kept up as trucks leave)
+  const busy = new Map<string, number>();
+  for (const sh of s.chain.shipments) busy.set(sh.from, (busy.get(sh.from) ?? 0) + 1);
+  const busyTrucks = (from: string) => busy.get(from) ?? 0;
+  const plants = plantsOf(s);
+  // each part maker's quality modes, in plant order (for the cars built in this step; looked up once)
+  let modesByMaker: Map<PlantType, ReturnType<typeof qualityOf>[]> | null = null;
+  const modesOf = (type: PlantType) => {
+    if (!modesByMaker) {
+      modesByMaker = new Map();
+      for (const [, o] of plants) {
+        const list = modesByMaker.get(o.type) ?? [];
+        list.push(qualityOf(o.plant));
+        modesByMaker.set(o.type, list);
+      }
+    }
+    return modesByMaker.get(type) ?? [];
+  };
+
+  for (const [id, b] of plants) {
     const st = snap.plants[id];
     if (!st) continue;
     const cfg = PLANT_BY_ID[b.type];
@@ -860,7 +911,7 @@ export function chainTick(
     };
     let can = canMake();
     // the floor: a boost, a broken machine, the crew's morale
-    const managed = Object.values(s.managers).some((m) => m.hired && m.assignedTo === id);
+    const managed = managedPlots.has(id);
     if (floorTick(id, p, dt, { running: p.status === "ok", offline, managed })) events?.push({ type: "breakdown", plot: id });
     const speed = (offline ? st.offline : 1) * floorPace(p);
     // running the plant costs wages, energy and maintenance for every second it works
@@ -883,6 +934,8 @@ export function chainTick(
       book(s, "energy", st.op.energy * dt * runSpeed * k);
       book(s, "maintenance", st.op.maintenance * dt * runSpeed * k);
       p.progress += (dt * speed) / st.cycle;
+      // the part plants' quality modes, for the cars built in this step (looked up once)
+      let partModes: ReturnType<typeof qualityOf>[] | undefined;
       while (p.progress >= 1) {
         can = canMake();
         if (can.n <= 0) {
@@ -917,7 +970,7 @@ export function chainTick(
             s.chain.dealers.local = emptyDealerStock();
           }
           events?.push({ type: "carBuilt", plot: id, car: st.car.id, first });
-          const partModes = recipe(st.car).flatMap((c) => plantsOf(s).filter(([, o]) => o.type === MAKER[c]).map(([, o]) => qualityOf(o.plant)));
+          partModes ??= recipe(st.car).flatMap((c) => modesOf(MAKER[c]));
           for (let k = 0; k < n; k++) onCarBuilt(s, st.car.id, defectRate(s, p, partModes), qualityOf(p));
           vipBuilt(s, st.car.id, n, qualityOf(p));
         }
@@ -935,19 +988,20 @@ export function chainTick(
       receiveRaceCar(s, st.car.id, "factory").home = id;
     }
     // …with it, the car leaves for the paddock on its own transporter
-    if (!cfg.item && st.car && p.out >= 1 && s.racing.unlocked && s.racing.orders.includes(st.car.id) && busyTrucks(s, id) < st.trucks) {
+    if (!cfg.item && st.car && p.out >= 1 && s.racing.unlocked && s.racing.orders.includes(st.car.id) && busyTrucks(id) < st.trucks) {
       const value = p.outValue / p.out;
       payOrOwe(s, TRIP_FEE.carrier);
       out.spent += TRIP_FEE.carrier;
       book(s, "logistics", TRIP_FEE.carrier);
       ship(s, { from: id, to: RACING, item: "car", qty: 1, value, dur: legTime(id, RACING, st.pace, st.load), vehicle: "carrier", models: [st.car.id] });
+      busy.set(id, busyTrucks(id) + 1);
       s.racing.orders.splice(s.racing.orders.indexOf(st.car.id), 1);
       p.out -= 1;
       p.outValue -= value;
     }
 
     // 3. loading dock: send a truck when there is a full load (or it waited long enough)
-    if (p.out >= 1 && busyTrucks(s, id) < st.trucks) {
+    if (p.out >= 1 && busyTrucks(id) < st.trucks) {
       p.wait += dt;
       // finished cars leave for the dealers straight away (no waiting for a full load);
       // other goods wait for a full truck or MAX_WAIT
@@ -965,8 +1019,9 @@ export function chainTick(
             out.spent += fee;
             book(s, "logistics", fee);
             const value = (p.outValue / p.out) * qty;
-            const models = cfg.item ? undefined : (Array.from({ length: qty }, () => st.car?.id ?? "city") as CarId[]);
+            const models = cfg.item ? undefined : (new Array(qty).fill(st.car?.id ?? "city") as CarId[]);
             ship(s, { from: id, to: dest.to, item: cfg.item ? (st.combine ? "chassis" : cfg.item) : "car", qty, value, dur: legTime(id, dest.to, st.pace, st.load), vehicle: st.vehicle, models, ...(dest.market ? { market: dest.market } : {}) });
+            busy.set(id, busyTrucks(id) + 1);
             p.out -= qty;
             p.outValue -= value;
             p.wait = 0;

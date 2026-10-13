@@ -193,8 +193,8 @@ export function runGoal(g: Goal, ready: boolean) {
 
 /** "What's next" — always visible on the Empire screen. */
 export function NextGoals() {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  const state = useGame((g) => g.view.state);
+  const snap = useGame((g) => g.view.snap);
   const goals = nextGoals(state, snap, 2);
   const { t, lang } = useT();
   const n = useContent(lang);
@@ -280,7 +280,7 @@ export function MissionRow({
   onClaim: () => void;
   money?: boolean;
 }) {
-  const snap = useGame((g) => g.snap);
+  const snap = useGame((g) => g.view.snap);
   const { t } = useT();
   const done = value >= target;
   const fmt = (n: number) => (money ? formatMoney(n) : formatNumber(Math.floor(n)));
@@ -310,8 +310,8 @@ export function MissionRow({
 
 /** Compact mission list for the Empire screen. */
 export function MissionStrip() {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  const state = useGame((g) => g.view.state);
+  const snap = useGame((g) => g.view.snap);
   const { claimDaily, claimMilestone } = useGame.getState();
   const setView = useUi((u) => u.setView);
   const daily = state.missions.daily.filter((m) => !m.claimed);

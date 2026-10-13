@@ -82,7 +82,7 @@ export function CarRoutePicker({ id }: { id: string }) {
 
 /** 📰 What the market wants right now, and when it changes. */
 export function MarketNewsCard() {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const { t } = useT();
   const tr = trendOf(state);
   if (!tr.hot) {
@@ -114,7 +114,7 @@ export function MarketNewsCard() {
 
 /** ⭐ Reputation: what it does to prices, and a running scandal. */
 export function ReputationCard() {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const { t } = useT();
   const q = state.quality;
   const mult = repPriceMult(state) - 1;

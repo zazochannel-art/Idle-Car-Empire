@@ -84,7 +84,7 @@ export function PlotPanel({ id }: { id: string }) {
 
 function BuildMenu({ id }: { id: string }) {
   const plot = plotOf(id)!;
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const buildStructure = useGame((g) => g.buildStructure);
   const preview = useUi((u) => u.preview);
   const setPreview = useUi((u) => u.setPreview);
@@ -207,7 +207,7 @@ function StructurePanel({ id }: { id: string }) {
 // ───────────────────────────── zones ─────────────────────────────
 
 export function ZonePanel({ id }: { id: ZoneId }) {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const unlockZone = useGame((g) => g.unlockZone);
   const { t, lang } = useT();
   const n = useContent(lang);
@@ -266,8 +266,8 @@ export function ZonePanel({ id }: { id: ZoneId }) {
 // ───────────────────────────── lists ─────────────────────────────
 
 export function GaragesView() {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  const state = useGame((g) => g.view.state);
+  const snap = useGame((g) => g.view.snap);
   const { enterGarage, selectPlot } = useUi.getState();
   const { t } = useT();
   const ids = garagePlots(state);
@@ -321,7 +321,7 @@ export function GaragesView() {
 }
 
 function FreePlotButton({ type }: { type?: StructureType }) {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const selectPlot = useUi((u) => u.selectPlot);
   const { t } = useT();
   const free = WORLD_MAP.plots.find((p) => p.kind === "plot" && state.city.zones.includes(p.zone) && !state.city.buildings[p.id] && (!type || buildableIn(p.zone, p.big).includes(type)));
@@ -334,7 +334,7 @@ function FreePlotButton({ type }: { type?: StructureType }) {
 }
 
 export function BuildPanel() {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const selectPlot = useUi((u) => u.selectPlot);
   const selectZone = useUi((u) => u.selectZone);
   const { t } = useT();
@@ -401,7 +401,7 @@ export function BuildPanel() {
 }
 
 export function UpgradePanel() {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const upgradeBuilding = useGame((g) => g.upgradeBuilding);
   const { selectPlot, setView } = useUi.getState();
   const { t } = useT();
@@ -485,8 +485,8 @@ export function MenuPanel({ onSettings }: { onSettings: () => void }) {
 }
 
 export function MechanicsSummary() {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  const state = useGame((g) => g.view.state);
+  const snap = useGame((g) => g.view.snap);
   const enterGarage = useUi((u) => u.enterGarage);
   const { t } = useT();
   const ids = garagePlots(state);

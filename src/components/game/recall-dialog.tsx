@@ -21,8 +21,8 @@ export function RecallDialog() {
 
 function RecallCard() {
   const recall = useGame((g) => g.state.quality.recall);
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  const state = useGame((g) => g.view.state);
+  const snap = useGame((g) => g.view.snap);
   const pay = useGame((g) => g.payRecall);
   const ignore = useGame((g) => g.ignoreRecall);
   const { t } = useT();

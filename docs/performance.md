@@ -1,0 +1,55 @@
+# Performance
+
+What keeps the game light, and how to measure it.
+
+## The first download
+
+- Only what the first screen needs loads at start. The screens that open on demand (Production,
+  Research, Racing, Missions… the garage, the factory floors, the race viewer) load the first
+  time they are opened, and in the background a few seconds after the game has started, so
+  opening one is still instant (`SCREENS` in `components/game/game.tsx`).
+- three.js loads with the 3D map (`map/empire-map.tsx` imports its engine on demand), never in the
+  first download: modules the shell needs at start import only types from it (`car-sizes.ts`
+  holds the car sizes the 2D map needs; the panel's car thumbnails import three when drawn).
+- The ready-made cars (`public/models`) are compressed (meshopt geometry, WebP textures) and
+  load after the map.
+
+## While playing
+
+- **Ticks** (10 a second): the state is copied with a plain-data copy (`cloneState`), plant lookups
+  count in place, and what was unlocked at the last commit is kept rather than worked out again.
+- **React**: the HUD's figures are small components of their own; screens and panels read
+  `view` from the store, which the player's actions update at once and the ticks about four
+  times a second (`VIEW_MS`); the conflict dialog mounts only when there is a conflict.
+- **Frames**: nothing asks for frames while nothing moves. The cash counter shows steady
+  income as it comes and glides only on jumps; the minimap checks the camera 20 times a second
+  on a timer and redraws only when its picture changes. The map's name tags are drawn once and
+  copied; trucks are built once per kind and repainted per copy.
+- **Absence**: the offline settlement simulates the chain step by step; recipes, unit materials
+  and road distances are worked out once, so it runs about a third faster with the same results.
+- The battery saver (`docs/battery-saver.md`) lowers frames and ticks further.
+
+## Measuring
+
+- `npx tsx scripts/bench-tick.ts <save.json>`: the cost of one tick, part by part.
+- `npx tsx scripts/bench-offline.ts <save.json>`: the settlement of 1, 8 and 20 hours away.
+- Bundled like the browser (no module getters):
+  `npx esbuild scripts/bench-tick.ts --bundle --platform=node --format=esm --outfile=/tmp/b.mjs && node /tmp/b.mjs <save.json>`.
+
+### Measured (October 2026)
+
+Production build, headless Chromium on a phone profile (390×844, CPU slowed 4×, 6 Mbit/s with
+80 ms latency); the container has no GPU, so the 3D view is off in these runs. A late-game save.
+
+| | before | after |
+| --- | --- | --- |
+| JS downloaded before the first screen (gzip) | 705 KB | 437 KB |
+| First screen (returning player) | 3.0 s | 2.4 s |
+| Map started | 3.6 s | 2.9 s |
+| Main thread busy before the first screen | 2.0 s | 1.6 s |
+| Main thread busy while playing, map | 39 % | 13 % |
+| …with the Missions screen open | 64 % | 26 % |
+| …with the Upgrade panel open | 39 % | 17 % |
+| One tick (engine, Node, bundled) | 1.22 ms | 0.57 ms |
+| Settling 20 h away (Node, bundled) | ~0.98 s | ~0.64 s |
+| React renders per second on the map | ~300 | ~60 |

@@ -25,7 +25,7 @@ const serial = (id: number) => `#${String(id).padStart(3, "0")}`;
 
 /** The cars the company owns, and how to keep a new one off the line. */
 export function MyCars() {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const [open, setOpen] = useState<number | null>(null);
   const { t } = useT();
   const R = state.racing;
@@ -44,7 +44,7 @@ export function MyCars() {
 
 /** Keep the next car of a model that comes off an assembly line. */
 function KeepCar() {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const order = useGame((g) => g.orderRaceCar);
   const { t, lang } = useT();
   const n = useContent(lang);
@@ -80,7 +80,7 @@ function KeepCar() {
 }
 
 function CarCard({ rc, open, onToggle }: { rc: RaceCarState; open: boolean; onToggle: () => void }) {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const { runTest, selectRaceCar, sendCar } = useGame.getState();
   const setView = useUi((u) => u.setView);
   const { t, lang } = useT();
@@ -220,7 +220,7 @@ const clock = (sec: number) => (sec >= 3600 ? `${Math.floor(sec / 3600)}h ${Math
 
 /** SHOWROOM: the player's price against what the car is worth; a transporter takes it to the dealer. */
 function Showroom({ rc }: { rc: RaceCarState }) {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const { sendCar, setShowroomPrice } = useGame.getState();
   const [pct, setPct] = useState(1.1);
   const { t, lang } = useT();
@@ -262,7 +262,7 @@ function Showroom({ rc }: { rc: RaceCarState }) {
 
 /** A marketing campaign: every dealer gets customers faster, the showroom more buyers. */
 function Campaign() {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const start = useGame((g) => g.startCampaign);
   const { t } = useT();
   if (!state.chain.firstCar) return null;

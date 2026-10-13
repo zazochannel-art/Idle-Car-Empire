@@ -475,3 +475,6 @@ export function machineSlot(defs: StationDef[], def: StationDef): number | undef
 export function lineStops(line: Line): PlacedStation[] {
   return line.stations.filter((s) => s.mode !== "planned");
 }
+
+/** The plants that have an interior to walk into (the others open the simple factory floor). */
+export const HAS_INTERIOR: ReadonlySet<string> = new Set(Object.keys(RECIPES));

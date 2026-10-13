@@ -24,7 +24,7 @@ import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import type { MapEngine } from "./world/engine";
 import { Showcase } from "./showcase";
-import { HAS_INTERIOR } from "../plant/interior/factory-interior";
+import { HAS_INTERIOR } from "../plant/interior/layout";
 import { setLiveryOverrides } from "../three/livery";
 import { Minimap } from "./minimap";
 import { plantName } from "../panels/plant-panel";

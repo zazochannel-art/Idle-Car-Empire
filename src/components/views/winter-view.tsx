@@ -16,8 +16,8 @@ const GOAL_ICON: Record<WinterGoal, string> = { cars: "🚗", earned: "💰", wi
 
 /** The winter festival: the advent calendar, the three goals and the liveries to win. */
 export function WinterView() {
-  const state = useGame((g) => g.state);
-  const snap = useGame((g) => g.snap);
+  const state = useGame((g) => g.view.state);
+  const snap = useGame((g) => g.view.snap);
   const { openAdventDoor, claimWinterGoal } = useGame.getState();
   const { t } = useT();
   const [now] = useState(Date.now);

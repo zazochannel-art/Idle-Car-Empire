@@ -166,6 +166,10 @@ function alongCached(pts: [number, number][], acc: number[], s: number, hint: nu
   return { x: a[0] + (b[0] - a[0]) * f, y: a[1] + (b[1] - a[1]) * f, tx: (b[0] - a[0]) / seg, ty: (b[1] - a[1]) / seg, seg: i };
 }
 
+
+/** The cab paint trucks are built with, swapped for each truck's own colour (no truck is this colour). */
+const CAB_PLACEHOLDER = "#fe01fe";
+
 export class Traffic3D {
   readonly root = new THREE.Group();
   /** Share of the usual town traffic (low graphics halves it). */
@@ -444,40 +448,41 @@ export class Traffic3D {
     const empty = v.back;
     const cabColors = ["#e11d48", "#2563eb", "#f59e0b", "#f2f4f7", "#334155", "#16a34a"];
     const cabColor = cabColors[Math.abs(v.id) % cabColors.length];
-    const key = v.vehicle === "carrier"
-      ? `carrier|${cabColor}|${empty ? "" : (v.models ?? []).join(",")}`
-      : `${v.vehicle}|${v.color}|${cabColor}|${empty}`;
-    let m = this.models.get(key);
-    if (!m) {
-      if (v.vehicle === "carrier") {
-        m = bake(buildCarrier(THREE, this.kit, [], 0, cabColor), VSCALE);
-        // the cars on its decks (simple shapes, in the models' colours)
-        const slots: [number, number][] = [
-          [-2.4, 0.95],
-          [-6.0, 0.95],
-          [-2.4, 2.65],
-          [-6.0, 2.65],
-        ];
-        if (!empty)
-          (v.models ?? []).slice(0, 4).forEach((model, i) => {
-            const car = new THREE.Mesh(this.carGeo, this.carMat(CAR_COLORS[(model.length * 3 + i) % CAR_COLORS.length]));
-            car.scale.setScalar(10 * VSCALE * 0.75);
-            car.position.set(slots[i][0] * VSCALE + 1.4 * VSCALE, slots[i][1] * VSCALE, 0);
-            m!.add(car);
-          });
-      } else {
-        const cabColors = ["#e11d48", "#2563eb", "#f59e0b", "#f2f4f7", "#334155", "#16a34a"];
-        const cabColor = cabColors[Math.abs(v.id) % cabColors.length];
-        m = bake(buildTruck(THREE, this.kit, {
-          kind: v.vehicle,
-          cargo: v.color,
-          empty,
-          cabColor,
-        }), VSCALE);
-      }
-      this.models.set(key, m);
+    // each kind of truck is built (and baked) once, with a placeholder cab paint that every copy swaps
+    // for its own colour; the cars on a carrier's decks are simple shapes added to each copy. (A model per
+    // cab colour, and per carrier load, kept building new trucks while playing.)
+    const key = v.vehicle === "carrier" ? "carrier" : `${v.vehicle}|${v.color}|${empty}`;
+    let base = this.models.get(key);
+    if (!base) {
+      base = bake(v.vehicle === "carrier" ? buildCarrier(THREE, this.kit, [], 0, CAB_PLACEHOLDER) : buildTruck(THREE, this.kit, { kind: v.vehicle, cargo: v.color, empty, cabColor: CAB_PLACEHOLDER }), VSCALE);
+      this.models.set(key, base);
     }
-    return m.clone();
+    const m = base.clone();
+    const placeholder = this.kit.paint(CAB_PLACEHOLDER, "gloss");
+    const paint = this.kit.paint(cabColor, "gloss");
+    if (!paint.userData.hazed) {
+      hazed(paint);
+      paint.userData.hazed = true;
+    }
+    m.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (mesh.isMesh && mesh.material === placeholder) mesh.material = paint;
+    });
+    if (v.vehicle === "carrier" && !empty) {
+      const slots: [number, number][] = [
+        [-2.4, 0.95],
+        [-6.0, 0.95],
+        [-2.4, 2.65],
+        [-6.0, 2.65],
+      ];
+      (v.models ?? []).slice(0, 4).forEach((model, i) => {
+        const car = new THREE.Mesh(this.carGeo, this.carMat(CAR_COLORS[(model.length * 3 + i) % CAR_COLORS.length]));
+        car.scale.setScalar(10 * VSCALE * 0.75);
+        car.position.set(slots[i][0] * VSCALE + 1.4 * VSCALE, slots[i][1] * VSCALE, 0);
+        m.add(car);
+      });
+    }
+    return m;
   }
 
   private carMat(hex: string) {

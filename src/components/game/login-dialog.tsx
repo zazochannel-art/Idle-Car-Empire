@@ -29,7 +29,7 @@ export function LoginDialog() {
 /** The calendar and the reward (mounted only while the dialog is open). */
 function LoginBody() {
   const login = useGame((g) => g.state.login);
-  const snap = useGame((g) => g.snap);
+  const snap = useGame((g) => g.view.snap);
   const claimLogin = useGame((g) => g.claimLogin);
   const { t } = useT();
   // a new game has no streak yet (0): never index before day 1
