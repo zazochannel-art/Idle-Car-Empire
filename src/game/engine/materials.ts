@@ -14,6 +14,7 @@ import {
   MATERIAL_IDS,
   PRICE_DRIFT,
   SUPPLIERS,
+  WAGE_RESERVE_SECONDS,
   WAREHOUSE_CAP,
   WAREHOUSE_COST,
   POWER_SYSTEM,
@@ -112,8 +113,14 @@ export function canOwe(s: GameState, amount: number): boolean {
 /** What a SUSPENDED status line says: what is owed, the limit, and where production resumes (formatted by the caller). */
 export function debtVars(s: GameState, fmt: (n: number) => string) {
   const limit = debtLimit(s);
-  return { owed: fmt(s.chain.owed), limit: fmt(limit), resume: fmt(limit * DEBT.resume) };
+  return { owed: fmt(s.chain.owed), limit: fmt(limit), resume: fmt(limit * DEBT.halt * DEBT.resume) };
 }
+
+/** Cash suggested and automatic material orders leave alone: a couple of minutes of wages, energy and maintenance. */
+export const wageReserve = (s: GameState) => Math.max(0, s.chain.runCost ?? 0) * WAGE_RESERVE_SECONDS;
+
+/** What suggested and automatic material orders may spend: the cash above the wage reserve. */
+export const spendable = (s: GameState) => Math.max(0, s.cash - wageReserve(s));
 
 /** Pays `amount` of the account from the cash (as far as both go). */
 export function repay(s: GameState, amount: number) {
@@ -339,11 +346,12 @@ export interface RestockPlan {
 
 /**
  * The biggest "buy for N units" order (up to `maxUnits`) that fits the
- * warehouse, the supplier's limit and — unless `ignoreCash` — the cash.
- * Materials in stock or on the way count. With nothing possible it plans one
- * unit, so the UI can show what the next unit costs.
+ * warehouse, the supplier's limit and — unless `ignoreCash` — the cash (or
+ * `budget`, a part of it). Materials in stock or on the way count. With
+ * nothing possible it plans one unit, so the UI can show what the next unit
+ * costs.
  */
-export function restockPlan(s: GameState, plotId: string, need: MaterialStock, maxUnits: number, ignoreCash = false): RestockPlan {
+export function restockPlan(s: GameState, plotId: string, need: MaterialStock, maxUnits: number, ignoreCash = false, budget = s.cash): RestockPlan {
   const p = s.city.buildings[plotId]?.plant;
   if (!p) return { units: 0, want: {}, cost: 0 };
   const coming = incomingMaterials(s, plotId);
@@ -358,12 +366,29 @@ export function restockPlan(s: GameState, plotId: string, need: MaterialStock, m
     const cost = (Object.entries(want) as [MaterialId, number][]).reduce((a, [m, q]) => a + orderCost(s, m, q), 0);
     return { units: n, want, cost };
   };
-  const ok = (r: RestockPlan) => stockTotal(r.want) <= room && Object.values(r.want).every((q) => (q ?? 0) <= maxQty) && (ignoreCash || r.cost <= s.cash);
+  const ok = (r: RestockPlan) => stockTotal(r.want) <= room && Object.values(r.want).every((q) => (q ?? 0) <= maxQty) && (ignoreCash || r.cost <= budget);
   for (let n = Math.max(1, Math.floor(maxUnits)); n >= 1; n--) {
     const r = plan(n);
     if (ok(r)) return r;
   }
   return { ...plan(1), units: 0 };
+}
+
+/** Units a plant with nothing to work with gets from the whole cash, past the wage reserve. */
+const OUT_UNITS = 2;
+
+/**
+ * A suggested restock (the goal card's one tap): the biggest order up to
+ * `maxUnits` that leaves the wage reserve in the cash; a plant that can't
+ * make a single unit still gets its next couple of units from the whole cash.
+ */
+export function suggestedRestock(s: GameState, plotId: string, need: MaterialStock, maxUnits: number): RestockPlan {
+  const plan = restockPlan(s, plotId, need, maxUnits, false, spendable(s));
+  const p = s.city.buildings[plotId]?.plant;
+  if (plan.units || !p) return plan;
+  const coming = incomingMaterials(s, plotId);
+  const out = (Object.entries(need) as [MaterialId, number][]).some(([m, per]) => (p.stock[m] ?? 0) + (coming[m] ?? 0) < per);
+  return out ? restockPlan(s, plotId, need, Math.min(maxUnits, OUT_UNITS)) : plan;
 }
 
 /** Places the orders of a restock plan; true if every order went through. */
@@ -397,7 +422,9 @@ export function autoRestock(s: GameState, plotId: string, unitsPerSec: number) {
     const have = p.stock[m] ?? 0;
     if (have >= low) continue;
     let qty = Math.floor(Math.min(high - have, supplierOf(s).maxOrder, warehouseRoom(s, plotId)));
-    while (qty >= 1 && orderCost(s, m, qty) > s.cash) qty = Math.floor(qty / 2);
+    // the wage reserve stays in the cash, unless the plant has not even one unit's worth left
+    const budget = have < n ? s.cash : spendable(s);
+    while (qty >= 1 && orderCost(s, m, qty) > budget) qty = Math.floor(qty / 2);
     if (qty >= 1) buyMaterial(s, plotId, m, qty);
   }
 }

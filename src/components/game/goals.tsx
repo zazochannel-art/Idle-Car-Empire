@@ -1,7 +1,7 @@
 "use client";
 
 import { territoryCenterTile } from "@/game/city/layout";
-import { restockPlan } from "@/game/engine/materials";
+import { suggestedRestock } from "@/game/engine/materials";
 import { RESTOCK_UNITS } from "@/game/config/economy";
 import { ArrowRight, CheckCircle2, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -111,7 +111,7 @@ export function runGoal(g: Goal, ready: boolean) {
     case "materials": {
       // one tap restocks this plant and every other one running low
       const st = game.snap.chain.plants[g.plot];
-      if (ready && st && !game.restockLow()) game.buyPlan(g.plot, restockPlan(game.state, g.plot, st.need, RESTOCK_UNITS));
+      if (ready && st && !game.restockLow()) game.buyPlan(g.plot, suggestedRestock(game.state, g.plot, st.need, RESTOCK_UNITS));
       ui.selectPlot(g.plot);
       break;
     }

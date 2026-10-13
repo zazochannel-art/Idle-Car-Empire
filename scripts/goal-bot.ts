@@ -7,7 +7,7 @@ import { writeFileSync } from "node:fs";
 import * as Ch from "../src/game/engine/chain";
 import { buildStructure, unlockZone } from "../src/game/engine/city";
 import { snapshot } from "../src/game/engine/economy";
-import { buyPlan, restockPlan } from "../src/game/engine/materials";
+import { buyPlan, suggestedRestock } from "../src/game/engine/materials";
 import { createInitialState } from "../src/game/engine/state";
 import { tick } from "../src/game/engine/tick";
 import { buyDealer, hireManager, upgradeDealer } from "../src/game/engine/actions";
@@ -167,7 +167,7 @@ for (let t = 0; t < hours * 3600; t++) {
     switch (g.kind) {
       case "plant": acted = buildStructure(s, g.plot, g.plant); break;
       case "upgrade": case "shortage": if ("what" in g && g.what) acted = g.what === "speed" ? Ch.upgradePlantSpeed(s, g.plot, gm) : Ch.upgradePlantLevel(s, g.plot, gm); break;
-      case "materials": { const st = snap.chain.plants[g.plot]; acted = restockLow(s, snap) > 0 || (!!st && buyPlan(s, g.plot, restockPlan(s, g.plot, st.need, RESTOCK_UNITS))); break; }
+      case "materials": { const st = snap.chain.plants[g.plot]; acted = restockLow(s, snap) > 0 || (!!st && buyPlan(s, g.plot, suggestedRestock(s, g.plot, st.need, RESTOCK_UNITS))); break; }
       case "dealer": acted = buyDealer(s, g.dealer); break;
       case "dealerFull": acted = g.open ? buyDealer(s, g.dealer) : upgradeDealer(s, g.dealer); break;
       case "car": if (g.plot && g.cost !== undefined) acted = Ch.upgradeGrade(s, g.plot, gm); break;

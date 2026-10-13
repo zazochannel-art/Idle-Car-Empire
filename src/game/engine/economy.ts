@@ -56,8 +56,10 @@ export interface EconomySnapshot {
   carsPerSec: number;
   /**
    * Operating profit per second, measured: the ledger's revenue minus its
-   * costs (plants, trucks, dealers, garages, racing). The HUD, the stats and
-   * the Economy dashboard all show this one figure; it can be negative.
+   * costs (plants, trucks, dealers, garages, racing), plus the change in the
+   * parts and cars made but not sold yet (at their cost: see goodsValue). The
+   * HUD, the stats and the Economy dashboard all show this one figure; it can
+   * be negative.
    */
   incomePerSec: number;
   /** Passive income: the chain's net averaged over ~10 minutes plus the garages (rewards are sized on it, never below 0). */
@@ -77,7 +79,7 @@ export function snapshot(s: GameState): EconomySnapshot {
     gm,
     chain,
     carsPerSec: chain.carsPerSec,
-    incomePerSec: ledgerNet(s.chain.ledger.rate),
+    incomePerSec: ledgerNet(s.chain.ledger.rate) + (s.chain.goodsRate ?? 0),
     steadyIncomePerSec: Math.max(0, s.chain.steady ?? s.chain.rate) + city.incomePerSec,
     rpPerSec,
     city,

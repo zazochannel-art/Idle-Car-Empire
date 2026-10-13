@@ -57,7 +57,40 @@ $15,000 Tire Factory). The first sale opens the Local Dealer.
 - **Each material keeps its own cost** in the warehouse (weighted average); using it books exactly that.
 - **Every dollar is booked once** in the ledger, under one key: manufacturing revenue/costs, side
   businesses (garages, racing), and rewards below the line. HUD profit = dashboard net = stats.
-- **Running costs on account** only up to the limit; suspended plants resume when the account is paid
-  down (or the cash covers it). While suspended, "What's next" says so and suggests no spending.
+- **Running costs on account**: over the limit nothing more is bought on credit, but plants with
+  material keep working; at twice the limit they stop, and resume when sales and profit have paid
+  it down (or the cash covers it). While they are stopped, "What's next" says so and suggests no
+  spending.
 - **Offline** runs the very same simulation (at the offline efficiency): it cannot create material,
   parts or cars that the online game couldn't; the Welcome Back report shows how the account changed.
+
+## 5. After the first car: cash, debt and the profit shown (second pass)
+
+A player who followed the goals found the money always at zero once the Assembly Plant opened.
+Measured with the goal-following bot (`scripts/goal-bot.ts`), 10-minute windows from the first car
+(0 h 44) to 2 h:
+
+| | Before | After |
+|---|---|---|
+| Cash at $0 | 69–100% of the time, for ~75 min | about half the time, for ~30 min |
+| Plants stopped (suspended for debt) | half the time, for 40 min | never |
+| Highest debt | $18.6K | $1.3K |
+| Profit shown negative | 58–98% of the time | 0% |
+| After 3 h (quiet bot) | 111 cars, $972K earned, $26/s | 396 cars, $2.8M, $199/s |
+| After 8 h (quiet bot) | 1,819 cars, $23.5M | 2,413 cars, $37.9M |
+| After 8 h (full bot) | 3,336 cars, $175M, debt up to $14.6K | 3,480 cars, $274M, debt up to $412 |
+| 24 h of 1 h play / 7 h away | 692 cars, $7.4M, debt up to $35.8K | 853 cars, $11.9M, debt up to $20.7K |
+
+What was wrong, and what changed:
+
+| | OLD | NEW | WHY |
+|---|---|---|---|
+| Over the account's limit | every plant **suspended** | nothing more bought on credit; plants with material **keep working**; only at **2×** the limit (`DEBT.halt`) does every plant stop | Stopping the plants stopped the cars that pay the account back: a spiral. |
+| Paying the account back | 50% of the 10-min average net income (nothing when it is ≤ 0) | also **30% of every sale** (`DEBT.share`, after fees and tax) | A struggling company's average is ≤ 0, so it never paid anything back. |
+| Suggested and automatic material orders | all the cash | leave **2 minutes of running costs** (`WAGE_RESERVE_SECONDS`); a plant with nothing to work with still gets 2 units from the whole cash | Each one-tap restock spent everything, so wages and power went on the account. |
+| Profit shown (HUD, stats, dashboard) | ledger net: materials and wages booked when a part is made, revenue when the car sells | the same plus the **change in parts and cars made but not sold yet, at their standard cost** (`goodsValue`), shown on the dashboard as "Made, not sold yet" | Building stock looked like a loss (−$47/s right after the first car). |
+| Car margins (`CLASS_MARGIN`) | economy 16%, sport 24%, premium 30%, luxury 38%, supercar 48%, hypercar 55% | **24%, 30%, 36%, 44%, 54%, 62%** | A car earned ~$700 against ~$350 for its body and engine sold as parts: not worth the money tied up in it. A City car now earns ~$1,050. |
+
+The ledger itself is unchanged: every dollar is still booked once, and the Welcome Back report
+still shows money in and out. Only the profit figure adds the stock change.
+

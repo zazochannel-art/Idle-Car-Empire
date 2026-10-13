@@ -59,7 +59,7 @@ export function EconomyView() {
       </div>
 
       <SectionTitle title={t("eco.perMinute")} />
-      <LedgerTable values={rate} scale={60} suffix={t("unit.perMin")} />
+      <LedgerTable values={rate} scale={60} suffix={t("unit.perMin")} stock={r.goodsPerSec} />
       <CostBar values={rate} />
 
       <SectionTitle title={t("eco.plants")} />

@@ -25,10 +25,15 @@ export const LEDGER_ICON: Record<LedgerKey, string> = {
   rewards: "🎁",
 };
 
-/** `suffix` is appended to every amount (e.g. "/min"); `scale` converts the values (e.g. ×60 for per-minute rates). */
-export function LedgerTable({ values, scale = 1, suffix = "", compact }: { values: LedgerValues; scale?: number; suffix?: string; compact?: boolean }) {
+/**
+ * `suffix` is appended to every amount (e.g. "/min"); `scale` converts the values (e.g. ×60 for
+ * per-minute rates). `stock`: the change in parts and cars made but not sold yet, at their cost
+ * (in the same unit as `values`), part of the net when given.
+ */
+export function LedgerTable({ values, scale = 1, suffix = "", compact, stock }: { values: LedgerValues; scale?: number; suffix?: string; compact?: boolean; stock?: number }) {
   const { t } = useT();
-  const net = ledgerNet(values) * scale;
+  const made = (stock ?? 0) * scale;
+  const net = ledgerNet(values) * scale + made;
   const revenue = ledgerRevenue(values) * scale;
   // operating revenue and costs; rewards are shown below the net (they are not earned by the business)
   const rows = [...REVENUE_KEYS, ...COST_KEYS];
@@ -54,6 +59,16 @@ export function LedgerTable({ values, scale = 1, suffix = "", compact }: { value
           </div>
         );
       })}
+      {stock !== undefined && Math.abs(made) >= 0.5 && (
+        <div className="flex items-center justify-between py-0.5 text-xs">
+          <span className="text-white/65">🗃️ {t("ledger.stock")}</span>
+          <span className={cn("font-semibold tabular-nums", made >= 0 ? "text-emerald-300" : "text-rose-300")}>
+            {made >= 0 ? "+" : "−"}
+            {formatMoney(Math.abs(made))}
+            {suffix}
+          </span>
+        </div>
+      )}
       <div className="mt-1 flex items-center justify-between border-t border-white/10 pt-1.5 text-sm font-black">
         <span>{t("ledger.net")}</span>
         <span className={cn("tabular-nums", net >= 0 ? "text-gold" : "text-rose-300")}>

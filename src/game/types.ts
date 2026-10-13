@@ -459,8 +459,14 @@ export interface ChainState {
   owed: number;
   /** The account's limit right now (DEBT: minutes of what the plants cost to run). */
   debtLimit?: number;
-  /** Over the limit: every plant stops until sales pay the account down (DEBT.resume). */
+  /** Far over the limit (DEBT.halt): every plant stops until sales pay the account down (DEBT.resume). */
   suspended?: boolean;
+  /** What the plants cost to run per second (wages, energy, maintenance), set each tick: sizes the wage reserve. */
+  runCost?: number;
+  /** Parts and cars made but not sold yet, at what they cost to make (standard cost), when last measured. */
+  goods?: number;
+  /** How fast that value changes, $/s (smoothed like the ledger's rates): added to the profit shown. */
+  goodsRate?: number;
   /** Parts Market: units of each item sold recently (decays over PARTS_DEMAND.window). */
   demand?: Partial<Record<ItemId, number>>;
   /** Net income per second averaged over ~10 minutes: sizes rewards, so a lucky moment doesn't. */

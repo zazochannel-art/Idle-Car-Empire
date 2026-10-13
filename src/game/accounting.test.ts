@@ -3,6 +3,8 @@
 import { describe, expect, it } from "vitest";
 import { STARTER_PLOT } from "./city/layout";
 import * as C from "./engine/city";
+import { carStdCost, componentStdCost } from "./engine/costs";
+import { CAR_BY_ID } from "./config/cars";
 import * as Co from "./engine/construction";
 import * as Ex from "./engine/expansion";
 import * as M from "./engine/materials";
@@ -100,10 +102,12 @@ describe("accounting: the game books every dollar once", () => {
     const s = createInitialState(T0);
     run(s, 300);
     const snap = snapshot(s);
-    expect(snap.incomePerSec).toBe(M.ledgerNet(s.chain.ledger.rate));
-    expect(s.chain.rate).toBeCloseTo(M.chainNet(s.chain.ledger.rate), 9);
+    // the ledger, plus the change in what was made and isn't sold yet (at its cost)
+    expect(snap.incomePerSec).toBe(M.ledgerNet(s.chain.ledger.rate) + (s.chain.goodsRate ?? 0));
+    expect(s.chain.rate).toBeCloseTo(M.chainNet(s.chain.ledger.rate) + (s.chain.goodsRate ?? 0), 9);
     // a company losing money shows it: the profit is not clamped at zero
     s.chain.ledger.rate = L({ labor: 5 });
+    s.chain.goodsRate = 0;
     expect(snapshot(s).incomePerSec).toBe(-5);
   });
 
@@ -161,5 +165,34 @@ describe("accounting: the game books every dollar once", () => {
     expect(s.chain.ledger.rate).toEqual(rates);
     expect(s.chain.rate).toBeCloseTo(M.chainNet(rates), 9);
     expect(M.ledgerRevenue(s.chain.ledger.run)).toBeGreaterThan(runBefore);
+  });
+});
+
+describe("the profit shown counts what was made and isn't sold yet", () => {
+  it("parts and cars waiting to be sold are worth what they cost to make", () => {
+    const s = createInitialState(T0);
+    s.city.buildings[STARTER_PLOT].plant!.out = 0;
+    s.chain.shipments = [];
+    const base = Ch.goodsValue(s);
+    // a car at the dealer and two bodies on their way to the market
+    s.chain.dealers.local = { cars: 1, value: 6_000, models: ["city"], next: 1e9, sold: 0 };
+    s.chain.shipments.push({ id: 7, from: STARTER_PLOT, to: "m:market", item: "body", qty: 2, value: 4_000, t: 0, dur: 1e9, back: false, vehicle: "truck" });
+    const car = carStdCost(CAR_BY_ID.city, Ch.recipe(CAR_BY_ID.city));
+    expect(Ch.goodsValue(s) - base).toBeCloseTo(car + 2 * componentStdCost("body", 1), 6);
+  });
+
+  it("selling a car takes its cost out of the stock: the profit shown is the sale minus what the car cost", () => {
+    const s = createInitialState(T0);
+    run(s, 2);
+    s.dealers.local.owned = true;
+    s.chain.dealers.local = { cars: 1, value: 6_000, models: ["city"], next: 1e9, sold: 0 };
+    run(s, 0.5);
+    const before = Ch.goodsValue(s);
+    s.chain.dealers.local!.next = 0;
+    run(s, 0.5);
+    expect(s.chain.dealers.local!.cars).toBe(0);
+    const car = carStdCost(CAR_BY_ID.city, Ch.recipe(CAR_BY_ID.city));
+    // (the starter Body Works may have made something in the same half second)
+    expect(before - Ch.goodsValue(s)).toBeGreaterThan(car - 2_000);
   });
 });

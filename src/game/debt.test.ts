@@ -1,7 +1,8 @@
 // Phase 6 of the economy audit: the company's account. Running costs the
-// cash can't cover go on it — never materials — up to a limit; above it
-// every plant is suspended until sales pay it down; half of every sale pays
-// it back, so there is always cash for materials again.
+// cash can't cover go on it — never materials. Over its limit nothing more is
+// bought on credit, but plants with material keep working (what they make is
+// what pays it back); only far over it (DEBT.halt) does every plant stop. A
+// share of every sale and of the profit pays it back.
 import { describe, expect, it } from "vitest";
 import { STARTER_PLOT } from "./city/layout";
 import { DEBT } from "./config/economy";
@@ -53,12 +54,26 @@ describe("debt: the company's account", () => {
     expect(M.debtLimit(s)).toBeGreaterThanOrEqual(DEBT.min);
   });
 
-  it("over the limit every plant is SUSPENDED: no production, no new costs", () => {
+  it("over the limit, plants with material keep working; nothing more goes on credit", () => {
+    const { s, p } = broke();
+    run(s, 2);
+    s.chain.dealers.local = { cars: 3, value: 15_000, models: ["city", "city", "city"], next: 1e9, sold: 0 };
+    s.chain.owed = M.debtLimit(s) + 1;
+    run(s, 1);
+    expect(s.chain.suspended).toBeUndefined();
+    expect(M.canOwe(s, 1)).toBe(false);
+    const made = p.made;
+    run(s, 120);
+    expect(p.status).not.toBe("suspended");
+    expect(p.made).toBeGreaterThan(made);
+  });
+
+  it("far over the limit (DEBT.halt) every plant is SUSPENDED: no production, no new costs", () => {
     const { s, p } = broke();
     run(s, 2);
     // cars still to sell at a dealer: the suspension holds until they pay the account down
     s.chain.dealers.local = { cars: 3, value: 15_000, models: ["city", "city", "city"], next: 1e9, sold: 0 };
-    s.chain.owed = M.debtLimit(s) + 1;
+    s.chain.owed = M.debtLimit(s) * DEBT.halt + 1;
     run(s, 1);
     expect(s.chain.suspended).toBe(true);
     const made = p.made;
@@ -97,27 +112,28 @@ describe("debt: the company's account", () => {
     const { s, p } = broke();
     run(s, 2);
     const limit = M.debtLimit(s);
-    s.chain.owed = limit + 1;
+    const halt = limit * DEBT.halt;
+    s.chain.owed = halt + 1;
     s.chain.dealers.local = { cars: 3, value: 15_000, models: ["city", "city", "city"], next: 1e9, sold: 0 };
     run(s, 1);
     expect(s.chain.suspended).toBe(true);
     // paid down, but not yet to the resume line: the plants still wait
-    s.chain.owed = limit * DEBT.resume + 100;
+    s.chain.owed = halt * DEBT.resume + 100;
     run(s, 1);
     expect(s.chain.suspended).toBe(true);
     // at the line they start again
-    s.chain.owed = limit * DEBT.resume - 1;
+    s.chain.owed = halt * DEBT.resume - 1;
     run(s, 1);
     expect(s.chain.suspended).toBeUndefined();
     const made = p.made;
     run(s, 120);
     expect(p.made).toBeGreaterThan(made);
     // or: while suspended, cash that covers the account settles it at once
-    s.chain.owed = limit + 500;
+    s.chain.owed = halt + 500;
     s.cash = 0;
     run(s, 1);
     expect(s.chain.suspended).toBe(true);
-    s.cash = limit + 600;
+    s.cash = halt + 600;
     run(s, 1);
     expect(s.chain.owed).toBe(0);
     expect(s.chain.suspended).toBeUndefined();
@@ -128,10 +144,27 @@ describe("debt: the company's account", () => {
     run(s, 2);
     s.chain.shipments = [];
     p.out = 0;
-    s.chain.owed = M.debtLimit(s) + 1;
+    s.chain.owed = M.debtLimit(s) * DEBT.halt + 1;
     run(s, 1);
     expect(s.chain.suspended).toBeUndefined();
     expect(p.status).toBe("ok");
+  });
+
+  it("a share of every sale pays the account back", () => {
+    const { s } = broke();
+    run(s, 2);
+    s.city.buildings[STARTER_PLOT].plant!.stock = {};
+    s.chain.rescueT = s.market.t;
+    s.chain.steady = 0;
+    s.dealers.local.owned = true;
+    s.chain.dealers.local = { cars: 1, value: 6_000, models: ["city"], next: 0, sold: 0 };
+    s.chain.owed = 5_000;
+    const L = s.chain.ledger.run;
+    const before = { sales: L.carSales, fees: L.dealerFees, tax: L.tax };
+    tick(s, 0.5);
+    const proceeds = L.carSales - before.sales - (L.dealerFees - before.fees) - (L.tax - before.tax);
+    expect(proceeds).toBeGreaterThan(0);
+    expect(s.chain.owed).toBeCloseTo(5_000 - DEBT.share * proceeds, 6);
   });
 
   it("bought-in parts on credit stay within the limit", () => {
