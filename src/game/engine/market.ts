@@ -1,6 +1,7 @@
 // Market trends, build quality, reputation and recalls (config/market.ts).
 import { brandPriceMult } from "./brand";
 import { defectMult, hypeDemand } from "./expansion";
+import { evDemandMult } from "./ev";
 import { CAR_BY_ID, type CarClass } from "../config/cars";
 import { MATERIAL_IDS, type MaterialId } from "../config/economy";
 import { CAMPAIGN } from "../config/showroom";
@@ -76,7 +77,7 @@ export const campaignOn = (s: GameState) => s.market.t < (s.showroom?.campaignUn
 
 /** How much faster customers come for a car (the class in fashion, a hyped prototype, a marketing campaign). */
 export function carDemandMult(s: GameState, car: CarId | undefined): number {
-  return (car && CAR_BY_ID[car].class === trendOf(s).hot ? HOT_CLASS.demand : 1) * hypeDemand(s, car) * (campaignOn(s) ? CAMPAIGN.demand : 1);
+  return (car && CAR_BY_ID[car].class === trendOf(s).hot ? HOT_CLASS.demand : 1) * hypeDemand(s, car) * (campaignOn(s) ? CAMPAIGN.demand : 1) * evDemandMult(s, car);
 }
 
 const clampRep = (r: number) => Math.max(0, Math.min(100, r));

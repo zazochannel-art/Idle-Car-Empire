@@ -26,6 +26,7 @@ const TRAFFIC_SCALE: Record<CarModel, number> = {
   electric: 1,
   offroad: 1,
   pickup: 1,
+  robotaxi: 1,
 };
 import { hazed } from "./kit";
 import { ROAD_LIFT, carGeometry, roadSurface, type MapRoad } from "./scenery";

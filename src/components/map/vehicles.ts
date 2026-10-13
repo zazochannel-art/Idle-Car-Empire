@@ -10,8 +10,8 @@ export type Dir = 0 | 1 | 2 | 3;
 export const CAR_COLORS = ["#dc2626", "#2563eb", "#f1f5f9", "#facc15", "#16a34a", "#111827", "#ea580c", "#7c3aed", "#94a3b8", "#0891b2"];
 
 /** Fictional car classes, from cheap to spectacular. */
-export type CarModel = "city" | "sedan" | "suv" | "sports" | "muscle" | "luxury" | "supercar" | "hypercar" | "electric" | "compact" | "minivan" | "offroad" | "pickup" | "wagon";
-export const CAR_MODELS: CarModel[] = ["city", "sedan", "suv", "sports", "muscle", "luxury", "supercar", "hypercar", "electric", "compact", "minivan", "offroad", "pickup", "wagon"];
+export type CarModel = "city" | "sedan" | "suv" | "sports" | "muscle" | "luxury" | "supercar" | "hypercar" | "electric" | "compact" | "minivan" | "offroad" | "pickup" | "wagon" | "robotaxi";
+export const CAR_MODELS: CarModel[] = ["city", "sedan", "suv", "sports", "muscle", "luxury", "supercar", "hypercar", "electric", "compact", "minivan", "offroad", "pickup", "wagon", "robotaxi"];
 
 
 export interface CarOpts {
@@ -170,6 +170,7 @@ export const CAR_MODEL_FOR: Record<CarId, CarModel> = {
   supercar: "supercar",
   hypercar: "hypercar",
   electric: "electric",
+  autonomous: "robotaxi",
 };
 
 

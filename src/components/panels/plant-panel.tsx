@@ -17,6 +17,8 @@ import { AUTO_UPGRADE_FROM, plantNetValue, plantProfitPerMin, plantUnitCost, aut
 import { isManagerUnlocked } from "@/game/engine/actions";
 import { dealerUpgradeCost, managerUpgradeCost } from "@/game/engine/economy";
 import { dealerRequirement } from "@/game/engine/insights";
+import { CHARGING, SUBSCRIPTION } from "@/game/config/ev";
+import { chargerCost, chargerLevel, chargingCapacity, chargingUnlocked, evDemandMult, evFleet, subscriptions, subscriptionsUnlocked } from "@/game/engine/ev";
 import { formatDuration, formatMoney, formatNumber, formatPercent } from "@/game/format";
 import type { ComponentId, DealerId, GameState, ItemId, PlantType } from "@/game/types";
 import type { MessageKey, Vars } from "@/i18n";
@@ -91,6 +93,7 @@ export function PlantPanel({ id, inside }: { id: string; inside?: boolean }) {
       <WorksBanner id={id} />
       <BreakdownBanner plotId={id} />
       <StatusLine id={id} />
+      {st.type === "softwareStudio" && <SubscriptionCard />}
       <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold text-white/70">
         <MoraleChip plotId={id} />
         <BoostButton plotId={id} className="h-8" />
@@ -791,6 +794,69 @@ export function DealerPanel({ id, inList }: { id: DealerId; inList?: boolean }) 
         <Stat label={t("dealers.avgPrice")} value={cars >= 1 ? formatMoney(((stock?.value ?? 0) / cars) * (1 + ds.markup)) : "—"} />
       </div>
       <CostButton className="w-full" size="lg" cost={dealerUpgradeCost(state, id)} onBuy={() => upgradeDealer(id)} label={t("dealers.upgrade")} />
+      {chargingUnlocked(state) && <ChargerCard id={id} />}
+    </div>
+  );
+}
+
+/** The dealer's charging station (Charging Network research): its level, the cars the network charges and what it earns. */
+function ChargerCard({ id }: { id: DealerId }) {
+  const state = useGame((g) => g.state);
+  const income = useGame((g) => g.snap.city.ev);
+  const buildCharger = useGame((g) => g.buildCharger);
+  const { t } = useT();
+  const level = chargerLevel(state, id);
+  const cost = chargerCost(state, id);
+  const fleet = evFleet(state);
+  const cap = chargingCapacity(state);
+  const boost = evDemandMult(state, "electric") - 1;
+  return (
+    <div className="space-y-2 rounded-2xl bg-gradient-to-br from-emerald-500/10 to-teal-500/5 p-3 ring-1 ring-emerald-400/25">
+      <div className="flex items-center gap-2">
+        <span className="text-xl">⚡</span>
+        <span className="min-w-0 flex-1 text-sm font-bold">{t("ev.station")}</span>
+        <Badge variant={level > 0 ? "gold" : "muted"}>{level > 0 ? t("common.lv", { level }) : t("ev.none")}</Badge>
+      </div>
+      <p className="text-[11px] leading-snug text-white/55">{t("ev.stationHint", { cars: CHARGING.carsPerLevel * (state.research.includes("fast_charging") ? CHARGING.fastMult : 1), pct: formatPercent(CHARGING.demandPerLevel) })}</p>
+      <div className="grid grid-cols-3 gap-2 text-center">
+        <Stat label={t("ev.charging")} value={`${formatNumber(Math.min(fleet, cap))}/${formatNumber(cap)}`} />
+        <Stat label={t("ev.income")} value={`${formatMoney(income.chargers[id] ?? 0)}/s`} gold />
+        <Stat label={t("ev.demand")} value={`+${formatPercent(boost)}`} />
+      </div>
+      {fleet > cap && cap > 0 && <p className="text-[11px] text-amber-300/90">{t("ev.full", { n: formatNumber(fleet - cap) })}</p>}
+      {level >= CHARGING.maxLevel ? (
+        <div className="text-center text-xs font-bold text-emerald-300">{t("ev.max")}</div>
+      ) : (
+        <CostButton className="w-full" cost={cost} label={level > 0 ? t("ev.upgrade") : t("ev.build")} onBuy={() => buildCharger(id)} />
+      )}
+    </div>
+  );
+}
+
+/** Over-the-Air Updates: the Autonomous Lounges on the road, the subscriptions the studios keep running, and what they pay. */
+function SubscriptionCard() {
+  const state = useGame((g) => g.state);
+  const subs = useGame((g) => g.snap.city.ev.subs);
+  const { t } = useT();
+  const sub = subscriptions(state);
+  return (
+    <div className="space-y-2 rounded-2xl bg-gradient-to-br from-indigo-500/15 to-teal-500/5 p-3 ring-1 ring-indigo-400/25">
+      <div className="flex items-center gap-2">
+        <span className="text-xl">📡</span>
+        <span className="min-w-0 flex-1 text-sm font-bold">{t("ev.subs")}</span>
+      </div>
+      {subscriptionsUnlocked(state) ? (
+        <>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <Stat label={t("ev.onRoad")} value={formatNumber(sub.cars)} />
+            <Stat label={t("ev.active")} value={`${formatNumber(sub.active)}/${formatNumber(sub.capacity)}`} />
+            <Stat label={t("ev.income")} value={`${formatMoney(subs)}/s`} gold />
+          </div>
+          <p className="text-[11px] leading-snug text-white/55">{t("ev.subsHint", { n: SUBSCRIPTION.perStudioLevel })}</p>
+        </>
+      ) : (
+        <p className="text-[11px] leading-snug text-white/55">🔒 {t("ev.subsLocked")}</p>
+      )}
     </div>
   );
 }

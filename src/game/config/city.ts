@@ -186,6 +186,13 @@ export const PLOT_USES: Record<ZoneId, { cells: StructureType[]; big: StructureT
   },
 };
 
+/**
+ * Plots that can also take a second kind of building, picked when it is
+ * built. The Software Studio came after the map was zoned, so it shares the
+ * Electronics Factory's plots: no plot of an existing save changes.
+ */
+export const ALT_USES: Partial<Record<StructureType, StructureType[]>> = { electronicsFactory: ["softwareStudio"] };
+
 export type PlotSize = "small" | "medium" | "large" | "mega";
 
 /** Size class of a plot: town-centre cells are small, industrial cells medium, whole blocks large (mega in the last districts). */

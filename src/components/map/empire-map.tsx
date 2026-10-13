@@ -37,7 +37,7 @@ function sceneKey(s: GameState) {
   const b = Object.entries(s.city.buildings)
     .map(([id, x]) => `${id}:${x.type}:${x.level}:${x.garage?.spec ?? ""}:${x.garage?.no ?? ""}:${x.works ? 1 : 0}`)
     .join("|");
-  const d = Object.values(s.dealers).map((x) => `${x.owned ? 1 : 0}${x.level}`).join(",");
+  const d = Object.entries(s.dealers).map(([id, x]) => `${x.owned ? 1 : 0}${x.level}:${s.ev?.chargers[id as keyof typeof s.ev.chargers] ?? 0}`).join(",");
   return `${s.city.zones.join()}#${(s.city.territories ?? []).join()}#${s.racing.unlocked ? 1 : 0}#${b}#${d}#${s.city.land.length}#${Object.keys(s.city.sites).join(",")}`;
 }
 
