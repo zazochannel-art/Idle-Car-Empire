@@ -2242,6 +2242,8 @@ export const en = {
   "skin.lockPass": "Season pass",
   "race.skin.pulse": "Pulse",
   "race.skin.legend": "Legend",
+  "settings.stats": "Anonymous statistics",
+  "settings.statsHint": "Helps us see where new players get stuck: only which step was reached and after how many minutes. No account, no device id, nothing personal.",
 } as const;
 
 export type MessageKey = keyof typeof en;

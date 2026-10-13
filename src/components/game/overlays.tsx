@@ -313,6 +313,7 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
           <Toggle label={t("settings.sound")} k="sound" />
           <Toggle label={t("settings.haptics")} k="haptics" />
           <NotifyToggle />
+          <Toggle label={t("settings.stats")} hint={t("settings.statsHint")} k="stats" />
         </div>
 
         <div className="mt-4">
@@ -442,7 +443,7 @@ function SaverPicker() {
   );
 }
 
-function Toggle({ label, hint, k }: { label: string; hint?: string; k: "lowGraphics" | "sound" | "haptics" }) {
+function Toggle({ label, hint, k }: { label: string; hint?: string; k: "lowGraphics" | "sound" | "haptics" | "stats" }) {
   const on = useGame((g) => g.state.settings[k]);
   const setPref = useGame((g) => g.setPref);
   return (

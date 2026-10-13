@@ -184,6 +184,19 @@ check(!!anonRead.error || (anonRead.data ?? []).length === 0, "signed out: the t
 const anonBoard = await anon.client.rpc("leaderboard", { p_kind: "all" });
 check(!!anonBoard.error, "signed out: no leaderboard", anonBoard.error?.code);
 
+// ── the anonymous funnel (0006): reached the way the game does, with the public key alone ──
+// ('ping' and an unknown step write nothing, so the live table stays clean)
+const track = async (step) => {
+  const r = await fetch(`${url}/rest/v1/rpc/track_step`, { method: "POST", headers: { apikey: key, "Content-Type": "application/json" }, body: JSON.stringify({ p_step: step, p_minutes: 1 }) });
+  return [r.status, await r.json().catch(() => null)];
+};
+const [pingStatus, ping] = await track("ping");
+check(pingStatus === 200 && ping === "ok", "the funnel answers with the public key alone", `${pingStatus} ${JSON.stringify(ping)}`);
+const [, unknownStep] = await track(`${tag}-nonsense`);
+check(unknownStep === "unknown", "an unknown funnel step is turned away", JSON.stringify(unknownStep));
+const funnelRead = await anon.client.from("funnel_steps").select("id");
+check(!!funnelRead.error, "the funnel's table is out of the API's reach", funnelRead.error?.code);
+
 // ── clean up: each test player deletes its own save (and so its card) ──
 for (const p of [a, b]) {
   const del = await p.client.from("game_saves").delete().not("user_id", "is", null);

@@ -2241,6 +2241,8 @@ export const ru: Record<MessageKey, string> = {
   "skin.lockPass": "Сезонный пропуск",
   "race.skin.pulse": "Пульс",
   "race.skin.legend": "Легенда",
+  "settings.stats": "Анонимная статистика",
+  "settings.statsHint": "Помогает понять, где застревают новые игроки: только какой шаг пройден и через сколько минут. Без аккаунта, без ID устройства, ничего личного.",
 };
 
 export const ruContent: Record<string, string> = {

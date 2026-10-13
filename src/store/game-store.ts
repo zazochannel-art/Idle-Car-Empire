@@ -62,11 +62,15 @@ import * as Gh from "@/game/engine/ghost";
 import { allianceReward } from "@/game/engine/alliance";
 import * as Wt from "@/game/engine/winter";
 import * as Ps from "@/game/engine/pass";
+import { funnelDue, funnelMinutes } from "@/game/engine/funnel";
+import { browserOptOut, sendStep } from "@/game/save/funnel";
 import { PASS, type WeeklyId } from "@/game/config/pass";
 import { batteryState, isIdle, isSaving, minTickMs, onSaverChange, setSaverSetting, startPower, type SaverSetting } from "@/lib/power";
 
 const TICK_MS = 100;
 const SAVE_MS = 5_000;
+/** How often the funnel steps are looked at (and any not sent yet are sent). */
+const FUNNEL_MS = 30_000;
 /** A gap this long between ticks (sleeping laptop, frozen tab) counts as being away. */
 const AWAY_GAP_S = 30;
 /** Gifts from other players and the player's ghost: first this long after the start, then this often. */
@@ -215,7 +219,7 @@ interface GameStore {
   setAutoRacing: (on: boolean) => boolean;
   setAutoRepair: (on: boolean) => void;
   setBuyAmount: (a: BuyAmount) => void;
-  setPref: (key: "lowGraphics" | "sound" | "haptics" | "notify", on: boolean) => void;
+  setPref: (key: "lowGraphics" | "sound" | "haptics" | "notify" | "stats", on: boolean) => void;
   setSaver: (saver: SaverSetting) => void;
   setLang: (lang: Lang) => void;
   exportSave: () => string;
@@ -231,6 +235,9 @@ let lastTick = 0;
 let lastSave = 0;
 /** The ghost last published (JSON), so an unchanged one isn't sent again. */
 let lastGhost = "";
+/** The anonymous funnel: when its steps were last looked at, and whether a send is under way. */
+let lastFunnel = 0;
+let funnelBusy = false;
 
 const initial = createInitialState(0);
 
@@ -381,6 +388,28 @@ export const useGame = create<GameStore>((set, get) => {
     }
     commit(next, snap);
     if (now - lastSave > SAVE_MS) persist();
+    if (now - lastFunnel > FUNNEL_MS) {
+      lastFunnel = now;
+      void sendFunnel(now);
+    }
+  }
+
+  /** Sends the funnel steps this company has reached and not sent yet, one after another (anonymous: engine/funnel.ts). */
+  async function sendFunnel(now: number) {
+    const s = get().state;
+    if (funnelBusy || !s.settings.stats || browserOptOut()) return;
+    funnelBusy = true;
+    try {
+      for (const step of funnelDue(s, now)) {
+        if (!(await sendStep(step, funnelMinutes(get().state)))) break;
+        act((x) => {
+          if (!x.funnel.includes(step)) x.funnel.push(step);
+          return true;
+        });
+      }
+    } finally {
+      funnelBusy = false;
+    }
   }
 
   const act = <T,>(fn: (s: GameState) => T): T => {
@@ -961,7 +990,11 @@ export const useGame = create<GameStore>((set, get) => {
     },
     resetGame: async () => {
       saves?.clearLocal();
+      const old = get().state;
       const state = createInitialState(Date.now());
+      // the same player starting over is not a new player: the funnel steps already sent stay sent
+      state.funnel = [...old.funnel];
+      state.settings.stats = old.settings.stats;
       refreshDaily(state, Date.now());
       set({ state, snap: snapshot(state) });
       persist(true);

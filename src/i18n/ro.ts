@@ -2241,6 +2241,8 @@ export const ro: Record<MessageKey, string> = {
   "skin.lockPass": "Pass sezonier",
   "race.skin.pulse": "Puls",
   "race.skin.legend": "Legendă",
+  "settings.stats": "Statistici anonime",
+  "settings.statsHint": "Ne ajută să vedem unde se blochează jucătorii noi: doar ce pas a fost atins și după câte minute. Fără cont, fără ID de dispozitiv, nimic personal.",
 };
 
 export const roContent: Record<string, string> = {
