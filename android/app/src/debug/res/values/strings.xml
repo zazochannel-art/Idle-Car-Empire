@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <!-- the test build's name on the phone, so it can't be mistaken for the Google Play app -->
+    <string name="app_name">Car Empire DEBUG</string>
+    <string name="title_activity_main">Car Empire DEBUG</string>
+</resources>
