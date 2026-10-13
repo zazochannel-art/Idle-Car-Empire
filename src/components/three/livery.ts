@@ -1,6 +1,6 @@
 // The factory paint of every model, as in the reference line-up: each class
 // leaves the assembly line in its own colour (no badges, no logos).
-export type LiveryModel = "city" | "sedan" | "suv" | "sports" | "muscle" | "luxury" | "supercar" | "hypercar" | "electric" | "compact" | "minivan" | "offroad" | "pickup" | "wagon";
+export type LiveryModel = "city" | "sedan" | "suv" | "sports" | "muscle" | "luxury" | "supercar" | "hypercar" | "electric" | "compact" | "minivan" | "offroad" | "pickup" | "wagon" | "robotaxi";
 
 export interface Livery {
   color: string;
@@ -23,6 +23,8 @@ export const LIVERY: Record<LiveryModel, Livery> = {
   offroad: { color: "#3f5a2a", finish: "gloss" },
   pickup: { color: "#1c7a3c", finish: "metallic" },
   wagon: { color: "#e9e9e4", finish: "gloss" },
+  // the Autonomous Lounge: a pearl-white people mover with a teal sensor band
+  robotaxi: { color: "#eef6f5", finish: "gloss" },
 };
 
 /** Colours the player picked in the Design studio, per model ("" or missing = factory colour). */

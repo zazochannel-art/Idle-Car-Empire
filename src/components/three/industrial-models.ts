@@ -40,6 +40,7 @@ export const STATION_MACHINES: Record<string, MachineKind[]> = {
   paintFactory: ["mixer", "mixer", "mixer", "packer", "packer"],
   electronicsFactory: ["coils", "cnc", "welder", "qcTunnel", "packer"],
   batteryFactory: ["mixer", "cnc", "welder", "gantry", "packer"],
+  softwareStudio: ["coils", "cnc", "qcTunnel", "qcTunnel", "packer"],
   assemblyPlant: ["welder", "hoist", "lift", "seatRobot", "glassRobot", "wheelRobot", "paintBooth", "gantry", "qcTunnel"],
 };
 

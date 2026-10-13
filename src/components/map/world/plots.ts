@@ -8,6 +8,7 @@ import { WORLD_MAP, type Plot } from "@/game/city/layout";
 import { SPEC_BY_ID, STRUCTURE_BY_ID } from "@/game/config/city";
 import { PLANT_BY_ID, isPlantType } from "@/game/config/chain";
 import type { PlotStatus } from "@/game/engine/construction";
+import { chargerLevel } from "@/game/engine/ev";
 import type { DealerId, GameState, StructureType } from "@/game/types";
 import type { MapNames } from "../map-types";
 import { dealerModel, depotModel, emptyDealerModel, garageModel, lotMarker, lotOutline, marketModel, paddockModel, plantModel, siteModel, structureModel, worksModel, type SiteModel } from "./structures";
@@ -18,7 +19,7 @@ export type PlotLook =
   | { kind: "market" }
   | { kind: "depot" }
   | { kind: "paddock"; open: boolean }
-  | { kind: "dealer"; tier: number; owned: boolean }
+  | { kind: "dealer"; tier: number; owned: boolean; chargers: number }
   | { kind: "plant"; type: string; level: number }
   | { kind: "garage"; level: number; color: string }
   | { kind: "structure"; type: StructureType; level: number }
@@ -47,7 +48,8 @@ export function plotViews(s: GameState, names: MapNames): Map<string, PlotView> 
     else if (plot.kind === "dealer") {
       const id = plot.dealer!;
       const owned = !!s.dealers[id]?.owned;
-      v = { look: { kind: "dealer", tier: Math.max(0, DEALER_TIER.indexOf(id)), owned }, sig: owned ? "built" : "lot", announce: names.dealer(id), works: false };
+      const chargers = owned ? chargerLevel(s, id) : 0;
+      v = { look: { kind: "dealer", tier: Math.max(0, DEALER_TIER.indexOf(id)), owned, chargers }, sig: owned ? `built:${chargers}` : "lot", announce: names.dealer(id), works: false };
     } else {
       const b = s.city.buildings[plot.id];
       const site = s.city.sites[plot.id];
@@ -84,7 +86,7 @@ function model(look: PlotLook, plot: Plot, seed: number): THREE.Object3D | null 
     case "paddock":
       return paddockModel(W, D, look.open);
     case "dealer":
-      return look.owned ? dealerModel(look.tier, W, D) : emptyDealerModel(W, D);
+      return look.owned ? dealerModel(look.tier, W, D, look.chargers) : emptyDealerModel(W, D);
     case "plant": {
       const cfg = PLANT_BY_ID[look.type as keyof typeof PLANT_BY_ID];
       return plantModel({ type: look.type, level: look.level, big: !!plot.big, wall: cfg.color, roof: cfg.roof, accent: cfg.roof }, W, D);

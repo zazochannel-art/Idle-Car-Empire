@@ -27,7 +27,8 @@ import {
 } from "../config/city";
 import { PLANT_MAX_LEVEL, isPlantType } from "../config/chain";
 import { migratePlant, newPlant, plantBuildCost, starterStock } from "./chain";
-import { buyAndBuild, startWorks } from "./construction";
+import { buyAndBuild, plotUses, startWorks } from "./construction";
+import { evIncome, type EvIncome } from "./ev";
 import { STARTER_PLOT, plotOf, WORLD_MAP, type Plot } from "../city/layout";
 import type {
   BuildingState,
@@ -220,8 +221,10 @@ export interface GarageStats {
 
 export interface CitySnapshot {
   garages: Record<string, GarageStats>;
-  /** Flat income from car washes, service centres… */
+  /** Flat income from car washes, service centres… (and the charging stations, by dealer plot) */
   structureIncome: Record<string, number>;
+  /** Charging and software subscriptions (engine/ev.ts). */
+  ev: EvIncome;
   incomePerSec: number;
   carsPerSec: number;
 }
@@ -329,7 +332,11 @@ export function citySnapshot(s: GameState, incomeMult: number): CitySnapshot {
       incomePerSec += inc;
     }
   }
-  return { garages, structureIncome, incomePerSec, carsPerSec };
+  // drivers charging at the dealers' stations, and the Autonomous Lounges' software subscriptions
+  const ev = evIncome(s, incomeMult);
+  for (const [id, inc] of Object.entries(ev.chargers)) structureIncome[`d:${id}`] = inc;
+  incomePerSec += ev.charging + ev.subs;
+  return { garages, structureIncome, incomePerSec, carsPerSec, ev };
 }
 
 /**
@@ -369,6 +376,7 @@ export function cityTick(s: GameState, dt: number, snap: CitySnapshot, credit: (
     }
   }
   for (const inc of Object.values(snap.structureIncome)) credit(inc * dt);
+  credit(snap.ev.subs * dt);
 }
 
 // ───────────────────────────── actions ─────────────────────────────
@@ -403,8 +411,8 @@ export function builtInZone(s: GameState, zone: ZoneId, type: StructureType): bo
  */
 export function buildStructure(s: GameState, plotId: string, type: StructureType): boolean {
   const plot = plotOf(plotId);
-  if (!plot || plot.use !== type || !canBuildOn(s, plotId) || !buildableIn(plot.zone, plot.big).includes(type)) return false;
-  return buyAndBuild(s, plotId);
+  if (!plot || !plotUses(plotId).includes(type) || !canBuildOn(s, plotId) || !buildableIn(plot.zone, plot.big).includes(type)) return false;
+  return buyAndBuild(s, plotId, type);
 }
 
 /** A new level is built onto the building (it keeps working meanwhile). */

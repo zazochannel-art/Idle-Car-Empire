@@ -4,7 +4,7 @@
 // Track and on the circuit.
 import type { RaceStat } from "./racing";
 
-export type TechId = "direct_injection" | "dual_clutch" | "wind_tunnel" | "carbon_body" | "adaptive_dampers" | "regen_braking" | "ceramic_coatings";
+export type TechId = "direct_injection" | "dual_clutch" | "wind_tunnel" | "carbon_body" | "adaptive_dampers" | "regen_braking" | "ceramic_coatings" | "sensor_fusion";
 
 export interface TechConfig {
   id: TechId;
@@ -20,6 +20,7 @@ export const CAR_TECH: Record<TechId, TechConfig> = {
   adaptive_dampers: { id: "adaptive_dampers", effect: { handling: 5 } },
   regen_braking: { id: "regen_braking", effect: { braking: 4, reliability: 2 } },
   ceramic_coatings: { id: "ceramic_coatings", effect: { reliability: 6 } },
+  sensor_fusion: { id: "sensor_fusion", effect: { handling: 4, braking: 4 } },
 };
 
 export const TECH_IDS = Object.keys(CAR_TECH) as TechId[];

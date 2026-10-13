@@ -21,6 +21,7 @@ export const COMPONENTS: ComponentConfig[] = [
   { id: "paint", emoji: "🎨", value: 150_000, color: "#ec4899" },
   { id: "electronics", emoji: "🔌", value: 300_000, color: "#22c55e" },
   { id: "battery", emoji: "🔋", value: 2_000_000, color: "#84cc16" },
+  { id: "software", emoji: "💻", value: 2_500_000, color: "#818cf8" },
   // the drivetrain and running gear every car from the Sedan up needs
   { id: "transmission", emoji: "🕹️", value: 4_000, color: "#64748b" },
   { id: "wheels", emoji: "⭕", value: 5_000, color: "#cbd5e1" },
@@ -99,6 +100,8 @@ export const PLANTS: PlantConfig[] = [
   { id: "paintFactory", emoji: "🎨", item: "paint", raw: "pigment", rawPer: 10, time: 30, cost: 3_000_000, requires: "glassFactory", color: "#fce7f3", roof: "#db2777" },
   { id: "electronicsFactory", emoji: "🔌", item: "electronics", raw: "chips", rawPer: 10, time: 50, cost: 10_000_000, requires: "paintFactory", color: "#dcfce7", roof: "#15803d" },
   { id: "batteryFactory", emoji: "🔋", item: "battery", raw: "lithium", rawPer: 10, time: 60, cost: 40_000_000, requires: "electronicsFactory", research: "electric_motors", color: "#ecfccb", roof: "#4d7c0f" },
+  // the self-driving stack: written, trained on fleet data and flashed onto every Autonomous car (its plots are the Electronics Factory's, see ALT_USES in config/city.ts)
+  { id: "softwareStudio", emoji: "💻", item: "software", raw: "code", rawPer: 10, time: 50, cost: 100_000_000, requires: "batteryFactory", research: "driving_software", color: "#e0e7ff", roof: "#4338ca" },
   // drivetrain and running gear: until these plants exist, an outside supplier delivers the parts
   { id: "transmissionFactory", emoji: "🕹️", item: "transmission", raw: "alloy", rawPer: 10, time: 45, cost: 250_000, requires: "suspensionFactory", color: "#e2e8f0", roof: "#475569" },
   { id: "wheelFactory", emoji: "⭕", item: "wheels", raw: "alloy", rawPer: 10, time: 30, cost: 300_000, requires: "transmissionFactory", color: "#f1f5f9", roof: "#94a3b8" },

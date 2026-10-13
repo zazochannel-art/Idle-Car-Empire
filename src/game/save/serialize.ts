@@ -6,6 +6,7 @@ import { migrateLive } from "../engine/live";
 import { migrateClassics } from "../engine/classics";
 import { migrateExpansion } from "../engine/expansion";
 import { migrateFunnel } from "../engine/funnel";
+import { migrateEv } from "../engine/ev";
 import { migratePass } from "../engine/pass";
 import { migrateCity, unlockOwnedZones } from "../engine/city";
 import { createInitialState, MAP_VERSION, SAVE_VERSION } from "../engine/state";
@@ -104,6 +105,8 @@ export function migrate(raw: unknown, now: number): GameState {
   state.quality = migrateQuality(raw.quality);
   // a save from before the funnel is not a new player: it is never counted
   state.funnel = migrateFunnel(raw.funnel);
+  // the charging stations are keyed by dealer (an open-ended record)
+  state.ev = migrateEv(raw.ev);
   // the season pass has open-ended lists (tiers taken, challenges, hall styles)
   state.pass = migratePass(raw.pass);
   migrateLive(raw, state);

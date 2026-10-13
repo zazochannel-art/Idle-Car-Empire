@@ -13,7 +13,7 @@ import type { CarId, Effect, GameState, PlantType } from "../types";
 import { cityEffects } from "./city";
 import { editionBonus } from "./collection";
 
-export const MAX_TIER = 9;
+export const MAX_TIER = 10;
 
 export interface GlobalMods {
   /** Value multiplier per car tier (index = tier). */
