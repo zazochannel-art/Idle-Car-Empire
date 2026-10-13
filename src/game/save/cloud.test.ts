@@ -8,6 +8,7 @@ import { SIGNED_OUT_KEY, SaveManager, WELCOMED_KEY, type StartHooks } from "./in
 import { LocalStore, LOCAL_SAVE_KEY, memoryStorage, type KeyValue } from "./local";
 import { decideStart, summarize, trustedLastActive } from "./policy";
 import { CloudSync, type SyncInfo } from "./sync";
+import { storedAccount } from "./supabase";
 import type { Account, AuthResult, CloudBackend, CloudCopy, LocalCopy, Profile } from "./types";
 
 const T0 = Date.UTC(2026, 0, 1);
@@ -33,6 +34,8 @@ class Server {
 class FakeCloud implements CloudBackend {
   user: string | null = null;
   fail = 0;
+  /** No connection: nothing reaches the server (a session kept on the device still answers). */
+  offline = false;
   constructor(public server: Server) {}
 
   private acc(id: string): Account {
@@ -43,6 +46,7 @@ class FakeCloud implements CloudBackend {
     return this.user ? this.acc(this.user) : null;
   }
   async signInGuest() {
+    if (this.offline) throw new Error("network");
     const id = `user-${this.server.next++}`;
     this.server.users.set(id, { email: null, password: null });
     this.server.profiles.set(id, { id, username: `Player-${id}`, avatar: "🧑‍🔧" });
@@ -70,6 +74,18 @@ class FakeCloud implements CloudBackend {
   async logout() {
     this.user = null;
   }
+  async deleteAccount(): Promise<AuthResult> {
+    if (this.fail > 0) {
+      this.fail--;
+      return { ok: false, error: "network" };
+    }
+    const id = this.user!;
+    this.server.users.delete(id);
+    this.server.profiles.delete(id);
+    this.server.rows.delete(id);
+    this.user = null;
+    return { ok: true };
+  }
   async refreshAccount() {
     return this.session();
   }
@@ -82,6 +98,7 @@ class FakeCloud implements CloudBackend {
     return { ok: true };
   }
   async load(): Promise<CloudCopy> {
+    if (this.offline) throw new Error("network");
     if (this.fail > 0) {
       this.fail--;
       throw new Error("network");
@@ -93,6 +110,7 @@ class FakeCloud implements CloudBackend {
       : { state: null, version: 0, revision: 0, updatedAt: 0, serverNow: this.server.clock };
   }
   async save(state: GameState, version: number, base: number) {
+    if (this.offline) throw new Error("network");
     this.server.requests++;
     if (this.fail > 0) {
       this.fail--;
@@ -287,6 +305,7 @@ describe("the welcome page before the game", () => {
     await alice.saves.start(T0, hooks());
     await alice.saves.updateProfile({ username: "Alice" });
 
+    flags.removeItem(WELCOMED_KEY); // another device: it never saw the welcome page
     const pc = device(server);
     const signIn = vi.fn(async (returning: boolean) => {
       expect(returning).toBe(false);
@@ -322,6 +341,7 @@ describe("the welcome page before the game", () => {
     await vi.advanceTimersByTimeAsync(2_100);
     await pc.saves.register("a@test.dev", "secret1", "");
 
+    flags.removeItem(WELCOMED_KEY); // another device: it never saw the welcome page
     const phone = device(server);
     const signIn = vi.fn(async () => {
       expect(await phone.saves.welcomeLogin("a@test.dev", "wrong")).toMatchObject({ ok: false, error: "credentials" });
@@ -332,6 +352,68 @@ describe("the welcome page before the game", () => {
     expect(res.state?.cash).toBe(321);
     expect(phone.cloud.user).toBe(pc.cloud.user);
     expect(server.users.size).toBe(1);
+  });
+
+  it("after playing without an account offline, the next start goes straight back to that game", async () => {
+    const server = new Server();
+    const phone = device(server);
+    phone.cloud.offline = true;
+    // the very first start has no connection: "play without an account" still plays, on this device
+    const first = await phone.saves.start(T0, hooks());
+    expect(first).toMatchObject({ state: null, mode: "local" });
+    phone.saves.save(game(42), true);
+
+    // the app restarts, still offline: the same game, no welcome page
+    const again = device(server, phone.storage);
+    again.cloud.offline = true;
+    const welcome = vi.fn(async () => "guest" as const);
+    expect(await again.saves.start(T0 + 60_000, hooks({ signIn: welcome }))).toMatchObject({ state: { cash: 42 }, mode: "local" });
+    expect(welcome).not.toHaveBeenCalled();
+
+    // back online: the guest account is made now and the game moves into it
+    const online = device(server, phone.storage);
+    expect((await online.saves.start(T0 + 120_000, hooks({ signIn: welcome }))).state?.cash).toBe(42);
+    expect(welcome).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(2_100);
+    expect((server.rows.get(online.cloud.user!)!.data as GameState).cash).toBe(42);
+  });
+
+  it("a signed-in player who starts without a connection plays their own copy, uploaded once back online", async () => {
+    const server = new Server();
+    const pc = device(server);
+    await pc.saves.start(T0, hooks());
+    pc.saves.save(game(10), true);
+    await vi.advanceTimersByTimeAsync(2_100);
+    const id = pc.cloud.user!;
+
+    // offline: the session kept on the device still says who plays (supabase.ts storedAccount)
+    const plane = device(server, pc.storage);
+    plane.cloud.user = id;
+    plane.cloud.offline = true;
+    const welcome = vi.fn(async () => "guest" as const);
+    expect(await plane.saves.start(T0 + 3_600_000, hooks({ signIn: welcome }))).toMatchObject({ state: { cash: 10 }, mode: "cloud" });
+    expect(welcome).not.toHaveBeenCalled();
+    plane.saves.save(game(15), true);
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(plane.saves.local.read(id)).toMatchObject({ state: { cash: 15 }, dirty: true });
+
+    plane.cloud.offline = false;
+    plane.saves.sync?.retryNow();
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect((server.rows.get(id)!.data as GameState).cash).toBe(15);
+  });
+
+  it("without a session but with an account's copy here, the welcome page asks to sign in again", async () => {
+    const server = new Server();
+    const pc = device(server);
+    await pc.saves.start(T0, hooks());
+    pc.saves.save(game(10), true);
+    await vi.advanceTimersByTimeAsync(2_100);
+
+    const lost = device(server, pc.storage); // the session is gone (not a logout)
+    const welcome = vi.fn(async () => "guest" as const);
+    await lost.saves.start(T0 + 60_000, hooks({ signIn: welcome }));
+    expect(welcome).toHaveBeenCalledOnce();
   });
 
   it("shows again for a guest that left it while registering; a guest with a game goes straight in", async () => {
@@ -476,6 +558,43 @@ describe("players and devices", () => {
     expect(next.cloud.user).not.toBe(id);
   });
 
+  it("deleting the account removes it from the server and this device, and saves nothing after", async () => {
+    const server = new Server();
+    const pc = device(server);
+    await pc.saves.start(T0, hooks());
+    pc.saves.save(game(10), true);
+    await vi.advanceTimersByTimeAsync(2_100);
+    const id = pc.cloud.user!;
+    expect(server.rows.get(id)).toBeDefined();
+
+    // the server can't be reached: nothing changes, the game goes on saving
+    pc.cloud.fail = 1;
+    expect(await pc.saves.deleteAccount()).toEqual({ ok: false, error: "network" });
+    pc.saves.save(game(12), true);
+    await vi.advanceTimersByTimeAsync(2_100);
+    expect((server.rows.get(id)!.data as GameState).cash).toBe(12);
+
+    expect(await pc.saves.deleteAccount()).toEqual({ ok: true });
+    expect(server.users.has(id)).toBe(false);
+    expect(server.rows.has(id)).toBe(false);
+    expect(server.profiles.has(id)).toBe(false);
+    expect(pc.saves.local.read(id)).toBeNull();
+    expect(flags.getItem(SIGNED_OUT_KEY)).toBe("1");
+    // the page's last saves while it reloads write nothing anywhere
+    pc.saves.save(game(13), true);
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(server.rows.size).toBe(0);
+    expect(pc.saves.local.read(id)).toBeNull();
+    expect(pc.storage.getItem(LOCAL_SAVE_KEY)).toBeNull();
+
+    // the next start is a new player's
+    const next = device(server, pc.storage);
+    const signIn = vi.fn(async () => "guest" as const);
+    await next.saves.start(T0, hooks({ signIn }));
+    expect(signIn).toHaveBeenCalledOnce();
+    expect(next.cloud.user).not.toBe(id);
+  });
+
   it("plays this device's copy when the cloud can't be reached, and repairs a damaged cloud save", async () => {
     const server = new Server();
     const pc = device(server);
@@ -496,5 +615,16 @@ describe("players and devices", () => {
     expect((await repair.saves.start(T0, hooks())).state?.cash).toBe(64);
     await vi.advanceTimersByTimeAsync(2_100);
     expect((server.rows.get(pc.cloud.user!)!.data as GameState).cash).toBe(64);
+  });
+});
+
+describe("the session kept on the device", () => {
+  it("names the signed-in player without the network, and nothing else", () => {
+    const user = { id: "u1", email: "a@test.dev", is_anonymous: false, new_email: null };
+    expect(storedAccount(JSON.stringify({ access_token: "x", refresh_token: "r", expires_at: 1, user }))).toEqual({ id: "u1", email: "a@test.dev", guest: false, pendingEmail: null });
+    expect(storedAccount(JSON.stringify({ refresh_token: "r", user: { id: "g", email: "", is_anonymous: true } }))).toMatchObject({ id: "g", guest: true });
+    expect(storedAccount(JSON.stringify({ user }))).toBeNull();
+    expect(storedAccount("not json")).toBeNull();
+    expect(storedAccount(null)).toBeNull();
   });
 });

@@ -29,12 +29,25 @@ export function authError(e: Pick<SbAuthError, "message"> & { code?: string; sta
 
 const fail = (e: Parameters<typeof authError>[0]): AuthResult => ({ ok: false, error: authError(e), detail: e.message });
 
+/** The account of a session as supabase-js keeps it in storage ({ refresh_token, user, … }), read without the network. */
+export function storedAccount(raw: string | null): Account | null {
+  try {
+    const s = raw ? (JSON.parse(raw) as { refresh_token?: string; user?: User } | null) : null;
+    return s?.refresh_token ? account(s.user) : null;
+  } catch {
+    return null;
+  }
+}
+
 const ms = (t: unknown) => (typeof t === "string" ? Date.parse(t) || 0 : 0);
 
 export class SupabaseBackend implements CloudBackend {
   private client: Promise<SupabaseClient>;
+  /** Where supabase-js keeps the session on this device (its default key for this project). */
+  private storageKey: string;
 
   constructor(url: string, key: string) {
+    this.storageKey = `sb-${new URL(url).hostname.split(".")[0]}-auth-token`;
     this.client = import("@supabase/supabase-js").then(({ createClient }) =>
       // sessions stay on this device and refresh themselves; email links come back with tokens in the URL
       createClient(url, key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }),
@@ -51,8 +64,20 @@ export class SupabaseBackend implements CloudBackend {
 
   async session(): Promise<Account | null> {
     const c = await this.client;
-    const { data } = await c.auth.getSession();
-    return account(data.session?.user);
+    const { data, error } = await c.auth.getSession();
+    if (data.session) return account(data.session.user);
+    // With no connection and an access token past its hour, supabase-js can't refresh it and
+    // answers "no session", but keeps the session and refreshes it once the connection is back.
+    // The player is still signed in: their own game (saved here, uploaded later), not the
+    // welcome page and a new company.
+    if (error?.name === "AuthRetryableFetchError") {
+      try {
+        return storedAccount(window.localStorage.getItem(this.storageKey));
+      } catch {
+        return null;
+      }
+    }
+    return null;
   }
 
   async signInGuest(): Promise<Account> {
@@ -96,6 +121,16 @@ export class SupabaseBackend implements CloudBackend {
     const c = await this.client;
     // this device only: the player stays signed in elsewhere
     await c.auth.signOut({ scope: "local" });
+  }
+
+  async deleteAccount(): Promise<AuthResult> {
+    const c = await this.client;
+    // the server deletes the account; its save, profile, leaderboard entry, gifts and alliance
+    // seat go with it (migration 0007)
+    const { error } = await c.rpc("delete_my_account");
+    if (error) return { ok: false, error: /fetch|network/i.test(error.message) ? "network" : "unknown", detail: error.message };
+    await c.auth.signOut({ scope: "local" }).catch(() => {});
+    return { ok: true };
   }
 
   async refreshAccount(): Promise<Account | null> {

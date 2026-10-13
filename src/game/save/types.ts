@@ -73,6 +73,8 @@ export interface CloudBackend {
   sendLink(email: string, redirectTo: string): Promise<AuthResult>;
   setPassword(password: string): Promise<AuthResult>;
   logout(): Promise<void>;
+  /** Deletes the signed-in account and everything the server keeps of it (for good). */
+  deleteAccount(): Promise<AuthResult>;
   /** The account as the server knows it now (email confirmed, guest or not). */
   refreshAccount(): Promise<Account | null>;
   profile(): Promise<Profile | null>;
