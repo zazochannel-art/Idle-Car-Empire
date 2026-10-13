@@ -4,7 +4,7 @@
 // the profile page, the sign-in and registration forms, and the choices the
 // start of the game and a save conflict may ask for.
 import { motion } from "framer-motion";
-import { Cloud, CloudOff, History, KeyRound, LogIn, LogOut, Mail, RefreshCw, UserPlus } from "lucide-react";
+import { Cloud, CloudOff, History, KeyRound, LogIn, LogOut, Mail, RefreshCw, Trash2, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -16,6 +16,7 @@ import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { answerStartChoice, enterGame, useCloud } from "@/store/cloud-store";
 import { trackGate } from "@/game/save/funnel";
+import { isNativeApp, publicPageUrl } from "@/lib/platform";
 import { uiEvents } from "@/store/events";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
@@ -25,8 +26,10 @@ type T = ReturnType<typeof useT>["t"];
 
 export const AVATARS = ["🧑‍🔧", "👩‍🔧", "👨‍💼", "👩‍💼", "🧑‍🏭", "🦁", "🐺", "🦊", "🐯", "🦅", "🐻", "🐼", "🚗", "🏎️", "🏁", "👑"];
 
-/** Where email links bring the player back: this page, without its hash. */
-const here = () => window.location.href.split("#")[0];
+/** Where email links bring the player back: this page, without its hash (the web game, from the app). */
+const here = publicPageUrl;
+/** A sign-in link opens the browser, not the app: the app signs in with the password only. */
+const linkSignIn = () => !isNativeApp();
 
 const ago = (t: T, ms: number | null) => (ms ? t("account.ago", { time: formatDuration(Math.max(1, (Date.now() - ms) / 1000)) }) : "—");
 
@@ -176,9 +179,11 @@ export function AccountForms({ initial, guest, onDone }: { initial: "login" | "r
           >
             <LogIn /> {t("account.login")}
           </Button>
-          <Button size="sm" variant="ghost" className="w-full" disabled={!validEmail(email) || busy} onClick={() => run(() => saves.sendLink(email.trim(), here()), () => t("account.linkSent"))}>
-            <Mail /> {t("account.sendLink")}
-          </Button>
+          {linkSignIn() && (
+            <Button size="sm" variant="ghost" className="w-full" disabled={!validEmail(email) || busy} onClick={() => run(() => saves.sendLink(email.trim(), here()), () => t("account.linkSent"))}>
+              <Mail /> {t("account.sendLink")}
+            </Button>
+          )}
         </>
       )}
       {msg && <p className={cn("text-center text-xs", msg.bad ? "text-rose-300" : "text-sky-300")}>{msg.text}</p>}
@@ -381,6 +386,54 @@ export function ProfileView() {
             </>
           )}
         </div>
+      )}
+
+      {enabled && account && <DeleteAccount />}
+    </div>
+  );
+}
+
+/** Deleting the account for good (two taps): the server's copy of everything, then a new game here. */
+function DeleteAccount() {
+  const saves = useGame((g) => g.saves);
+  const { t } = useT();
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  return (
+    <div className="space-y-2 rounded-2xl bg-[#2b2b2e] p-3 ring-1 ring-rose-500/20">
+      {asking ? (
+        <>
+          <p className="text-[11px] leading-snug text-white/70">{t("account.deleteHint")}</p>
+          <div className="grid grid-cols-2 gap-1.5">
+            <Button size="sm" variant="secondary" disabled={busy} onClick={() => setAsking(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              size="sm"
+              className="bg-none bg-rose-600 shadow-none"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                setFailed(false);
+                const r = await saves?.deleteAccount();
+                if (r?.ok) {
+                  window.location.reload();
+                  return;
+                }
+                setBusy(false);
+                setFailed(true);
+              }}
+            >
+              <Trash2 /> {t("account.deleteConfirm")}
+            </Button>
+          </div>
+          {failed && <p className="text-center text-xs text-rose-300">{t("account.deleteFailed")}</p>}
+        </>
+      ) : (
+        <Button size="sm" variant="ghost" className="w-full text-rose-300" onClick={() => setAsking(true)}>
+          <Trash2 /> {t("account.delete")}
+        </Button>
       )}
     </div>
   );
@@ -616,7 +669,7 @@ function WelcomeGate({ returning }: { returning: boolean }) {
           )}
         </Button>
       </form>
-      {tab === "login" && (
+      {tab === "login" && linkSignIn() && (
         <Button
           size="sm"
           variant="ghost"

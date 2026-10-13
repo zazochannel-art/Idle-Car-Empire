@@ -3,18 +3,23 @@
 
     <application
         android:allowBackup="true"
+        android:appCategory="game"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
+        <!-- Portrait on phones: the game's phone layout is portrait (landscape squeezes the HUD).
+             Android 16 ignores this on tablets and foldables (600dp+), which rotate freely with
+             the game's wide layout. -->
         <activity
-            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:name=".MainActivity"
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
+            android:screenOrientation="portrait"
             android:exported="true">
 
             <intent-filter>
@@ -38,4 +43,6 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- haptics: the game's navigator.vibrate() taps (the WebView needs this to vibrate) -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 </manifest>

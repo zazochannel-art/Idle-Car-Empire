@@ -521,3 +521,15 @@ body {
 .game-shell {
   bottom: calc(-1 * env(safe-area-inset-bottom));
 }
+
+/* The Android app draws the game edge to edge: the status bar's white icons sit over it, and a
+   light shade keeps them readable on the bright map. Zero height wherever the page has no top
+   inset (browser tabs, the installed web app). */
+.status-scrim {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: env(safe-area-inset-top, 0px);
+  background: linear-gradient(to bottom, rgb(0 0 0 / 0.45), rgb(0 0 0 / 0.12));
+  pointer-events: none;
+  z-index: 2147483000;
+}

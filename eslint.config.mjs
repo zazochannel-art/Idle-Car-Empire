@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // native app projects: Gradle/Xcode files and the game's build copied into them
+    "android/**",
+    "ios/**",
   ]),
 ]);
 

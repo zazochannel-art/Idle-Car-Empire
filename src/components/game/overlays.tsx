@@ -13,6 +13,7 @@ import { LANGS } from "@/i18n";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { batteryState, isSaving, powerVersion, watchPower, type SaverSetting } from "@/lib/power";
+import { publicPageUrl } from "@/lib/platform";
 import { uiEvents, type UiEvent, type UiToastAction } from "@/store/events";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
@@ -326,7 +327,7 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
             className="w-full"
             onClick={async () => {
               try {
-                const url = await transferLink(useGame.getState().state, window.location.href.split("#")[0]);
+                const url = await transferLink(useGame.getState().state, publicPageUrl());
                 if (navigator.share) {
                   await navigator.share({ title: "Idle Car Empire", text: t("transfer.shareText"), url });
                   setMsg(t("transfer.sent"));

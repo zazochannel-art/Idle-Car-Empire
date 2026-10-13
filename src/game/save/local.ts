@@ -107,6 +107,22 @@ export class LocalStore {
     return out;
   }
 
+  /** The accounts that have a copy on this device. */
+  owners(): string[] {
+    const s = this.store;
+    if (!s) return [];
+    const out: string[] = [];
+    try {
+      for (let i = 0; i < s.length; i++) {
+        const k = s.key(i);
+        if (k?.startsWith(OWNER_PREFIX)) out.push(k.slice(OWNER_PREFIX.length));
+      }
+    } catch {
+      return [];
+    }
+    return out;
+  }
+
   /** Backups, oldest first. */
   backupKeys(): string[] {
     const s = this.store;

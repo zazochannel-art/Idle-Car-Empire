@@ -126,7 +126,11 @@ export class SaveManager {
     let account = await this.currentAccount();
     // a guest that never got past the welcome page (it left while registering) sees it again
     const welcomed = flag(WELCOMED_KEY) || !!legacy || (!!account && !!this.local.read(account.id));
-    if (!account || (account.guest && !welcomed)) {
+    // This device went past the welcome page to play without an account, but its guest account
+    // was never made (no connection then): straight back to the game, not the welcome page again.
+    // Not after a logout, nor when an account's copy is here (that player signs in again).
+    const guestHere = flag(WELCOMED_KEY) && !flag(SIGNED_OUT_KEY) && this.local.owners().length === 0;
+    if ((!account && !guestHere) || (account?.guest && !welcomed)) {
       const how = await hooks.signIn(flag(SIGNED_OUT_KEY));
       flag(SIGNED_OUT_KEY, false);
       flag(WELCOMED_KEY, true);
@@ -336,6 +340,25 @@ export class SaveManager {
 
   async sendLink(email: string, redirectTo: string): Promise<AuthResult> {
     return this.backend ? this.backend.sendLink(email, redirectTo) : { ok: false, error: "network" };
+  }
+
+  /**
+   * Deletes the player's account on the server, with everything kept there (save, profile,
+   * leaderboard entry, gifts, alliance seat), then forgets this device's copy of it. Nothing is
+   * saved after it (the page reloads next and starts a new game). If the server says no, nothing
+   * changed and the game goes on.
+   */
+  async deleteAccount(): Promise<AuthResult> {
+    if (!this.backend || !this.account) return { ok: false, error: "network" };
+    const id = this.account.id;
+    const r = await this.backend.deleteAccount();
+    if (!r.ok) return r;
+    this.closed = true;
+    this.sync?.stop();
+    this.local.remove(id);
+    this.account = null;
+    flag(SIGNED_OUT_KEY, true);
+    return r;
   }
 
   /** Saves, signs out on this device, and forgets this account's local copy (the page reloads after it). */

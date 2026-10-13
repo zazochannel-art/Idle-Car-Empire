@@ -26,7 +26,8 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
     <header className="pointer-events-none absolute inset-x-0 top-0 z-30 pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       <div className="flex items-start gap-2 p-2 sm:p-3">
         <div className="pointer-events-auto flex min-w-0 flex-1 flex-wrap items-center gap-1.5 rounded-2xl bg-[rgba(36,104,214,0.82)] p-1.5 shadow-[0_3px_0_0_rgba(10,40,110,0.35)] md:flex-nowrap md:gap-2 md:bg-[rgba(36,104,214,0.62)] md:p-2 md:hud-bar">
-          <div className="relative flex min-w-0 items-center gap-2 pl-1 pr-2">
+          {/* the cash never gives way to the other figures */}
+          <div className="relative flex shrink-0 items-center gap-2 pl-1 pr-2">
             <CashCounter label={t("hud.cash")} />
           </div>
           <IncomePill />
@@ -34,7 +35,8 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
           <div className="hidden md:block">
             <FactoriesPill />
           </div>
-          <div className="hidden md:block"><EventChip /></div>
+          {/* on tablet widths there's no room for it next to the figures (the Missions screen shows it too) */}
+          <div className="hidden lg:block"><EventChip /></div>
           <div className="hidden md:block">
             <button onClick={() => setView("imperium")} className="text-left">
               <StarsPill />
@@ -91,7 +93,7 @@ function Pill({ icon, label, value, gold }: { icon: React.ReactNode; label: stri
       {icon}
       <div className="leading-tight">
         <div className="hidden text-[9px] font-bold uppercase tracking-wider text-white/65 xl:block">{label}</div>
-        <div className={`race-type text-[15px] not-italic tabular-nums md:text-base ${gold ? "text-gold" : "text-white"}`}>{value}</div>
+        <div className={`race-type whitespace-nowrap text-[15px] not-italic tabular-nums md:text-base ${gold ? "text-gold" : "text-white"}`}>{value}</div>
       </div>
     </div>
   );
