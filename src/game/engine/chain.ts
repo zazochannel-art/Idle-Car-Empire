@@ -41,7 +41,7 @@ import {
   isPlantType,
 } from "../config/chain";
 import { DEALERS, DEALER_BY_ID, DEALER_MARKUP_PER_LEVEL, DEALER_SPECIALTY } from "../config/dealerships";
-import { MATERIALS as MATERIALS_LIST, CAR_STORAGE, CLASS_DEMAND, DEALER_FEE, DEBT, RESCUE, SALES_TAX, TRIP_FEE, UPGRADE_SCALING, WAREHOUSE_CAP, POWER_SYSTEM, type MaterialId } from "../config/economy";
+import { MATERIALS as MATERIALS_LIST, CAR_STORAGE, CLASS_DEMAND, CLASS_MARGIN, DEALER_FEE, DEBT, RESCUE, SALES_TAX, TRIP_FEE, UPGRADE_SCALING, WAREHOUSE_CAP, POWER_SYSTEM, type MaterialId } from "../config/economy";
 import { assemblyTime, carListPrice, carStdCost, componentPrice, componentStdCost, componentTime, netOfSale, opRates, opTotal, type OpRates } from "./costs";
 import {
   addStock,
@@ -1099,12 +1099,24 @@ export function chainTick(
   }
 
   s.rp += out.rp;
-  // net income: revenue minus every cost (materials count when a plant uses them)
-  const net = chainNet(s.chain.ledger.pending); // garages and racing are counted on their own
+  // a share of every sale pays the account back, so it shrinks with each car or load sold
+  if (s.chain.owed > 0) {
+    const P = s.chain.ledger.pending;
+    const proceeds = P.carSales + P.partSales - P.dealerFees - P.tax;
+    if (proceeds > 0) repay(s, DEBT.share * proceeds);
+  }
+  // net income: revenue minus every cost (materials count when a plant uses them), plus what the
+  // parts and cars made but not sold yet are worth at their cost (see goodsValue); an absence
+  // keeps the rates of the session, so it is measured once when it ends (simulateChain)
+  const goods = offline ? (s.chain.goods ?? 0) : goodsValue(s);
+  const madeNotSold = offline ? 0 : goods - (s.chain.goods ?? goods);
+  s.chain.goods = goods;
+  const net = chainNet(s.chain.ledger.pending) + madeNotSold; // garages and racing are counted on their own
   s.chain.steady = (s.chain.steady ?? s.chain.rate) + (net / dt - (s.chain.steady ?? s.chain.rate)) * Math.min(1, dt / STEADY_WINDOW);
   settleLedger(s, dt, RATE_WINDOW);
-  // the chain's income rate is read off the ledger, never smoothed on its own
-  s.chain.rate = chainNet(s.chain.ledger.rate);
+  s.chain.goodsRate = (s.chain.goodsRate ?? 0) + (madeNotSold / dt - (s.chain.goodsRate ?? 0)) * Math.min(1, dt / RATE_WINDOW);
+  // the chain's income rate is read off the ledger (and the stock change), never smoothed on its own
+  s.chain.rate = chainNet(s.chain.ledger.rate) + s.chain.goodsRate;
   s.chain.wholesale += (out.wholesale / dt - s.chain.wholesale) * Math.min(1, dt / 120);
   // the Parts Market forgets what it bought, over its window
   if (s.chain.demand) {
@@ -1140,6 +1152,67 @@ export function partsPriceMult(s: GameState, item: ItemId, qty = 1): number {
   return v <= d ? 1 : Math.max(PARTS_DEMAND.floor, d / v);
 }
 
+// Standard costs never change (list prices, a Level 1 plant): worked out once each.
+const CAR_COSTS = new Map<CarId, number>();
+const PART_COSTS = new Map<string, number>();
+function stdCarCost(id: CarId): number {
+  let c = CAR_COSTS.get(id);
+  if (c === undefined) CAR_COSTS.set(id, (c = carStdCost(CAR_BY_ID[id], recipe(CAR_BY_ID[id]))));
+  return c;
+}
+function stdItemCost(item: ItemId, grade: number): number {
+  if (item === "car") return 0;
+  if (item === "chassis") return stdItemCost("body", grade) + stdItemCost("engine", grade);
+  const key = `${item}:${grade}`;
+  let c = PART_COSTS.get(key);
+  if (c === undefined) PART_COSTS.set(key, (c = componentStdCost(item, grade)));
+  return c;
+}
+/** The share of a car's sale value that is its cost: its class margin, the dealer's fee and the tax taken off. */
+const carCostShare = (id: CarId | null | undefined) => (1 - DEALER_FEE - SALES_TAX) / (1 + CLASS_MARGIN[id ? CAR_BY_ID[id].class : "economy"]);
+
+/**
+ * What the parts and cars made but not sold yet cost to make (at standard
+ * cost): at the plants, on the road, at the dealers and at the export port.
+ * The ledger books materials and wages when a plant makes something and the
+ * revenue when it sells, so while stock builds up it shows a loss that isn't
+ * one: the profit shown adds the change of this value (the change in
+ * inventories of an income statement). Materials in the warehouses aren't in
+ * it — they are booked only when used.
+ */
+export function goodsValue(s: GameState): number {
+  const grade: Partial<Record<ComponentId, number>> = {};
+  const plants = plantsOf(s);
+  for (const [, b] of plants) {
+    const item = PLANT_BY_ID[b.type].item;
+    if (item) grade[item] = Math.max(grade[item] ?? 1, b.plant.grade);
+  }
+  const gradeOf = (item: ItemId) => (item === "car" || item === "chassis" ? (grade.body ?? 1) : (grade[item] ?? 1));
+  let v = 0;
+  for (const [, b] of plants) {
+    const p = b.plant;
+    const item = PLANT_BY_ID[b.type].item;
+    for (const [c, n] of Object.entries(p.inputs) as [ComponentId, number][]) if (n > 0) v += n * stdItemCost(c, gradeOf(c));
+    if (p.out > 0) v += item ? p.out * stdItemCost(item, p.grade) : p.outValue * carCostShare(p.car);
+  }
+  for (const sh of s.chain.shipments) {
+    if (sh.back || sh.fleet || sh.item === "raw") continue;
+    if (sh.item !== "car") v += sh.qty * stdItemCost(sh.item, gradeOf(sh.item));
+    else if (sh.models?.length) for (const m of sh.models) v += stdCarCost(m);
+    else v += sh.value * carCostShare(null);
+  }
+  for (const d of Object.values(s.chain.dealers)) {
+    if (!d) continue;
+    for (const m of d.models) v += stdCarCost(m);
+    // cars from older saves without their models: by their value
+    const rest = Math.floor(d.cars) - d.models.length;
+    if (rest > 0 && d.cars > 0) v += (d.value / d.cars) * rest * carCostShare(null);
+  }
+  for (const d of Object.values(s.export.dock)) if (d) for (const m of d.cars) v += stdCarCost(m);
+  for (const sh of s.export.ships) for (const m of sh.cars) v += stdCarCost(m);
+  return v;
+}
+
 /** Goods the company still has to sell: on the road, at a plant's dock, at a dealer or on a ship. */
 function goodsInPipeline(s: GameState): boolean {
   if (s.chain.shipments.some((sh) => !sh.back && sh.item !== "raw" && sh.from !== DEPOT)) return true;
@@ -1150,15 +1223,18 @@ function goodsInPipeline(s: GameState): boolean {
 
 /**
  * The company's account (DEBT): its limit follows what the plants cost to
- * run; it is paid out of profit (DEBT.repay of the average net income), and
- * cash that covers it twice over (or at all, while suspended) settles it.
- * Over the limit every plant is suspended until it is paid down to
- * DEBT.resume × the limit — or until nothing is left to sell (then only
- * producing again can pay it back).
+ * run; it is paid back from every sale (see the end of chainTick) and out of
+ * profit (DEBT.repay of the average net income), and cash that covers it
+ * twice over (or at all, while suspended) settles it. Over the limit nothing
+ * more is bought on credit (canOwe) while the plants keep making what pays it
+ * back; only past DEBT.halt × the limit is every plant suspended, until it is
+ * paid down to DEBT.resume of that line — or until nothing is left to sell
+ * (then only producing again can pay it back).
  */
 function accountTick(s: GameState, dt: number, snap: ChainSnapshot, events?: GameEvent[]) {
   const C = s.chain;
   const run = Object.values(snap.plants).reduce((a, st) => a + st.opPerSec, 0);
+  C.runCost = run;
   C.debtLimit = Math.max(DEBT.min, run * DEBT.seconds);
   if (C.owed > 0) {
     // cash that covers it settles it; otherwise it is paid out of profit
@@ -1166,8 +1242,8 @@ function accountTick(s: GameState, dt: number, snap: ChainSnapshot, events?: Gam
     else repay(s, DEBT.repay * Math.max(0, C.steady ?? C.rate) * dt);
   }
   const was = !!C.suspended;
-  if (C.owed >= C.debtLimit) C.suspended = true;
-  if (C.suspended && (C.owed <= C.debtLimit * DEBT.resume || !goodsInPipeline(s))) delete C.suspended;
+  if (C.owed >= C.debtLimit * DEBT.halt) C.suspended = true;
+  if (C.suspended && (C.owed <= C.debtLimit * DEBT.halt * DEBT.resume || !goodsInPipeline(s))) delete C.suspended;
   if (C.suspended && !was) events?.push({ type: "suspended" });
 }
 
@@ -1305,6 +1381,7 @@ export function simulateChain(s: GameState, seconds: number, snap: ChainSnapshot
   // the HUD and dashboard rates describe the session, not the absence: keep them
   const rates = { ...s.chain.ledger.rate };
   const steady = s.chain.steady;
+  const goodsRate = s.chain.goodsRate;
   for (let i = 0; i < steps; i++) {
     const r = chainTick(s, dt, snap, credit, undefined, true);
     total.earned += r.earned;
@@ -1318,7 +1395,9 @@ export function simulateChain(s: GameState, seconds: number, snap: ChainSnapshot
     total.materials += r.materials;
   }
   s.chain.ledger.rate = rates;
-  s.chain.rate = chainNet(rates);
+  s.chain.goods = goodsValue(s);
+  s.chain.goodsRate = goodsRate;
+  s.chain.rate = chainNet(rates) + (goodsRate ?? 0);
   s.chain.steady = steady;
   return total;
 }
@@ -1511,6 +1590,8 @@ export function migrateChain(raw: unknown, s: GameState): ChainState {
     for (const [k, v] of Object.entries(raw.demand))
       if ((k in COMPONENT_BY_ID || k === "chassis") && typeof v === "number" && Number.isFinite(v) && v > 0) (chain.demand ??= {})[k as ItemId] = v;
   if (typeof raw.steady === "number" && Number.isFinite(raw.steady)) chain.steady = raw.steady;
+  if (typeof raw.goods === "number" && Number.isFinite(raw.goods) && raw.goods >= 0) chain.goods = raw.goods;
+  if (typeof raw.goodsRate === "number" && Number.isFinite(raw.goodsRate)) chain.goodsRate = raw.goodsRate;
   if (typeof raw.rescueT === "number" && Number.isFinite(raw.rescueT)) chain.rescueT = raw.rescueT;
   if (typeof raw.restructuredT === "number" && Number.isFinite(raw.restructuredT)) chain.restructuredT = raw.restructuredT;
   chain.nextShip = int(raw.nextShip, 1, 1e12, 1);

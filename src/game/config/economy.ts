@@ -119,6 +119,14 @@ export const LOW_STOCK_UNITS = 4;
 export const RESERVE_UNITS = 5;
 
 /**
+ * Suggested and automatic material orders leave this many seconds of what
+ * the plants cost to run (wages, energy, maintenance) in the cash, so those
+ * are paid from it instead of going on the company's account. A plant with
+ * nothing left to work with still gets its next units from the whole cash.
+ */
+export const WAGE_RESERVE_SECONDS = 120;
+
+/**
  * Auto-restock keeps a few minutes of production in stock — not a full
  * warehouse, so the cash stays free for building: it orders when a material
  * drops below `belowMin` minutes of work and fills up to `upToMin` minutes
@@ -177,7 +185,7 @@ export const SALES_TAX = 0.08;
  * grossed up for the dealer fee and tax. Premium cars earn more per car
  * but sell slowly (demand).
  */
-export const CLASS_MARGIN: Record<CarClass, number> = { economy: 0.16, sport: 0.24, premium: 0.3, luxury: 0.38, supercar: 0.48, hypercar: 0.55 };
+export const CLASS_MARGIN: Record<CarClass, number> = { economy: 0.24, sport: 0.3, premium: 0.36, luxury: 0.44, supercar: 0.54, hypercar: 0.62 };
 /** How quickly each class finds a buyer (× the dealer's customer rate). */
 export const CLASS_DEMAND: Record<CarClass, number> = { economy: 1.3, sport: 1, premium: 0.8, luxury: 0.6, supercar: 0.35, hypercar: 0.25 };
 
@@ -212,15 +220,17 @@ export const UPGRADE_SCALING = {
  * The company's account with its suppliers. Wages, energy, maintenance and
  * truck trips the cash can't cover yet go on it (and, for bought-in tyres and
  * drivetrain parts, the next batch; and the emergency supplier) — never
- * materials: those are paid when ordered. It is paid back out of profit:
- * `repay` of the chain's average net income, every second, from the cash —
- * so the cash that buys the next materials is never swallowed by it — and
+ * materials: those are paid when ordered. It is paid back from every sale
+ * (`share` of what the sale brings in, after fees and tax) and out of profit
+ * (`repay` of the chain's average net income, every second), from the cash;
  * cash that covers it twice over settles it. Its limit is `seconds` of what
- * the plants cost to run, at least `min`: above it every plant is SUSPENDED
- * until it is paid down to `resume` × the limit (cash that covers it settles
- * it at once).
+ * the plants cost to run, at least `min`: over it, nothing more is bought on
+ * credit, but plants with material keep working (what they make is what pays
+ * the account back). Only at `halt` × the limit is every plant SUSPENDED,
+ * until it is paid down to `resume` of that line (cash that covers it
+ * settles it at once).
  */
-export const DEBT = { min: 10_000, seconds: 300, resume: 0.5, repay: 0.5 };
+export const DEBT = { min: 10_000, seconds: 300, resume: 0.5, repay: 0.5, share: 0.3, halt: 2 };
 
 
 /**

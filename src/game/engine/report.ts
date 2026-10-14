@@ -7,9 +7,11 @@ import { debtLimit, inventoryValue, ledgerCosts, ledgerNet, ledgerRevenue } from
 
 export interface EconomyReport {
   cash: number;
-  /** Operating revenue, costs and net per second (smoothed ledger rates). */
+  /** Operating revenue, costs and net per second (smoothed ledger rates; the net with the stock change). */
   revenuePerSec: number;
   costsPerSec: number;
+  /** The change in parts and cars made but not sold yet, at their cost, per second. */
+  goodsPerSec: number;
   netPerSec: number;
   /** Net ÷ revenue (0 without revenue). */
   margin: number;
@@ -31,7 +33,8 @@ export interface EconomyReport {
 export function economyReport(s: GameState): EconomyReport {
   const L = s.chain.ledger;
   const revenue = ledgerRevenue(L.rate);
-  const net = ledgerNet(L.rate);
+  const goods = s.chain.goodsRate ?? 0;
+  const net = ledgerNet(L.rate) + goods;
   let stored = 0;
   let stock = 0;
   for (const [, b] of plantsOf(s)) {
@@ -52,6 +55,7 @@ export function economyReport(s: GameState): EconomyReport {
     cash: s.cash,
     revenuePerSec: revenue,
     costsPerSec: ledgerCosts(L.rate),
+    goodsPerSec: goods,
     netPerSec: net,
     margin: revenue > 0 ? net / revenue : 0,
     runRevenue: ledgerRevenue(L.run),

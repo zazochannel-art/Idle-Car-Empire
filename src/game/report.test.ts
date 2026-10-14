@@ -16,7 +16,7 @@ describe("economy dashboard: one source of truth", () => {
     for (let t = 0; t < 300; t += 0.5) tick(s, 0.5);
     const r = economyReport(s);
     expect(r.netPerSec).toBe(snapshot(s).incomePerSec);
-    expect(r.revenuePerSec - r.costsPerSec).toBeCloseTo(r.netPerSec, 9);
+    expect(r.revenuePerSec - r.costsPerSec + r.goodsPerSec).toBeCloseTo(r.netPerSec, 9);
     expect(r.margin).toBeCloseTo(r.netPerSec / r.revenuePerSec, 9);
     expect(r.runNet).toBe(M.ledgerNet(s.chain.ledger.run));
     expect(r.cash).toBe(s.cash);

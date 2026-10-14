@@ -6,7 +6,7 @@ import { atTrack, racingCost } from "./racing";
 import { nextTerritory, territoryLock } from "./territory";
 import type { TerritoryId } from "../config/city";
 import { DEBT, LOW_STOCK_UNITS, MATERIAL_BY_ID, RESERVE_UNITS, RESTOCK_UNITS, WAREHOUSE_MINUTES, type MaterialId } from "../config/economy";
-import { buyPlan, debtLimit, plantMaterials, restockPlan, stockTotal, supplierOf, unitsInStock, warehouseCap, warehouseCost } from "./materials";
+import { buyPlan, debtLimit, plantMaterials, restockPlan, stockTotal, suggestedRestock, supplierOf, unitsInStock, warehouseCap, warehouseCost } from "./materials";
 import { CARS } from "../config/cars";
 import { MAKER, PLANTS, PLANT_BY_ID } from "../config/chain";
 import { DEALERS } from "../config/dealerships";
@@ -82,7 +82,7 @@ export function restockLow(s: GameState, snap: EconomySnapshot): number {
   }
   low.sort((a, b) => a.n - b.n);
   let done = 0;
-  for (const l of low) if (buyPlan(s, l.id, restockPlan(s, l.id, l.need, RESTOCK_UNITS))) done++;
+  for (const l of low) if (buyPlan(s, l.id, suggestedRestock(s, l.id, l.need, RESTOCK_UNITS))) done++;
   return done;
 }
 
@@ -128,10 +128,12 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
       if (!low || units < low.units) low = { id, units, material, need: st.need };
     }
     if (low) {
-      // the biggest order (up to 10 units) that fits the warehouse and the cash; else what one unit costs
-      const plan = restockPlan(s, low.id, low.need, RESTOCK_UNITS);
+      // the biggest order (up to 10 units) that fits the warehouse and the cash above the wage
+      // reserve; else what one unit costs. A plant that is only running low waits for the cash.
+      const plan = suggestedRestock(s, low.id, low.need, RESTOCK_UNITS);
       const shown = plan.units ? plan : restockPlan(s, low.id, low.need, 1, true);
-      goals.push({ kind: "materials", icon: MATERIAL_BY_ID[low.material].emoji, plot: low.id, material: low.material, cost: shown.cost, units: Math.max(1, shown.units) });
+      if (plan.units || low.units < 1)
+        goals.push({ kind: "materials", icon: MATERIAL_BY_ID[low.material].emoji, plot: low.id, material: low.material, cost: shown.cost, units: Math.max(1, shown.units) });
     }
   }
 
@@ -311,7 +313,7 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
     const limit = debtLimit(s);
     const spending: Goal["kind"][] = ["plant", "upgrade", "warehouse", "dealer", "dealerFull", "zone", "territory", "manager", "car", "racing", "imperium"];
     const keep = goals.filter((g) => !spending.includes(g.kind) && !(g.kind === "shortage" && g.what));
-    return [{ kind: "debt" as const, icon: "⛔", owed: s.chain.owed, limit, resume: limit * DEBT.resume }, ...keep].slice(0, max);
+    return [{ kind: "debt" as const, icon: "⛔", owed: s.chain.owed, limit, resume: limit * DEBT.halt * DEBT.resume }, ...keep].slice(0, max);
   }
   return goals.slice(0, max);
 }
