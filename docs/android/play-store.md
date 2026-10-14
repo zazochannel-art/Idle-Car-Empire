@@ -15,19 +15,16 @@ manual approval. They can't be done from the repository.
 2. **(you) Contact email.** Replace `CONTACT_EMAIL` in
    `public/privacy/index.html` and `public/delete-account/index.html`. Use the
    address you will also show on the store listing.
-3. **(you) 3D car model licences.** Three car models are **CC BY-NC-SA 4.0
-   (non-commercial)**: `sports-1975.glb`, `electric-survolt.glb` and
-   `hypercar-dmc12.glb` (`public/models/CREDITS.txt`).
-   - A free app with no ads and no purchases is arguably non-commercial.
-   - With ads or purchases it is not.
-
-   They also recreate real cars and film cars (Porsche 911, DeLorean "Back to
-   the Future", Nissan R34 "Fast & Furious", Citroën). The badges are hidden,
-   but the shapes are recognisable, and Google Play's
-   [intellectual property policy](https://support.google.com/googleplay/android-developer/answer/9888072)
-   lets the owners file complaints. For a store release, the safest path is to
-   replace those models with original or permissively licensed ones, or to
-   fall back to the game's own procedural car bodies. That decision is yours.
+3. **3D car model licences: done.** The app shows ads, so it is commercial:
+   the three non-commercial (CC BY-NC-SA) models (Porsche 911, Citroën
+   Survolt, DeLorean) are gone, on the web too. Their platforms use bodies
+   from the CC BY car pack (`public/models/CREDITS.txt`).
+   - **(you) one model left to decide on:** the MC GT is a Nissan R34 from
+     the "Fast & Furious" films (CC BY 4.0, so commercial use is allowed by
+     its licence). The badges are hidden, but the shape is recognisable, and
+     Google Play's [intellectual property policy](https://support.google.com/googleplay/android-developer/answer/9888072)
+     lets the owners file complaints. Replacing it with an original or
+     unbranded CC BY / CC0 model is the safest path for the store.
 4. **(you) Upload key.** Create it and give it to the build ([signing.md](signing.md)).
 5. **(you) Supabase plan.** The free plan pauses a project after a week
    without activity. Paused, the cloud save and the leaderboards stop, and
@@ -83,7 +80,7 @@ manual approval. They can't be done from the repository.
 > • Battery saver and low-graphics mode for older phones
 > • English, Română, Русский
 >
-> No ads. No in-app purchases.
+> Optional rewarded ads: watch one only when you want a bonus. No in-app purchases.
 
 Check that the description still matches the build you upload: if a feature
 is removed (for example a car model), update the text.
@@ -121,7 +118,12 @@ rendered in software), captured at 1080×1920.
 
 **Privacy policy**: the URL above.
 
-**Ads**: *No, my app does not contain ads.*
+**Ads**: *Yes, my app contains ads* (rewarded ads, Google AdMob: see
+[ads.md](ads.md)).
+
+**Advertising ID** (App content → Advertising ID): *Yes*, the app uses it
+(the Google Mobile Ads SDK adds the `AD_ID` permission), for **Advertising or
+marketing**.
 
 **App access**: *All functionality is available without special access.*
 Reviewers can tap "Play without an account" on the welcome page.
@@ -147,8 +149,12 @@ rating authority decides.
 
 **Data safety** form. Answers that match the code and the privacy policy:
 
-- Does the app collect or share user data? **Yes, collects; does not share.**
-  Supabase processes data on your behalf, which is not "sharing".
+- Does the app collect or share user data? **Yes, collects and shares.**
+  Supabase processes the game's data on your behalf, which is not "sharing";
+  the Google Mobile Ads SDK collects data and **shares** it with Google for
+  advertising (rows marked *AdMob* below). Check Google's current
+  [data disclosure for the SDK](https://developers.google.com/admob/android/privacy/play-data-disclosure)
+  before submitting: it is the reference for these rows.
 - Is all data encrypted in transit? **Yes** (HTTPS).
 - Can users request deletion? **Yes**. In the app (Profile → Delete account)
   and at `https://zazochannel-art.github.io/Idle-Car-Empire/delete-account/`.
@@ -161,11 +167,14 @@ rating authority decides.
 | App activity → **Other actions** (game progress / save) | yes | required when online | App functionality |
 | App activity → **Other user-generated content** (company and alliance names) | yes | optional | App functionality |
 | App activity → **App interactions** (anonymous beginner steps) | yes | optional (Settings → Anonymous statistics) | Analytics |
+| *AdMob:* Device or other IDs → **Device or other IDs** (advertising ID) | yes, **shared** | required (the SDK collects it when an ad is requested) | Advertising or marketing, Analytics, Fraud prevention, security, and compliance |
+| *AdMob:* Location → **Approximate location** (from the IP address) | yes, **shared** | required | Advertising or marketing, Analytics, Fraud prevention, security, and compliance |
+| *AdMob:* App activity → **App interactions** (with the ads) | yes, **shared** | required | Advertising or marketing, Analytics |
+| *AdMob:* App info and performance → **Crash logs**, **Diagnostics** | yes, **shared** | required | Analytics, Fraud prevention, security, and compliance |
 
-Not collected: location, contacts, photos/files, messages, financial info,
-health, web history, device or advertising IDs, audio, calendar. The
-"Android · Chrome" device label stored with saves is a type, not an
-identifier.
+Not collected: precise location, contacts, photos/files, messages, financial
+info, health, web history, audio, calendar. The "Android · Chrome" device
+label stored with saves is a type, not an identifier.
 
 **Other declarations**:
 - News app: no.
@@ -173,7 +182,8 @@ identifier.
 - Government app: no.
 - Financial features: none.
 - Health: no.
-- Data used for ads: no.
+- Data used for ads: yes, by the Google Mobile Ads SDK only (above). The
+  game's own data (saves, accounts, profiles) is never used for ads.
 
 ## Publishing, step by step
 

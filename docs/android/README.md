@@ -12,12 +12,12 @@ online features talk to the same Supabase project as the web game.
 | Debug build id | `com.zazochannel.idlecarempire.debug` ("Car Empire DEBUG", installs next to the store app) |
 | SDK levels | minSdk 24 (Android 7.0), target/compile SDK 36 (Android 16) |
 | Version | `android/version.properties` (`versionCode`, `versionName`) |
-| Permissions | `INTERNET` (cloud save), `VIBRATE` (haptics) |
+| Permissions | `INTERNET` (cloud save, ads), `VIBRATE` (haptics); the Google Mobile Ads SDK adds `AD_ID`, `ACCESS_NETWORK_STATE` and its own |
 | Orientation | portrait on phones; tablets and foldables rotate (Android 16 ignores the lock on large screens) |
 
 Other documents: [signing.md](signing.md) (the upload key),
 [play-store.md](play-store.md) (listing, forms, publication),
-[ads.md](ads.md) (rewarded ads: not in this version).
+[ads.md](ads.md) (rewarded ads: AdMob, consent, what you set up).
 
 ## Why Capacitor (and not a Trusted Web Activity)
 
@@ -28,7 +28,7 @@ Other documents: [signing.md](signing.md) (the upload key),
   (`zazochannel-art.github.io/.well-known/…`), which a project site under
   `/Idle-Car-Empire/` can't serve without a separate user-site repository.
 - **Native features when needed**: the Back button, app background and
-  foreground, and later rewarded ads or notifications, through Capacitor
+  foreground, rewarded ads, and later notifications, through Capacitor
   plugins. The same project can add iOS (`npx cap add ios`) later.
 
 ## How the game behaves in the app

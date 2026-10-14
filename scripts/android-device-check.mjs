@@ -8,7 +8,8 @@
 //   - the Back button closes a dialog, and with nothing open puts the app in the background;
 //   - leaving the app saves the game (the save on the phone is fresh);
 //   - the game survives the app being killed, an app update (reinstall over it) and,
-//     with --reboot, the phone restarting: same company, same settings.
+//     with --reboot, the phone restarting: same company, same settings;
+//   - a rewarded ad (Google's test ads) loads, plays and, watched to the end, gives its reward.
 // Screenshots go to the output folder (default android-check/). Needs adb on the PATH
 // (Android SDK platform-tools) and Node 22+. Exits non-zero if a check fails.
 import { execFileSync } from "node:child_process";
@@ -310,6 +311,32 @@ try {
     const copiesNow = (await gamePages()).length;
     check(copiesNow === 1, "after the phone restarts: one copy of the game", `${copiesNow} game page(s)`);
     shot("4-after-reboot");
+  }
+
+  // 9. a rewarded ad (Google's test ads): the offer appears once one is loaded, the ad
+  // plays in its own screen, and once it has played to the end the reward is given
+  const AD_OFFER = `!![...document.querySelectorAll("header button")].find((b) => b.textContent.includes("📺"))`;
+  const offered = await until(() => evaluate(AD_OFFER).catch(() => false), 120_000);
+  check(offered, "a rewarded test ad loads and the game offers it", offered ? "" : "no ad offer after 120 s");
+  if (offered) {
+    const onAd = () => focus().some((l) => /AdActivity/.test(l));
+    await evaluate(`[...document.querySelectorAll("header button")].find((b) => b.textContent.includes("📺")).click()`);
+    await waitFor(DIALOG_OPEN, 15_000, "the ad offer");
+    await evaluate(`[...document.querySelectorAll('[role="dialog"] button')].find((b) => b.textContent.includes("📺")).click()`);
+    const shown = await until(onAd, 30_000);
+    check(shown, "the ad plays in its own screen", focus().join(" · "));
+    if (shown) {
+      // a test ad plays for up to ~30 s; then Back closes it
+      await sleep(35_000);
+      shot("5-ad");
+      for (let i = 0; i < 8 && onAd(); i++) {
+        adb("shell", "input", "keyevent", "KEYCODE_BACK");
+        await sleep(5000);
+      }
+      const rewarded = await until(() => evaluate(`document.querySelector("header")?.textContent.includes("📈")`).catch(() => false), 30_000);
+      check(rewarded, "the ad watched to the end gives its reward (×2 profit running)", rewarded ? "" : `focus: ${focus().join(" · ")}`);
+      shot("6-after-ad");
+    }
   }
 } catch (e) {
   check(false, "the run finished", e.message);

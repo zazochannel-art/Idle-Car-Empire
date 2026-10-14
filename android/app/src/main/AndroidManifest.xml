@@ -29,6 +29,11 @@
 
         </activity>
 
+        <!-- AdMob app id (rewarded ads): set by the build, see android/app/build.gradle -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="${admobAppId}" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

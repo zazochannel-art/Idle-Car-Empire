@@ -60,6 +60,8 @@ import * as Tu from "@/game/engine/tuning";
 import * as Gf from "@/game/engine/gifts";
 import * as Gh from "@/game/engine/ghost";
 import { allianceReward } from "@/game/engine/alliance";
+import { grantAd } from "@/game/engine/ads";
+import { ADS, type AdReward } from "@/game/config/ads";
 import * as Wt from "@/game/engine/winter";
 import * as Ps from "@/game/engine/pass";
 import { funnelDue, funnelMinutes } from "@/game/engine/funnel";
@@ -172,6 +174,8 @@ interface GameStore {
   buyLand: (plot: string) => boolean;
   startConstruction: (plot: string, type?: StructureType) => boolean;
   speedUp: (plot: string) => boolean;
+  /** The reward of a rewarded ad the player watched to the end (offline ×2, a job finished, the ×2 profit boost). */
+  adReward: (reward: AdReward, plot?: string) => boolean;
   upgradeBuilding: (plot: string) => boolean;
   placeFacility: (plot: string, type: FacilityType, x: number, y: number, rot: 0 | 1) => boolean;
   moveFacility: (plot: string, uid: number, x: number, y: number, rot: 0 | 1) => boolean;
@@ -852,6 +856,15 @@ export const useGame = create<GameStore>((set, get) => {
       const ok = act((s) => Co.speedUp(s, plot));
       if (ok) persist(true);
       return ok;
+    },
+    adReward: (reward, plot) => {
+      const offline = get().state.pendingOffline?.money ?? 0;
+      const ok = act((s) => grantAd(s, reward, Date.now(), plot));
+      if (!ok) return false;
+      if (reward === "offline") uiEvents.emit({ type: "toast", tone: "gold", icon: "💰", title: tr("toast.collected", { amount: formatMoney(offline * ADS.offlineMult) }), body: tr("toast.collectedBody") });
+      else if (reward === "boost") uiEvents.emit({ type: "toast", tone: "gold", icon: "📈", title: tr("ad.boostStarted"), body: tr("ad.boostStartedBody") });
+      persist(true);
+      return true;
     },
     upgradeBuilding: (plot) => act((s) => C.upgradeBuilding(s, plot)),
     placeFacility: (plot, type, x, y, rot) => act((s) => C.placeFacility(s, plot, type, x, y, rot)),

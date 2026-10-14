@@ -1,19 +1,6 @@
 3D models used in Idle Car Empire
 =================================
 
-sports-1975.glb — the Sports Car platform
-  Original: "Porsche 911(930) Turbo 1975 | www.vecarz.com" by vecarz
-  https://sketchfab.com/heynic
-  https://sketchfab.com/3d-models/porsche-911930-turbo-1975-wwwvecarzcom-1b576d8b56e445fe8595e1b3fc07bcfe
-  Licence: CC BY-NC-SA 4.0 — https://creativecommons.org/licenses/by-nc-sa/4.0/
-
-  Changes: geometry simplified and meshopt-compressed, textures resized to
-  512 px WebP (gltf-transform optimize). In the game the badges, stickers,
-  number plates and air freshener are hidden and the body paint is
-  recoloured. This adapted model is shared under the same licence
-  (CC BY-NC-SA 4.0). Non-commercial use only. Not affiliated with or
-  endorsed by Porsche AG; all trademarks belong to their owners.
-
 gt-r34.glb — the MC GT platform (Performance car)
   Original: "Nissan R34 Brians Fast Furious | www.vecarz.com" by vecarz
   https://sketchfab.com/heynic
@@ -26,8 +13,8 @@ gt-r34.glb — the MC GT platform (Performance car)
   picks a colour. Not affiliated with or endorsed by Nissan or the makers of
   the Fast & Furious films; all trademarks belong to their owners.
 
-car-pack.glb — City Car, Sedan, SUV, Luxury and Supercar
-  platforms, and the street traffic (compact, minivan, off-roader, pickup, wagon)
+car-pack.glb — City Car, Sedan, SUV, Luxury, Supercar, Sports Car, Hypercar and
+  Electric platforms, and the street traffic (compact, minivan, off-roader, pickup, wagon)
   Original: "Generic passenger car pack" by Comrade1280
   https://sketchfab.com/comrade1280
   https://sketchfab.com/3d-models/generic-passenger-car-pack-20f9af9b8a404d5cb022ac6fe87f21f5
@@ -39,29 +26,5 @@ car-pack.glb — City Car, Sedan, SUV, Luxury and Supercar
   straightened and scaled, and its paint texture is turned grey so the body
   can be painted in the game's colours.
 
-electric-survolt.glb — the Electric platform (MC E-Volt)
-  Original: "2010 Citroën DS Survolt" by Ddiaz Design
-  https://sketchfab.com/ddiaz-design
-  https://sketchfab.com/3d-models/2010-citroen-ds-survolt-3530851a413e492d90c8f799ab230f34
-  Licence: CC BY-NC-SA 4.0 — https://creativecommons.org/licenses/by-nc-sa/4.0/
-
-  Changes: geometry simplified (85k → 44k triangles) and meshopt-compressed,
-  textures resized to 512 px WebP (gltf-transform optimize). In the game the
-  number plate is hidden and the accent paint takes the platform's colour.
-  This adapted model is shared under the same licence (CC BY-NC-SA 4.0).
-  Non-commercial use only. Not affiliated with or endorsed by Citroën or
-  Stellantis; all trademarks belong to their owners.
-
-hypercar-dmc12.glb — the Hypercar platform (MC Hyper)
-  Original: "1985 DeLorean DMC-12 Time Machine BTTF" by Ddiaz Design
-  https://sketchfab.com/ddiaz-design
-  https://sketchfab.com/3d-models/1985-delorean-dmc-12-time-machine-bttf-c6d865257d344523be373f543323ae18
-  Licence: CC BY-NC-SA 4.0 — https://creativecommons.org/licenses/by-nc-sa/4.0/
-
-  Changes: geometry simplified (462k → 62k triangles) and meshopt-compressed,
-  textures resized to 512 px WebP (gltf-transform optimize). In the game the
-  badges are hidden; a Design-studio colour repaints the body panels only.
-  This adapted model is shared under the same licence (CC BY-NC-SA 4.0).
-  Non-commercial use only. Not affiliated with or endorsed by the DeLorean
-  Motor Company or the makers of the Back to the Future films; all
-  trademarks belong to their owners.
+Every model here allows commercial use (CC BY 4.0). Models under a
+non-commercial licence (CC BY-NC) are not used: the Android app shows ads.

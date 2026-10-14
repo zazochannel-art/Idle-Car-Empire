@@ -287,11 +287,15 @@ interface HeroFile {
   /** One car out of a pack (its body's node name), and which way it faces once straightened. */
   pick?: string;
   facing?: Facing;
+  /** A spoiler the body wears once painted (a tuned one replaces it). */
+  wing?: "lip" | "wing" | "gt";
 }
 const PACK = "models/car-pack.glb";
+/**
+ * Every model must allow commercial use (the Android app shows ads): CC BY or
+ * freer. A non-commercial (NC) model can't be used, on the web either.
+ */
 const HERO_FILES: Partial<Record<BodyModel, HeroFile>> = {
-  // "Porsche 911(930) Turbo 1975" by vecarz, CC BY-NC-SA 4.0 — badges and plates left out
-  sports: { url: "models/sports-1975.glb", hide: /sticker|plate|wunderbaum/i },
   // "Nissan R34 Brians Fast Furious" by vecarz, CC BY 4.0 — silver with blue graphics, badges left out
   muscle: { url: "models/gt-r34.glb", hide: /badge|manufacturerplate/i, ownPaint: true },
   // "Generic passenger car pack" by Comrade1280, CC BY 4.0 — unbranded cars, painted in the game's colours
@@ -300,10 +304,10 @@ const HERO_FILES: Partial<Record<BodyModel, HeroFile>> = {
   suv: { url: PACK, pick: "SUV Body", facing: "-x" },
   luxury: { url: PACK, pick: "Coupe Body" },
   supercar: { url: PACK, pick: "Sport body", facing: "-x" },
-  // "1985 DeLorean DMC-12 Time Machine BTTF" by Ddiaz Design, CC BY-NC-SA 4.0 — stainless steel as built; a Design colour paints the body only
-  hypercar: { url: "models/hypercar-dmc12.glb", hide: /BadgeA/, ownPaint: true, paint: /1985Paint_Material1$/ },
-  // "2010 Citroën DS Survolt" by Ddiaz Design, CC BY-NC-SA 4.0 — black body, the accents take the paint
-  electric: { url: "models/electric-survolt.glb", hide: /licenseplate/i, paint: /^CarPaint_Color$/ },
+  // the pack has no more bodies: these share one with a car above, told apart by paint and spoiler
+  sports: { url: PACK, pick: "Coupe Body", wing: "lip" },
+  hypercar: { url: PACK, pick: "Sport body", facing: "-x", wing: "gt" },
+  electric: { url: PACK, pick: "Sedan Body", facing: "-x" },
   // street traffic
   compact: { url: PACK, pick: "Compact Body" },
   minivan: { url: PACK, pick: "minivan body" },
@@ -316,6 +320,7 @@ const HERO_FILES: Partial<Record<BodyModel, HeroFile>> = {
 interface Hero {
   car: THREE_NS.Group;
   ownPaint: boolean;
+  wing?: HeroFile["wing"];
   /** Names of the body-paint materials (repainted per car). */
   paint: Set<string>;
   /** One repainted copy of each paint material per colour. */
@@ -353,7 +358,7 @@ export function loadHeroes(T: Three): Promise<void> {
             m.geometry.userData.keep = true;
             for (const mm of Array.isArray(m.material) ? m.material : [m.material]) mm.userData.keep = true;
           });
-          HEROES[model] = { car, ownPaint: !!f.ownPaint, paint: new Set(paint.map((m) => m.name)), coats: new Map() };
+          HEROES[model] = { car, ownPaint: !!f.ownPaint, wing: f.wing, paint: new Set(paint.map((m) => m.name)), coats: new Map() };
         } catch {
           // no file or no network: the procedural body stays
         }
@@ -476,10 +481,11 @@ export function buildCar(T: Three, look: CarLook): THREE_NS.Group {
   const st = look.stage?.station ?? 8;
   const car = heroCopy(hero, st < 6 ? "#9aa3ad" : look.build?.color || (hero.ownPaint ? null : liveryOf(look.model).color));
   const pod = look.model === "robotaxi" && st >= 6;
-  if ((!look.build?.wing || st < 6) && !pod) return car;
+  const wing = st >= 6 ? (look.build?.wing ?? hero.wing) : undefined;
+  if (!wing && !pod) return car;
   const g = new T.Group();
   g.add(car);
-  if (look.build?.wing && st >= 6) g.add(spoiler(T, car, look.build.wing));
+  if (wing) g.add(spoiler(T, car, wing));
   if (pod) g.add(sensors(T, car));
   return g;
 }

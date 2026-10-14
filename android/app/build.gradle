@@ -20,6 +20,12 @@ def signingValue = { String key, String env -> keystoreProps.getProperty(key) ?:
 def releaseStoreFile = signingValue('storeFile', 'ANDROID_KEYSTORE_FILE')
 def canSignRelease = releaseStoreFile && signingValue('storePassword', 'ANDROID_KEYSTORE_PASSWORD') && signingValue('keyAlias', 'ANDROID_KEY_ALIAS') && signingValue('keyPassword', 'ANDROID_KEY_PASSWORD')
 
+// The AdMob app id (rewarded ads): from your AdMob account, as -PadmobAppId=… or the
+// ADMOB_APP_ID variable (docs/android/ads.md). Without one, Google's sample app id:
+// the app then shows test ads only, which pay nothing. Never invent one.
+def admobSampleAppId = 'ca-app-pub-3940256099942544~3347511713'
+def admobAppId = (project.findProperty('admobAppId') ?: System.getenv('ADMOB_APP_ID') ?: admobSampleAppId) as String
+
 android {
     namespace = "com.zazochannel.idlecarempire"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -29,6 +35,7 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode appVersionCode
         versionName appVersionName
+        manifestPlaceholders = [admobAppId: admobAppId]
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -61,6 +68,10 @@ android {
             }
         }
     }
+}
+
+if (admobAppId == admobSampleAppId) {
+    logger.lifecycle("No AdMob app id (ADMOB_APP_ID or -PadmobAppId): this build shows Google's test ads only.")
 }
 
 if (!canSignRelease) {

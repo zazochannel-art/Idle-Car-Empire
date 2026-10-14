@@ -47,4 +47,6 @@ export async function startNative() {
   // game uses no battery. Coming back settles the time away like any absence.
   await App.addListener("pause", () => useGame.getState().suspend());
   await App.addListener("resume", () => useGame.getState().resume());
+  // rewarded ads, always the player's choice: the consent first, then an ad kept ready
+  void import("./native-ads").then((m) => m.startAds()).catch(() => {});
 }

@@ -14,6 +14,7 @@ import { createEngineers, createExport, createFleet, createProto } from "./expan
 import { createStory } from "./story";
 import { createEditions } from "./collection";
 import { createPass } from "./pass";
+import { createAds } from "./ads";
 import type { CarDesign, CarId, ComponentId, DealerId, DealerState, GameState, ManagerId, ManagerState, Stats } from "../types";
 
 /** v3: the supply-chain economy (older saves start a new company). */
@@ -98,6 +99,7 @@ export function createInitialState(now: number): GameState {
     story: createStory(),
     editions: createEditions(),
     pass: createPass(),
+    ads: createAds(),
     research: [],
     achievements: [],
     missions: { dailyDate: "", daily: [], milestonesClaimed: [] },
