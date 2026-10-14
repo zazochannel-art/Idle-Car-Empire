@@ -43,6 +43,8 @@ interface Shown {
   settle: (r: AdResult) => void;
   rewarded: boolean;
   closing: boolean;
+  /** The ad is on screen (its "showed" event came). */
+  visible: boolean;
 }
 let shown: Shown | null = null;
 /** An ad is on screen (one at a time). */
@@ -65,6 +67,10 @@ function rewarded() {
 function closed(failed = false) {
   const s = shown;
   if (!s || s.closing) return;
+  // On a slow phone the SDK reports "Timeout for show call succeed." as a failure to show
+  // while the ad is in fact on screen: only its real close ends it (a next ad loaded
+  // meanwhile would be dropped by the plugin when this one closes).
+  if (failed && s.visible) return;
   s.closing = true;
   setTimeout(() => {
     open = false;
@@ -80,7 +86,7 @@ function show(onReward: () => void): Promise<AdResult> {
   open = true;
   setAdStatus({ showing: true });
   return new Promise<AdResult>((settle) => {
-    shown = { onReward, settle, rewarded: false, closing: false };
+    shown = { onReward, settle, rewarded: false, closing: false, visible: false };
     // (this call answers only once the reward is earned; a refusal means the ad couldn't show)
     AdMob.showRewardVideoAd().then(rewarded, () => closed(true));
   });
@@ -122,6 +128,9 @@ async function begin() {
   }
   started = true;
   // the ad events, listened to for good (never per ad: a listener removed early would lose a reward)
+  await AdMob.addListener(RewardAdPluginEvents.Showed, () => {
+    if (shown) shown.visible = true;
+  });
   await AdMob.addListener(RewardAdPluginEvents.Rewarded, rewarded);
   await AdMob.addListener(RewardAdPluginEvents.Dismissed, () => closed());
   await AdMob.addListener(RewardAdPluginEvents.FailedToShow, () => closed(true));

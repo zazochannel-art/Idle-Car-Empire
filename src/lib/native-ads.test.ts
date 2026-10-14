@@ -7,7 +7,7 @@ const shows = vi.fn();
 vi.mock("@capacitor-community/admob", () => ({
   AdmobConsentStatus: { REQUIRED: "REQUIRED" },
   MaxAdContentRating: { Teen: "Teen" },
-  RewardAdPluginEvents: { Rewarded: "rewarded", Dismissed: "dismissed", FailedToShow: "failedToShow" },
+  RewardAdPluginEvents: { Showed: "showed", Rewarded: "rewarded", Dismissed: "dismissed", FailedToShow: "failedToShow" },
   AdMob: {
     requestConsentInfo: async () => ({ status: "NOT_REQUIRED", canRequestAds: true, privacyOptionsRequirementStatus: "NOT_REQUIRED" }),
     initialize: async () => {},
@@ -68,6 +68,25 @@ describe("rewarded ads in the app", () => {
     await vi.advanceTimersByTimeAsync(2000);
     await result;
     emit("rewarded");
+    expect(reward).toHaveBeenCalledTimes(1);
+  });
+
+  it("a 'failed to show' for an ad already on screen (the SDK's show timeout) doesn't end it", async () => {
+    const reward = vi.fn();
+    shows.mockClear();
+    const result = watchAd(reward);
+    // seen on the emulator: showed, then "Timeout for show call succeed." 2 s later, the reward 9 s after that
+    emit("showed");
+    emit("failedToShow");
+    await vi.advanceTimersByTimeAsync(5000);
+    // still on screen: no second ad can start, nothing settled
+    setAdStatus({ ready: true });
+    expect(await watchAd(vi.fn())).toBe("failed");
+    expect(shows).toHaveBeenCalledTimes(1);
+    emit("rewarded");
+    emit("dismissed");
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(await result).toBe("rewarded");
     expect(reward).toHaveBeenCalledTimes(1);
   });
 
