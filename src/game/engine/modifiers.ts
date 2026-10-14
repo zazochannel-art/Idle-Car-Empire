@@ -4,6 +4,7 @@ import { ENGINEER_BY_ID } from "../config/expansion";
 import { CARS, CAR_MODEL } from "../config/cars";
 import { MANAGERS, type ManagerConfig } from "../config/managers";
 import { OFFLINE } from "../config/offline";
+import { ADS } from "../config/ads";
 import { PLANT_MAX_LEVEL, plantLevelCap } from "../config/chain";
 import { activeEvent } from "./events";
 import { SEASON_BONUS, seasonAt } from "./season";
@@ -186,5 +187,7 @@ export function computeGlobalMods(s: GameState): GlobalMods {
   // permanent boosts from milestones, and the limited editions collected
   m.income *= 1 + s.boost;
   m.income *= 1 + editionBonus(s);
+  // the ×2 sales boost of a rewarded ad
+  if (s.ads?.boostLeft > 0) m.income *= ADS.boostMult;
   return m;
 }

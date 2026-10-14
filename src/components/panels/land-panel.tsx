@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { CostButton } from "../game/cost-button";
+import { BuildAdButton } from "../game/ad-buttons";
 
 const lv2 = (n: number) => String(n).padStart(2, "0");
 
@@ -245,6 +246,7 @@ export function SitePanel({ id }: { id: string }) {
       </div>
       <p className="px-1 text-xs text-white/50">{t("site.offline")}</p>
       <CostButton className="w-full" cost={speedUpCost} label={`⚡ ${t("site.speedUp")}`} onBuy={() => speedUp(id)} />
+      <BuildAdButton plot={id} />
     </div>
   );
 }
@@ -268,6 +270,7 @@ export function WorksBanner({ id }: { id: string }) {
         <span className="text-[11px] text-white/50">🚧 {t(`site.phase.${Co.phaseOf(progress)}` as MessageKey)}</span>
         <CostButton size="sm" cost={speedUpCost} label={`⚡ ${t("site.speedUp")}`} onBuy={() => speedUp(id)} />
       </div>
+      <BuildAdButton plot={id} size="sm" />
     </div>
   );
 }

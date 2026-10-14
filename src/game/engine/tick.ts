@@ -7,6 +7,7 @@ import { book } from "./materials";
 import { racingTick } from "./racing";
 import { showroomTick } from "./showroom";
 import { eventGoalTick } from "./events";
+import { adsTick } from "./ads";
 
 /** Adds money to the wallet and to the earnings stats. */
 export function credit(s: GameState, amount: number) {
@@ -43,6 +44,7 @@ export function tick(s: GameState, dt: number, snap?: EconomySnapshot): GameEven
   if (race) events.push({ type: "raceFinished", race: race.id });
   showroomTick(s, dt, events);
   eventGoalTick(s, s.lastActiveAt);
+  adsTick(s, dt);
 
   s.run.playTime += dt;
   s.lifetime.playTime += dt;

@@ -18,6 +18,7 @@ import { uiEvents, type UiEvent, type UiToastAction } from "@/store/events";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { LedgerTable } from "../views/ledger-table";
+import { AdPrivacyButton, OfflineAdButton } from "./ad-buttons";
 
 /** "Welcome Back!" — shown while an offline report is waiting to be collected. */
 export function OfflineDialog() {
@@ -143,6 +144,7 @@ function OfflineReport() {
         <Button variant="gold" size="lg" className="mt-5 w-full text-base" onClick={collect}>
           {t("offline.collect", { amount: formatMoney(report.money) })}
         </Button>
+        <OfflineAdButton amount={report.money} />
       </DialogContent>
     </Dialog>
   );
@@ -403,9 +405,6 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
           <div className="mb-0.5 font-bold uppercase tracking-wider text-white/60">{t("settings.credits")}</div>
           <p>
             {t("settings.creditsModel")}{" "}
-<a className="underline" href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noreferrer">
-              CC BY-NC-SA 4.0
-            </a>{" · "}
             <a className="underline" href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">
               CC BY 4.0
             </a>
@@ -415,6 +414,7 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
               {t("settings.privacy")}
             </a>
           </p>
+          <AdPrivacyButton />
         </div>
       </DialogContent>
     </Dialog>

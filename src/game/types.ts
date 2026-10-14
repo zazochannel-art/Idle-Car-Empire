@@ -586,6 +586,8 @@ export interface GameState {
   editions: import("./engine/collection").EditionsState;
   /** The free season pass (engine/pass.ts). */
   pass: import("./engine/pass").PassState;
+  /** Rewarded ads (engine/ads.ts): today's count, the sales boost, the instant-build pause. */
+  ads: import("./engine/ads").AdsState;
   /** Unlock bonuses already claimed this run ("car:sedan", "plant:engineFactory"). */
   unlocks: string[];
   /** stats: send the anonymous new-player funnel steps (engine/funnel.ts). */

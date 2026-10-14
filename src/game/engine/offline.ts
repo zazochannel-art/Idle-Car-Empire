@@ -16,6 +16,17 @@ import { book, chainNet, LEDGER_KEYS, settleLedger } from "./materials";
  * the player collects it.
  */
 export function computeOffline(s: GameState, now: number): OfflineReport {
+  // an ad's sales boost counts play time only: it waits, unspent, while the game is closed
+  const boostLeft = s.ads.boostLeft;
+  s.ads.boostLeft = 0;
+  try {
+    return absence(s, now);
+  } finally {
+    s.ads.boostLeft = boostLeft;
+  }
+}
+
+function absence(s: GameState, now: number): OfflineReport {
   const seconds = Math.max(0, (now - s.lastActiveAt) / 1000);
   const snap = snapshot(s);
   const capped = Math.min(seconds, snap.gm.offlineCapHours * 3600);

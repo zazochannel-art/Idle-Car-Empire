@@ -190,8 +190,13 @@ export function speedUpCost(s: GameState, plotId: string): number | null {
 
 export function speedUp(s: GameState, plotId: string): boolean {
   const cost = speedUpCost(s, plotId);
+  return cost !== null && spend(s, cost) && finishNow(s, plotId);
+}
+
+/** Finishes the job on the plot (the next tick hands the building over). */
+export function finishNow(s: GameState, plotId: string): boolean {
   const job = s.city.sites[plotId] ?? s.city.buildings[plotId]?.works;
-  if (!job || cost === null || !spend(s, cost)) return false;
+  if (!job || job.t >= job.dur) return false;
   job.t = job.dur;
   return true;
 }

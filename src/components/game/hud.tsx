@@ -10,6 +10,7 @@ import { useT } from "@/i18n/use-t";
 import { plantsOf } from "@/game/engine/chain";
 import { useGame } from "@/store/game-store";
 import { EventChip } from "./event-chip";
+import { AdBoostChip } from "./ad-buttons";
 import { useUi } from "@/store/ui-store";
 import { AnimatedNumber } from "./animated-number";
 
@@ -32,6 +33,7 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
           </div>
           <IncomePill />
           <RatePill />
+          <AdBoostChip />
           <div className="hidden md:block">
             <FactoriesPill />
           </div>
