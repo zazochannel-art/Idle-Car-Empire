@@ -316,13 +316,19 @@ try {
   // 9. a rewarded ad (Google's test ads): the offer appears once one is loaded, the ad
   // plays in its own screen, and once it has played to the end the reward is given
   const AD_OFFER = `!![...document.querySelectorAll("header button")].find((b) => b.textContent.includes("📺"))`;
+  // whatever the restart left open first (the offline report has an ad button of its own)
+  for (let i = 0; i < 4 && (await evaluate(DIALOG_OPEN).catch(() => false)); i++) {
+    adb("shell", "input", "keyevent", "KEYCODE_BACK");
+    await until(noDialog, 10_000);
+  }
   const offered = await until(() => evaluate(AD_OFFER).catch(() => false), 120_000);
   check(offered, "a rewarded test ad loads and the game offers it", offered ? "" : "no ad offer after 120 s");
   if (offered) {
     const onAd = () => focus().some((l) => /AdActivity/.test(l));
     await evaluate(`[...document.querySelectorAll("header button")].find((b) => b.textContent.includes("📺")).click()`);
     await waitFor(DIALOG_OPEN, 15_000, "the ad offer");
-    await evaluate(`[...document.querySelectorAll('[role="dialog"] button')].find((b) => b.textContent.includes("📺")).click()`);
+    // the button of the offer just opened (the newest dialog)
+    await evaluate(`[...[...document.querySelectorAll('[role="dialog"]:not([data-state="closed"])')].at(-1).querySelectorAll("button")].find((b) => b.textContent.includes("📺")).click()`);
     const shown = await until(onAd, 30_000);
     check(shown, "the ad plays in its own screen", focus().join(" · "));
     if (shown) {
