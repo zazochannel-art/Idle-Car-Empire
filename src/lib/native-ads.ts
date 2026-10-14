@@ -6,7 +6,6 @@
 // allows. Then one ad is kept loaded, so the game offers an ad only when there
 // is one to watch.
 import { AdMob, AdmobConsentStatus, MaxAdContentRating, RewardAdPluginEvents } from "@capacitor-community/admob";
-import type { PluginListenerHandle } from "@capacitor/core";
 import { registerAdDriver, setAdStatus, type AdResult } from "./ads";
 
 /**
@@ -38,38 +37,59 @@ async function load() {
   }
 }
 
+/** The latest ad shown: its reward, given once, and the watch waiting for it to close. */
+interface Shown {
+  onReward: () => void;
+  settle: (r: AdResult) => void;
+  rewarded: boolean;
+  closing: boolean;
+  /** The ad is on screen (its "showed" event came). */
+  visible: boolean;
+}
+let shown: Shown | null = null;
+/** An ad is on screen (one at a time). */
+let open = false;
+
 /**
- * Shows the loaded ad. The reward comes only from the ad network's reward event
- * (the ad watched to the end), at most once; closing the ad early gives nothing.
+ * The ad network says the ad was watched to the end (its reward event, or the
+ * show call's answer: whichever comes first): the reward, once. It counts even
+ * if the ad was already reported closed, so an early or out-of-order close never
+ * loses it; the ad shown stays the one rewarded until the next one plays.
  */
-async function show(onReward: () => void): Promise<AdResult> {
-  let rewarded = false;
-  let settle: (r: AdResult) => void = () => {};
-  const result = new Promise<AdResult>((resolve) => (settle = resolve));
-  const handles: PluginListenerHandle[] = [];
-  let over = false;
-  const finish = (r: AdResult) => {
-    if (over) return;
-    over = true;
-    for (const h of handles) void h.remove();
+function rewarded() {
+  const s = shown;
+  if (!s || s.rewarded) return;
+  s.rewarded = true;
+  s.onReward();
+}
+
+/** The ad closed (or couldn't show): the watch settles a moment later (a reward may come just after), then the next ad loads. */
+function closed(failed = false) {
+  const s = shown;
+  if (!s || s.closing) return;
+  // On a slow phone the SDK reports "Timeout for show call succeed." as a failure to show
+  // while the ad is in fact on screen: only its real close ends it (a next ad loaded
+  // meanwhile would be dropped by the plugin when this one closes).
+  if (failed && s.visible) return;
+  s.closing = true;
+  setTimeout(() => {
+    open = false;
     setAdStatus({ showing: false, ready: false });
-    settle(r);
+    s.settle(s.rewarded ? "rewarded" : failed ? "failed" : "closed");
     void load();
-  };
-  handles.push(
-    await AdMob.addListener(RewardAdPluginEvents.Rewarded, () => {
-      if (rewarded || over) return;
-      rewarded = true;
-      onReward();
-    }),
-    // a reward that comes a moment after the close still counts
-    await AdMob.addListener(RewardAdPluginEvents.Dismissed, () => setTimeout(() => finish(rewarded ? "rewarded" : "closed"), 600)),
-    await AdMob.addListener(RewardAdPluginEvents.FailedToShow, () => finish("failed")),
-  );
+  }, 1500);
+}
+
+/** Shows the loaded ad. The reward comes only from the ad network (the ad watched to the end); closing it early gives nothing. */
+function show(onReward: () => void): Promise<AdResult> {
+  if (open) return Promise.resolve("failed");
+  open = true;
   setAdStatus({ showing: true });
-  // (this call settles only when the reward is earned: the events above decide)
-  AdMob.showRewardVideoAd().catch(() => finish("failed"));
-  return result;
+  return new Promise<AdResult>((settle) => {
+    shown = { onReward, settle, rewarded: false, closing: false, visible: false };
+    // (this call answers only once the reward is earned; a refusal means the ad couldn't show)
+    AdMob.showRewardVideoAd().then(rewarded, () => closed(true));
+  });
 }
 
 /** Google's form to change the ad consent; ads stop if it no longer allows them. */
@@ -107,6 +127,13 @@ async function begin() {
     return;
   }
   started = true;
+  // the ad events, listened to for good (never per ad: a listener removed early would lose a reward)
+  await AdMob.addListener(RewardAdPluginEvents.Showed, () => {
+    if (shown) shown.visible = true;
+  });
+  await AdMob.addListener(RewardAdPluginEvents.Rewarded, rewarded);
+  await AdMob.addListener(RewardAdPluginEvents.Dismissed, () => closed());
+  await AdMob.addListener(RewardAdPluginEvents.FailedToShow, () => closed(true));
   // the game is for 13 and over: no ads rated for adults
   await AdMob.initialize({ maxAdContentRating: MaxAdContentRating.Teen });
   void load();
