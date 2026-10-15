@@ -77,6 +77,7 @@ export function createInitialState(now: number): GameState {
     managers: createManagers(),
     carModels: emptyCarCounts(),
     designs: createDesigns(),
+    customGarageDesign: null,
     boost: 0,
     stars: 0,
     starUpgrades: {},
