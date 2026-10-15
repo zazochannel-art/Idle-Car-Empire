@@ -502,6 +502,19 @@ export interface LogisticsState {
   tier: number;
 }
 
+/** Validated visual setup saved for the player's custom garage build. */
+export interface CustomGarageDesign {
+  version: 1;
+  name: string;
+  paint: string;
+  kit: "stock" | "street" | "widebody" | "track";
+  wheels: "five-spoke" | "mesh" | "deep-dish";
+  lowered: boolean;
+  spoiler: boolean;
+  prompt: string;
+  updatedAt: number;
+}
+
 /** The player's own model on a platform (Design studio). */
 export interface CarDesign {
   name: string;
@@ -521,6 +534,8 @@ export interface GameState {
   managers: Record<ManagerId, ManagerState>;
   carModels: Record<CarId, number>;
   designs: Record<CarId, CarDesign>;
+  /** Custom Garage build; optional for saves created before the feature. */
+  customGarageDesign?: CustomGarageDesign | null;
   /** Permanent income boost from milestones (0.06 = +6%). */
   boost: number;
   /** ⭐ Stars: earned from milestones and Reset Imperium, spent on permanent upgrades. */
