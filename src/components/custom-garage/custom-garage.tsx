@@ -2,10 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
+import { useGame } from "@/store/game-store";
+import type { CustomGarageDesign } from "@/game/types";
 
 type Kit = "stock" | "street" | "widebody" | "track";
 type Wheels = "five-spoke" | "mesh" | "deep-dish";
-type Design = { version: 1; name: string; paint: string; kit: Kit; wheels: Wheels; lowered: boolean; spoiler: boolean; prompt: string; updatedAt: number };
+type Design = CustomGarageDesign;
 const KEY = "ice.customGarage.design.v1";
 const initial: Design = { version: 1, name: "My Custom Build", paint: "#1687ff", kit: "street", wheels: "deep-dish", lowered: true, spoiler: true, prompt: "", updatedAt: Date.now() };
 
@@ -94,33 +96,37 @@ function interpret(text: string, old: Design): Design {
 export function CustomGarage() {
   const host = useRef<HTMLDivElement>(null);
   const importFile = useRef<HTMLInputElement>(null);
+  const gameReady = useGame((s) => s.ready);
+  const savedDesignJson = useGame((s) => s.state.customGarageDesign ? JSON.stringify(s.state.customGarageDesign) : "");
+  const saveToGame = useGame((s) => s.setCustomGarageDesign);
   const [design, setDesign] = useState<Design>(initial);
   const [prompt, setPrompt] = useState("");
   const [notice, setNotice] = useState("Alege piese sau descrie modificarea dorită.");
   const [ready, setReady] = useState(false);
   useEffect(() => {
-    // Defer hydration to a task so React's set-state-in-effect lint rule is respected.
+    if (!gameReady) return;
+    // Game saves are authoritative; localStorage remains a migration fallback for old prototype builds.
     const timer = window.setTimeout(() => {
       try {
-        const raw = localStorage.getItem(KEY);
+        const raw = savedDesignJson || localStorage.getItem(KEY);
         if (raw) {
           const p = JSON.parse(raw) as Partial<Design>;
           const safePaint = typeof p.paint === "string" && /^#[0-9a-f]{6}$/i.test(p.paint) ? p.paint : initial.paint;
           const safeKit: Kit = ["stock", "street", "widebody", "track"].includes(String(p.kit)) ? p.kit as Kit : initial.kit;
           const safeWheels: Wheels = ["five-spoke", "mesh", "deep-dish"].includes(String(p.wheels)) ? p.wheels as Wheels : initial.wheels;
-          setDesign({ ...initial, ...p, version: 1, paint: safePaint, kit: safeKit, wheels: safeWheels });
+          setDesign({ ...initial, ...p, version: 1, name: typeof p.name === "string" ? p.name.slice(0, 48) : initial.name, paint: safePaint, kit: safeKit, wheels: safeWheels, lowered: typeof p.lowered === "boolean" ? p.lowered : initial.lowered, spoiler: typeof p.spoiler === "boolean" ? p.spoiler : initial.spoiler, prompt: typeof p.prompt === "string" ? p.prompt.slice(0, 500) : "" });
         }
       } catch { /* corrupted save: keep safe defaults */ }
       setReady(true);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [gameReady, savedDesignJson]);
   useEffect(() => { if (!ready || !host.current) return; return preview(host.current, design); }, [design, ready]);
   const update = <K extends keyof Design>(key: K, value: Design[K]) => setDesign((d) => ({ ...d, [key]: value }));
   const field: React.CSSProperties = { width: "100%", background: "#111720", color: "#edf3fa", border: "1px solid #303b4b", borderRadius: 10, padding: "10px 12px", fontSize: 14 };
   const label: React.CSSProperties = { display: "block", color: "#aebdd0", fontSize: 12, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", marginBottom: 7 };
   const button: React.CSSProperties = { border: "1px solid #3a485b", borderRadius: 10, padding: "11px 12px", background: "#1766bd", color: "#fff", fontWeight: 800, cursor: "pointer", width: "100%" };
-  function save() { try { localStorage.setItem(KEY, JSON.stringify({ ...design, updatedAt: Date.now() })); setNotice("Design salvat local pe acest dispozitiv. Integrarea în trafic, curse și cloud rămâne un pas următor."); } catch { setNotice("Nu am putut salva designul în acest browser."); } }
+  function save() { try { const next = { ...design, updatedAt: Date.now() }; saveToGame(next); localStorage.setItem(KEY, JSON.stringify(next)); setNotice("Design salvat în progresul jocului și sincronizat conform setărilor contului."); } catch { setNotice("Nu am putut salva designul."); } }
   function exportDesign() {
     const payload = JSON.stringify({ ...design, version: 1, updatedAt: Date.now() }, null, 2);
     const url = URL.createObjectURL(new Blob([payload], { type: "application/json" }));
@@ -153,8 +159,9 @@ export function CustomGarage() {
         updatedAt: Date.now(),
       };
       setDesign(imported);
+      saveToGame(imported);
       localStorage.setItem(KEY, JSON.stringify(imported));
-      setNotice("Design importat și salvat local. Doar opțiunile acceptate de prototip au fost încărcate.");
+      setNotice("Design importat și salvat în progresul jocului. Doar opțiunile acceptate au fost încărcate.");
     } catch {
       setNotice("Nu am putut importa fișierul. Alege un JSON Custom Garage valid.");
     } finally {
