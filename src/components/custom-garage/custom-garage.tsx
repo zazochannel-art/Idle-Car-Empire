@@ -93,6 +93,7 @@ function interpret(text: string, old: Design): Design {
 
 export function CustomGarage() {
   const host = useRef<HTMLDivElement>(null);
+  const importFile = useRef<HTMLInputElement>(null);
   const [design, setDesign] = useState<Design>(initial);
   const [prompt, setPrompt] = useState("");
   const [notice, setNotice] = useState("Alege piese sau descrie modificarea dorită.");
@@ -120,6 +121,46 @@ export function CustomGarage() {
   const label: React.CSSProperties = { display: "block", color: "#aebdd0", fontSize: 12, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", marginBottom: 7 };
   const button: React.CSSProperties = { border: "1px solid #3a485b", borderRadius: 10, padding: "11px 12px", background: "#1766bd", color: "#fff", fontWeight: 800, cursor: "pointer", width: "100%" };
   function save() { try { localStorage.setItem(KEY, JSON.stringify({ ...design, updatedAt: Date.now() })); setNotice("Design salvat local pe acest dispozitiv. Integrarea în trafic, curse și cloud rămâne un pas următor."); } catch { setNotice("Nu am putut salva designul în acest browser."); } }
+  function exportDesign() {
+    const payload = JSON.stringify({ ...design, version: 1, updatedAt: Date.now() }, null, 2);
+    const url = URL.createObjectURL(new Blob([payload], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${(design.name || "custom-build").trim().replace(/[^a-z0-9-_]+/gi, "-").slice(0, 40) || "custom-build"}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setNotice("Design exportat ca fișier JSON. Îl poți păstra ca backup sau transfera pe alt dispozitiv.");
+  }
+  async function importDesign(file?: File) {
+    if (!file) return;
+    try {
+      if (file.size > 100_000) throw new Error("Fișier prea mare.");
+      const raw: unknown = JSON.parse(await file.text());
+      if (!raw || typeof raw !== "object") throw new Error("Format invalid.");
+      const p = raw as Partial<Design>;
+      const safePaint = typeof p.paint === "string" && /^#[0-9a-f]{6}$/i.test(p.paint) ? p.paint : initial.paint;
+      const safeKit: Kit = ["stock", "street", "widebody", "track"].includes(String(p.kit)) ? p.kit as Kit : initial.kit;
+      const safeWheels: Wheels = ["five-spoke", "mesh", "deep-dish"].includes(String(p.wheels)) ? p.wheels as Wheels : initial.wheels;
+      const imported: Design = {
+        version: 1,
+        name: typeof p.name === "string" ? p.name.slice(0, 48) : initial.name,
+        paint: safePaint,
+        kit: safeKit,
+        wheels: safeWheels,
+        lowered: typeof p.lowered === "boolean" ? p.lowered : initial.lowered,
+        spoiler: typeof p.spoiler === "boolean" ? p.spoiler : initial.spoiler,
+        prompt: typeof p.prompt === "string" ? p.prompt.slice(0, 500) : "",
+        updatedAt: Date.now(),
+      };
+      setDesign(imported);
+      localStorage.setItem(KEY, JSON.stringify(imported));
+      setNotice("Design importat și salvat local. Doar opțiunile acceptate de prototip au fost încărcate.");
+    } catch {
+      setNotice("Nu am putut importa fișierul. Alege un JSON Custom Garage valid.");
+    } finally {
+      if (importFile.current) importFile.current.value = "";
+    }
+  }
   function generate() { if (!prompt.trim()) { setNotice("Scrie întâi o descriere."); return; } setDesign((d) => interpret(prompt.trim(), d)); setNotice("Previzualizare actualizată cu opțiunile recunoscute. Acesta este un prototip, nu generare AI reală de mesh 3D."); }
   return <main style={{ minHeight: "100dvh", background: "#090c11", color: "#f3f6fb", padding: "clamp(14px, 3vw, 32px)", fontFamily: "Arial, sans-serif" }}>
     <div style={{ maxWidth: 1200, margin: "0 auto" }}>
@@ -129,7 +170,7 @@ export function CustomGarage() {
         <section style={{ minWidth: 0, border: "1px solid #273241", borderRadius: 18, overflow: "hidden", background: "#10151d" }}><div style={{ display: "flex", justifyContent: "space-between", padding: 14, borderBottom: "1px solid #273241", fontSize: 12, fontWeight: 800, letterSpacing: ".1em" }}><span>3D LIVE PREVIEW</span><span style={{ color: "#8da2bb" }}>TRAGE PENTRU ROTIRE</span></div><div ref={host} style={{ width: "100%", height: "clamp(300px, 48vw, 560px)", touchAction: "pan-y" }} /><div style={{ display: "flex", flexWrap: "wrap", gap: 8, padding: 12, borderTop: "1px solid #273241", color: "#b9c7d8", fontSize: 11 }}><span>{design.kit.toUpperCase()}</span><span>• {design.wheels.toUpperCase()}</span><span>• {design.lowered ? "LOWERED" : "STANDARD HEIGHT"}</span></div></section>
         <section style={{ display: "grid", gap: 14 }}>
           <div style={{ border: "1px solid #273241", borderRadius: 16, background: "#10151d", padding: 16 }}><h2 style={{ margin: "0 0 14px", fontSize: 17 }}>AI DESIGN BRIEF</h2><label style={label} htmlFor="build-name">Numele mașinii</label><input id="build-name" value={design.name} onChange={(e) => update("name", e.target.value)} maxLength={48} style={{ ...field, marginBottom: 12 }} /><label style={label} htmlFor="design-prompt">Descrie modificarea</label><textarea id="design-prompt" value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Ex.: Golf albastru, widebody, jante concave, suspensie coborâtă și eleron..." rows={4} maxLength={500} style={{ ...field, resize: "vertical", lineHeight: 1.5 }} /><button type="button" onClick={generate} style={{ ...button, marginTop: 10 }}>Generează previzualizarea</button><p style={{ color: "#8192a7", fontSize: 11, lineHeight: 1.5 }}>Prototip: descrierea selectează opțiunile recunoscute. Nu trimite promptul către un serviciu AI și nu generează mesh-uri noi.</p></div>
-          <div style={{ border: "1px solid #273241", borderRadius: 16, background: "#10151d", padding: 16 }}><h2 style={{ margin: "0 0 14px", fontSize: 17 }}>PIESE ȘI SETĂRI</h2><label style={label} htmlFor="paint">Culoare</label><div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}><input id="paint" type="color" value={design.paint} onChange={(e) => update("paint", e.target.value)} style={{ width: 44, height: 38, border: 0, background: "transparent" }} /><code>{design.paint.toUpperCase()}</code></div><label style={label} htmlFor="kit">Body kit</label><select id="kit" value={design.kit} onChange={(e) => update("kit", e.target.value as Kit)} style={{ ...field, marginBottom: 12 }}><option value="stock">Original</option><option value="street">Street kit</option><option value="widebody">Widebody</option><option value="track">Track / racing</option></select><label style={label} htmlFor="wheels">Jante</label><select id="wheels" value={design.wheels} onChange={(e) => update("wheels", e.target.value as Wheels)} style={{ ...field, marginBottom: 12 }}><option value="five-spoke">Five-spoke</option><option value="mesh">Mesh</option><option value="deep-dish">Deep dish</option></select><label style={{ display: "flex", alignItems: "center", gap: 9, margin: "10px 0", fontSize: 14 }}><input type="checkbox" checked={design.lowered} onChange={(e) => update("lowered", e.target.checked)} /> Suspensie coborâtă</label><label style={{ display: "flex", alignItems: "center", gap: 9, margin: "10px 0 16px", fontSize: 14 }}><input type="checkbox" checked={design.spoiler} onChange={(e) => update("spoiler", e.target.checked)} /> Eleron spate</label><button type="button" onClick={save} style={{ ...button, background: "#18764d", borderColor: "#299566" }}>Salvează designul pe dispozitiv</button></div>
+          <div style={{ border: "1px solid #273241", borderRadius: 16, background: "#10151d", padding: 16 }}><h2 style={{ margin: "0 0 14px", fontSize: 17 }}>PIESE ȘI SETĂRI</h2><label style={label} htmlFor="paint">Culoare</label><div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}><input id="paint" type="color" value={design.paint} onChange={(e) => update("paint", e.target.value)} style={{ width: 44, height: 38, border: 0, background: "transparent" }} /><code>{design.paint.toUpperCase()}</code></div><label style={label} htmlFor="kit">Body kit</label><select id="kit" value={design.kit} onChange={(e) => update("kit", e.target.value as Kit)} style={{ ...field, marginBottom: 12 }}><option value="stock">Original</option><option value="street">Street kit</option><option value="widebody">Widebody</option><option value="track">Track / racing</option></select><label style={label} htmlFor="wheels">Jante</label><select id="wheels" value={design.wheels} onChange={(e) => update("wheels", e.target.value as Wheels)} style={{ ...field, marginBottom: 12 }}><option value="five-spoke">Five-spoke</option><option value="mesh">Mesh</option><option value="deep-dish">Deep dish</option></select><label style={{ display: "flex", alignItems: "center", gap: 9, margin: "10px 0", fontSize: 14 }}><input type="checkbox" checked={design.lowered} onChange={(e) => update("lowered", e.target.checked)} /> Suspensie coborâtă</label><label style={{ display: "flex", alignItems: "center", gap: 9, margin: "10px 0 16px", fontSize: 14 }}><input type="checkbox" checked={design.spoiler} onChange={(e) => update("spoiler", e.target.checked)} /> Eleron spate</label><button type="button" onClick={save} style={{ ...button, background: "#18764d", borderColor: "#299566" }}>Salvează designul pe dispozitiv</button><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 9 }}><button type="button" onClick={exportDesign} style={{ ...button, background: "#182331" }}>Exportă JSON</button><button type="button" onClick={() => importFile.current?.click()} style={{ ...button, background: "#182331" }}>Importă JSON</button></div><input ref={importFile} type="file" accept="application/json,.json" aria-label="Importă fișierul de design" onChange={(e) => void importDesign(e.target.files?.[0])} style={{ display: "none" }} /></div>
           <div role="status" aria-live="polite" style={{ border: "1px solid #293748", borderRadius: 12, padding: 12, background: "#0e141c", color: "#b8c9dc", fontSize: 12, lineHeight: 1.5 }}>{notice}</div>
         </section>
       </div>
