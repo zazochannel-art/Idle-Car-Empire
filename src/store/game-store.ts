@@ -33,7 +33,7 @@ import { tick as engineTick } from "@/game/engine/tick";
 import { formatDuration, formatMoney, formatPercent } from "@/game/format";
 import { decodeSave, encodeSave, SaveManager } from "@/game/save";
 import { askStartChoice, askWelcome, useCloud } from "./cloud-store";
-import type { BuyAmount, CarId, CarRoute, DealerId, FacilityType, GameState, Lang, ManagerId, PlantType, QualityMode, Specialization, StructureType, ZoneId } from "@/game/types";
+import type { BuyAmount, CarId, CarRoute, CustomGarageDesign, DealerId, FacilityType, GameState, Lang, ManagerId, PlantType, QualityMode, Specialization, StructureType, ZoneId } from "@/game/types";
 import { applyLanguage, detectLanguage, loadLanguage, translate, type MessageKey, type Vars } from "@/i18n";
 import { contentFor } from "@/i18n/content";
 import { uiEvents } from "./events";
@@ -124,6 +124,8 @@ interface GameStore {
   resume: () => void;
   /** Runs a player action on a copy of the state and commits it if it succeeded. */
   act: <T>(fn: (s: GameState) => T) => T;
+  /** Saves the validated Custom Garage design into the normal local/cloud game save. */
+  setCustomGarageDesign: (design: CustomGarageDesign) => void;
 
   plantLevel: (plot: string) => boolean;
   buyBodyMachine: (plot: string) => boolean;
@@ -651,6 +653,11 @@ export const useGame = create<GameStore>((set, get) => {
         setTimeout(social, SOCIAL_FIRST_MS);
         setInterval(social, SOCIAL_EVERY_MS);
       }
+    },
+
+    setCustomGarageDesign: (design) => {
+      act((s) => { s.customGarageDesign = { ...design }; return true; });
+      persist(true);
     },
 
     plantLevel: (plot) => {
