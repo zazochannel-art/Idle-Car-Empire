@@ -3,7 +3,8 @@
 ## Added on this branch
 - Separate /custom-garage/ route; the existing home route and game navigation are untouched.
 - Three.js procedural 3D hatchback preview with drag-to-rotate, paint, wheel style, body kit, ride height and spoiler controls.
-- Versioned localStorage save at ice.customGarage.design.v1.
+- Versioned localStorage save at `ice.customGarage.design.v1`.
+- Validated JSON import/export to back up or transfer a design between devices.
 - A deterministic prompt-to-options prototype for common colour and tuning requests.
 
 ## Limits to be explicit about
