@@ -656,7 +656,19 @@ export const useGame = create<GameStore>((set, get) => {
     },
 
     setCustomGarageDesign: (design) => {
-      act((s) => { s.customGarageDesign = { ...design }; return true; });
+      // Treat the store as a trust boundary too: the UI and imported JSON are not the only callers.
+      const safeDesign: CustomGarageDesign = {
+        version: 1,
+        name: typeof design.name === "string" ? design.name.slice(0, 48) : "My Custom Build",
+        paint: typeof design.paint === "string" && /^#[0-9a-f]{6}$/i.test(design.paint) ? design.paint : "#1687ff",
+        kit: ["stock", "street", "widebody", "track"].includes(design.kit) ? design.kit : "street",
+        wheels: ["five-spoke", "mesh", "deep-dish"].includes(design.wheels) ? design.wheels : "deep-dish",
+        lowered: typeof design.lowered === "boolean" ? design.lowered : true,
+        spoiler: typeof design.spoiler === "boolean" ? design.spoiler : true,
+        prompt: typeof design.prompt === "string" ? design.prompt.slice(0, 500) : "",
+        updatedAt: typeof design.updatedAt === "number" && Number.isFinite(design.updatedAt) && design.updatedAt >= 0 ? design.updatedAt : Date.now(),
+      };
+      act((s) => { s.customGarageDesign = safeDesign; return true; });
       persist(true);
     },
 
