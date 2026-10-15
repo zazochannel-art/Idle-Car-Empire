@@ -97,7 +97,23 @@ export function CustomGarage() {
   const [prompt, setPrompt] = useState("");
   const [notice, setNotice] = useState("Alege piese sau descrie modificarea dorită.");
   const [ready, setReady] = useState(false);
-  useEffect(() => { try { const raw = localStorage.getItem(KEY); if (raw) { const p = JSON.parse(raw) as Partial<Design>; setDesign({ ...initial, ...p, version: 1 }); } } catch { /* corrupted save: keep safe defaults */ } setReady(true); }, []);
+  useEffect(() => {
+    // Defer hydration to a task so React's set-state-in-effect lint rule is respected.
+    const timer = window.setTimeout(() => {
+      try {
+        const raw = localStorage.getItem(KEY);
+        if (raw) {
+          const p = JSON.parse(raw) as Partial<Design>;
+          const safePaint = typeof p.paint === "string" && /^#[0-9a-f]{6}$/i.test(p.paint) ? p.paint : initial.paint;
+          const safeKit: Kit = ["stock", "street", "widebody", "track"].includes(String(p.kit)) ? p.kit as Kit : initial.kit;
+          const safeWheels: Wheels = ["five-spoke", "mesh", "deep-dish"].includes(String(p.wheels)) ? p.wheels as Wheels : initial.wheels;
+          setDesign({ ...initial, ...p, version: 1, paint: safePaint, kit: safeKit, wheels: safeWheels });
+        }
+      } catch { /* corrupted save: keep safe defaults */ }
+      setReady(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
   useEffect(() => { if (!ready || !host.current) return; return preview(host.current, design); }, [design, ready]);
   const update = <K extends keyof Design>(key: K, value: Design[K]) => setDesign((d) => ({ ...d, [key]: value }));
   const field: React.CSSProperties = { width: "100%", background: "#111720", color: "#edf3fa", border: "1px solid #303b4b", borderRadius: 10, padding: "10px 12px", fontSize: 14 };
