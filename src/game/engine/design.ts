@@ -72,8 +72,11 @@ export function renameDesign(s: GameState, id: CarId, name: string): boolean {
 }
 
 export function setDesignColor(s: GameState, id: CarId, color: string): boolean {
-  if (!DESIGN_COLORS.includes(color)) return false;
-  s.designs[id].color = color;
+  // Keep factory/default paint and the curated palette, but also allow valid
+  // custom hex colors selected in Custom Garage. Reject arbitrary CSS values.
+  const validHex = /^#[0-9a-fA-F]{6}$/.test(color);
+  if (color !== "" && !DESIGN_COLORS.includes(color) && !validHex) return false;
+  s.designs[id].color = color.toLowerCase();
   return true;
 }
 
