@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FACILITY_BY_ID, SERVICE_FEE, TERRITORIES, ZONES } from "./config/city";
-import { DEPOT, DRIVEWAY, FAST_ROAD, MARKET, RACING, STARTER_PLOT, UNITS_PER_TILE, WORLD_MAP, along, roadOpen, roadRoute, routeLine } from "./city/layout";
+import { DEPOT, DRIVEWAY, FAST_ROAD, MARKET, RACING, STARTER_PLOT, UNITS_PER_TILE, WORLD_MAP, CUSTOM_GARAGE_FACTORY, along, roadOpen, roadRoute, routeLine } from "./city/layout";
 import * as T from "./engine/territory";
 import { computeGlobalMods } from "./engine/modifiers";
 import type { GameState } from "./types";
@@ -61,6 +61,8 @@ describe("world layout", () => {
     expect(WORLD_MAP.plots.filter((p) => p.kind === "dealer")).toHaveLength(6);
     expect(WORLD_MAP.plotById[STARTER_PLOT].zone).toBe("town");
     expect(WORLD_MAP.plotById[STARTER_PLOT].use).toBe("bodyWorks");
+    expect(WORLD_MAP.plots.filter((p) => p.id === CUSTOM_GARAGE_FACTORY)).toHaveLength(1);
+    expect(WORLD_MAP.plotById[CUSTOM_GARAGE_FACTORY].kind).toBe("customGarage");
     for (const z of ZONES) expect(WORLD_MAP.plots.filter((p) => p.zone === z.id && p.kind === "plot").length).toBeGreaterThanOrEqual(6);
     // ranks run through the districts in stage order
     const ranked = WORLD_MAP.plots.filter((p) => p.kind === "plot").sort((a, b) => a.rank! - b.rank!);
