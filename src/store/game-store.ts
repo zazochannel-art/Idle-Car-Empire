@@ -125,7 +125,7 @@ interface GameStore {
   /** Runs a player action on a copy of the state and commits it if it succeeded. */
   act: <T>(fn: (s: GameState) => T) => T;
   /** Saves the validated Custom Garage design into the normal local/cloud game save. */
-  setCustomGarageDesign: (design: CustomGarageDesign) => void;
+  setCustomGarageDesign: (design: CustomGarageDesign) => boolean;
 
   plantLevel: (plot: string) => boolean;
   buyBodyMachine: (plot: string) => boolean;
@@ -668,8 +668,21 @@ export const useGame = create<GameStore>((set, get) => {
         prompt: typeof design.prompt === "string" ? design.prompt.slice(0, 500) : "",
         updatedAt: typeof design.updatedAt === "number" && Number.isFinite(design.updatedAt) && design.updatedAt >= 0 ? design.updatedAt : Date.now(),
       };
-      act((s) => { s.customGarageDesign = safeDesign; return true; });
-      persist(true);
+      const ok = act((s) => {
+        const previous = s.customGarageDesign ?? { paint: "#1687ff", kit: "stock", wheels: "five-spoke", lowered: false, spoiler: false };
+        let cost = 0;
+        if (safeDesign.paint !== previous.paint) cost += 1_000;
+        if (safeDesign.kit !== previous.kit) cost += ({ stock: 0, street: 3_500, widebody: 9_000, track: 6_000 } as const)[safeDesign.kit];
+        if (safeDesign.wheels !== previous.wheels) cost += 2_500;
+        if (safeDesign.lowered !== previous.lowered && safeDesign.lowered) cost += 1_800;
+        if (safeDesign.spoiler !== previous.spoiler && safeDesign.spoiler) cost += 1_200;
+        if (s.cash < cost) return false;
+        s.cash -= cost;
+        s.customGarageDesign = safeDesign;
+        return true;
+      });
+      if (ok) persist(true);
+      return ok;
     },
 
     plantLevel: (plot) => {
