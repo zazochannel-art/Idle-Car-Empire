@@ -105,7 +105,7 @@ export function CustomGarage() {
   const [ready, setReady] = useState(false);
   const [targetCar, setTargetCar] = useState<CarId>("city");
   const setDesignColor = useGame((g) => g.setDesignColor);
-  useEffect(() => { const frame = window.requestAnimationFrame(() => { try { const raw = localStorage.getItem(KEY); if (raw) { const p = JSON.parse(raw) as Partial<Design>; setDesign({ ...initial, ...p, version: 1 }); } } catch { /* corrupted save: keep safe defaults */ } setReady(true); }); return () => window.cancelAnimationFrame(frame); }, []);
+  useEffect(() => { const frame = window.requestAnimationFrame(() => { try { const raw = localStorage.getItem(KEY); if (raw) { const p = JSON.parse(raw) as Partial<Design> & { targetCar?: CarId }; setDesign({ ...initial, ...p, version: 1 }); if (p.targetCar && CARS.some((car) => car.id === p.targetCar)) setTargetCar(p.targetCar); } } catch { /* corrupted save: keep safe defaults */ } setReady(true); }); return () => window.cancelAnimationFrame(frame); }, []);
   useEffect(() => { if (!ready || !host.current) return; return preview(host.current, design); }, [design, ready]);
   useEffect(() => { if (!ready) return; setCustomBuildOverride(CAR_MODEL_FOR[targetCar], { wing: design.spoiler ? (design.kit === "track" ? "gt" : "wing") : "none" }); }, [ready, targetCar, design.spoiler, design.kit]);
   const update = <K extends keyof Design>(key: K, value: Design[K]) => setDesign((d) => ({ ...d, [key]: value }));
