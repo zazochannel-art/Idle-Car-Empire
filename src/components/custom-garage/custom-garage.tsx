@@ -1,6 +1,7 @@
+"use client";
+
 import { setCustomBuildOverride } from "@/components/three/livery";
 import { CAR_MODEL_FOR } from "@/components/map/vehicles";
-"use client";
 
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
