@@ -677,6 +677,9 @@ describe("design studio", () => {
     // Custom Garage accepts any well-formed six-digit hex colour.
     expect(D.setDesignColor(s, "city", "#123456")).toBe(true);
     expect(s.designs.city.color).toBe("#123456");
+    // Uppercase HEX is accepted and normalized before it reaches rendering.
+    expect(D.setDesignColor(s, "city", "#ABCDEF")).toBe(true);
+    expect(s.designs.city.color).toBe("#abcdef");
     // Reject malformed values and CSS injection.
     expect(D.setDesignColor(s, "city", "red")).toBe(false);
     expect(D.setDesignColor(s, "city", "url(javascript:alert(1))")).toBe(false);
