@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { customBuildOf, setCustomBuildOverride } from "../components/three/livery";
 import { CARS, CAR_BY_ID } from "./config/cars";
 import { CHASSIS_BONUS, MAX_WAIT, PLANT_BY_ID, VEHICLE_CAPACITY } from "./config/chain";
 import { COMPONENT_TIME, DEALER_FEE, PARTS_MARGIN, SALES_TAX, START_CASH } from "./config/economy";
@@ -1230,5 +1231,16 @@ describe("economy audit fixes", () => {
     const snap = snapshot(s);
     expect(snap.incomePerSec).toBeGreaterThan(4_000);
     expect(snap.steadyIncomePerSec).toBeLessThan(100);
+  });
+});
+
+describe("Custom Garage appearance integration", () => {
+  it("applies spoiler choices to the selected 3D model", () => {
+    setCustomBuildOverride("city", { wing: "gt" });
+    expect(customBuildOf("city").wing).toBe("gt");
+    setCustomBuildOverride("city", { wing: "none" });
+    expect(customBuildOf("city").wing).toBe("none");
+    setCustomBuildOverride("sedan", { wing: "lip" });
+    expect(customBuildOf("sedan").wing).toBe("lip");
   });
 });
