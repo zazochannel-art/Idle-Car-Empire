@@ -1,12 +1,14 @@
 "use client";
 
+import Link from "next/link";
+
 import { EditionsCard } from "./editions-card";
 import { PrototypeLab } from "./expansion-cards";
 import { ClassicsPanel, ShowCard } from "./live-cards";
 import { MyCars } from "./my-cars";
 import { BrandStudio } from "./brand-studio";
 import { netOfSale } from "@/game/engine/costs";
-import { Lock, Palette } from "lucide-react";
+import { Lock, Palette, Wrench } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { CARS, CAR_MODEL, DESIGN_COLORS, DESIGN_MAX, DESIGN_OPTIONS, type CarConfig } from "@/game/config/cars";
@@ -43,6 +45,13 @@ export function CarsView() {
   return (
     <div className="space-y-4">
       <ViewHeader icon="🚗" title={t("cars.title")} subtitle={t("cars.subtitle", { n: unlocked.size, total: CARS.length })} />
+      <Link href="/custom-garage/" className="flex items-center justify-between gap-3 rounded-2xl border border-sky-400/25 bg-gradient-to-r from-sky-500/15 to-indigo-500/10 p-3 transition hover:border-sky-300/50 hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400">
+        <span className="flex min-w-0 items-center gap-3">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-sky-400/15 text-sky-300"><Wrench className="size-5" /></span>
+          <span className="min-w-0"><span className="block text-sm font-black">Custom Garage</span><span className="block text-xs text-white/55">Configurează mașina în previzualizare 3D</span></span>
+        </span>
+        <span className="shrink-0 text-xs font-black text-sky-300">DESCHIDE ↗</span>
+      </Link>
       <div className="grid grid-cols-4 gap-1 rounded-2xl bg-white/[0.04] p-1 ring-1 ring-white/[0.07]">
         {(["mine", "models", "dev", "brand"] as const).map((k) => (
           <button key={k} onClick={() => setTab(k)} className={cn("rounded-xl py-2 text-[11px] font-black uppercase tracking-wide", tab === k ? "bg-gold text-black" : "text-white/60")}>
