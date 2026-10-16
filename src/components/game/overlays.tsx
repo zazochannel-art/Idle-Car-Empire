@@ -283,6 +283,15 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
   const [msg, setMsg] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
 
+  // Android's hardware Back button sends this event before the generic Escape fallback.
+  // Explicitly close controlled Settings so the dialog cannot trap the app in the emulator.
+  useEffect(() => {
+    if (!open) return;
+    const onNativeBack = () => onOpenChange(false);
+    window.addEventListener("idle-car-empire:native-back", onNativeBack);
+    return () => window.removeEventListener("idle-car-empire:native-back", onNativeBack);
+  }, [open, onOpenChange]);
+
   return (
     <Dialog
       open={open}
