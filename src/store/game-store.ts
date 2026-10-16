@@ -1,6 +1,7 @@
+"use client";
+
 import { CAR_MODEL_FOR } from "@/components/map/vehicles";
 import { setLiveryOverride } from "@/components/three/livery";
-"use client";
 
 import * as Rc from "@/game/engine/racing";
 import type { RaceUpgrade } from "@/game/config/racing";
