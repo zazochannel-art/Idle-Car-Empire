@@ -135,7 +135,12 @@ export function CustomGarage() {
   const closeView = useUi((s) => s.setView);
   const cash = useGame((s) => s.state.cash);
   const savedDesignJson = useGame((s) => s.state.customGarageDesign ? JSON.stringify(s.state.customGarageDesign) : "");
-  const saveToGame = useGame((s) => s.setCustomGarageDesign);
+  const production = useGame((s) => s.state.customGarageProduction);
+  const hireWorker = useGame((s) => s.hireCustomGarageWorker);
+  const upgradeMachine = useGame((s) => s.upgradeCustomGarageMachine);
+  const startJob = useGame((s) => s.startCustomGarageJob);
+  const claimJob = useGame((s) => s.claimCustomGarageJob);
+  const [clockNow, setClockNow] = useState(Date.now());
   const [design, setDesign] = useState<Design>(initial);
   const [prompt, setPrompt] = useState("");
   const [notice, setNotice] = useState("Alege piese sau descrie modificarea dorită.");
@@ -160,20 +165,30 @@ export function CustomGarage() {
     return () => window.clearTimeout(timer);
   }, [gameReady, savedDesignJson]);
   useEffect(() => { if (!ready || !host.current) return; return preview(host.current, design); }, [design, ready]);
+  useEffect(() => { const timer = window.setInterval(() => setClockNow(Date.now()), 250); return () => window.clearInterval(timer); }, []);
   const update = <K extends keyof Design>(key: K, value: Design[K]) => setDesign((d) => ({ ...d, [key]: value }));
   const field: React.CSSProperties = { width: "100%", background: "#111720", color: "#edf3fa", border: "1px solid #303b4b", borderRadius: 10, padding: "10px 12px", fontSize: 14 };
   const label: React.CSSProperties = { display: "block", color: "#aebdd0", fontSize: 12, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", marginBottom: 7 };
   const button: React.CSSProperties = { border: "1px solid #3a485b", borderRadius: 10, padding: "11px 12px", background: "#1766bd", color: "#fff", fontWeight: 800, cursor: "pointer", width: "100%" };
   function save() {
-    try {
-      const next = { ...design, updatedAt: Date.now() };
-      if (gameReady && !saveToGame(next)) {
-        setNotice("Nu ai suficienți bani pentru aceste modificări. Redu costul pieselor sau câștigă bani în joc.");
-        return;
-      }
-      localStorage.setItem(KEY, JSON.stringify(next));
-      setNotice(gameReady ? "Design salvat în progresul jocului. Costul modificărilor a fost scăzut din buget." : "Design salvat local pe acest dispozitiv.");
-    } catch { setNotice("Nu am putut salva designul."); }
+    const next = { ...design, updatedAt: Date.now() };
+    if (!gameReady) {
+      setNotice("Așteaptă încărcarea progresului jocului înainte de a porni producția.");
+      return;
+    }
+    if (!production?.workerHired) {
+      setNotice("Fabrica nu are încă un angajat. Angajează primul muncitor pentru 2.500 $.");
+      return;
+    }
+    if (production.activeJob) {
+      setNotice("Linia de producție este ocupată. Așteaptă terminarea lucrării curente.");
+      return;
+    }
+    if (!startJob(next)) {
+      setNotice(cash < 1_000 ? "Buget insuficient pentru această lucrare." : "Nu am putut porni lucrarea. Verifică bugetul și postul de lucru.");
+      return;
+    }
+    setNotice("Producția a început. Costul a fost plătit; designul se aplică după finalizarea lucrării.");
   }
   function exportDesign() {
     const payload = JSON.stringify({ ...design, version: 1, updatedAt: Date.now() }, null, 2);
@@ -206,13 +221,9 @@ export function CustomGarage() {
         prompt: typeof p.prompt === "string" ? p.prompt.slice(0, 500) : "",
         updatedAt: Date.now(),
       };
-      if (gameReady && !saveToGame(imported)) {
-        setNotice("Importul este valid, dar nu ai suficienți bani pentru a aplica toate modificările. Designul curent a rămas neschimbat.");
-        return;
-      }
       setDesign(imported);
-      localStorage.setItem(KEY, JSON.stringify(imported));
-      setNotice(gameReady ? "Design importat în progresul jocului. Costul modificărilor a fost scăzut din buget." : "Design importat local.");
+      setPrompt(imported.prompt);
+      setNotice("Design importat în previzualizare. Pentru a-l aplica în joc, pornește lucrarea în fabrica Custom Garage.");
     } catch {
       setNotice("Nu am putut importa fișierul. Alege un JSON Custom Garage valid.");
     } finally {
@@ -249,7 +260,29 @@ export function CustomGarage() {
         <section style={{ minWidth: 0, border: "1px solid #273241", borderRadius: 18, overflow: "hidden", background: "#10151d" }}><div style={{ display: "flex", justifyContent: "space-between", padding: 14, borderBottom: "1px solid #273241", fontSize: 12, fontWeight: 800, letterSpacing: ".1em" }}><span>3D LIVE PREVIEW</span><span style={{ color: "#8da2bb" }}>TRAGE PENTRU ROTIRE</span></div><div ref={host} style={{ width: "100%", height: "clamp(300px, 48vw, 560px)", touchAction: "pan-y" }} /><div style={{ display: "flex", flexWrap: "wrap", gap: 8, padding: 12, borderTop: "1px solid #273241", color: "#b9c7d8", fontSize: 11 }}><span>{design.kit.toUpperCase()}</span><span>• {design.wheels.toUpperCase()}</span><span>• {design.lowered ? "LOWERED" : "STANDARD HEIGHT"}</span></div></section>
         <section style={{ display: "grid", gap: 14 }}>
           <div style={{ border: "1px solid #273241", borderRadius: 16, background: "#10151d", padding: 16 }}><h2 style={{ margin: "0 0 14px", fontSize: 17 }}>AI DESIGN BRIEF</h2><label style={label} htmlFor="build-name">Numele mașinii</label><input id="build-name" value={design.name} onChange={(e) => update("name", e.target.value)} maxLength={48} style={{ ...field, marginBottom: 12 }} /><label style={label} htmlFor="design-prompt">Descrie modificarea</label><textarea id="design-prompt" value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Ex.: Golf albastru, widebody, jante concave, suspensie coborâtă și eleron..." rows={4} maxLength={500} style={{ ...field, resize: "vertical", lineHeight: 1.5 }} /><button type="button" onClick={generate} style={{ ...button, marginTop: 10 }}>Generează previzualizarea</button><p style={{ color: "#8192a7", fontSize: 11, lineHeight: 1.5 }}>Prototip: descrierea selectează opțiunile recunoscute. Nu trimite promptul către un serviciu AI și nu generează mesh-uri noi.</p></div>
-          <div style={{ border: "1px solid #273241", borderRadius: 16, background: "#10151d", padding: 16 }}><h2 style={{ margin: "0 0 8px", fontSize: 17 }}>PIESE ȘI SETĂRI</h2><p style={{ color: "#9aabc0", fontSize: 12, margin: "0 0 14px" }}>Buget disponibil: {Math.floor(cash).toLocaleString("en-US")} $ · culoare 1.000 $ · jante 2.500 $ · suspensie 1.800 $ · eleron 1.200 $ · body kit în funcție de tip.</p><label style={label} htmlFor="paint">Culoare</label><div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}><input id="paint" type="color" value={design.paint} onChange={(e) => update("paint", e.target.value)} style={{ width: 44, height: 38, border: 0, background: "transparent" }} /><code>{design.paint.toUpperCase()}</code></div><label style={label} htmlFor="kit">Body kit</label><select id="kit" value={design.kit} onChange={(e) => update("kit", e.target.value as Kit)} style={{ ...field, marginBottom: 12 }}><option value="stock">Original</option><option value="street">Street kit</option><option value="widebody">Widebody</option><option value="track">Track / racing</option></select><label style={label} htmlFor="wheels">Jante</label><select id="wheels" value={design.wheels} onChange={(e) => update("wheels", e.target.value as Wheels)} style={{ ...field, marginBottom: 12 }}><option value="five-spoke">Five-spoke</option><option value="mesh">Mesh</option><option value="deep-dish">Deep dish</option></select><label style={{ display: "flex", alignItems: "center", gap: 9, margin: "10px 0", fontSize: 14 }}><input id="lowered" type="checkbox" checked={design.lowered} onChange={(e) => update("lowered", e.target.checked)} /> Suspensie coborâtă</label><label style={{ display: "flex", alignItems: "center", gap: 9, margin: "10px 0 16px", fontSize: 14 }}><input id="spoiler" type="checkbox" checked={design.spoiler} onChange={(e) => update("spoiler", e.target.checked)} /> Eleron spate</label><button type="button" onClick={save} style={{ ...button, background: "#18764d", borderColor: "#299566" }}>Salvează designul pe dispozitiv</button><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 9 }}><button type="button" onClick={exportDesign} style={{ ...button, background: "#182331" }}>Exportă JSON</button><button type="button" onClick={() => importFile.current?.click()} style={{ ...button, background: "#182331" }}>Importă JSON</button></div><input ref={importFile} type="file" accept="application/json,.json" aria-label="Importă fișierul de design" onChange={(e) => void importDesign(e.target.files?.[0])} style={{ display: "none" }} /></div>
+          <div style={{ border: "1px solid #273241", borderRadius: 16, background: "#10151d", padding: 16 }}>
+            <h2 style={{ margin: "0 0 8px", fontSize: 17 }}>LINIA DE PRODUCȚIE</h2>
+            <p style={{ color: "#9aabc0", fontSize: 12, margin: "0 0 12px" }}>Buget: {Math.floor(cash).toLocaleString("en-US")} $ · Angajat: {production?.workerHired ? "da" : "nu"} · Mașină: nivel {production?.machineLevel ?? 1} · Lucrări finalizate: {production?.completedJobs ?? 0}</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <button type="button" onClick={() => setNotice(hireWorker() ? "Primul muncitor a fost angajat pentru 2.500 $." : "Nu poți angaja acum: verifică bugetul sau dacă există deja un angajat.")} disabled={!!production?.workerHired} style={{ ...button, background: production?.workerHired ? "#17212b" : "#1766bd", opacity: production?.workerHired ? .65 : 1 }}>Angajează muncitor · 2.500 $</button>
+              <button type="button" onClick={() => setNotice(upgradeMachine() ? "Echipamentul a fost îmbunătățit." : "Upgrade indisponibil: ai nevoie de angajat, fonduri suficiente și linie liberă.")} disabled={!production?.workerHired || !!production?.activeJob || (production?.machineLevel ?? 1) >= 5} style={{ ...button, background: "#273548" }}>Upgrade echipament · {(5_000 * (production?.machineLevel ?? 1)).toLocaleString("en-US")} $</button>
+            </div>
+            {#if production?.activeJob}
+              <div style={{ marginTop: 12, padding: 12, border: "1px solid #304154", borderRadius: 10, background: "#0b1118" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12, marginBottom: 8 }}><strong>Lucrare în producție</strong><span>{Math.min(100, Math.floor((clockNow - production.activeJob.startedAt) / production.activeJob.durationMs * 100))}%</span></div>
+                <div style={{ height: 7, background: "#273241", borderRadius: 8, overflow: "hidden" }}><div style={{ height: "100%", width: `${Math.min(100, Math.max(0, (clockNow - production.activeJob.startedAt) / production.activeJob.durationMs * 100))}%`, background: "#38bdf8", transition: "width .2s" }} /></div>
+                <p style={{ fontSize: 11, color: "#9aabc0", margin: "8px 0" }}>Cost achitat: {production.activeJob.cost.toLocaleString("en-US")} $ · Designul se aplică la final.</p>
+                {#if clockNow >= production.activeJob.startedAt + production.activeJob.durationMs}
+                  <button type="button" onClick={() => setNotice(claimJob() ? "Lucrare finalizată. Designul a fost aplicat și salvat în progresul jocului." : "Lucrarea nu este încă gata.")} style={{ ...button, background: "#18764d", borderColor: "#299566" }}>Finalizează și aplică piesele</button>
+                {:else}
+                  <p style={{ fontSize: 11, color: "#8fa2b9", margin: 0 }}>Timp rămas: {Math.max(1, Math.ceil((production.activeJob.startedAt + production.activeJob.durationMs - clockNow) / 1000))} sec.</p>
+                {/if}
+              </div>
+            {:else}
+              <p style={{ fontSize: 11, color: "#8fa2b9", margin: "10px 0 0" }}>Linia este {production?.workerHired ? "liberă — poți lansa o lucrare" : "oprită — angajează muncitorul pentru a începe"}.</p>
+            {/if}
+          </div>
+          <div style={{ border: "1px solid #273241", borderRadius: 16, background: "#10151d", padding: 16 }}><h2 style={{ margin: "0 0 8px", fontSize: 17 }}>PIESE ȘI SETĂRI</h2><p style={{ color: "#9aabc0", fontSize: 12, margin: "0 0 14px" }}>Buget disponibil: {Math.floor(cash).toLocaleString("en-US")} $ · culoare 1.000 $ · jante 2.500 $ · suspensie 1.800 $ · eleron 1.200 $ · body kit în funcție de tip.</p><label style={label} htmlFor="paint">Culoare</label><div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}><input id="paint" type="color" value={design.paint} onChange={(e) => update("paint", e.target.value)} style={{ width: 44, height: 38, border: 0, background: "transparent" }} /><code>{design.paint.toUpperCase()}</code></div><label style={label} htmlFor="kit">Body kit</label><select id="kit" value={design.kit} onChange={(e) => update("kit", e.target.value as Kit)} style={{ ...field, marginBottom: 12 }}><option value="stock">Original</option><option value="street">Street kit</option><option value="widebody">Widebody</option><option value="track">Track / racing</option></select><label style={label} htmlFor="wheels">Jante</label><select id="wheels" value={design.wheels} onChange={(e) => update("wheels", e.target.value as Wheels)} style={{ ...field, marginBottom: 12 }}><option value="five-spoke">Five-spoke</option><option value="mesh">Mesh</option><option value="deep-dish">Deep dish</option></select><label style={{ display: "flex", alignItems: "center", gap: 9, margin: "10px 0", fontSize: 14 }}><input id="lowered" type="checkbox" checked={design.lowered} onChange={(e) => update("lowered", e.target.checked)} /> Suspensie coborâtă</label><label style={{ display: "flex", alignItems: "center", gap: 9, margin: "10px 0 16px", fontSize: 14 }}><input id="spoiler" type="checkbox" checked={design.spoiler} onChange={(e) => update("spoiler", e.target.checked)} /> Eleron spate</label><button type="button" onClick={save} style={{ ...button, background: "#18764d", borderColor: "#299566" }}>Lansează producția</button><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 9 }}><button type="button" onClick={exportDesign} style={{ ...button, background: "#182331" }}>Exportă JSON</button><button type="button" onClick={() => importFile.current?.click()} style={{ ...button, background: "#182331" }}>Importă JSON</button></div><input ref={importFile} type="file" accept="application/json,.json" aria-label="Importă fișierul de design" onChange={(e) => void importDesign(e.target.files?.[0])} style={{ display: "none" }} /></div>
           <div role="status" aria-live="polite" style={{ border: "1px solid #293748", borderRadius: 12, padding: 12, background: "#0e141c", color: "#b8c9dc", fontSize: 12, lineHeight: 1.5 }}>{notice}</div>
         </section>
       </div>
