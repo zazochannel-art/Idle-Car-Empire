@@ -108,7 +108,7 @@ function preview(host: HTMLDivElement, d: Design) {
     modelDisposed = true;
     cancelAnimationFrame(frame); observer.disconnect();
     renderer.domElement.removeEventListener("pointerdown", down); renderer.domElement.removeEventListener("pointermove", move); renderer.domElement.removeEventListener("pointerup", up); renderer.domElement.removeEventListener("pointercancel", up);
-    scene.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) { m.geometry.dispose(); (Array.isArray(m.material) ? m.material : [m.material]).forEach((mat) => mat.dispose()); } });
+    scene.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) { if (!m.geometry.userData.keep) m.geometry.dispose(); (Array.isArray(m.material) ? m.material : [m.material]).forEach((mat) => { if (!mat.userData.keep) mat.dispose(); }); } });
     renderer.dispose(); renderer.domElement.remove();
   };
 }
