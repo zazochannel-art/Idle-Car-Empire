@@ -4,7 +4,7 @@
 // lights, grilles, mirrors, handles, spoilers and diffusers are geometry,
 // not texture. Units are metres; +X is forward, +Y up, +Z to the right.
 import type * as THREE_NS from "three";
-import { liveryOf } from "./livery";
+import { customBuildOf, liveryOf } from "./livery";
 import type { Facing } from "./glb-car";
 import { CAR_LENGTH, type BodyModel } from "./car-sizes";
 
@@ -481,7 +481,8 @@ export function buildCar(T: Three, look: CarLook): THREE_NS.Group {
   const st = look.stage?.station ?? 8;
   const car = heroCopy(hero, st < 6 ? "#9aa3ad" : look.build?.color || (hero.ownPaint ? null : liveryOf(look.model).color));
   const pod = look.model === "robotaxi" && st >= 6;
-  const wing = st >= 6 ? (look.build?.wing ?? hero.wing) : undefined;
+  const customWing = customBuildOf(look.model).wing;
+  const wing = st >= 6 ? (customWing === "none" ? undefined : customWing ?? look.build?.wing ?? hero.wing) : undefined;
   if (!wing && !pod) return car;
   const g = new T.Group();
   g.add(car);
