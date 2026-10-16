@@ -458,6 +458,7 @@ export function MenuPanel({ onSettings }: { onSettings: () => void }) {
     { icon: "🏆", label: t("nav.leaderboard"), go: () => setView("leaderboard"), gold: true },
     { icon: "🤝", label: t("nav.alliance"), go: () => setView("alliance"), gold: true },
     { icon: "🚗", label: t("nav.cars"), go: () => setView("cars") },
+    { icon: "🛠️", label: "Custom Garage", go: () => { window.location.assign("./custom-garage/"); } },
     // research has no other way in (only a goal can open it)
     { icon: "🔬", label: t("nav.research"), go: () => setView("research") },
     { icon: "🎖️", label: t("nav.achievements"), go: () => setView("achievements") },
