@@ -455,3 +455,23 @@ export function lotOutline(W: number, D: number, color: string) {
   line.renderOrder = 3;
   return line;
 }
+
+
+/** Distinctive fixed building for the one Custom Garage factory on the map. */
+export function customGarageFactoryModel(W: number, D: number) {
+  return cached(`custom-garage-factory|${W}|${D}`, () => {
+    const P: (THREE.BufferGeometry | null)[] = [];
+    const Mt: (THREE.BufferGeometry | null)[] = [];
+    const G: (THREE.BufferGeometry | null)[] = [];
+    P.push(slab(W, D, "#64748b"));
+    P.push(box(W * 0.78, 1.05, D * 0.62, C("#273545"), 0, 0.55, -0.12, 0));
+    P.push(box(W * 0.84, 0.14, D * 0.68, C("#1d2938"), 0, 1.12, -0.12, 0));
+    P.push(box(W * 0.34, 0.72, 0.08, C("#111827"), 0, 0.42, D * 0.2, 0));
+    P.push(box(W * 0.28, 0.54, 0.035, C("#38bdf8"), 0, 0.45, D * 0.25, 0));
+    G.push(box(W * 0.22, 0.48, 0.045, C("#93c5fd"), -W * 0.23, 0.62, D * 0.196, 0));
+    G.push(box(W * 0.22, 0.48, 0.045, C("#93c5fd"), W * 0.23, 0.62, D * 0.196, 0));
+    Mt.push(box(W * 0.18, 0.24, 0.08, C("#f59e0b"), 0, 1.35, D * 0.2, 0));
+    P.push(box(W * 0.55, 0.05, 0.16, C("#38bdf8"), 0, 0.08, D * 0.43, 0));
+    return parts({ plain: P, metal: Mt, glass: G });
+  });
+}
