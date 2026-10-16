@@ -27,6 +27,19 @@ export const LIVERY: Record<LiveryModel, Livery> = {
   robotaxi: { color: "#eef6f5", finish: "gloss" },
 };
 
+/** Appearance overrides from Custom Garage, keyed by the actual 3D model. */
+export interface CustomBuildLook {
+  wing?: "lip" | "wing" | "gt" | "none";
+}
+const buildOverrides: Partial<Record<LiveryModel, CustomBuildLook>> = {};
+
+export function setCustomBuildOverride(model: LiveryModel, look: CustomBuildLook) {
+  buildOverrides[model] = { ...look };
+}
+
+export function customBuildOf(model: LiveryModel): CustomBuildLook {
+  return buildOverrides[model] ?? {};
+}
 /** Colours the player picked in the Design studio, per model ("" or missing = factory colour). */
 const overrides: Partial<Record<LiveryModel, string>> = {};
 
