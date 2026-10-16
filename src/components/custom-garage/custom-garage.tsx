@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { buildCar, loadHeroes } from "@/components/three/car-models";
 import { useGame } from "@/store/game-store";
+import { useUi } from "@/store/ui-store";
 import type { CustomGarageDesign } from "@/game/types";
 
 type Kit = "stock" | "street" | "widebody" | "track";
@@ -131,6 +132,7 @@ export function CustomGarage() {
   const host = useRef<HTMLDivElement>(null);
   const importFile = useRef<HTMLInputElement>(null);
   const gameReady = useGame((s) => s.ready);
+  const closeView = useUi((s) => s.setView);
   const cash = useGame((s) => s.state.cash);
   const savedDesignJson = useGame((s) => s.state.customGarageDesign ? JSON.stringify(s.state.customGarageDesign) : "");
   const saveToGame = useGame((s) => s.setCustomGarageDesign);
@@ -220,7 +222,7 @@ export function CustomGarage() {
   function generate() { if (!prompt.trim()) { setNotice("Scrie întâi o descriere."); return; } setDesign((d) => interpret(prompt.trim(), d)); setNotice("Previzualizare actualizată cu opțiunile recunoscute. Acesta este un prototip, nu generare AI reală de mesh 3D."); }
   return <main style={{ minHeight: "100dvh", background: "#090c11", color: "#f3f6fb", padding: "clamp(14px, 3vw, 32px)", fontFamily: "Arial, sans-serif" }}>
     <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-      <a href="../" style={{ color: "#8ca7c7", textDecoration: "none", fontSize: 13 }}>← Înapoi la Idle Car Empire</a>
+      <button type="button" onClick={() => closeView(null)} style={{ border: "1px solid #303b4b", borderRadius: 9, padding: "8px 11px", background: "#111720", color: "#a9c4e3", fontSize: 13, cursor: "pointer" }}>← Înapoi la hartă</button>
       <header style={{ margin: "18px 0 22px" }}><div style={{ color: "#54aaff", fontSize: 12, fontWeight: 900, letterSpacing: ".16em" }}>PLAYER CREATION STUDIO</div><h1 style={{ fontSize: "clamp(28px, 5vw, 46px)", lineHeight: 1, margin: "8px 0", fontWeight: 900 }}>CUSTOM GARAGE FACTORY</h1><p style={{ color: "#aab7c8", maxWidth: 700, lineHeight: 1.6 }}>Lucrează la mașină în fabrica unică de personalizare: caroserie, vopsitorie, roți, suspensie și aerodinamică, cu previzualizare 3D. Modificările aplicate se plătesc din economia jocului; generarea AI de geometrie nouă necesită un serviciu separat.</p></header>
       <section aria-label="Posturi de lucru ale fabricii" style={{ marginBottom: 18, border: "1px solid #273241", borderRadius: 16, padding: 14, background: "linear-gradient(135deg,#121b27,#0d1219)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
