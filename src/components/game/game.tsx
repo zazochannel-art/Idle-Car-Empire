@@ -365,6 +365,8 @@ function viewTitle(v: View, t: ReturnType<typeof useT>["t"]): string {
       return t("account.title");
     case "empire":
       return t("map.nav.factories");
+    case "customGarage":
+      return "Custom Garage Factory";
     default:
       return t(`nav.${v}`);
   }
