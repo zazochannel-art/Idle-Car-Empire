@@ -219,6 +219,19 @@ function DesignStudio({ car }: { car: CarConfig }) {
             );
           })}
         </div>
+        <label className="mt-3 flex items-center gap-3 rounded-xl bg-white/[0.04] p-2.5 ring-1 ring-white/[0.06]">
+          <input
+            type="color"
+            aria-label="Culoare personalizată"
+            value={/^#[0-9a-fA-F]{6}$/.test(d.color) ? d.color : LIVERY[CAR_MODEL_FOR[car.id]].color}
+            onChange={(e) => setDesignColor(car.id, e.target.value)}
+            className="size-9 cursor-pointer rounded-lg border-0 bg-transparent p-0"
+          />
+          <span className="min-w-0">
+            <span className="block text-xs font-bold text-white">Culoare personalizată</span>
+            <span className="block text-[10px] text-white/45">HEX · {d.color || "culoarea originală"}</span>
+          </span>
+        </label>
       </div>
 
       <div className="space-y-2">
