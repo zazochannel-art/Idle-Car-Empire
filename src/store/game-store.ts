@@ -126,6 +126,10 @@ interface GameStore {
   act: <T>(fn: (s: GameState) => T) => T;
   /** Saves the validated Custom Garage design into the normal local/cloud game save. */
   setCustomGarageDesign: (design: CustomGarageDesign) => boolean;
+  hireCustomGarageWorker: () => boolean;
+  upgradeCustomGarageMachine: () => boolean;
+  startCustomGarageJob: (design: CustomGarageDesign) => boolean;
+  claimCustomGarageJob: () => boolean;
 
   plantLevel: (plot: string) => boolean;
   buyBodyMachine: (plot: string) => boolean;
@@ -679,6 +683,73 @@ export const useGame = create<GameStore>((set, get) => {
         if (s.cash < cost) return false;
         s.cash -= cost;
         s.customGarageDesign = safeDesign;
+        return true;
+      });
+      if (ok) persist(true);
+      return ok;
+    },
+
+    hireCustomGarageWorker: () => {
+      const ok = act((s) => {
+        const p = s.customGarageProduction ??= { workerHired: false, machineLevel: 1, activeJob: null, completedJobs: 0 };
+        if (p.workerHired || s.cash < 2_500) return false;
+        s.cash -= 2_500;
+        p.workerHired = true;
+        return true;
+      });
+      if (ok) persist(true);
+      return ok;
+    },
+    upgradeCustomGarageMachine: () => {
+      const ok = act((s) => {
+        const p = s.customGarageProduction ??= { workerHired: false, machineLevel: 1, activeJob: null, completedJobs: 0 };
+        const cost = 5_000 * p.machineLevel;
+        if (!p.workerHired || p.activeJob || s.cash < cost || p.machineLevel >= 5) return false;
+        s.cash -= cost;
+        p.machineLevel += 1;
+        return true;
+      });
+      if (ok) persist(true);
+      return ok;
+    },
+    startCustomGarageJob: (design) => {
+      const safeDesign: CustomGarageDesign = {
+        version: 1,
+        name: typeof design.name === "string" ? design.name.slice(0, 48) : "My Custom Build",
+        paint: typeof design.paint === "string" && /^#[0-9a-f]{6}$/i.test(design.paint) ? design.paint : "#1687ff",
+        kit: ["stock", "street", "widebody", "track"].includes(design.kit) ? design.kit : "street",
+        wheels: ["five-spoke", "mesh", "deep-dish"].includes(design.wheels) ? design.wheels : "deep-dish",
+        lowered: typeof design.lowered === "boolean" ? design.lowered : true,
+        spoiler: typeof design.spoiler === "boolean" ? design.spoiler : true,
+        prompt: typeof design.prompt === "string" ? design.prompt.slice(0, 500) : "",
+        updatedAt: Date.now(),
+      };
+      const ok = act((s) => {
+        const p = s.customGarageProduction ??= { workerHired: false, machineLevel: 1, activeJob: null, completedJobs: 0 };
+        if (!p.workerHired || p.activeJob) return false;
+        const previous = s.customGarageDesign ?? { paint: "#1687ff", kit: "stock" as const, wheels: "five-spoke" as const, lowered: false, spoiler: false };
+        let cost = 0;
+        if (safeDesign.paint !== previous.paint) cost += 1_000;
+        if (safeDesign.kit !== previous.kit) cost += ({ stock: 0, street: 3_500, widebody: 9_000, track: 6_000 } as const)[safeDesign.kit];
+        if (safeDesign.wheels !== previous.wheels) cost += 2_500;
+        if (safeDesign.lowered !== previous.lowered && safeDesign.lowered) cost += 1_800;
+        if (safeDesign.spoiler !== previous.spoiler && safeDesign.spoiler) cost += 1_200;
+        if (s.cash < cost) return false;
+        s.cash -= cost;
+        const durationMs = Math.round((12 + cost / 1_000 * 2) * 1_000 / Math.min(3, p.machineLevel));
+        p.activeJob = { design: safeDesign, startedAt: Date.now(), durationMs, cost };
+        return true;
+      });
+      if (ok) persist(true);
+      return ok;
+    },
+    claimCustomGarageJob: () => {
+      const ok = act((s) => {
+        const p = s.customGarageProduction;
+        if (!p?.activeJob || Date.now() < p.activeJob.startedAt + p.activeJob.durationMs) return false;
+        s.customGarageDesign = p.activeJob.design;
+        p.activeJob = null;
+        p.completedJobs += 1;
         return true;
       });
       if (ok) persist(true);
