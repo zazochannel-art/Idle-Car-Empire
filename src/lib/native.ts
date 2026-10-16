@@ -32,8 +32,10 @@ function back() {
     void App.minimizeApp();
     return;
   }
-  const target = document.activeElement instanceof HTMLElement ? document.activeElement : document.body;
-  target.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", keyCode: 27, bubbles: true, cancelable: true }));
+  // Controlled Radix dialogs can miss a synthetic Escape when Android/WebView focus is stale.
+  // Notify the active React dialog directly, then keep Escape as a fallback for sheets/overlays.
+  window.dispatchEvent(new CustomEvent("idle-car-empire:native-back"));
+  document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", keyCode: 27, bubbles: true, cancelable: true }));
 }
 
 let started = false;
