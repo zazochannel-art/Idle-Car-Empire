@@ -55,6 +55,7 @@ const SCREENS = {
   garage: () => import("../garage/garage-view"),
   achievements: () => import("../views/achievements-view"),
   cars: () => import("../views/cars-view"),
+  customGarage: () => import("../custom-garage/custom-garage"),
   logistics: () => import("../views/logistics-view"),
   dealers: () => import("../views/dealers-view"),
   production: () => import("../views/production-view"),
@@ -77,6 +78,7 @@ const SCREENS = {
 const GarageView = lazy(() => retry(SCREENS.garage).then((m) => ({ default: m.GarageView })));
 const AchievementsView = lazy(() => retry(SCREENS.achievements).then((m) => ({ default: m.AchievementsView })));
 const CarsView = lazy(() => retry(SCREENS.cars).then((m) => ({ default: m.CarsView })));
+const CustomGarageView = lazy(() => retry(SCREENS.customGarage).then((m) => ({ default: m.CustomGarage })));
 const LogisticsView = lazy(() => retry(SCREENS.logistics).then((m) => ({ default: m.LogisticsView })));
 const DealersView = lazy(() => retry(SCREENS.dealers).then((m) => ({ default: m.DealersView })));
 const ProductionView = lazy(() => retry(SCREENS.production).then((m) => ({ default: m.ProductionView })));
@@ -363,6 +365,8 @@ function viewTitle(v: View, t: ReturnType<typeof useT>["t"]): string {
       return t("account.title");
     case "empire":
       return t("map.nav.factories");
+    case "customGarage":
+      return "Custom Garage Factory";
     default:
       return t(`nav.${v}`);
   }
@@ -386,6 +390,8 @@ const ViewSwitch = memo(function ViewSwitch({ view, onSettings }: { view: View; 
       return <LogisticsView />;
     case "cars":
       return <CarsView />;
+    case "customGarage":
+      return <CustomGarageView />;
     case "research":
       return <ResearchView />;
     case "managers":

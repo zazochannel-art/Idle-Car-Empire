@@ -21,6 +21,7 @@ export type View =
   | "empire"
   | "dealers"
   | "cars"
+  | "customGarage"
   | "research"
   | "managers"
   | "missions"
