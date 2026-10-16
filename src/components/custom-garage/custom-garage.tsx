@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
+import { buildCar, loadHeroes } from "@/components/three/car-models";
 import { useGame } from "@/store/game-store";
 import type { CustomGarageDesign } from "@/game/types";
 
@@ -29,13 +30,14 @@ function preview(host: HTMLDivElement, d: Design) {
   floor.rotation.x = -Math.PI / 2; floor.position.y = -.04; floor.receiveShadow = true; scene.add(floor);
   const grid = new THREE.GridHelper(40, 40, "#354252", "#202a36"); grid.position.y = -.025; scene.add(grid);
   const car = new THREE.Group(); scene.add(car);
+  const placeholder = new THREE.Group(); car.add(placeholder);
   const paint = new THREE.MeshPhysicalMaterial({ color: d.paint, metalness: .62, roughness: .25, clearcoat: .9 });
   const glass = new THREE.MeshPhysicalMaterial({ color: "#101a26", metalness: .3, roughness: .15 });
   const trim = new THREE.MeshStandardMaterial({ color: "#111318", metalness: .65, roughness: .32 });
   const rubber = new THREE.MeshStandardMaterial({ color: "#08090b", roughness: .8 });
   const rimMat = new THREE.MeshStandardMaterial({ color: d.wheels === "deep-dish" ? "#d6a76b" : "#bdc9d5", metalness: .9, roughness: .2 });
   const box = (w: number, h: number, l: number, mat: THREE.Material, x: number, y: number, z: number) => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, l), mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; car.add(m); return m;
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, l), mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; placeholder.add(m); return m;
   };
   // Safe placeholder geometry; swap for licensed GLB assets with named attachment points.
   box(2.25, .52, 4.35, paint, 0, .68, 0);
@@ -46,9 +48,9 @@ function preview(host: HTMLDivElement, d: Design) {
   box(.44, .12, .08, new THREE.MeshStandardMaterial({ color: "#d92f3d", emissive: "#5a080e" }), .72, .79, -2.22);
   const wx = d.kit === "widebody" ? 1.18 : 1.08, wy = d.lowered ? .43 : .5;
   for (const x of [-wx, wx]) for (const z of [-1.42, 1.42]) {
-    const tire = new THREE.Mesh(new THREE.CylinderGeometry(.43, .43, .28, 32), rubber); tire.rotation.z = Math.PI / 2; tire.position.set(x, wy, z); tire.castShadow = true; car.add(tire);
-    const rim = new THREE.Mesh(new THREE.CylinderGeometry(.28, .28, .295, d.wheels === "mesh" ? 24 : 5), rimMat); rim.rotation.z = Math.PI / 2; rim.position.set(x * 1.006, wy, z); car.add(rim);
-    const hub = new THREE.Mesh(new THREE.CylinderGeometry(.07, .07, .31, 16), trim); hub.rotation.z = Math.PI / 2; hub.position.set(x * 1.01, wy, z); car.add(hub);
+    const tire = new THREE.Mesh(new THREE.CylinderGeometry(.43, .43, .28, 32), rubber); tire.rotation.z = Math.PI / 2; tire.position.set(x, wy, z); tire.castShadow = true; placeholder.add(tire);
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(.28, .28, .295, d.wheels === "mesh" ? 24 : 5), rimMat); rim.rotation.z = Math.PI / 2; rim.position.set(x * 1.006, wy, z); placeholder.add(rim);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(.07, .07, .31, 16), trim); hub.rotation.z = Math.PI / 2; hub.position.set(x * 1.01, wy, z); placeholder.add(hub);
   }
   if (d.kit !== "stock") {
     const w = d.kit === "widebody" ? 2.62 : 2.36;
@@ -61,6 +63,37 @@ function preview(host: HTMLDivElement, d: Design) {
     box(1.95, .09, .28, trim, 0, 1.44, -1.72); box(.09, .25, .09, trim, -.7, 1.32, -1.72); box(.09, .25, .09, trim, .7, 1.32, -1.72);
   }
   if (d.kit === "widebody") for (const z of [-1.42, 1.42]) { box(.18, .34, .92, paint, -1.17, .68, z); box(.18, .34, .92, paint, 1.17, .68, z); }
+  let modelDisposed = false;
+  // Reuse the game’s production car builder; the primitive model remains an offline fallback.
+  void loadHeroes(THREE).then(() => {
+    if (modelDisposed) return;
+    const production = buildCar(THREE, { model: "compact", color: d.paint, finish: "gloss", build: { color: d.paint, wing: d.kit === "track" ? "gt" : d.spoiler ? "wing" : undefined } });
+    if (!production.children.length) return;
+    car.remove(placeholder);
+    car.add(production);
+    production.updateMatrixWorld(true);
+    const bounds = new THREE.Box3().setFromObject(production);
+    if (bounds.isEmpty()) return;
+    const size = bounds.getSize(new THREE.Vector3());
+    const center = bounds.getCenter(new THREE.Vector3());
+    const parts = new THREE.Group();
+    const dark = new THREE.MeshStandardMaterial({ color: "#111318", metalness: .65, roughness: .32 });
+    const bodyPaint = new THREE.MeshPhysicalMaterial({ color: d.paint, metalness: .62, roughness: .25, clearcoat: .9 });
+    const addBox = (w: number, h: number, l: number, mat: THREE.Material, x: number, y: number, z: number) => { const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, l), mat); mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true; parts.add(mesh); };
+    if (d.kit !== "stock") {
+      for (const side of [-1, 1]) addBox(size.x * .54, size.y * .035, size.z * .075, dark, center.x, bounds.min.y + size.y * .18, center.z + side * size.z * .48);
+      addBox(size.x * .36, size.y * .035, size.z * .045, bodyPaint, center.x, bounds.min.y + size.y * .2, center.z);
+    }
+    if (d.kit === "widebody") for (const x of [bounds.min.x + size.x * .22, bounds.max.x - size.x * .22]) for (const side of [-1, 1]) addBox(size.x * .13, size.y * .14, size.z * .075, bodyPaint, x, bounds.min.y + size.y * .32, center.z + side * size.z * .52);
+    const rimMat = new THREE.MeshStandardMaterial({ color: d.wheels === "deep-dish" ? "#d6a76b" : "#bdc9d5", metalness: .9, roughness: .2 });
+    const wheelX = [bounds.min.x + size.x * .22, bounds.max.x - size.x * .22];
+    for (const x of wheelX) for (const side of [-1, 1]) { const face = new THREE.Mesh(new THREE.CylinderGeometry(size.y * .105, size.y * .105, size.z * .018, d.wheels === "mesh" ? 24 : d.wheels === "five-spoke" ? 5 : 12), rimMat); face.rotation.x = Math.PI / 2; face.position.set(x, bounds.min.y + size.y * .25, center.z + side * size.z * .49); parts.add(face); }
+    if (d.kit === "track" || d.spoiler) {
+      addBox(size.z * .7, size.y * .025, size.z * .12, dark, bounds.min.x + size.x * .12, bounds.max.y + size.y * .015, center.z);
+      if (d.kit === "track") for (const side of [-1, 1]) addBox(size.y * .025, size.y * .13, size.y * .025, dark, bounds.min.x + size.x * .12, bounds.max.y - size.y * .035, center.z + side * size.z * .2);
+    }
+    car.add(parts);
+  }).catch(() => { /* keep fallback if model assets fail to load */ });
   let dragging = false, lastX = 0, rotation = -.35, frame = 0;
   const down = (e: PointerEvent) => { dragging = true; lastX = e.clientX; };
   const move = (e: PointerEvent) => { if (dragging) { rotation += (e.clientX - lastX) * .008; lastX = e.clientX; } };
@@ -72,6 +105,7 @@ function preview(host: HTMLDivElement, d: Design) {
   const animate = () => { frame = requestAnimationFrame(animate); const dt = Math.min(clock.getDelta(), .05); if (!dragging) rotation += dt * .09; car.rotation.y = rotation; renderer.render(scene, camera); };
   animate();
   return () => {
+    modelDisposed = true;
     cancelAnimationFrame(frame); observer.disconnect();
     renderer.domElement.removeEventListener("pointerdown", down); renderer.domElement.removeEventListener("pointermove", move); renderer.domElement.removeEventListener("pointerup", up); renderer.domElement.removeEventListener("pointercancel", up);
     scene.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) { m.geometry.dispose(); (Array.isArray(m.material) ? m.material : [m.material]).forEach((mat) => mat.dispose()); } });
