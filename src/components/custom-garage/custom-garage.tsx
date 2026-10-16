@@ -97,7 +97,7 @@ export function CustomGarage() {
   const [prompt, setPrompt] = useState("");
   const [notice, setNotice] = useState("Alege piese sau descrie modificarea dorită.");
   const [ready, setReady] = useState(false);
-  useEffect(() => { try { const raw = localStorage.getItem(KEY); if (raw) { const p = JSON.parse(raw) as Partial<Design>; setDesign({ ...initial, ...p, version: 1 }); } } catch { /* corrupted save: keep safe defaults */ } setReady(true); }, []);
+  useEffect(() => { const frame = window.requestAnimationFrame(() => { try { const raw = localStorage.getItem(KEY); if (raw) { const p = JSON.parse(raw) as Partial<Design>; setDesign({ ...initial, ...p, version: 1 }); } } catch { /* corrupted save: keep safe defaults */ } setReady(true); }); return () => window.cancelAnimationFrame(frame); }, []);
   useEffect(() => { if (!ready || !host.current) return; return preview(host.current, design); }, [design, ready]);
   const update = <K extends keyof Design>(key: K, value: Design[K]) => setDesign((d) => ({ ...d, [key]: value }));
   const field: React.CSSProperties = { width: "100%", background: "#111720", color: "#edf3fa", border: "1px solid #303b4b", borderRadius: 10, padding: "10px 12px", fontSize: 14 };
