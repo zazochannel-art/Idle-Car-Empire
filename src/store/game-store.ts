@@ -1,3 +1,4 @@
+import { CAR_MODEL_FOR } from "@/components/map/vehicles";
 import { setLiveryOverride } from "@/components/three/livery";
 "use client";
 
@@ -812,7 +813,7 @@ export const useGame = create<GameStore>((set, get) => {
       act((s) => D.setDesignColor(s, id, color));
       // Keep the 3D showroom/garage livery in sync with the persisted design.
       // The store is the source of truth; blank paint resets to the factory look.
-      setLiveryOverride(id as import('@/components/three/livery').LiveryModel, color);
+      setLiveryOverride(CAR_MODEL_FOR[id], color);
     },
     research: (id) => {
       const ok = act((s) => A.doResearch(s, id));
