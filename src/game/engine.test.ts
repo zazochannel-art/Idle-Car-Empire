@@ -673,7 +673,15 @@ describe("design studio", () => {
     D.renameDesign(s, "city", "  MC Rocket  ");
     expect(s.designs.city.name).toBe("MC Rocket");
     expect(D.setDesignColor(s, "city", "#1b46b8")).toBe(true);
-    expect(D.setDesignColor(s, "city", "#123456")).toBe(false);
+    // Custom Garage accepts any well-formed six-digit hex colour.
+    expect(D.setDesignColor(s, "city", "#123456")).toBe(true);
+    expect(s.designs.city.color).toBe("#123456");
+    // Reject malformed values and CSS injection.
+    expect(D.setDesignColor(s, "city", "red")).toBe(false);
+    expect(D.setDesignColor(s, "city", "url(javascript:alert(1))")).toBe(false);
+    expect(D.setDesignColor(s, "city", "#12GG56")).toBe(false);
+    expect(D.setDesignColor(s, "city", "#12345")).toBe(false);
+    expect(D.setDesignColor(s, "city", "#1b46b8")).toBe(true);
     // a reset keeps the name and colour, the options start over
     resetRun(s, T0 + 1);
     expect(s.designs.city).toMatchObject({ name: "MC Rocket", color: "#1b46b8", engine: 0 });
