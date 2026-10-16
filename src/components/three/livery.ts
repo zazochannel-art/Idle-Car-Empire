@@ -37,6 +37,12 @@ export function setLiveryOverrides(colors: Partial<Record<LiveryModel, string>>)
   }
 }
 
+/** Update one player-owned model without clearing other custom liveries. */
+export function setLiveryOverride(model: LiveryModel, color: string) {
+  if (/^#[0-9a-fA-F]{6}$/.test(color)) overrides[model] = color.toLowerCase();
+  else delete overrides[model];
+}
+
 /** The paint a model wears right now: the player's colour or the factory one. */
 export function liveryOf(model: LiveryModel): Livery {
   const c = overrides[model];
