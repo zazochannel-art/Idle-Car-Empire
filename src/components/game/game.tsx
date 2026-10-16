@@ -1,3 +1,6 @@
+import { setLiveryOverrides, type LiveryModel } from "../three/livery";
+import { CAR_MODEL_FOR } from "../map/vehicles";
+import { CARS } from "@/game/config/cars";
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
@@ -194,6 +197,19 @@ export function Game() {
   useEffect(() => {
     void init();
   }, [init]);
+
+  // Reapply persisted custom paint after local/cloud save initialization.
+  // Live changes are handled by the game-store action; this covers a fresh load.
+  useEffect(() => {
+    if (!ready) return;
+    const state = useGame.getState().state;
+    const colors: Partial<Record<LiveryModel, string>> = {};
+    for (const car of CARS) {
+      const color = state.designs[car.id]?.color;
+      if (color) colors[CAR_MODEL_FOR[car.id]] = color;
+    }
+    setLiveryOverrides(colors);
+  }, [ready]);
 
   return (
     <>
