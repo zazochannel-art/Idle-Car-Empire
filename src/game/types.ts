@@ -515,6 +515,14 @@ export interface CustomGarageDesign {
   updatedAt: number;
 }
 
+/** Production line state for the single Custom Garage factory. Jobs persist across sessions. */
+export interface CustomGarageProduction {
+  workerHired: boolean;
+  machineLevel: number;
+  activeJob: { design: CustomGarageDesign; startedAt: number; durationMs: number; cost: number } | null;
+  completedJobs: number;
+}
+
 /** The player's own model on a platform (Design studio). */
 export interface CarDesign {
   name: string;
@@ -536,6 +544,8 @@ export interface GameState {
   designs: Record<CarId, CarDesign>;
   /** Custom Garage build; optional for saves created before the feature. */
   customGarageDesign?: CustomGarageDesign | null;
+  /** The unique Custom Garage factory's production line (optional for older saves). */
+  customGarageProduction?: CustomGarageProduction;
   /** Permanent income boost from milestones (0.06 = +6%). */
   boost: number;
   /** ⭐ Stars: earned from milestones and Reset Imperium, spent on permanent upgrades. */
