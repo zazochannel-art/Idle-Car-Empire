@@ -71,7 +71,7 @@ function fromOldMap(raw: Json, now: number): GameState {
   return cleanSettings(state);
 }
 
-function migrateCustomGarageDesign(value: unknown): GameState["customGarageDesign"] {
+function migrateCustomGarageDesign(value: unknown, now: number): GameState["customGarageDesign"] {
   if (!isObject(value)) return null;
   const paint = typeof value.paint === "string" && /^#[0-9a-f]{6}$/i.test(value.paint) ? value.paint : "#1687ff";
   const kit = ["stock", "street", "widebody", "track"].includes(String(value.kit)) ? value.kit as "stock" | "street" | "widebody" | "track" : "street";
@@ -96,7 +96,7 @@ export function migrate(raw: unknown, now: number): GameState {
   // a save from an older world map: its lots don't exist on this one
   if (raw.mapVersion !== MAP_VERSION) return fromOldMap(raw, now);
   const state = mergeDefaults(fresh, raw);
-  state.customGarageDesign = migrateCustomGarageDesign(raw.customGarageDesign);
+  state.customGarageDesign = migrateCustomGarageDesign(raw.customGarageDesign, now);
   state.mapVersion = MAP_VERSION;
   // Global Expansion is gone (its regions, Empire Points and perks): each expansion
   // already made becomes a ⭐ Star; the old fields are not carried over
