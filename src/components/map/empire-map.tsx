@@ -9,7 +9,7 @@ import { CAR_BY_ID } from "@/game/config/cars";
 import { COMPONENT_BY_ID } from "@/game/config/chain";
 import { ZONES, ZONE_BY_ID } from "@/game/config/city";
 import { DEALER_BY_ID } from "@/game/config/dealerships";
-import { RACING, WORLD_MAP, plotOf } from "@/game/city/layout";
+import { CUSTOM_GARAGE_FACTORY, RACING, WORLD_MAP, plotOf } from "@/game/city/layout";
 import { racingBlocker, racingCost } from "@/game/engine/racing";
 import { zoneBlocker } from "@/game/engine/city";
 import { plotStatus, type PlotStatus } from "@/game/engine/construction";
@@ -136,6 +136,7 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
             if (!target) ui.closeAll();
             else if (target.kind === "zone") ui.selectZone(target.id);
             else if (target.kind === "vehicle") ui.setShowcase(target.v);
+            else if (target.id === CUSTOM_GARAGE_FACTORY) ui.setView("customGarage");
             else if (target.id === RACING) ui.setView("racing");
             else if (hasInterior(target.id)) {
               if (enterTimer) clearTimeout(enterTimer);
