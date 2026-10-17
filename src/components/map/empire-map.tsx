@@ -146,7 +146,7 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
             }
             else ui.selectPlot(target.id);
           },
-          { base: process.env.NEXT_PUBLIC_BASE_PATH ?? "", low: useGame.getState().state.settings.lowGraphics },
+          { low: useGame.getState().state.settings.lowGraphics },
         );
         made = e;
         e.money = (v) => formatMoney(v);

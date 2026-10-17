@@ -35,7 +35,6 @@ import { createInitialState } from "./engine/state";
 import { tick } from "./engine/tick";
 import { formatMoney, formatNumber } from "./format";
 import { decodeSave, encodeSave, migrate } from "./save/serialize";
-import { decodeTransfer, transferCodeIn, transferLink } from "./save/transfer";
 import type { CarId, GameEvent, GameState, PlantType, StructureType } from "./types";
 
 // outside every season (seasons add income) and outside market events
@@ -909,19 +908,6 @@ describe("market events", () => {
     const t = [...Array(20)].map((_, b) => b * 3 * 3_600_000 + 3_600_000 + 1).find((x) => Ev.activeEvent(x)!.event.id === "rushOrders")!;
     s.lastActiveAt = t;
     expect(snapshot(s).gm.speed).toBeCloseTo(base.speed * 1.5);
-  });
-});
-
-describe("save transfer", () => {
-  it("round-trips a save through a compressed link", async () => {
-    const s = createInitialState(T0);
-    s.cash = 12_345;
-    const link = await transferLink(s, "https://example.com/Idle-Car-Empire/");
-    const code = transferCodeIn(new URL(link).hash)!;
-    const back = decodeSave(await decodeTransfer(code), T0);
-    expect(back.cash).toBe(12_345);
-    expect(link.length).toBeLessThan(encodeSave(s).length);
-    await expect(decodeTransfer("z1.broken")).rejects.toThrow();
   });
 });
 

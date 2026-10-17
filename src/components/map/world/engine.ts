@@ -150,8 +150,6 @@ interface Live {
 }
 
 export interface EngineOptions {
-  /** Where the world files are served (the site's base path). */
-  base: string;
   low: boolean;
 }
 
@@ -269,7 +267,7 @@ export class MapEngine {
   // ───────────────────────── loading ─────────────────────────
 
   private async load() {
-    const base = `${this.opt.base}/world`;
+    const base = "/world";
     const [data, heights, areas] = await Promise.all([
       fetch(`${base}/world.json`).then((r) => r.json() as Promise<WorldJson>),
       fetch(`${base}/heights.bin`).then((r) => r.arrayBuffer()),

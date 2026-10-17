@@ -2,7 +2,7 @@
 
 The Android app offers **rewarded ads**: the player chooses to watch a short ad
 for a bonus. Nothing in the game needs one, and no ad plays without a tap. The
-web version (GitHub Pages) has no ads.
+iOS app shows the same offers ([../ios.md](../ios.md)).
 
 ## What an ad gives
 
@@ -29,7 +29,7 @@ no offer.
   in `android/variables.gradle`) and Google's User Messaging Platform (4.0.0).
 - **Loaded only in the app:** `src/lib/native-ads.ts` is imported from
   `src/lib/native.ts`, which only the Android app loads. The screens use
-  `src/lib/ads.ts`, which never loads the plugin, so on the web no ad is ever
+  `src/lib/ads.ts`, which never loads the plugin, so in a development browser no ad is ever
   ready and no offer shows.
 - **Consent first:** at start the app asks Google's UMP whether consent is
   needed (the EEA, the UK, Switzerland). If it is, Google's consent form shows
@@ -108,8 +108,8 @@ They can't be done from the repository.
 
 ## Declarations that changed with ads
 
-- **Privacy policy** (`public/privacy/index.html`): the section "Ads in the
-  Android app" covers:
+- **Privacy policy** (`site/privacy/index.html`): the section "Ads in the
+  app" covers:
   - what Google collects;
   - consent;
   - how to reset the advertising ID.

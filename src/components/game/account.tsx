@@ -4,7 +4,7 @@
 // the profile page, the sign-in and registration forms, and the choices the
 // start of the game and a save conflict may ask for.
 import { motion } from "framer-motion";
-import { Cloud, CloudOff, History, KeyRound, LogIn, LogOut, Mail, RefreshCw, Trash2, UserPlus } from "lucide-react";
+import { Cloud, CloudOff, History, KeyRound, LogIn, LogOut, RefreshCw, Trash2, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -16,7 +16,7 @@ import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { answerStartChoice, enterGame, useCloud } from "@/store/cloud-store";
 import { trackGate } from "@/game/save/funnel";
-import { isNativeApp, publicPageUrl } from "@/lib/platform";
+import { SITE_URL } from "@/lib/platform";
 import { uiEvents } from "@/store/events";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
@@ -26,10 +26,8 @@ type T = ReturnType<typeof useT>["t"];
 
 export const AVATARS = ["🧑‍🔧", "👩‍🔧", "👨‍💼", "👩‍💼", "🧑‍🏭", "🦁", "🐺", "🦊", "🐯", "🦅", "🐻", "🐼", "🚗", "🏎️", "🏁", "👑"];
 
-/** Where email links bring the player back: this page, without its hash (the web game, from the app). */
-const here = publicPageUrl;
-/** A sign-in link opens the browser, not the app: the app signs in with the password only. */
-const linkSignIn = () => !isNativeApp();
+/** Where an account email's link leads (the game's site says the address is confirmed): the app signs in with the password. */
+const here = () => SITE_URL;
 
 const ago = (t: T, ms: number | null) => (ms ? t("account.ago", { time: formatDuration(Math.max(1, (Date.now() - ms) / 1000)) }) : "—");
 
@@ -179,11 +177,6 @@ export function AccountForms({ initial, guest, onDone }: { initial: "login" | "r
           >
             <LogIn /> {t("account.login")}
           </Button>
-          {linkSignIn() && (
-            <Button size="sm" variant="ghost" className="w-full" disabled={!validEmail(email) || busy} onClick={() => run(() => saves.sendLink(email.trim(), here()), () => t("account.linkSent"))}>
-              <Mail /> {t("account.sendLink")}
-            </Button>
-          )}
         </>
       )}
       {msg && <p className={cn("text-center text-xs", msg.bad ? "text-rose-300" : "text-sky-300")}>{msg.text}</p>}
@@ -669,22 +662,6 @@ function WelcomeGate({ returning }: { returning: boolean }) {
           )}
         </Button>
       </form>
-      {tab === "login" && linkSignIn() && (
-        <Button
-          size="sm"
-          variant="ghost"
-          className="w-full"
-          disabled={!validEmail(email) || busy}
-          onClick={() =>
-            run(async () => {
-              const r = await saves.sendLink(email.trim(), here());
-              setMsg(r.ok ? { text: t("account.linkSent") } : { text: errorText(t, r), bad: true });
-            })
-          }
-        >
-          <Mail /> {t("account.sendLink")}
-        </Button>
-      )}
       {msg && <p className={cn("text-center text-xs", msg.bad ? "text-rose-300" : "text-sky-300")}>{msg.text}</p>}
       <div className="border-t border-white/10 pt-2.5 text-center">
         <button className="text-[11px] font-bold text-white/55 underline-offset-2 hover:text-white/80 hover:underline" disabled={busy} onClick={() => enterGame("guest")}>

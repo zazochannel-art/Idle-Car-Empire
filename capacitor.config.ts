@@ -1,9 +1,8 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
-// The Android app: the game's static export (`npm run build:android` builds it
-// without the GitHub Pages prefix) packaged inside the app, so it starts and
-// plays with no connection. Cloud saves and the other online features call
-// Supabase from the app exactly as the web version does.
+// The Android and iOS apps: the game's static export (`npm run build:app`)
+// packaged inside each app, so it starts and plays with no connection. Cloud
+// saves and the other online features call Supabase from the app.
 const config: CapacitorConfig = {
   // Permanent once the app is on Google Play: a new id is a different app.
   appId: "com.zazochannel.idlecarempire",
@@ -22,6 +21,10 @@ const config: CapacitorConfig = {
     // the game never loads http:// content
     allowMixedContent: false,
   },
+  ios: {
+    // the page runs edge to edge; the game pads its HUD with env(safe-area-inset-*)
+    contentInset: "never",
+  },
   plugins: {
     SystemBars: {
       // light status-bar icons over the game's dark screens; the game pads its HUD and
@@ -29,6 +32,11 @@ const config: CapacitorConfig = {
       style: "DARK",
       insetsHandling: "css",
       initialViewportFitValueHint: "cover",
+    },
+    LocalNotifications: {
+      // Android: the emblem's silhouette (scripts/app-assets.mjs), tinted in the game's gold
+      smallIcon: "ic_stat_notify",
+      iconColor: "#f59e0b",
     },
   },
 };

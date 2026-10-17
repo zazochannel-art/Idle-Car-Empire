@@ -1,0 +1,86 @@
+name: iOS
+
+# Builds the iPhone/iPad app from the same game code as the Android app, for the
+# iOS Simulator (no signing: that needs the owner's Apple Developer account, see
+# docs/ios.md), then starts it in a simulator and checks that the game comes up.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  simulator:
+    name: Build and run in the iOS Simulator
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Build the game for the app
+        run: npm run build:ios
+        env:
+          # the public Supabase project and key (the same as the Android app's)
+          NEXT_PUBLIC_SUPABASE_URL: https://orffhhsogoymalyogfzl.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_hqGfNt6uaNbq0AgGyp0I8g_QLjjFaJ-
+          # the iOS rewarded ad unit of the AdMob account, a repository variable (docs/ios.md);
+          # unset: Google's test ads
+          NEXT_PUBLIC_ADMOB_REWARDED_ID_IOS: ${{ vars.ADMOB_REWARDED_ID_IOS }}
+      - name: Xcode
+        run: xcodebuild -version
+      - name: Build for the simulator
+        env:
+          ADMOB_APP_ID_IOS: ${{ vars.ADMOB_APP_ID_IOS }}
+        run: |
+          # the AdMob app id: the repository variable, else Google's sample (set in the project)
+          extra=()
+          if [ -n "$ADMOB_APP_ID_IOS" ]; then extra+=("ADMOB_APP_ID=$ADMOB_APP_ID_IOS"); fi
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build/ios CODE_SIGNING_ALLOWED=NO "${extra[@]}" build | tail -40
+          test -d build/ios/Build/Products/Debug-iphonesimulator/App.app
+      - name: Run it in a simulator
+        run: |
+          set -x
+          # the newest iPhone the runner has
+          udid=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          d = json.load(sys.stdin)["devices"]
+          phones = [(rt, x["udid"], x["name"]) for rt, xs in d.items() if "iOS" in rt for x in xs if x["name"].startswith("iPhone")]
+          print(sorted(phones)[-1][1])')
+          xcrun simctl boot "$udid"
+          xcrun simctl bootstatus "$udid" -b
+          xcrun simctl install "$udid" build/ios/Build/Products/Debug-iphonesimulator/App.app
+          mkdir -p ios-check
+          # Capacitor prints what the app loads and the page's console to the app's output; through a
+          # terminal (--console-pty) each line arrives at once (to a file, it would wait in a buffer)
+          xcrun simctl launch --console-pty "$udid" com.zazochannel.idlecarempire > ios-check/app.log 2>&1 &
+          console=$!
+          sleep 60
+          xcrun simctl io "$udid" screenshot ios-check/game.png
+          # still running after a minute (no crash at start)
+          xcrun simctl spawn "$udid" launchctl list | grep -q "com.zazochannel.idlecarempire" || { echo "::error::the app is not running"; tail -80 ios-check/app.log; exit 1; }
+          kill "$console" 2>/dev/null || true
+          # Capacitor loaded the game's page from inside the app
+          grep -q "Loading app at capacitor://localhost" ios-check/app.log || { echo "::error::the game's page did not load"; tail -80 ios-check/app.log; exit 1; }
+          if grep -E "⚡️  \[error\]" ios-check/app.log; then echo "::warning::the page logged errors (above)"; fi
+          # a screen with the game on it (a blank screen is a few KB)
+          size=$(stat -f%z ios-check/game.png); echo "screenshot: $size bytes"
+          test "$size" -gt 100000 || { echo "::error::the screen looks empty"; exit 1; }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-simulator-check
+          path: ios-check
+          if-no-files-found: ignore

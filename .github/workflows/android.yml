@@ -1,6 +1,6 @@
 name: Android
 
-# Builds the Android app from the same game code as the web version:
+# Builds the Android app from the game code (the iOS app is built by ios.yml):
 # - a debug APK (install it on a phone to test: docs/android/README.md),
 # - a release App Bundle (.aab) for Google Play, signed with the upload key when the
 #   repository has it in its secrets (docs/android/signing.md), unsigned otherwise,
@@ -40,7 +40,7 @@ jobs:
       - name: Build the game for the app
         run: npm run build:android
         env:
-          # the same public Supabase project and key as the web build (pages.yml)
+          # the public Supabase project and key (the same as the iOS app's, ios.yml)
           NEXT_PUBLIC_SUPABASE_URL: https://orffhhsogoymalyogfzl.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_hqGfNt6uaNbq0AgGyp0I8g_QLjjFaJ-
           # the rewarded ad unit of the AdMob account, a repository variable (docs/android/ads.md);

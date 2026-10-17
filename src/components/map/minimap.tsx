@@ -69,7 +69,7 @@ export function Minimap({ engine }: { engine: RefObject<MapEngine | null> }) {
     canvas.width = W * dpr;
     canvas.height = H * dpr;
     const ctx = canvas.getContext("2d")!;
-    const base = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/world`;
+    const base = "/world";
     let island: HTMLImageElement | null = null;
     let areas: HTMLImageElement | null = null;
     let fog: { key: string; cv: HTMLCanvasElement } | null = null;

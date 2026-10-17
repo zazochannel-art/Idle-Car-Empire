@@ -60,10 +60,11 @@ function flag(key: string, on?: boolean): boolean {
   }
 }
 
-/** "Windows · Chrome": which device saved, shown when two saves differ. */
+/** "iPhone", "Android": which device saved, shown when two saves differ (a development browser adds its name). */
 export function deviceLabel(ua = typeof navigator !== "undefined" ? navigator.userAgent : ""): string {
-  const os = /iPhone|iPad/.test(ua) ? "iOS" : /Android/.test(ua) ? "Android" : /Windows/.test(ua) ? "Windows" : /Mac OS/.test(ua) ? "macOS" : /Linux/.test(ua) ? "Linux" : "";
-  const br = /Edg\//.test(ua) ? "Edge" : /OPR\//.test(ua) ? "Opera" : /Firefox\//.test(ua) ? "Firefox" : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : "";
+  const os = /iPhone/.test(ua) ? "iPhone" : /iPad/.test(ua) ? "iPad" : /Android/.test(ua) ? "Android" : /Windows/.test(ua) ? "Windows" : /Mac OS/.test(ua) ? "macOS" : /Linux/.test(ua) ? "Linux" : "";
+  // the apps' web views (Android's says "wv"; iOS's names no browser) are just the phone
+  const br = /; wv\)/.test(ua) ? "" : /Edg\//.test(ua) ? "Edge" : /OPR\//.test(ua) ? "Opera" : /Firefox\//.test(ua) ? "Firefox" : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : "";
   return [os, br].filter(Boolean).join(" · ").slice(0, 64) || "device";
 }
 
@@ -336,10 +337,6 @@ export class SaveManager {
       flag(SIGNED_OUT_KEY, false);
     }
     return res;
-  }
-
-  async sendLink(email: string, redirectTo: string): Promise<AuthResult> {
-    return this.backend ? this.backend.sendLink(email, redirectTo) : { ok: false, error: "network" };
   }
 
   /**

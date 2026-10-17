@@ -11,23 +11,36 @@ city with five more islands round it, joined by bridges: eight districts and
 eight territories to unlock, each a real part of the map (a downtown of
 towers, a Speedway, a red canyon, mountains, a port, an airport…). It has day
 and night lighting, plants that grow from Small to Mega Factory, and a live
-factory-floor view. It is made for phones first.
+factory-floor view.
 
-Built with Next.js (App Router, static export), TypeScript, Tailwind CSS v4,
-shadcn/ui-style components, Lucide icons, Framer Motion and Zustand. Saves go
-to `localStorage`, with optional Supabase cloud saves.
+**It is a phone app, for Android and iOS.** The game is built with Next.js
+(App Router, static export), TypeScript, Tailwind CSS v4, shadcn/ui-style
+components, Lucide icons, Framer Motion and Zustand, and ships inside each
+app with [Capacitor](https://capacitorjs.com): it starts and plays with no
+connection. Saves stay on the phone, with optional Supabase cloud saves.
 
-**Play:** https://zazochannel-art.github.io/Idle-Car-Empire/
+- Android: [`docs/android/`](docs/android/README.md) (APK, Google Play bundle,
+  emulator checks).
+- iOS: [`docs/ios.md`](docs/ios.md) (Xcode project, simulator check, App
+  Store).
+
+The game no longer runs in a browser. The public site
+(zazochannel-art.github.io/Idle-Car-Empire) only carries what the stores and
+players need, from [`site/`](site): the privacy policy, account deletion, and
+a page that confirms account emails and hands a save left in a browser to the
+app.
 
 ## Run it
 
 ```bash
 npm install
-npm run dev        # http://localhost:3000
-npm run build      # static site in out/
+npm run dev        # the game in a development browser, http://localhost:3000
 npm test           # engine unit tests (vitest)
 npm run lint && npm run typecheck
 npm run simulate -- 3   # balance bot: plays 3 hours and logs milestones
+npm run build:app  # the game for both apps (out/) + cap sync
+npm run android:open    # Android Studio
+npm run ios:open        # Xcode (on a Mac)
 ```
 
 ## How to play
@@ -198,11 +211,16 @@ its engine, seats, glass, wheels, paint and lights station by station.
 The UI never contains economy numbers; tune the game in `src/game/config/` and
 check the pacing with `npm run simulate`.
 
-## Deploy
+## Builds
 
-Every push to `main` builds the static site and publishes it to GitHub Pages
-(`.github/workflows/pages.yml`). In the repository settings, **Pages → Build
-and deployment → Source** must be set to **GitHub Actions**.
+- **Android** (`.github/workflows/android.yml`): a debug APK and the release
+  App Bundle for Google Play, and a run on an Android emulator.
+- **iOS** (`.github/workflows/ios.yml`): a simulator build, started in an
+  iPhone simulator. A build for the App Store is made in Xcode with the
+  owner's Apple account ([`docs/ios.md`](docs/ios.md)).
+- **The site** (`.github/workflows/pages.yml`): the files in `site/`,
+  published to GitHub Pages when they change. In the repository settings,
+  **Pages → Build and deployment → Source** must be set to **GitHub Actions**.
 
 ## Player accounts and cloud saves (optional)
 

@@ -8,10 +8,10 @@ settings, or while it can't be reached, it saves on the device only.
 
 - **Welcome page**: before the game, a player who isn't signed in on this
   device sees "Create account" (name, email, password) and "Sign in" (email
-  and password, or a sign-in link by email). Nothing starts or saves behind
-  it. A small "Play without an account" link at the bottom starts a guest
-  game (Supabase anonymous sign-in, saved to the cloud but reachable only
-  from this browser), which can become an account later from the profile.
+  and password). Nothing starts or saves behind it. A small "Play without an
+  account" link at the bottom starts a guest game (Supabase anonymous
+  sign-in, saved to the cloud but reachable only from this phone), which can
+  become an account later from the profile.
 - **Create an account**: under the hood it is a guest account that gets the
   name, email and password, so a confirmation email the player hasn't
   clicked yet never blocks the game (they play meanwhile, the profile shows
@@ -238,15 +238,15 @@ with the Supabase CLI (`supabase db push`).
 
 ### Environment variables
 
-Only two, both **public by design** (they end up in the browser):
+Only two, both **public by design** (they ship inside the apps):
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<publishable key, "sb_publishable_…" (or the legacy anon key)>
 ```
 
-Locally: copy `.env.example` to `.env.local`. For GitHub Pages they are set
-in `.github/workflows/pages.yml`. **Never** put the `service_role` /
+Locally: copy `.env.example` to `.env.local`. For the app builds they are set
+in `.github/workflows/android.yml` and `ios.yml`. **Never** put the `service_role` /
 `sb_secret_…` key in the game, the repository or a workflow: it bypasses Row
 Level Security. The game doesn't need it.
 
@@ -268,7 +268,8 @@ Level Security. The game doesn't need it.
    under the guest account.
 3. **Authentication → URL Configuration**: Site URL
    `https://zazochannel-art.github.io/Idle-Car-Empire/`, and the same URL
-   under Redirect URLs (it is where confirmation and sign-in links lead).
+   under Redirect URLs (it is where confirmation links lead: the site's page
+   there says the address is confirmed and to go back to the app).
 4. Free plan notes: the project pauses after a week without any traffic
    (restore it from the dashboard; the game keeps saving on devices
    meanwhile), and anonymous sign-ins are rate limited per IP (30/hour by
