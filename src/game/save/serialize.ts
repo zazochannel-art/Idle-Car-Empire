@@ -10,6 +10,7 @@ import { migrateEv } from "../engine/ev";
 import { migratePass } from "../engine/pass";
 import { migrateAds } from "../engine/ads";
 import { migrateCity, unlockOwnedZones } from "../engine/city";
+import { migrateProduction, sanitizeDesign } from "../engine/custom-garage";
 import { createInitialState, MAP_VERSION, SAVE_VERSION } from "../engine/state";
 import { ACHIEVEMENTS } from "../config/achievements";
 import type { GameState } from "../types";
@@ -71,24 +72,6 @@ function fromOldMap(raw: Json, now: number): GameState {
   return cleanSettings(state);
 }
 
-function migrateCustomGarageDesign(value: unknown, now: number): GameState["customGarageDesign"] {
-  if (!isObject(value)) return null;
-  const paint = typeof value.paint === "string" && /^#[0-9a-f]{6}$/i.test(value.paint) ? value.paint : "#1687ff";
-  const kit = ["stock", "street", "widebody", "track"].includes(String(value.kit)) ? value.kit as "stock" | "street" | "widebody" | "track" : "street";
-  const wheels = ["five-spoke", "mesh", "deep-dish"].includes(String(value.wheels)) ? value.wheels as "five-spoke" | "mesh" | "deep-dish" : "deep-dish";
-  return {
-    version: 1,
-    name: typeof value.name === "string" ? value.name.slice(0, 48) : "My Custom Build",
-    paint,
-    kit,
-    wheels,
-    lowered: typeof value.lowered === "boolean" ? value.lowered : true,
-    spoiler: typeof value.spoiler === "boolean" ? value.spoiler : true,
-    prompt: typeof value.prompt === "string" ? value.prompt.slice(0, 500) : "",
-    updatedAt: typeof value.updatedAt === "number" && Number.isFinite(value.updatedAt) && value.updatedAt >= 0 ? value.updatedAt : now,
-  };
-}
-
 export function migrate(raw: unknown, now: number): GameState {
   const fresh = createInitialState(now);
   if (!isObject(raw)) return fresh;
@@ -96,7 +79,9 @@ export function migrate(raw: unknown, now: number): GameState {
   // a save from an older world map: its lots don't exist on this one
   if (raw.mapVersion !== MAP_VERSION) return fromOldMap(raw, now);
   const state = mergeDefaults(fresh, raw);
-  state.customGarageDesign = migrateCustomGarageDesign(raw.customGarageDesign, now);
+  // the Custom Garage build and its production line (a job holds a whole design: no typed default to merge against)
+  state.customGarageDesign = sanitizeDesign(raw.customGarageDesign, now);
+  state.customGarageProduction = migrateProduction(raw.customGarageProduction, now);
   state.mapVersion = MAP_VERSION;
   // Global Expansion is gone (its regions, Empire Points and perks): each expansion
   // already made becomes a ⭐ Star; the old fields are not carried over

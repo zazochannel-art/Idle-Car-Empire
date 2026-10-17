@@ -9,9 +9,10 @@ import * as Co from "./engine/construction";
 import { snapshot } from "./engine/economy";
 import { computeOffline } from "./engine/offline";
 import { resetRun } from "./engine/reset";
-import { createInitialState } from "./engine/state";
+import { createInitialState, MAP_VERSION } from "./engine/state";
 import { tick } from "./engine/tick";
 import { decodeSave, encodeSave, migrate } from "./save/serialize";
+import MAP_V3_LOTS from "./save/fixtures/map-v3-lots.json";
 
 // outside every season (seasons add income) and outside market events
 const T0 = Date.UTC(2026, 2, 1, 12);
@@ -68,6 +69,20 @@ describe("world layout", () => {
     const ranked = WORLD_MAP.plots.filter((p) => p.kind === "plot").sort((a, b) => a.rank! - b.rank!);
     const stage = (z: string) => ZONES.find((x) => x.id === z)!.stage;
     for (let i = 1; i < ranked.length; i++) expect(stage(ranked[i].zone)).toBeGreaterThanOrEqual(stage(ranked[i - 1].zone));
+  });
+
+  it("keeps every lot of this map version where it was, zoned as it was (saves name their buildings by lot)", () => {
+    // a lot taken away or rezoned loses what players built there: that needs a new MAP_VERSION and a migration
+    expect(MAP_VERSION).toBe(3);
+    expect(Object.fromEntries(WORLD_MAP.plots.filter((p) => p.kind === "plot").map((p) => [p.id, p.use]))).toEqual(MAP_V3_LOTS);
+  });
+
+  it("a save with the Car Assembly Plant on the big industrial lot keeps it", () => {
+    const raw = JSON.parse(JSON.stringify(createInitialState(T0)));
+    raw.city.buildings["b:industrial:0"] = { type: "assemblyPlant", level: 3 };
+    const s = migrate(raw, T0);
+    expect(s.city.buildings["b:industrial:0"]).toMatchObject({ type: "assemblyPlant", level: 3 });
+    expect(s.city.land).toContain("b:industrial:0");
   });
 
   it("lots never overlap and face their road, with the entry on it", () => {

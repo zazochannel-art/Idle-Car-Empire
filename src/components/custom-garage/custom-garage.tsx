@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { buildCar, loadHeroes } from "@/components/three/car-models";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
+import { sanitizeDesign } from "@/game/engine/custom-garage";
 import type { CustomGarageDesign } from "@/game/types";
 
 type Kit = "stock" | "street" | "widebody" | "track";
@@ -13,25 +14,17 @@ type Design = CustomGarageDesign;
 const KEY = "ice.customGarage.design.v1";
 const initial: Design = { version: 1, name: "My Custom Build", paint: "#1687ff", kit: "street", wheels: "deep-dish", lowered: true, spoiler: true, prompt: "", updatedAt: Date.now() };
 
-function preview(host: HTMLDivElement, d: Design) {
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color("#10151d");
-  const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
-  camera.position.set(5.5, 3.6, 7.5); camera.lookAt(0, 0.6, 0);
-  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "low-power" });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-  renderer.shadowMap.enabled = true; renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  host.replaceChildren(renderer.domElement);
-  Object.assign(renderer.domElement.style, { width: "100%", height: "100%", display: "block", touchAction: "pan-y" });
-  scene.add(new THREE.HemisphereLight("#dceaff", "#252a31", 2));
-  const key = new THREE.DirectionalLight("#fff", 3); key.position.set(4, 8, 5); key.castShadow = true; scene.add(key);
-  const rim = new THREE.DirectionalLight("#54aaff", 2); rim.position.set(-5, 3, -4); scene.add(rim);
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshStandardMaterial({ color: "#171d25", roughness: .8 }));
-  floor.rotation.x = -Math.PI / 2; floor.position.y = -.04; floor.receiveShadow = true; scene.add(floor);
-  const grid = new THREE.GridHelper(40, 40, "#354252", "#202a36"); grid.position.y = -.025; scene.add(grid);
-  const car = new THREE.Group(); scene.add(car);
-  const placeholder = new THREE.Group(); car.add(placeholder);
+/** What the 3D preview shows of a design (its name and brief don't change the car). */
+type Look = Pick<Design, "paint" | "kit" | "wheels" | "lowered" | "spoiler">;
+
+/** Frees a car the preview no longer shows (the game's shared car assets stay). */
+function disposeCar(o: THREE.Object3D) {
+  o.traverse((x) => { const m = x as THREE.Mesh; if (m.isMesh) { if (!m.geometry.userData.keep) m.geometry.dispose(); (Array.isArray(m.material) ? m.material : [m.material]).forEach((mat) => { if (!mat.userData.keep) mat.dispose(); }); } });
+}
+
+/** The car for a look: simple shapes at once, then the game's production model once its assets are loaded. */
+function carFor(d: Look, onModel: (model: THREE.Object3D) => void) {
+  const placeholder = new THREE.Group();
   const paint = new THREE.MeshPhysicalMaterial({ color: d.paint, metalness: .62, roughness: .25, clearcoat: .9 });
   const glass = new THREE.MeshPhysicalMaterial({ color: "#101a26", metalness: .3, roughness: .15 });
   const trim = new THREE.MeshStandardMaterial({ color: "#111318", metalness: .65, roughness: .32 });
@@ -64,14 +57,12 @@ function preview(host: HTMLDivElement, d: Design) {
     box(1.95, .09, .28, trim, 0, 1.44, -1.72); box(.09, .25, .09, trim, -.7, 1.32, -1.72); box(.09, .25, .09, trim, .7, 1.32, -1.72);
   }
   if (d.kit === "widebody") for (const z of [-1.42, 1.42]) { box(.18, .34, .92, paint, -1.17, .68, z); box(.18, .34, .92, paint, 1.17, .68, z); }
-  let modelDisposed = false;
   // Reuse the game’s production car builder; the primitive model remains an offline fallback.
   void loadHeroes(THREE).then(() => {
-    if (modelDisposed) return;
     const production = buildCar(THREE, { model: "compact", color: d.paint, finish: "gloss", build: { color: d.paint, wing: d.kit === "track" ? "gt" : d.spoiler ? "wing" : undefined } });
     if (!production.children.length) return;
-    car.remove(placeholder);
-    car.add(production);
+    const model = new THREE.Group();
+    model.add(production);
     production.updateMatrixWorld(true);
     const bounds = new THREE.Box3().setFromObject(production);
     if (bounds.isEmpty()) return;
@@ -93,8 +84,37 @@ function preview(host: HTMLDivElement, d: Design) {
       addBox(size.z * .7, size.y * .025, size.z * .12, dark, bounds.min.x + size.x * .12, bounds.max.y + size.y * .015, center.z);
       if (d.kit === "track") for (const side of [-1, 1]) addBox(size.y * .025, size.y * .13, size.y * .025, dark, bounds.min.x + size.x * .12, bounds.max.y - size.y * .035, center.z + side * size.z * .2);
     }
-    car.add(parts);
+    model.add(parts);
+    onModel(model);
   }).catch(() => { /* keep fallback if model assets fail to load */ });
+  return placeholder;
+}
+
+/**
+ * The 3D preview: one renderer (one WebGL context) for as long as the screen is open,
+ * the car swapped when the look changes. A renderer per change would use up the
+ * browser's few contexts, and the oldest one it drops can be the map's.
+ */
+function createPreview(host: HTMLDivElement) {
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color("#10151d");
+  const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+  camera.position.set(5.5, 3.6, 7.5); camera.lookAt(0, 0.6, 0);
+  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "low-power" });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  renderer.shadowMap.enabled = true; renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  host.replaceChildren(renderer.domElement);
+  Object.assign(renderer.domElement.style, { width: "100%", height: "100%", display: "block", touchAction: "pan-y" });
+  scene.add(new THREE.HemisphereLight("#dceaff", "#252a31", 2));
+  const key = new THREE.DirectionalLight("#fff", 3); key.position.set(4, 8, 5); key.castShadow = true; scene.add(key);
+  const rim = new THREE.DirectionalLight("#54aaff", 2); rim.position.set(-5, 3, -4); scene.add(rim);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshStandardMaterial({ color: "#171d25", roughness: .8 }));
+  floor.rotation.x = -Math.PI / 2; floor.position.y = -.04; floor.receiveShadow = true; scene.add(floor);
+  const grid = new THREE.GridHelper(40, 40, "#354252", "#202a36"); grid.position.y = -.025; scene.add(grid);
+  const car = new THREE.Group(); scene.add(car);
+  let shown = 0;
+  const swap = (o: THREE.Object3D) => { for (const c of [...car.children]) { car.remove(c); disposeCar(c); } car.add(o); };
   let dragging = false, lastX = 0, rotation = -.35, frame = 0;
   const down = (e: PointerEvent) => { dragging = true; lastX = e.clientX; };
   const move = (e: PointerEvent) => { if (dragging) { rotation += (e.clientX - lastX) * .008; lastX = e.clientX; } };
@@ -102,15 +122,21 @@ function preview(host: HTMLDivElement, d: Design) {
   renderer.domElement.addEventListener("pointerdown", down); renderer.domElement.addEventListener("pointermove", move); renderer.domElement.addEventListener("pointerup", up); renderer.domElement.addEventListener("pointercancel", up);
   const resize = () => { const w = Math.max(1, host.clientWidth), h = Math.max(1, host.clientHeight); renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); };
   const observer = new ResizeObserver(resize); observer.observe(host); resize();
-  const clock = new THREE.Clock();
-  const animate = () => { frame = requestAnimationFrame(animate); const dt = Math.min(clock.getDelta(), .05); if (!dragging) rotation += dt * .09; car.rotation.y = rotation; renderer.render(scene, camera); };
-  animate();
-  return () => {
-    modelDisposed = true;
-    cancelAnimationFrame(frame); observer.disconnect();
-    renderer.domElement.removeEventListener("pointerdown", down); renderer.domElement.removeEventListener("pointermove", move); renderer.domElement.removeEventListener("pointerup", up); renderer.domElement.removeEventListener("pointercancel", up);
-    scene.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) { if (!m.geometry.userData.keep) m.geometry.dispose(); (Array.isArray(m.material) ? m.material : [m.material]).forEach((mat) => { if (!mat.userData.keep) mat.dispose(); }); } });
-    renderer.dispose(); renderer.domElement.remove();
+  const timer = new THREE.Timer();
+  const animate = (t: number) => { frame = requestAnimationFrame(animate); timer.update(t); const dt = Math.min(timer.getDelta(), .05); if (!dragging) rotation += dt * .09; car.rotation.y = rotation; renderer.render(scene, camera); };
+  frame = requestAnimationFrame(animate);
+  return {
+    show(d: Look) {
+      const id = ++shown;
+      swap(carFor(d, (model) => { if (id === shown) swap(model); else disposeCar(model); }));
+    },
+    dispose() {
+      shown = -1;
+      cancelAnimationFrame(frame); observer.disconnect();
+      renderer.domElement.removeEventListener("pointerdown", down); renderer.domElement.removeEventListener("pointermove", move); renderer.domElement.removeEventListener("pointerup", up); renderer.domElement.removeEventListener("pointercancel", up);
+      disposeCar(scene);
+      renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
+    },
   };
 }
 
@@ -140,7 +166,7 @@ export function CustomGarage() {
   const upgradeMachine = useGame((s) => s.upgradeCustomGarageMachine);
   const startJob = useGame((s) => s.startCustomGarageJob);
   const claimJob = useGame((s) => s.claimCustomGarageJob);
-  const [clockNow, setClockNow] = useState(Date.now());
+  const [clockNow, setClockNow] = useState(() => Date.now());
   const [design, setDesign] = useState<Design>(initial);
   const [prompt, setPrompt] = useState("");
   const [notice, setNotice] = useState("Alege piese sau descrie modificarea dorită.");
@@ -152,20 +178,23 @@ export function CustomGarage() {
     const timer = window.setTimeout(() => {
       try {
         const raw = savedDesignJson || localStorage.getItem(KEY);
-        if (raw) {
-          const p = JSON.parse(raw) as Partial<Design>;
-          const safePaint = typeof p.paint === "string" && /^#[0-9a-f]{6}$/i.test(p.paint) ? p.paint : initial.paint;
-          const safeKit: Kit = ["stock", "street", "widebody", "track"].includes(String(p.kit)) ? p.kit as Kit : initial.kit;
-          const safeWheels: Wheels = ["five-spoke", "mesh", "deep-dish"].includes(String(p.wheels)) ? p.wheels as Wheels : initial.wheels;
-          setDesign({ ...initial, ...p, version: 1, name: typeof p.name === "string" ? p.name.slice(0, 48) : initial.name, paint: safePaint, kit: safeKit, wheels: safeWheels, lowered: typeof p.lowered === "boolean" ? p.lowered : initial.lowered, spoiler: typeof p.spoiler === "boolean" ? p.spoiler : initial.spoiler, prompt: typeof p.prompt === "string" ? p.prompt.slice(0, 500) : "" });
-        }
+        const saved = raw ? sanitizeDesign(JSON.parse(raw), Date.now()) : null;
+        if (saved) setDesign(saved);
       } catch { /* corrupted save: keep safe defaults */ }
       setReady(true);
     }, 0);
     return () => window.clearTimeout(timer);
   }, [gameReady, savedDesignJson]);
-  useEffect(() => { if (!ready || !host.current) return; return preview(host.current, design); }, [design, ready]);
-  useEffect(() => { const timer = window.setInterval(() => setClockNow(Date.now()), 250); return () => window.clearInterval(timer); }, []);
+  const preview = useRef<ReturnType<typeof createPreview> | null>(null);
+  useEffect(() => {
+    if (!ready || !host.current) return;
+    const p = (preview.current = createPreview(host.current));
+    return () => { p.dispose(); preview.current = null; };
+  }, [ready]);
+  // only what the car looks like redraws it (not every letter of its name)
+  useEffect(() => { preview.current?.show({ paint: design.paint, kit: design.kit, wheels: design.wheels, lowered: design.lowered, spoiler: design.spoiler }); }, [ready, design.paint, design.kit, design.wheels, design.lowered, design.spoiler]);
+  const working = !!production?.activeJob;
+  useEffect(() => { if (!working) return; const timer = window.setInterval(() => setClockNow(Date.now()), 250); return () => window.clearInterval(timer); }, [working]);
   const update = <K extends keyof Design>(key: K, value: Design[K]) => setDesign((d) => ({ ...d, [key]: value }));
   const field: React.CSSProperties = { width: "100%", background: "#111720", color: "#edf3fa", border: "1px solid #303b4b", borderRadius: 10, padding: "10px 12px", fontSize: 14 };
   const label: React.CSSProperties = { display: "block", color: "#aebdd0", fontSize: 12, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", marginBottom: 7 };
@@ -188,6 +217,7 @@ export function CustomGarage() {
       setNotice(cash < 1_000 ? "Buget insuficient pentru această lucrare." : "Nu am putut porni lucrarea. Verifică bugetul și postul de lucru.");
       return;
     }
+    setClockNow(Date.now());
     setNotice("Producția a început. Costul a fost plătit; designul se aplică după finalizarea lucrării.");
   }
   function exportDesign() {
@@ -206,21 +236,8 @@ export function CustomGarage() {
       if (file.size > 100_000) throw new Error("Fișier prea mare.");
       const raw: unknown = JSON.parse(await file.text());
       if (!raw || typeof raw !== "object") throw new Error("Format invalid.");
-      const p = raw as Partial<Design>;
-      const safePaint = typeof p.paint === "string" && /^#[0-9a-f]{6}$/i.test(p.paint) ? p.paint : initial.paint;
-      const safeKit: Kit = ["stock", "street", "widebody", "track"].includes(String(p.kit)) ? p.kit as Kit : initial.kit;
-      const safeWheels: Wheels = ["five-spoke", "mesh", "deep-dish"].includes(String(p.wheels)) ? p.wheels as Wheels : initial.wheels;
-      const imported: Design = {
-        version: 1,
-        name: typeof p.name === "string" ? p.name.slice(0, 48) : initial.name,
-        paint: safePaint,
-        kit: safeKit,
-        wheels: safeWheels,
-        lowered: typeof p.lowered === "boolean" ? p.lowered : initial.lowered,
-        spoiler: typeof p.spoiler === "boolean" ? p.spoiler : initial.spoiler,
-        prompt: typeof p.prompt === "string" ? p.prompt.slice(0, 500) : "",
-        updatedAt: Date.now(),
-      };
+      const imported = sanitizeDesign(raw, Date.now())!;
+      imported.updatedAt = Date.now();
       setDesign(imported);
       setPrompt(imported.prompt);
       setNotice("Design importat în previzualizare. Pentru a-l aplica în joc, pornește lucrarea în fabrica Custom Garage.");
@@ -269,7 +286,7 @@ export function CustomGarage() {
             </div>
             {production?.activeJob ? (
               <div style={{ marginTop: 12, padding: 12, border: "1px solid #304154", borderRadius: 10, background: "#0b1118" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12, marginBottom: 8 }}><strong>Lucrare în producție</strong><span>{Math.min(100, Math.floor((clockNow - production.activeJob.startedAt) / production.activeJob.durationMs * 100))}%</span></div>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12, marginBottom: 8 }}><strong>Lucrare în producție</strong><span>{Math.min(100, Math.max(0, Math.floor((clockNow - production.activeJob.startedAt) / production.activeJob.durationMs * 100)))}%</span></div>
                 <div style={{ height: 7, background: "#273241", borderRadius: 8, overflow: "hidden" }}><div style={{ height: "100%", width: `${Math.min(100, Math.max(0, (clockNow - production.activeJob.startedAt) / production.activeJob.durationMs * 100))}%`, background: "#38bdf8", transition: "width .2s" }} /></div>
                 <p style={{ fontSize: 11, color: "#9aabc0", margin: "8px 0" }}>Cost achitat: {production.activeJob.cost.toLocaleString("en-US")} $ · Designul se aplică la final.</p>
                 {clockNow >= production.activeJob.startedAt + production.activeJob.durationMs ? (

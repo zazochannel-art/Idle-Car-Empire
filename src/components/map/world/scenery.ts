@@ -831,6 +831,17 @@ export class Scenery {
     return false;
   }
 
+  /** On a lot: a tree or bush there would come up through its building. */
+  private onLot(x: number, z: number) {
+    for (const l of this.opt.lots ?? []) {
+      const dx = x - l.x, dz = z - l.y, r = (l.w + l.d) / 2;
+      if (dx > r || dx < -r || dz > r || dz < -r) continue;
+      const c = Math.cos(l.rot), s = Math.sin(l.rot);
+      if (Math.abs(dx * c - dz * s) < l.w / 2 && Math.abs(dx * s + dz * c) < l.d / 2) return true;
+    }
+    return false;
+  }
+
   private streetLamps() {
     const o = { x: 0, z: 0, tx: 0, tz: 0 };
     const degree = this.data.drumuri.noduri.map(() => 0);
@@ -1034,6 +1045,7 @@ export class Scenery {
     const groups: Record<string, number[][]> = {};
     this.data.copaci.forEach((tr, i) => {
       if (this.opt.low && !tr[5] && (tr[4] === 0 || tr[4] === 1) && i % 3 === 0) return;
+      if (this.onLot(tr[0], tr[1])) return;
       (groups[`${tr[4] ?? 0}|${this.tileOf(tr[0], tr[1])}`] ||= []).push(tr);
     });
     const c = new THREE.Color();
@@ -1065,18 +1077,20 @@ export class Scenery {
     const PAL = [["#5aa843", "#4b9640", "#6cb84c", "#7aa83f"], ["#8a8a4a", "#7d7a45", "#9a9055", "#6f7a43"], ["#46693a", "#3e6034", "#527542", "#5a6e3a"]];
     const list = this.data.tufe;
     const m = new THREE.InstancedMesh(bush, this.mats.leaves, Math.max(1, list.length));
-    m.count = list.length;
+    let n = 0;
     m.castShadow = !this.opt.low;
     m.receiveShadow = true;
     list.forEach((b, i) => {
+      if (this.onLot(b[0], b[1])) return;
       const pal = PAL[b[3] ?? 0];
       c.set(pal[i % 4]);
       if (b.length === 3 && i % 23 === 0) c.set("#d96a8a");
       if (b.length === 3 && i % 31 === 0) c.set("#f0d24a");
-      m.setColorAt(i, c);
+      m.setColorAt(n, c);
       M4.compose(V.set(b[0], this.ground.at(b[0], b[1]) - 0.03, b[1]), Q.setFromAxisAngle(YAX, i * 1.7), SC.set(b[2], b[2], b[2]));
-      m.setMatrixAt(i, M4);
+      m.setMatrixAt(n++, M4);
     });
+    m.count = n;
     m.computeBoundingSphere();
     this.root.add(m);
   }

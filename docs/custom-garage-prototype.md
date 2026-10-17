@@ -1,7 +1,7 @@
 # Custom Garage prototype
 
 ## Added on this branch
-- Separate /custom-garage/ route; the existing home route and game navigation are untouched.
+- Opens inside the game, as a screen over the map: from its factory on the map (the fixed lot across the road from the industrial district, which takes no building lot) or from the menu.
 - Three.js 3D preview that loads the same production car-model pipeline as the game, with a procedural fallback when assets are unavailable; supports paint, wheel-face style, body-kit overlays and spoiler.
 - Validated custom design persisted into the main game save, so it can travel with local/cloud save sync.
 - Economy hook: changing paint, body kit, wheels, lowered suspension or spoiler charges in-game cash; changes are rejected when the player cannot afford them.
@@ -24,4 +24,4 @@ The prompt interpreter is keyword matching, not an AI service. It does not gener
 7. The prototype charges cash for cosmetic modifications. Next, tie body kits to material inventory and workshop production time; cosmetic parts should not silently change race performance.
 
 ## Verification
-Run npm ci, npm run typecheck, npm run lint, npm test and npm run build. Check that /custom-garage/ is exported and test pointer controls on a physical phone. Creating this prototype does not imply these checks have passed.
+Run npm ci, npm run typecheck, npm run lint, npm test and npm run build. Test pointer controls on a physical phone. Creating this prototype does not imply these checks have passed.
