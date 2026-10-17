@@ -5,15 +5,17 @@
 // inside the app; in a development browser there are none.
 import { isNativeApp } from "./platform";
 
-type Plugin = typeof import("@capacitor/local-notifications").LocalNotifications;
+type Module = typeof import("@capacitor/local-notifications");
 
-const plugin = (): Promise<Plugin | null> => (isNativeApp() ? import("@capacitor/local-notifications").then((m) => m.LocalNotifications, () => null) : Promise.resolve(null));
+// The promise carries the plugin's module, never the plugin itself: a Capacitor plugin
+// answers any method name, "then" included, so a promise resolved with it never settles.
+const load = (): Promise<Module | null> => (isNativeApp() ? import("@capacitor/local-notifications").catch(() => null) : Promise.resolve(null));
 
 export const notifySupported = () => isNativeApp();
 
 /** Asks the phone for permission (on a tap). True once notifications are allowed. */
 export async function askNotify(): Promise<boolean> {
-  const n = await plugin();
+  const n = (await load())?.LocalNotifications;
   if (!n) return false;
   try {
     let p = await n.checkPermissions();
@@ -35,7 +37,7 @@ const FIRST_ID = 1000;
 
 /** Takes back what was scheduled for the time away. */
 export async function cancelAway() {
-  const n = await plugin();
+  const n = (await load())?.LocalNotifications;
   if (!n) return;
   try {
     const { notifications } = await n.getPending();
@@ -48,7 +50,7 @@ export async function cancelAway() {
 
 /** Schedules the notes for the time away (only if the player allowed notifications). */
 export async function scheduleAway(notes: AwayNote[]) {
-  const n = await plugin();
+  const n = (await load())?.LocalNotifications;
   if (!n || !notes.length) return;
   try {
     if ((await n.checkPermissions()).display !== "granted") return;
