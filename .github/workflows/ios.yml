@@ -63,12 +63,15 @@ jobs:
           xcrun simctl bootstatus "$udid" -b
           xcrun simctl install "$udid" build/ios/Build/Products/Debug-iphonesimulator/App.app
           mkdir -p ios-check
-          # Capacitor prints what the app loads and the page's console to the app's output
-          xcrun simctl launch --stdout="$PWD/ios-check/app.log" --stderr="$PWD/ios-check/app-err.log" "$udid" com.zazochannel.idlecarempire
+          # Capacitor prints what the app loads and the page's console to the app's output; through a
+          # terminal (--console-pty) each line arrives at once (to a file, it would wait in a buffer)
+          xcrun simctl launch --console-pty "$udid" com.zazochannel.idlecarempire > ios-check/app.log 2>&1 &
+          console=$!
           sleep 60
           xcrun simctl io "$udid" screenshot ios-check/game.png
           # still running after a minute (no crash at start)
-          xcrun simctl spawn "$udid" launchctl list | grep -q "com.zazochannel.idlecarempire" || { echo "::error::the app is not running"; tail -80 ios-check/app.log ios-check/app-err.log; exit 1; }
+          xcrun simctl spawn "$udid" launchctl list | grep -q "com.zazochannel.idlecarempire" || { echo "::error::the app is not running"; tail -80 ios-check/app.log; exit 1; }
+          kill "$console" 2>/dev/null || true
           # Capacitor loaded the game's page from inside the app
           grep -q "Loading app at capacitor://localhost" ios-check/app.log || { echo "::error::the game's page did not load"; tail -80 ios-check/app.log; exit 1; }
           if grep -E "⚡️  \[error\]" ios-check/app.log; then echo "::warning::the page logged errors (above)"; fi
