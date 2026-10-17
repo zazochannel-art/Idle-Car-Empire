@@ -1,8 +1,13 @@
 name: Deploy to GitHub Pages
 
+# The game is a phone app (Android, iOS); the site only carries the pages the
+# stores and players need: the privacy policy, account deletion, and a page
+# that confirms account emails and hands a save left in a browser to the app.
+# They are plain files in site/: nothing to build.
 on:
   push:
     branches: [main]
+    paths: ["site/**", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
 permissions:
@@ -19,25 +24,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-      - id: pages
-        uses: actions/configure-pages@v5
-      - run: npm ci
-      - run: npm run build
-        env:
-          PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
-          # Cloud saves (Supabase project "Idle Car Empire"). The publishable key is meant
-          # for the browser: Row Level Security keeps every player's save private.
-          NEXT_PUBLIC_SUPABASE_URL: https://orffhhsogoymalyogfzl.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_hqGfNt6uaNbq0AgGyp0I8g_QLjjFaJ-
-      # Pages would otherwise run Jekyll, which drops the _next/ folder.
-      - run: touch out/.nojekyll
+      - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: out
+          path: site
 
   deploy:
     needs: build

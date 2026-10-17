@@ -1,7 +1,8 @@
-// The Android app's link to the phone (loaded only inside the app, see
-// components/game/native-app.tsx): the system Back button, and the app going
-// to the background and coming back.
+// The app's link to the phone (loaded only inside the app, see
+// components/game/native-app.tsx): the system Back button (Android), and the
+// app going to the background and coming back.
 import { App } from "@capacitor/app";
+import { cancelAway, scheduleAway } from "./notify";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 
@@ -48,8 +49,18 @@ export async function startNative() {
   // Leaving the app (Home, another app, the screen turning off): save now and stop
   // ticking, since Android may close a background app at any moment and a stopped
   // game uses no battery. Coming back settles the time away like any absence.
-  await App.addListener("pause", () => useGame.getState().suspend());
-  await App.addListener("resume", () => useGame.getState().resume());
+  // With notifications on, the phone is told when something will be waiting (a building
+  // finished, the offline limit reached); back in the game, those are taken back.
+  await App.addListener("pause", () => {
+    const g = useGame.getState();
+    g.suspend();
+    if (g.state.settings.notify) void scheduleAway(g.awayNotes());
+  });
+  await App.addListener("resume", () => {
+    void cancelAway();
+    useGame.getState().resume();
+  });
+  void cancelAway();
   // rewarded ads, always the player's choice: the consent first, then an ad kept ready
   void import("./native-ads").then((m) => m.startAds()).catch(() => {});
 }

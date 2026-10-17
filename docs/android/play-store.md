@@ -13,11 +13,11 @@ manual approval. They can't be done from the repository.
 
    The `cloud-e2e` workflow checks both.
 2. **(you) Contact email.** Replace `CONTACT_EMAIL` in
-   `public/privacy/index.html` and `public/delete-account/index.html`. Use the
+   `site/privacy/index.html` and `site/delete-account/index.html`. Use the
    address you will also show on the store listing.
 3. **3D car model licences: done.** The app shows ads, so it is commercial:
    the three non-commercial (CC BY-NC-SA) models (Porsche 911, Citroën
-   Survolt, DeLorean) are gone, on the web too. Their platforms use bodies
+   Survolt, DeLorean) are gone. Their platforms use bodies
    from the CC BY car pack (`public/models/CREDITS.txt`).
    - **(you) one model left to decide on:** the MC GT is a Nissan R34 from
      the "Fast & Furious" films (CC BY 4.0, so commercial use is allowed by
@@ -34,8 +34,9 @@ manual approval. They can't be done from the repository.
      count) and restore it from the dashboard if it pauses.
 6. **(you) Auth redirect URLs.** Email confirmations from the app link to
    `https://zazochannel-art.github.io/Idle-Car-Empire/`. It must be listed
-   under Supabase → Authentication → URL Configuration → Redirect URLs (it
-   already is if confirmations work on the web game).
+   under Supabase → Authentication → URL Configuration → Redirect URLs, and
+   should be the **Site URL** there too (that page now says the address is
+   confirmed and to go back to the app).
 
 ## Store listing
 
@@ -75,7 +76,7 @@ manual approval. They can't be done from the repository.
 > PLAY YOUR WAY
 > • Your factories keep producing while you're offline
 > • Plays offline: no connection needed after installing
-> • Optional account with cloud save to continue on another device or on the web
+> • Optional account with cloud save to continue on another phone
 > • Leaderboards, alliances and daily gifts with other players
 > • Battery saver and low-graphics mode for older phones
 > • English, Română, Русский
@@ -173,8 +174,8 @@ rating authority decides.
 | *AdMob:* App info and performance → **Crash logs**, **Diagnostics** | yes, **shared** | required | Analytics, Fraud prevention, security, and compliance |
 
 Not collected: precise location, contacts, photos/files, messages, financial
-info, health, web history, audio, calendar. The "Android · Chrome" device
-label stored with saves is a type, not an identifier.
+info, health, web history, audio, calendar. The "Android" device label stored
+with saves is a type, not an identifier.
 
 **Other declarations**:
 - News app: no.

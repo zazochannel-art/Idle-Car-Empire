@@ -30,11 +30,9 @@ import { passWaiting } from "@/game/engine/pass";
 import { winterWaiting } from "@/game/engine/winter";
 import { ConflictDialog, ProfileView, StartGate } from "./account";
 import { Coach } from "./coach";
-import { AwayNotifier, FeedbackBridge } from "./feedback-bridge";
+import { FeedbackBridge } from "./feedback-bridge";
 import { NativeApp } from "./native-app";
 import { retry, ScreenBoundary } from "./screen-boundary";
-import { pruneOfflineCache, ServiceWorker } from "./service-worker";
-import { TransferImport } from "./transfer-import";
 import { LoginDialog } from "./login-dialog";
 import { goalText, runGoal } from "./goals";
 import { Hud } from "./hud";
@@ -105,18 +103,12 @@ function usePrefetchScreens() {
     const idle = (fn: () => void) => ("requestIdleCallback" in window ? window.requestIdleCallback(fn, { timeout: 4000 }) : setTimeout(fn, 200));
     const timer = setTimeout(() => {
       const queue = Object.values(SCREENS);
-      let failed = false;
       const next = () => {
         const load = queue.shift();
-        if (cancelled) return;
-        // all of this version's screens are here: the offline cache can let go of older versions' files
-        if (!load) return void (!failed && pruneOfflineCache());
+        if (cancelled || !load) return;
         load().then(
           () => idle(next),
-          () => {
-            failed = true;
-            idle(next);
-          },
+          () => idle(next),
         );
       };
       idle(next);
@@ -338,9 +330,6 @@ function Shell() {
 
       <Toasts />
       <FeedbackBridge />
-      <AwayNotifier />
-      <ServiceWorker />
-      <TransferImport />
       <LoginDialog />
       <OfflineDialog />
       <ImperiumOverlay />

@@ -69,8 +69,6 @@ export interface CloudBackend {
   /** Makes the guest permanent with an email and password (same account, same save). */
   register(email: string, password: string, redirectTo: string): Promise<AuthResult>;
   login(email: string, password: string): Promise<AuthResult>;
-  /** A sign-in link by email (needs the project's email delivery). */
-  sendLink(email: string, redirectTo: string): Promise<AuthResult>;
   setPassword(password: string): Promise<AuthResult>;
   logout(): Promise<void>;
   /** Deletes the signed-in account and everything the server keeps of it (for good). */

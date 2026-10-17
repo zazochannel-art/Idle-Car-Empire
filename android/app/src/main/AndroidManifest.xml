@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <application
         android:allowBackup="true"
@@ -50,4 +51,10 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- haptics: the game's navigator.vibrate() taps (the WebView needs this to vibrate) -->
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- notifications while the game is closed (a building finished, the offline limit): the
+         player turns them on in Settings, and Android 13+ asks then -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- the notifications plugin asks for exact alarms; the game's never need to be exact
+         (lib/notify.ts schedules them inexact), so the app doesn't ask for that special access -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" tools:node="remove" />
 </manifest>

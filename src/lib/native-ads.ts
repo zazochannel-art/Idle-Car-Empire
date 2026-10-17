@@ -1,5 +1,5 @@
-// The Android app's rewarded ads (AdMob, through @capacitor-community/admob).
-// Loaded only inside the app (lib/native.ts); the web game never shows ads.
+// The app's rewarded ads (AdMob, through @capacitor-community/admob), on Android
+// and iOS. Loaded only inside the app (lib/native.ts).
 //
 // Consent first: Google's User Messaging Platform asks the player where the law
 // requires it (the EEA, the UK, Switzerland) and no ad is requested before it
@@ -7,14 +7,16 @@
 // is one to watch.
 import { AdMob, AdmobConsentStatus, MaxAdContentRating, RewardAdPluginEvents } from "@capacitor-community/admob";
 import { registerAdDriver, setAdStatus, type AdResult } from "./ads";
+import { platform } from "./platform";
 
 /**
- * Google's sample rewarded ad unit: test ads, never paid. A build for Google Play
- * takes the real unit from the AdMob account in NEXT_PUBLIC_ADMOB_REWARDED_ID
- * (docs/android/ads.md); it is never written in the code.
+ * Google's sample rewarded ad units (one per platform): test ads, never paid. A build
+ * for the stores takes the real units from the AdMob account, in
+ * NEXT_PUBLIC_ADMOB_REWARDED_ID (Android) and NEXT_PUBLIC_ADMOB_REWARDED_ID_IOS
+ * (docs/android/ads.md, docs/ios.md); they are never written in the code.
  */
-const TEST_UNIT = "ca-app-pub-3940256099942544/5224354917";
-const UNIT = process.env.NEXT_PUBLIC_ADMOB_REWARDED_ID || TEST_UNIT;
+const TEST_UNIT = platform() === "ios" ? "ca-app-pub-3940256099942544/1712485313" : "ca-app-pub-3940256099942544/5224354917";
+const UNIT = (platform() === "ios" ? process.env.NEXT_PUBLIC_ADMOB_REWARDED_ID_IOS : process.env.NEXT_PUBLIC_ADMOB_REWARDED_ID) || TEST_UNIT;
 
 let started = false;
 let loading = false;
@@ -127,6 +129,14 @@ async function begin() {
     return;
   }
   started = true;
+  // iOS: Apple's own question before the advertising identifier may be used (once; "no" still gets ads, not personalised)
+  if (platform() === "ios") {
+    try {
+      if ((await AdMob.trackingAuthorizationStatus()).status === "notDetermined") await AdMob.requestTrackingAuthorization();
+    } catch {
+      // older iOS, or the prompt unavailable: ads go on without the identifier
+    }
+  }
   // the ad events, listened to for good (never per ad: a listener removed early would lose a reward)
   await AdMob.addListener(RewardAdPluginEvents.Showed, () => {
     if (shown) shown.visible = true;

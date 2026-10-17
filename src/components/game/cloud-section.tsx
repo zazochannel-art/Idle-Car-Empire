@@ -38,7 +38,7 @@ export function CloudSection({ onOpen }: { onOpen?: () => void }) {
   );
 }
 
-/** Notifications while away: turning them on asks the browser first. */
+/** Notifications while away: turning them on asks the phone first. */
 export function NotifyToggle() {
   const on = useGame((g) => g.state.settings.notify);
   const setPref = useGame((g) => g.setPref);

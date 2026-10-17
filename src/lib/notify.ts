@@ -1,45 +1,69 @@
-// Notifications while the game is in the background (another tab, the
-// phone's home screen): a machine down, a decision on the desk, a building
-// finished. Only with the player's consent, never while they are looking,
-// and at most one per kind a minute.
+// Notifications while the game is closed: as the app goes to the background it
+// asks the phone to notify the player when something will be waiting for them
+// (a building finished, the offline limit reached), and takes those back when
+// the player returns. Only with the player's consent. The plugin is loaded only
+// inside the app; in a development browser there are none.
+import { isNativeApp } from "./platform";
 
-const last = new Map<string, number>();
+type Plugin = typeof import("@capacitor/local-notifications").LocalNotifications;
 
-export const notifySupported = () => typeof window !== "undefined" && "Notification" in window;
+const plugin = (): Promise<Plugin | null> => (isNativeApp() ? import("@capacitor/local-notifications").then((m) => m.LocalNotifications, () => null) : Promise.resolve(null));
 
-/** Asks the browser for permission (on a tap). True once notifications are allowed. */
+export const notifySupported = () => isNativeApp();
+
+/** Asks the phone for permission (on a tap). True once notifications are allowed. */
 export async function askNotify(): Promise<boolean> {
-  if (!notifySupported()) return false;
-  if (Notification.permission === "granted") return true;
-  if (Notification.permission === "denied") return false;
+  const n = await plugin();
+  if (!n) return false;
   try {
-    return (await Notification.requestPermission()) === "granted";
+    let p = await n.checkPermissions();
+    if (p.display !== "granted" && p.display !== "denied") p = await n.requestPermissions();
+    return p.display === "granted";
   } catch {
     return false;
   }
 }
 
-/** Shows a notification if the game is hidden and the player allowed them. */
-export async function notifyAway(n: { title: string; body?: string; tag: string }) {
-  if (!notifySupported() || Notification.permission !== "granted" || !document.hidden) return;
-  const now = Date.now();
-  if (now - (last.get(n.tag) ?? 0) < 60_000) return;
-  last.set(n.tag, now);
-  const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-  const opts: NotificationOptions = { body: n.body, tag: n.tag, icon: `${base}/icon-192.png`, badge: `${base}/icon-192.png` };
+export interface AwayNote {
+  at: number;
+  title: string;
+  body: string;
+}
+
+/** Ids of the notifications this app schedules (each trip to the background replaces them). */
+const FIRST_ID = 1000;
+
+/** Takes back what was scheduled for the time away. */
+export async function cancelAway() {
+  const n = await plugin();
+  if (!n) return;
   try {
-    // phones only show them through the service worker
-    const reg = await navigator.serviceWorker?.getRegistration();
-    if (reg) {
-      await reg.showNotification(n.title, opts);
-      return;
-    }
-    const note = new Notification(n.title, opts);
-    note.onclick = () => {
-      window.focus();
-      note.close();
-    };
+    const { notifications } = await n.getPending();
+    const mine = notifications.filter((x) => x.id >= FIRST_ID && x.id < FIRST_ID + 100);
+    if (mine.length) await n.cancel({ notifications: mine.map((x) => ({ id: x.id })) });
   } catch {
-    // not allowed here (a private window, an old browser): stay quiet
+    // nothing scheduled, or no permission: nothing to take back
+  }
+}
+
+/** Schedules the notes for the time away (only if the player allowed notifications). */
+export async function scheduleAway(notes: AwayNote[]) {
+  const n = await plugin();
+  if (!n || !notes.length) return;
+  try {
+    if ((await n.checkPermissions()).display !== "granted") return;
+    await cancelAway();
+    await n.schedule({
+      notifications: notes.map((x, i) => ({
+        id: FIRST_ID + i,
+        title: x.title,
+        body: x.body,
+        // no exact alarm: a minute late is fine, and the app asks for no special permission
+        schedule: { at: new Date(x.at), allowWhileIdle: true },
+        isExactNotification: false,
+      })),
+    });
+  } catch {
+    // the phone refused: the game simply doesn't notify
   }
 }

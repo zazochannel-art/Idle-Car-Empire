@@ -1,13 +1,16 @@
-// Draws the Android launcher icons and launch screens from the game's crown-and-car
-// emblem (the same picture as the web icons in public/), so the installed app
-// doesn't show Capacitor's placeholder art. Run after changing the emblem:
+// Draws the apps' icons and launch screens from the game's crown-and-car emblem,
+// so the installed apps don't show Capacitor's placeholder art. Run after
+// changing the emblem:
 //
-//   node scripts/android-assets.mjs
+//   npm run app:assets
 //
-// Writes into android/app/src/main/res: legacy and round icons (Android 7),
-// adaptive icon layers with a themed-icon silhouette (Android 8+ / 13+), and
-// the launch-screen pictures shown before the game loads (Android 7–11; newer
-// systems show the icon on the background colour set in styles.xml).
+// Android (android/app/src/main/res): legacy and round icons (Android 7),
+// adaptive icon layers with a themed-icon silhouette (Android 8+ / 13+), the
+// notification icon, and the launch-screen pictures shown before the game loads
+// (Android 7–11; newer systems show the icon on the background colour set in
+// styles.xml).
+// iOS (ios/App/App/Assets.xcassets): the 1024 px app icon (no transparency, as
+// the App Store asks) and the launch screen.
 import sharp from "sharp";
 import fs from "node:fs";
 import path from "node:path";
@@ -16,7 +19,7 @@ const RES = path.resolve("android/app/src/main/res");
 /** The game's background (styles.xml and capacitor.config.ts use the same). */
 const BG = "#06070a";
 
-// The emblem on a 512 grid, as on public/icon-512.png.
+// The emblem on a 512 grid.
 const EMBLEM = `
   <defs>
     <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
@@ -83,8 +86,9 @@ const monochrome = svg(
     .replace(/fill="(?!#000")[^"]*"/g, 'fill="#fff"')
     .replace(/stroke="[^"]*"/g, 'stroke="#fff"'),
 );
-async function silhouette(size, file) {
-  const alpha = await sharp(monochrome, { density: 72 * (size / 512) * 4 })
+async function silhouette(size, file, shape = monochrome) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const alpha = await sharp(shape, { density: 72 * (size / 512) * 4 })
     .resize(size, size)
     .flatten({ background: "#000" })
     .extractChannel(0)
@@ -139,4 +143,26 @@ for (const [d, [w, h]] of Object.entries(SPLASH)) {
   await splash(h, w, path.join(RES, `drawable-land-${d}/splash.png`));
 }
 await splash(480, 320, path.join(RES, "drawable/splash.png"));
-console.log("Android icons and launch screens written to", RES);
+
+// Notification icon (Android): white on transparent, the emblem filling the 24 dp square.
+const notifyShape = svg(
+  placed(0.98)
+    .replace(/<ellipse[^>]*\/>/, "")
+    .replace(/fill="#(bae6fd|94a3b8)"/g, 'fill="#000"')
+    .replace(/fill="(?!#000")[^"]*"/g, 'fill="#fff"')
+    .replace(/stroke="[^"]*"/g, 'stroke="#fff"'),
+);
+for (const [d, k] of Object.entries(DENSITIES)) await silhouette(24 * k, path.join(RES, `drawable-${d}/ic_stat_notify.png`), notifyShape);
+
+// iOS: the app icon (opaque: the App Store refuses transparency) and the launch screen.
+const IOS = path.resolve("ios/App/App/Assets.xcassets");
+if (fs.existsSync(IOS)) {
+  await sharp(full, { density: 72 * 2 * 4 })
+    .resize(1024, 1024)
+    .flatten({ background: BG })
+    .removeAlpha()
+    .png({ compressionLevel: 9 })
+    .toFile(path.join(IOS, "AppIcon.appiconset/AppIcon-512@2x.png"));
+  for (const f of ["splash-2732x2732.png", "splash-2732x2732-1.png", "splash-2732x2732-2.png"]) await splash(2732, 2732, path.join(IOS, "Splash.imageset", f));
+}
+console.log("App icons and launch screens written: Android (android/app/src/main/res) and iOS (ios/App/App/Assets.xcassets)");

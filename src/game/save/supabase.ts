@@ -104,13 +104,6 @@ export class SupabaseBackend implements CloudBackend {
     return error ? fail(error) : { ok: true };
   }
 
-  async sendLink(email: string, redirectTo: string): Promise<AuthResult> {
-    const c = await this.client;
-    // only an existing account: a new player starts as a guest
-    const { error } = await c.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo, shouldCreateUser: false } });
-    return error ? fail(error) : { ok: true };
-  }
-
   async setPassword(password: string): Promise<AuthResult> {
     const c = await this.client;
     const { error } = await c.auth.updateUser({ password });

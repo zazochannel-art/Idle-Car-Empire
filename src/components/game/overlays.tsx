@@ -2,18 +2,17 @@
 
 import { CloudSection, NotifyToggle } from "./cloud-section";
 import { AnimatePresence, motion } from "framer-motion";
-import { Clock, Download, RotateCcw, Smartphone, Upload } from "lucide-react";
+import { Clock, Download, RotateCcw, Upload } from "lucide-react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { formatDuration, formatHours, formatMoney, formatNumber } from "@/game/format";
 import { STRUCTURE_BY_ID } from "@/game/config/city";
-import { transferLink } from "@/game/save/transfer";
 import { LANGS } from "@/i18n";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { batteryState, isSaving, powerVersion, watchPower, type SaverSetting } from "@/lib/power";
-import { publicPageUrl, WEB_URL } from "@/lib/platform";
+import { PRIVACY_URL } from "@/lib/platform";
 import { uiEvents, type UiEvent, type UiToastAction } from "@/store/events";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
@@ -334,27 +333,6 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
 
         <div className="mt-4 space-y-2">
           <Button
-            variant="gold"
-            className="w-full"
-            onClick={async () => {
-              try {
-                const url = await transferLink(useGame.getState().state, publicPageUrl());
-                if (navigator.share) {
-                  await navigator.share({ title: "Idle Car Empire", text: t("transfer.shareText"), url });
-                  setMsg(t("transfer.sent"));
-                } else {
-                  await navigator.clipboard.writeText(url);
-                  setMsg(t("transfer.copied"));
-                }
-              } catch (e) {
-                // closing the share sheet is not an error
-                if ((e as Error)?.name !== "AbortError") setMsg(t("transfer.failed"));
-              }
-            }}
-          >
-            <Smartphone /> {t("transfer.send")}
-          </Button>
-          <Button
             variant="secondary"
             className="w-full"
             onClick={async () => {
@@ -419,7 +397,7 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
             </a>
           </p>
           <p className="mt-1.5">
-            <a className="underline" href={`${WEB_URL}privacy/`} target="_blank" rel="noreferrer">
+            <a className="underline" href={PRIVACY_URL} target="_blank" rel="noreferrer">
               {t("settings.privacy")}
             </a>
           </p>
