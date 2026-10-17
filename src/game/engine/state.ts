@@ -15,6 +15,7 @@ import { createStory } from "./story";
 import { createEditions } from "./collection";
 import { createPass } from "./pass";
 import { createAds } from "./ads";
+import { createProduction } from "./custom-garage";
 import type { CarDesign, CarId, ComponentId, DealerId, DealerState, GameState, ManagerId, ManagerState, Stats } from "../types";
 
 /** v3: the supply-chain economy (older saves start a new company). */
@@ -78,7 +79,7 @@ export function createInitialState(now: number): GameState {
     carModels: emptyCarCounts(),
     designs: createDesigns(),
     customGarageDesign: null,
-    customGarageProduction: { workerHired: false, machineLevel: 1, activeJob: null, completedJobs: 0 },
+    customGarageProduction: createProduction(),
     boost: 0,
     stars: 0,
     starUpgrades: {},
