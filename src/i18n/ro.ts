@@ -2297,6 +2297,10 @@ export const ro: Record<MessageKey, string> = {
   "shop.rp": "{n} PC",
   "shop.got": "Ai primit {what}.",
   "shop.builtBody": "Construcția e gata.",
+  "update.title": "Versiune nouă de test",
+  "update.body": "A apărut build-ul {n} (ai {mine}). Descarcă-l și deschide fișierul: se instalează peste aceasta, iar compania ta rămâne cum e.",
+  "update.download": "Descarcă",
+  "update.later": "Mai târziu",
 };
 
 export const roContent: Record<string, string> = {

@@ -120,6 +120,14 @@ from the game's logo (`assets/logo.webp`).
    with its own saves (sign in to the same account to share progress), and it
    always shows Google's test ads.
 
+Once installed, the test app looks for a newer build itself (a little after
+it starts and when it comes back, at most once an hour): it reads the build
+number in the test-apk release's notes, and when main has a newer one it offers
+**Download**, which opens the APK in the browser; open the downloaded file and
+tap **Install**. Android doesn't let an app installed from a file update itself
+without that tap; the Google Play app never looks, since Play updates it
+(`src/lib/test-update.ts`, the build number is the Android workflow's run).
+
 A newer test APK installs over the older one: CI keeps the debug key in its
 cache. If Android ever says the app can't be installed (the cache was dropped
 after a week without builds, so the key is new), uninstall Car Empire DEBUG
