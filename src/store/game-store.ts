@@ -22,6 +22,7 @@ import type { LogisticsUpgrade } from "@/game/config/logistics";
 import * as C from "@/game/engine/city";
 import * as Co from "@/game/engine/construction";
 import * as CG from "@/game/engine/custom-garage";
+import { awayEvents } from "@/game/engine/away";
 import { STRUCTURE_BY_ID } from "@/game/config/city";
 import { PLANT_LEVELS } from "@/game/config/chain";
 import { snapshot, unlockedCarIds, type EconomySnapshot } from "@/game/engine/economy";
@@ -38,6 +39,7 @@ import type { BuyAmount, CarId, CarRoute, CustomGarageDesign, DealerId, Facility
 import { applyLanguage, detectLanguage, loadLanguage, translate, type MessageKey, type Vars } from "@/i18n";
 import { contentFor } from "@/i18n/content";
 import { uiEvents } from "./events";
+import type { AwayNote } from "@/lib/notify";
 import * as Mk from "@/game/engine/market";
 import * as Lv from "@/game/engine/live";
 import * as Cl from "@/game/engine/classics";
@@ -123,6 +125,8 @@ interface GameStore {
   suspend: () => void;
   /** Back in front: ticks again, the time away settled like any absence. */
   resume: () => void;
+  /** What will be waiting while the game is closed, as notifications for the phone (lib/notify.ts). */
+  awayNotes: () => AwayNote[];
   /** Runs a player action on a copy of the state and commits it if it succeeded. */
   act: <T>(fn: (s: GameState) => T) => T;
   /** The Custom Garage factory's production line (engine/custom-garage.ts); its build travels in the normal game save. */
@@ -1072,6 +1076,15 @@ export const useGame = create<GameStore>((set, get) => {
       if (loop || !get().ready) return;
       runTick();
       loop = setInterval(runTick, TICK_MS);
+    },
+    awayNotes: () => {
+      const { state, snap } = get();
+      return awayEvents(state, snap.gm.offlineCapHours, Date.now()).map((e) => {
+        if (e.kind === "offlineFull") return { at: e.at, title: `💰 ${tr("notify.offlineFull")}`, body: tr("notify.offlineFullBody") };
+        const name = tr(`structure.${e.structure}`);
+        const title = e.upgrade ? `⬆️ ${tr("toast.upgradeDone", { name, level: e.level })}` : `${STRUCTURE_BY_ID[e.structure].emoji} ${tr("toast.constructionDone", { name })}`;
+        return { at: e.at, title, body: e.upgrade ? tr("toast.upgradeDoneBody") : tr("toast.constructionDoneBody") };
+      });
     },
     resetGame: async () => {
       saves?.clearLocal();

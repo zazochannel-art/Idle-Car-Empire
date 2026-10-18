@@ -64,9 +64,6 @@ class FakeCloud implements CloudBackend {
     this.user = hit[0];
     return { ok: true };
   }
-  async sendLink(): Promise<AuthResult> {
-    return { ok: true };
-  }
   async setPassword(password: string): Promise<AuthResult> {
     this.server.users.get(this.user!)!.password = password;
     return { ok: true };

@@ -1,16 +1,10 @@
 import type { NextConfig } from "next";
 
-// GitHub Pages serves the site from /<repo>/, so the deploy workflow passes
-// that prefix in. Locally and on root-domain hosts it stays empty.
-const basePath = process.env.PAGES_BASE_PATH ?? "";
-
 const nextConfig: NextConfig = {
-  // The game is fully client-side, so it ships as a static site (`out/`) that
-  // any host can serve. Supabase, when configured, is called from the browser.
+  // The game runs inside the Android and iOS apps: it is built to static files
+  // (`out/`) that the apps carry inside them (capacitor.config.ts), so it starts
+  // and plays with no connection. Supabase, when configured, is called from the app.
   output: "export",
-  basePath,
-  // the service worker registration needs the prefix on the client
-  env: { NEXT_PUBLIC_BASE_PATH: basePath },
   images: { unoptimized: true },
   trailingSlash: true,
 };

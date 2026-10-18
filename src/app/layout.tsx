@@ -4,8 +4,6 @@ import { GeistMono } from "geist/font/mono";
 import { Barlow_Condensed, Barlow_Semi_Condensed, Fira_Sans_Condensed, Fira_Sans_Extra_Condensed } from "next/font/google";
 import "./globals.css";
 
-const base = process.env.PAGES_BASE_PATH ?? "";
-
 // racing-game lettering: narrow, heavy, slanted headings over a narrow body
 // face (self-hosted at build time). Barlow has no Cyrillic, so Fira's
 // condensed cuts fill in those letters for Russian.
@@ -17,16 +15,15 @@ const bodyCyr = Fira_Sans_Condensed({ subsets: ["cyrillic"], weight: ["500", "60
 export const metadata: Metadata = {
   title: "Idle Car Empire",
   description: "Build a global car empire — from a tiny garage to hypercars and future cars.",
-  applicationName: "Idle Car Empire",
-  appleWebApp: { capable: true, title: "Car Empire", statusBarStyle: "black" },
-  // metadata icons are not prefixed with basePath, so add it here
-  icons: { icon: `${base}/icon-192.png`, apple: `${base}/apple-touch-icon.png` },
 };
 
+// The app's screen: edge to edge (the HUD pads itself with the safe areas), and the
+// page never zooms (the map has its own pinch zoom).
 export const viewport: Viewport = {
-  themeColor: "#2b2b2e",
   width: "device-width",
   initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
   viewportFit: "cover",
 };
 

@@ -344,11 +344,10 @@ function materialsNamed(T: Three, car: THREE_NS.Object3D, re: RegExp): THREE_NS.
 export function loadHeroes(T: Three): Promise<void> {
   heroLoad ??= (async () => {
     const { loadGlbCar, paintMaterials, neutralizePaint } = await import("./glb-car");
-    const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
     await Promise.all(
       (Object.entries(HERO_FILES) as [BodyModel, HeroFile][]).map(async ([model, f]) => {
         try {
-          const car = await loadGlbCar(T, `${base}/${f.url}`, { length: CAR_LENGTH[model], hide: f.hide, pick: f.pick, facing: f.facing });
+          const car = await loadGlbCar(T, `/${f.url}`, { length: CAR_LENGTH[model], hide: f.hide, pick: f.pick, facing: f.facing });
           const paint = f.paint ? materialsNamed(T, car, f.paint) : paintMaterials(T, car);
           if (!f.ownPaint) neutralizePaint(T, paint);
           // shared by every copy: never disposed with a sprite
