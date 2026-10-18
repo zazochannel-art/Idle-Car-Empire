@@ -21,6 +21,7 @@ import { uiEvents } from "@/store/events";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { ViewHeader } from "../views/section-title";
+import { StartLoading } from "./start-screen";
 
 type T = ReturnType<typeof useT>["t"];
 
@@ -553,7 +554,7 @@ export function StartGate() {
     );
   if (choice) return <ChooseSave {...choice} onKeep={answerStartChoice} />;
   if (welcome) return <WelcomeGate returning={welcome === "returning"} />;
-  return <div className="text-xs font-semibold text-white/45">{t(phase === "account" ? "account.loadingAccount" : "account.loadingSave")}</div>;
+  return <StartLoading label={t(phase === "account" ? "account.loadingAccount" : "account.loadingSave")} />;
 }
 
 /** Before the game: create an account or sign in (or, at the bottom, play without one). */
@@ -602,7 +603,9 @@ function WelcomeGate({ returning }: { returning: boolean }) {
       enterGame("account");
     });
 
-  const card = "w-full max-w-sm space-y-3 rounded-2xl bg-[#2b2b2e] p-4 ring-1 ring-white/10";
+  // a dark glass card over the start screen, a gold-and-blue stripe along its top
+  const card =
+    "relative w-full max-w-sm space-y-3 overflow-hidden rounded-3xl bg-[#0d1828]/85 p-4 pt-5 shadow-[0_24px_60px_-24px_rgb(0_0_0/0.9)] ring-1 ring-white/10 backdrop-blur-md before:absolute before:inset-x-0 before:top-0 before:h-1 before:bg-gradient-to-r before:from-electric before:via-gold before:to-electric before:content-['']";
   if (pending)
     return (
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={cn(card, "text-center")}>
@@ -618,15 +621,23 @@ function WelcomeGate({ returning }: { returning: boolean }) {
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={card}>
       <div className="text-center">
-        <div className="text-lg font-black leading-tight">{t(returning ? "account.welcomeBack" : "welcome.title")}</div>
-        <p className="mt-1 text-[11px] leading-snug text-white/60">{t("welcome.subtitle")}</p>
-        <div className="mt-2 flex justify-center gap-3 text-[10px] font-bold text-white/55">
-          <span>☁️ {t("welcome.perkCloud")}</span>
-          <span>📱 {t("welcome.perkDevices")}</span>
-          <span>🏁 {t("welcome.perkName")}</span>
+        <div className="race-type text-2xl leading-none">{t(returning ? "account.welcomeBack" : "welcome.title")}</div>
+        <p className="mt-1.5 text-xs leading-snug text-white/65">{t("welcome.subtitle")}</p>
+        <div className="mt-2.5 flex flex-wrap justify-center gap-1.5 text-[10px] font-bold text-white/75">
+          {(
+            [
+              ["☁️", "welcome.perkCloud"],
+              ["📱", "welcome.perkDevices"],
+              ["🏁", "welcome.perkName"],
+            ] as const
+          ).map(([icon, key]) => (
+            <span key={key} className="rounded-full bg-white/[0.07] px-2.5 py-1 ring-1 ring-white/10">
+              {icon} {t(key)}
+            </span>
+          ))}
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-1 rounded-xl bg-white/[0.04] p-1 ring-1 ring-white/[0.07]">
+      <div className="grid grid-cols-2 gap-1 rounded-xl bg-black/30 p-1 ring-1 ring-white/[0.08]">
         {(["register", "login"] as const).map((k) => (
           <button
             key={k}
@@ -634,9 +645,11 @@ function WelcomeGate({ returning }: { returning: boolean }) {
               setTab(k);
               setMsg(null);
             }}
-            className={cn("rounded-lg py-1.5 text-[11px] font-black uppercase tracking-wide", tab === k ? "bg-gold text-black" : "text-white/60")}
+            className={cn("race-type relative rounded-lg py-2 text-[12px] tracking-wide transition-colors", tab === k ? "text-[#2a1d00]" : "text-white/60")}
           >
-            {t(k === "register" ? "account.tab.register" : "account.tab.login")}
+            {/* the gold marker slides to the chosen tab */}
+            {tab === k && <motion.span layoutId="welcome-tab" transition={{ type: "spring", stiffness: 420, damping: 34 }} className="absolute inset-0 rounded-lg bg-gold shadow-[0_2px_0_0_#c48300]" />}
+            <span className="relative">{t(k === "register" ? "account.tab.register" : "account.tab.login")}</span>
           </button>
         ))}
       </div>
@@ -650,7 +663,7 @@ function WelcomeGate({ returning }: { returning: boolean }) {
         {tab === "register" && <Field label={t("account.username")} autoComplete="nickname" maxLength={20} value={name} onChange={(e) => setName(e.target.value)} />}
         <Field label={t("account.email")} type="email" inputMode="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         <Field label={t("account.password")} type="password" autoComplete={tab === "register" ? "new-password" : "current-password"} value={password} onChange={(e) => setPassword(e.target.value)} />
-        <Button type="submit" variant="gold" className="w-full" disabled={!canSubmit}>
+        <Button type="submit" variant="gold" size="lg" className="w-full" disabled={!canSubmit}>
           {tab === "register" ? (
             <>
               <UserPlus /> {t("welcome.start")}

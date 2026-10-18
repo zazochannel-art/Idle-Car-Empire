@@ -542,3 +542,226 @@ body {
   pointer-events: none;
   z-index: 2147483000;
 }
+
+/* ───────────── start screen (start-screen.tsx) ───────────── */
+
+/* the logo's night blue, lit behind the logo and warm along the bottom */
+.start-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -10;
+  background:
+    radial-gradient(60% 38% at 50% 34%, rgb(47 123 255 / 0.38), transparent 70%),
+    radial-gradient(90% 30% at 50% 100%, rgb(255 194 26 / 0.12), transparent 70%),
+    linear-gradient(180deg, #17293f 0%, #0b1523 55%, #06070a 100%);
+}
+
+/* light rays fanning out from behind the logo: still, as a turning layer this size would hold a
+   screen-sized texture in the phone's memory for the whole start */
+.start-rays {
+  position: absolute;
+  z-index: -10;
+  left: 50%;
+  top: 34%;
+  width: 120vmax;
+  height: 120vmax;
+  background: repeating-conic-gradient(from 0deg, rgb(255 255 255 / 0.035) 0deg 5deg, transparent 5deg 15deg);
+  -webkit-mask-image: radial-gradient(circle, #000 0%, transparent 60%);
+  mask-image: radial-gradient(circle, #000 0%, transparent 60%);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.start-spark {
+  position: absolute;
+  bottom: 3rem;
+  border-radius: 9999px;
+  background: #ffd75e;
+  box-shadow: 0 0 8px 2px rgb(255 194 26 / 0.55);
+  opacity: 0;
+  animation: start-rise 10s linear infinite;
+}
+
+@keyframes start-rise {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.9;
+  }
+  75% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateY(-80vh);
+    opacity: 0;
+  }
+}
+
+.start-skyline {
+  position: absolute;
+  inset: auto 0 calc(env(safe-area-inset-bottom) + 3.25rem) 0;
+  z-index: -10;
+  width: 100%;
+  height: 6.5rem;
+  opacity: 0.95;
+  pointer-events: none;
+}
+
+.start-smoke {
+  fill: rgb(203 213 225 / 0.35);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: start-smoke 3.2s ease-out infinite;
+}
+
+@keyframes start-smoke {
+  0% {
+    transform: translateY(0) scale(0.5);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(-22px) scale(1.8);
+    opacity: 0;
+  }
+}
+
+.start-window {
+  animation: start-twinkle 4s ease-in-out infinite;
+}
+
+@keyframes start-twinkle {
+  0%,
+  100% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 0.15;
+  }
+}
+
+/* the road in front of the skyline: asphalt, a glowing kerb, moving lane marks and passing lights */
+.start-road {
+  position: absolute;
+  inset: auto 0 0 0;
+  z-index: -10;
+  height: calc(env(safe-area-inset-bottom) + 3.25rem);
+  overflow: hidden;
+  background: linear-gradient(180deg, #1b222d 0%, #0b0e14 100%);
+  border-top: 2px solid rgb(76 195 255 / 0.45);
+  box-shadow: 0 -6px 24px rgb(47 123 255 / 0.25);
+  pointer-events: none;
+}
+
+.start-lane {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 1.4rem;
+  height: 3px;
+  background: repeating-linear-gradient(90deg, rgb(255 194 26 / 0.85) 0 26px, transparent 26px 52px);
+  animation: start-lane 0.7s linear infinite;
+}
+
+@keyframes start-lane {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: -52px 0;
+  }
+}
+
+.start-trail {
+  position: absolute;
+  top: 0.55rem;
+  left: 0;
+  width: 5rem;
+  height: 3px;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, transparent, rgb(255 80 80 / 0.9));
+  filter: blur(0.5px);
+  animation: start-trail 3.6s linear infinite;
+}
+
+.start-trail-2 {
+  top: 2.15rem;
+  background: linear-gradient(270deg, transparent, rgb(255 244 200 / 0.95));
+  animation-duration: 2.8s;
+  animation-delay: 1.2s;
+  animation-direction: reverse;
+}
+
+@keyframes start-trail {
+  from {
+    transform: translateX(-6rem);
+  }
+  to {
+    transform: translateX(110vw);
+  }
+}
+
+.start-float {
+  animation: start-float 3.4s ease-in-out infinite;
+}
+
+@keyframes start-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+
+.start-logo {
+  filter: drop-shadow(0 14px 30px rgb(47 123 255 / 0.45)) drop-shadow(0 2px 3px rgb(0 0 0 / 0.6));
+  animation: start-pop 0.7s cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
+}
+
+@keyframes start-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* loading: a gold segment running along the bar */
+.start-progress {
+  animation: start-progress 1.3s ease-in-out infinite;
+}
+
+@keyframes start-progress {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(330%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .start-spark,
+  .start-smoke,
+  .start-window,
+  .start-lane,
+  .start-trail,
+  .start-float,
+  .start-logo {
+    animation: none;
+  }
+  .start-spark,
+  .start-trail,
+  .start-smoke {
+    display: none;
+  }
+}
