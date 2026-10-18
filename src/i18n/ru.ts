@@ -954,7 +954,7 @@ export const ru: Record<MessageKey, string> = {
   "goal.upgradeDetail": "Больше продукции, пока копите на следующий завод.",
   "goal.shortage": "Не хватает: {item}",
   "goal.shortageDetail": "Сборочная линия ждёт: улучшите {name}.",
-  "goal.shortageFix": "Нажмите, чтобы улучшить {name} и снабдить линию.",
+  "goal.shortageFix": "Улучшите {name}, чтобы снабдить линию.",
   "goal.dealer": "Постройте первый дилерский центр",
   "goal.dealerDetail": "Машины копятся на заводе — откройте салон, чтобы их продавать.",
   "map.bigLot": "промышленный участок: вдвое больше продукции и склада",

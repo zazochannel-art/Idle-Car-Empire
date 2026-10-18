@@ -56,7 +56,6 @@ import * as Tr from "@/game/engine/territory";
 import { ENGINEER_BY_ID, type EngineerId, type ExportMarketId, type FleetProduct, type PayLevel, type ProtoFocus } from "@/game/config/expansion";
 import { HOT_CLASS, RECALL } from "@/game/config/market";
 import { claimUnlock, openPlantTypes } from "@/game/engine/unlocks";
-import { restockLow } from "@/game/engine/insights";
 import { hasPlant as hasPlantType } from "@/game/engine/chain";
 import * as Tu from "@/game/engine/tuning";
 import * as Gf from "@/game/engine/gifts";
@@ -151,7 +150,6 @@ interface GameStore {
   setCombine: (plot: string, on: boolean) => void;
   buyMaterial: (plot: string, m: MaterialId, qty: number) => boolean;
   buyPlan: (plot: string, plan: Mat.RestockPlan) => boolean;
-  restockLow: () => number;
   setQualityMode: (plot: string, mode: QualityMode) => void;
   setCarRoute: (plot: string, route: CarRoute) => void;
   payRecall: (cost: number) => void;
@@ -705,7 +703,6 @@ export const useGame = create<GameStore>((set, get) => {
     },
     buyMaterial: (plot, m, qty) => act((s) => Mat.buyMaterial(s, plot, m, qty).ok),
     buyPlan: (plot, plan) => act((s) => Mat.buyPlan(s, plot, plan)),
-    restockLow: () => act((s) => restockLow(s, get().snap)),
     setQualityMode: (plot, mode) => {
       act((s) => Ch.setQualityMode(s, plot, mode));
     },

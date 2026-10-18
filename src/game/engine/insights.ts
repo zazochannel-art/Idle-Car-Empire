@@ -34,7 +34,7 @@ export type Goal =
   /** The next plant is going up: how far it is and how long it still takes. */
   | { kind: "site"; icon: string; plot: string; type: StructureType; progress: number; left: number }
   | { kind: "upgrade"; icon: string; cost: number; plot: string; what: "speed" | "level" }
-  /** cost/what: the cheapest upgrade on the maker plot, bought by tapping the goal. */
+  /** cost/what: the cheapest upgrade on the maker plot (tapping the goal opens it). */
   | { kind: "shortage"; icon: string; plot: string; component: ComponentId; cost?: number; what?: "speed" | "level" }
   | { kind: "dealer"; icon: string; cost: number; dealer: DealerId }
   /** Every dealer is full and cars wait at the plants: the cheapest way to sell more (perMin: cars waiting). */

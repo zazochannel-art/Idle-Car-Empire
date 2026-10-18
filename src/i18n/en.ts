@@ -955,7 +955,7 @@ export const en = {
   "goal.upgradeDetail": "More output while you save for the next factory.",
   "goal.shortage": "Not enough {item}",
   "goal.shortageDetail": "The assembly line waits: upgrade the {name}.",
-  "goal.shortageFix": "Tap to upgrade the {name} and feed the line.",
+  "goal.shortageFix": "Upgrade the {name} to feed the line.",
   "goal.dealer": "Build your first dealership",
   "goal.dealerDetail": "Cars are piling up at the plant — open a showroom to sell them.",
   "map.bigLot": "industrial lot: double output and storage",
