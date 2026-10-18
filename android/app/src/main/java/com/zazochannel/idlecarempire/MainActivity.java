@@ -29,16 +29,25 @@ public class MainActivity extends BridgeActivity {
 
     /**
      * Back with nothing open puts the game in the background (lib/native.ts → App.minimizeApp →
-     * here). Should Android refuse to move the task, the home screen comes up instead, as with the
-     * Home button. Either way logcat says what happened (the emulator check reads it).
+     * here). Should Android refuse to move the task, or say it moved it while the game stays in
+     * front (seen on the emulator: "moved", yet still focused a minute later), the home screen
+     * comes up instead, as with the Home button. Either way logcat says what happened (the
+     * emulator check reads it).
      */
     @Override
     public boolean moveTaskToBack(boolean nonRoot) {
         boolean moved = super.moveTaskToBack(nonRoot);
         Log.i(TAG, "moveTaskToBack: " + (moved ? "moved" : "refused, showing the home screen") + " (" + Thread.currentThread().getName() + ")");
-        if (!moved) {
-            startActivity(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-        }
+        if (!moved) showHome();
+        else getWindow().getDecorView().postDelayed(() -> {
+            if (!hasWindowFocus()) return;
+            Log.i(TAG, "moveTaskToBack: still in front, showing the home screen");
+            showHome();
+        }, 1000);
         return moved;
+    }
+
+    private void showHome() {
+        startActivity(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
     }
 }
