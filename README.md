@@ -215,7 +215,10 @@ check the pacing with `npm run simulate`.
 ## Builds
 
 - **Android** (`.github/workflows/android.yml`): a debug APK and the release
-  App Bundle for Google Play, and a run on an Android emulator.
+  App Bundle for Google Play, and a run on an Android emulator. `main`'s debug
+  APK is also on the
+  [test-apk release](https://github.com/zazochannel-art/Idle-Car-Empire/releases/tag/test-apk),
+  to download straight onto a phone.
 - **iOS** (`.github/workflows/ios.yml`): a simulator build, started in an
   iPhone simulator. A build for the App Store is made in Xcode with the
   owner's Apple account ([`docs/ios.md`](docs/ios.md)).
