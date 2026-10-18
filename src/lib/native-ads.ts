@@ -6,6 +6,7 @@
 // allows. Then one ad is kept loaded, so the game offers an ad only when there
 // is one to watch.
 import { AdMob, AdmobConsentStatus, MaxAdContentRating, RewardAdPluginEvents } from "@capacitor-community/admob";
+import { App } from "@capacitor/app";
 import { registerAdDriver, setAdStatus, type AdResult } from "./ads";
 import { platform } from "./platform";
 
@@ -17,6 +18,8 @@ import { platform } from "./platform";
  */
 const TEST_UNIT = platform() === "ios" ? "ca-app-pub-3940256099942544/1712485313" : "ca-app-pub-3940256099942544/5224354917";
 const UNIT = (platform() === "ios" ? process.env.NEXT_PUBLIC_ADMOB_REWARDED_ID_IOS : process.env.NEXT_PUBLIC_ADMOB_REWARDED_ID) || TEST_UNIT;
+/** The unit the ads load from: UNIT, or the test one in a test build (begin()). */
+let unit = UNIT;
 
 let started = false;
 let loading = false;
@@ -27,7 +30,7 @@ async function load() {
   if (loading) return;
   loading = true;
   try {
-    await AdMob.prepareRewardVideoAd({ adId: UNIT, isTesting: UNIT === TEST_UNIT });
+    await AdMob.prepareRewardVideoAd({ adId: unit, isTesting: unit === TEST_UNIT });
     failures = 0;
     setAdStatus({ ready: true });
   } catch {
@@ -146,5 +149,8 @@ async function begin() {
   await AdMob.addListener(RewardAdPluginEvents.FailedToShow, () => closed(true));
   // the game is for 13 and over: no ads rated for adults
   await AdMob.initialize({ maxAdContentRating: MaxAdContentRating.Teen });
+  // a test build (its app id ends in ".debug", like the test APK anyone may download) shows
+  // Google's test ads whatever unit it was built with: playing it is never real ad traffic
+  if ((await App.getInfo().catch(() => null))?.id.endsWith(".debug")) unit = TEST_UNIT;
   void load();
 }

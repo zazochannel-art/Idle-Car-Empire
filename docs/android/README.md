@@ -103,16 +103,27 @@ from the game's logo (`assets/logo.webp`).
 
 ## Installing the debug APK on your phone
 
-1. Get `app-debug.apk`: from a workflow run (Actions → Android → the run →
-   Artifacts → `idle-car-empire-debug-apk`, a zip with the APK inside), or from
-   your own build.
-2. Copy it to the phone (USB, Google Drive, email…) and open it there.
+1. Get the APK. The quickest way is to open this link on the phone:
+   <https://github.com/zazochannel-art/Idle-Car-Empire/releases/download/test-apk/idle-car-empire-test.apk>.
+   It is `main`'s latest build (the
+   [test-apk release](https://github.com/zazochannel-art/Idle-Car-Empire/releases/tag/test-apk),
+   replaced by every build of `main`; no zip, no GitHub account). Any other
+   build: a workflow run's artifacts (Actions → Android → the run → Artifacts →
+   `idle-car-empire-debug-apk`, a zip with `app-debug.apk` inside), or your own.
+2. Open it on the phone (from another device: copy it over by USB, Google
+   Drive, email…).
 3. Android asks to allow installing apps from that source (the file manager or
    browser): allow it, go back, and tap **Install**. Google Play Protect may
    warn about an unknown developer: **More details → Install anyway** (this is
    your own build).
 4. Open **Car Empire DEBUG**. It is a separate app from the Google Play one,
-   with its own saves (sign in to the same account to share progress).
+   with its own saves (sign in to the same account to share progress), and it
+   always shows Google's test ads.
+
+A newer test APK installs over the older one: CI keeps the debug key in its
+cache. If Android ever says the app can't be installed (the cache was dropped
+after a week without builds, so the key is new), uninstall Car Empire DEBUG
+first; the company comes back when you sign in.
 
 With a USB cable instead: enable *Developer options → USB debugging* on the
 phone, then `adb install -r app-debug.apk`.

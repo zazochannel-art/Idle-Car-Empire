@@ -4,6 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const listeners = new Map<string, (data?: unknown) => void>();
 let answerShow: { resolve: (v: unknown) => void; reject: (e: unknown) => void } | null = null;
 const shows = vi.fn();
+const prepares = vi.fn();
+// a build with a real ad unit, installed as the test app (the test APK)
+process.env.NEXT_PUBLIC_ADMOB_REWARDED_ID = "ca-app-pub-0000000000000000/0000000000";
+vi.mock("@capacitor/app", () => ({ App: { getInfo: async () => ({ id: "com.zazochannel.idlecarempire.debug" }) } }));
 vi.mock("@capacitor-community/admob", () => ({
   AdmobConsentStatus: { REQUIRED: "REQUIRED" },
   MaxAdContentRating: { Teen: "Teen" },
@@ -15,7 +19,10 @@ vi.mock("@capacitor-community/admob", () => ({
       listeners.set(event, fn);
       return { remove: async () => listeners.delete(event) };
     },
-    prepareRewardVideoAd: async () => ({ adUnitId: "test" }),
+    prepareRewardVideoAd: async (options: unknown) => {
+      prepares(options);
+      return { adUnitId: "test" };
+    },
     showRewardVideoAd: () => {
       shows();
       return new Promise((resolve, reject) => (answerShow = { resolve, reject }));
@@ -40,6 +47,11 @@ afterEach(async () => {
 });
 
 describe("rewarded ads in the app", () => {
+  it("the test app shows Google's test ads, whatever unit it was built with", () => {
+    expect(prepares).toHaveBeenCalled();
+    for (const [options] of prepares.mock.calls) expect(options).toEqual({ adId: "ca-app-pub-3940256099942544/5224354917", isTesting: true });
+  });
+
   it("rewards once when the ad is watched to the end (event and show answer both say so)", async () => {
     const reward = vi.fn();
     const result = watchAd(reward);
