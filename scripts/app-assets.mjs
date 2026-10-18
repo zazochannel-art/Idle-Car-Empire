@@ -1,16 +1,20 @@
-// Draws the apps' icons and launch screens from the game's crown-and-car emblem,
-// so the installed apps don't show Capacitor's placeholder art. Run after
-// changing the emblem:
+// Draws the apps' icons and launch screens from the game's logo, so the
+// installed apps don't show Capacitor's placeholder art. Run after changing the
+// logo:
 //
 //   npm run app:assets
 //
+// The logo is assets/logo.webp (on its dark backdrop) and assets/logo-cutout.webp
+// (the same picture with the backdrop taken out, for anything drawn on another
+// background).
+//
 // Android (android/app/src/main/res): legacy and round icons (Android 7),
-// adaptive icon layers with a themed-icon silhouette (Android 8+ / 13+), the
-// notification icon, and the launch-screen pictures shown before the game loads
-// (Android 7–11; newer systems show the icon on the background colour set in
-// styles.xml).
+// adaptive icon layers (Android 8+), the notification icon, and the launch-screen
+// pictures shown before the game loads (Android 7–11; newer systems show the icon
+// on the background colour set in styles.xml).
 // iOS (ios/App/App/Assets.xcassets): the 1024 px app icon (no transparency, as
 // the App Store asks) and the launch screen.
+// The game's own loading screen (public/logo.webp), the store icon and the site's.
 import sharp from "sharp";
 import fs from "node:fs";
 import path from "node:path";
@@ -18,40 +22,13 @@ import path from "node:path";
 const RES = path.resolve("android/app/src/main/res");
 /** The game's background (styles.xml and capacitor.config.ts use the same). */
 const BG = "#06070a";
-
-// The emblem on a 512 grid.
-const EMBLEM = `
-  <defs>
-    <linearGradient id="metal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f8fafc"/><stop offset=".45" stop-color="#94a3b8"/><stop offset="1" stop-color="#475569"/></linearGradient>
-    <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#67e8f9"/><stop offset="1" stop-color="#0891b2"/></linearGradient>
-    <linearGradient id="amber" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fcd34d"/><stop offset="1" stop-color="#f59e0b"/></linearGradient>
-  </defs>
-  <path d="M256 48 L408 108 L391 276 Q373 373 256 445 Q139 373 121 276 L104 108 Z" fill="#0b1220" stroke="url(#metal)" stroke-width="9" stroke-linejoin="round"/>
-  <path d="M256 68 L387 120 L371 270 Q355 350 256 412 Q157 350 141 270 L125 120 Z" fill="#111c2e" stroke="#26364d" stroke-width="3"/>
-  <path d="M139 260 L176 238 L211 181 Q222 164 244 161 L298 161 Q319 164 332 184 L361 229 L390 248 L390 291 L355 301 L331 285 L182 285 L160 302 L126 291 Z" fill="url(#metal)" stroke="#e2e8f0" stroke-width="5" stroke-linejoin="round"/>
-  <path d="M220 187 Q228 177 244 177 L296 177 Q309 179 318 194 L339 228 L198 228 Z" fill="#07111f" stroke="#22d3ee" stroke-width="4" stroke-linejoin="round"/>
-  <path d="M266 180 L266 226" stroke="#22d3ee" stroke-width="4"/>
-  <path d="M147 258 L185 243 L203 243 L191 260 Z" fill="url(#amber)"/><path d="M337 243 L357 246 L379 260 L341 260 Z" fill="url(#amber)"/>
-  <path d="M151 278 L185 278 L185 290 L160 294 Z M330 278 L366 278 L359 294 L330 290 Z" fill="#020617"/>
-  <circle cx="190" cy="290" r="22" fill="#020617" stroke="#94a3b8" stroke-width="7"/><circle cx="190" cy="290" r="8" fill="url(#cyan)"/>
-  <circle cx="330" cy="290" r="22" fill="#020617" stroke="#94a3b8" stroke-width="7"/><circle cx="330" cy="290" r="8" fill="url(#cyan)"/>
-  <path d="M256 319 L276 356 L256 369 L236 356 Z" fill="url(#cyan)"/><path d="M256 329 L256 352" stroke="#e0f2fe" stroke-width="4" stroke-linecap="round"/>
-`;
-
+const LOGO = path.resolve("assets/logo.webp");
+const CUTOUT = path.resolve("assets/logo-cutout.webp");
+/** The logo's own backdrop, lighter at the top right: behind the cut-out logo it matches the full one. */
 const BACKDROP = `
-  <defs>
-    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#1c2638"/><stop offset="1" stop-color="${BG}"/>
-    </linearGradient>
-    <radialGradient id="glow" cx="0.5" cy="0.45" r="0.45">
-      <stop offset="0" stop-color="#f59e0b" stop-opacity="0.28"/><stop offset="1" stop-color="#f59e0b" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-  <rect width="512" height="512" fill="url(#sky)"/>
-  <rect width="512" height="512" fill="url(#glow)"/>`;
+  <defs><linearGradient id="bd" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#17293f"/><stop offset="1" stop-color="#0b1523"/></linearGradient></defs>
+  <rect width="512" height="512" fill="url(#bd)"/>`;
 
-/** The emblem scaled about its middle (258, 250) and centred on a 512 canvas. */
-const placed = (scale) => `<g transform="translate(256 256) scale(${scale}) translate(-258 -250)">${EMBLEM}</g>`;
 const svg = (body) => Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">${body}</svg>`);
 
 const DENSITIES = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
@@ -63,25 +40,87 @@ async function png(input, size, file, opts = {}) {
   await img.png({ compressionLevel: 9 }).toFile(file);
 }
 
+/** The cut-out logo at `scale` of a transparent square, in its middle. */
+async function centred(size, scale) {
+  const side = Math.round(size * scale);
+  const logo = await sharp(CUTOUT).resize(side, side).png().toBuffer();
+  const at = Math.round((size - side) / 2);
+  return sharp({ create: { width: size, height: size, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+    .composite([{ input: logo, left: at, top: at }])
+    .png()
+    .toBuffer();
+}
+
 const circle = (size) => Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${size / 2}"/></svg>`);
 const rounded = (size) => Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><rect width="${size}" height="${size}" rx="${size * 0.18}"/></svg>`);
 
-// Adaptive icon layers are 108 dp with the visible part in the middle 72 dp (and only a
-// 66 dp circle is safe under every mask): the emblem fits that circle at about 0.7.
-const foreground = svg(placed(0.7));
-const background = svg(BACKDROP);
-// Android 13 themed icons: one colour that the launcher tints, so only the shape counts.
-// Drawn white with the windows and hubs black, then that brightness becomes the alpha.
-const monochrome = svg(
-  placed(0.7)
-    .replace(/<ellipse[^>]*\/>/, "")
-    .replace(/fill="#(bae6fd|94a3b8)"/g, 'fill="#000"')
-    .replace(/fill="(?!#000")[^"]*"/g, 'fill="#fff"')
-    .replace(/stroke="[^"]*"/g, 'stroke="#fff"'),
+// Adaptive icon layers are 108 dp with the visible part in the middle 72 dp, and only a
+// 66 dp circle is safe under every mask. The badge reaches 0.47 of the logo's side from
+// its middle, so at 0.64 of the layer it stays inside that circle.
+for (const [d, k] of Object.entries(DENSITIES)) {
+  const dir = path.join(RES, `mipmap-${d}`);
+  await png(await centred(108 * k, 0.64), 108 * k, path.join(dir, "ic_launcher_foreground.png"));
+  await png(svg(BACKDROP), 108 * k, path.join(dir, "ic_launcher_background.png"));
+  // the legacy square and round icons: the whole logo
+  await png(LOGO, 48 * k, path.join(dir, "ic_launcher.png"), { mask: rounded });
+  await png(LOGO, 48 * k, path.join(dir, "ic_launcher_round.png"), { mask: circle });
+  // no themed (one-colour) icon: the logo is a picture, so launchers show it in colour
+  fs.rmSync(path.join(dir, "ic_launcher_monochrome.png"), { force: true });
+}
+
+fs.writeFileSync(
+  path.join(RES, "mipmap-anydpi-v26/ic_launcher.xml"),
+  `<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@mipmap/ic_launcher_background"/>
+    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+</adaptive-icon>
+`,
 );
-async function silhouette(size, file, shape = monochrome) {
+fs.copyFileSync(path.join(RES, "mipmap-anydpi-v26/ic_launcher.xml"), path.join(RES, "mipmap-anydpi-v26/ic_launcher_round.xml"));
+// the template's placeholder background layer is no longer used
+fs.rmSync(path.join(RES, "drawable/ic_launcher_background.xml"), { force: true });
+fs.rmSync(path.join(RES, "drawable-v24/ic_launcher_foreground.xml"), { force: true });
+
+// Launch screens: the cut-out logo in the middle of the game's background, `scale` of its shorter side.
+async function splash(w, h, file, scale = 0.62) {
+  const side = Math.round(Math.min(w, h) * scale);
+  const logo = await sharp(CUTOUT).resize(side, side).png().toBuffer();
+  await sharp({ create: { width: w, height: h, channels: 3, background: BG } })
+    .composite([{ input: logo, left: Math.round((w - side) / 2), top: Math.round((h - side) / 2) }])
+    .png({ compressionLevel: 9 })
+    .toFile(file);
+}
+// Android 7–11
+const SPLASH = { mdpi: [320, 480], hdpi: [480, 800], xhdpi: [720, 1280], xxhdpi: [960, 1600], xxxhdpi: [1280, 1920] };
+for (const [d, [w, h]] of Object.entries(SPLASH)) {
+  await splash(w, h, path.join(RES, `drawable-port-${d}/splash.png`));
+  await splash(h, w, path.join(RES, `drawable-land-${d}/splash.png`));
+}
+await splash(480, 320, path.join(RES, "drawable/splash.png"));
+
+// Notification icon (Android): white on transparent, so a simple shape rather than the
+// logo's picture: the crown over a car, filling the 24 dp square. Drawn white with the
+// windows and hubs black, then that brightness becomes the alpha.
+const EMBLEM = `
+  <path d="M150 170 L180 92 L222 140 L256 66 L290 140 L332 92 L362 170 Z" fill="#fff" stroke="#fff" stroke-width="6" stroke-linejoin="round"/>
+  <circle cx="180" cy="92" r="12" fill="#fff"/>
+  <circle cx="256" cy="62" r="12" fill="#fff"/>
+  <circle cx="332" cy="92" r="12" fill="#fff"/>
+  <path d="M128 286 L176 222 Q190 204 214 204 L300 204 Q324 204 338 222 L392 286 Z" fill="#fff"/>
+  <rect x="84" y="278" width="348" height="92" rx="34" fill="#fff"/>
+  <path d="M194 278 L232 226 L262 226 L262 278 Z" fill="#000"/>
+  <path d="M282 226 L316 226 L356 278 L282 278 Z" fill="#000"/>
+  <rect x="96" y="318" width="34" height="14" rx="7" fill="#fff"/>
+  <rect x="390" y="318" width="34" height="14" rx="7" fill="#fff"/>
+  <circle cx="164" cy="372" r="40" fill="#fff"/>
+  <circle cx="164" cy="372" r="19" fill="#000"/>
+  <circle cx="352" cy="372" r="40" fill="#fff"/>
+  <circle cx="352" cy="372" r="19" fill="#000"/>`;
+const notifyShape = svg(`<g transform="translate(256 256) scale(0.98) translate(-258 -250)">${EMBLEM}</g>`);
+async function silhouette(size, file) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  const alpha = await sharp(shape, { density: 72 * (size / 512) * 4 })
+  const alpha = await sharp(notifyShape, { density: 72 * (size / 512) * 4 })
     .resize(size, size)
     .flatten({ background: "#000" })
     .extractChannel(0)
@@ -91,75 +130,20 @@ async function silhouette(size, file, shape = monochrome) {
     .png({ compressionLevel: 9 })
     .toFile(file);
 }
-// The legacy square and round icons: backdrop and emblem together.
-const full = svg(BACKDROP + placed(0.82));
+for (const [d, k] of Object.entries(DENSITIES)) await silhouette(24 * k, path.join(RES, `drawable-${d}/ic_stat_notify.png`));
 
-for (const [d, k] of Object.entries(DENSITIES)) {
-  const dir = path.join(RES, `mipmap-${d}`);
-  await png(foreground, 108 * k, path.join(dir, "ic_launcher_foreground.png"));
-  await png(background, 108 * k, path.join(dir, "ic_launcher_background.png"));
-  await silhouette(108 * k, path.join(dir, "ic_launcher_monochrome.png"));
-  await png(full, 48 * k, path.join(dir, "ic_launcher.png"), { mask: rounded });
-  await png(full, 48 * k, path.join(dir, "ic_launcher_round.png"), { mask: circle });
-}
-
-fs.writeFileSync(
-  path.join(RES, "mipmap-anydpi-v26/ic_launcher.xml"),
-  `<?xml version="1.0" encoding="utf-8"?>
-<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@mipmap/ic_launcher_background"/>
-    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
-    <monochrome android:drawable="@mipmap/ic_launcher_monochrome"/>
-</adaptive-icon>
-`,
-);
-fs.copyFileSync(path.join(RES, "mipmap-anydpi-v26/ic_launcher.xml"), path.join(RES, "mipmap-anydpi-v26/ic_launcher_round.xml"));
-// the template's placeholder background layer is no longer used
-fs.rmSync(path.join(RES, "drawable/ic_launcher_background.xml"), { force: true });
-fs.rmSync(path.join(RES, "drawable-v24/ic_launcher_foreground.xml"), { force: true });
-
-// Launch screens (Android 7–11): the emblem small in the middle of the game's background.
-const SPLASH = { mdpi: [320, 480], hdpi: [480, 800], xhdpi: [720, 1280], xxhdpi: [960, 1600], xxxhdpi: [1280, 1920] };
-async function splash(w, h, file) {
-  const side = Math.round(Math.min(w, h) * 0.42);
-  const emblem = await sharp(svg(placed(0.95)), { density: 72 * (side / 512) * 4 })
-    .resize(side, side)
-    .png()
-    .toBuffer();
-  await sharp({ create: { width: w, height: h, channels: 3, background: BG } })
-    .composite([{ input: emblem, left: Math.round((w - side) / 2), top: Math.round((h - side) / 2) }])
-    .png({ compressionLevel: 9 })
-    .toFile(file);
-}
-for (const [d, [w, h]] of Object.entries(SPLASH)) {
-  await splash(w, h, path.join(RES, `drawable-port-${d}/splash.png`));
-  await splash(h, w, path.join(RES, `drawable-land-${d}/splash.png`));
-}
-await splash(480, 320, path.join(RES, "drawable/splash.png"));
-
-// Notification icon (Android): white on transparent, the emblem filling the 24 dp square.
-const notifyShape = svg(
-  placed(0.98)
-    .replace(/<ellipse[^>]*\/>/, "")
-    .replace(/fill="#(bae6fd|94a3b8)"/g, 'fill="#000"')
-    .replace(/fill="(?!#000")[^"]*"/g, 'fill="#fff"')
-    .replace(/stroke="[^"]*"/g, 'stroke="#fff"'),
-);
-for (const [d, k] of Object.entries(DENSITIES)) await silhouette(24 * k, path.join(RES, `drawable-${d}/ic_stat_notify.png`), notifyShape);
-
-// Shared web/store icon exports use the same master artwork.
-await png(full, 512, path.resolve("site/icon.png"));
-await png(full, 512, path.resolve("docs/android/store/icon-512.png"));
+// The store icon, and the site's (shown at 96 px and as the tab icon).
+await png(LOGO, 512, path.resolve("docs/android/store/icon-512.png"));
+await png(LOGO, 192, path.resolve("site/icon.png"));
+// The game's loading screen shows the cut-out logo (about 240 px wide on a phone, so 3× that).
+await sharp(CUTOUT).resize(720, 720).webp({ quality: 85, alphaQuality: 90 }).toFile(path.resolve("public/logo.webp"));
 
 // iOS: the app icon (opaque: the App Store refuses transparency) and the launch screen.
 const IOS = path.resolve("ios/App/App/Assets.xcassets");
 if (fs.existsSync(IOS)) {
-  await sharp(full, { density: 72 * 2 * 4 })
-    .resize(1024, 1024)
-    .flatten({ background: BG })
-    .removeAlpha()
-    .png({ compressionLevel: 9 })
-    .toFile(path.join(IOS, "AppIcon.appiconset/AppIcon-512@2x.png"));
-  for (const f of ["splash-2732x2732.png", "splash-2732x2732-1.png", "splash-2732x2732-2.png"]) await splash(2732, 2732, path.join(IOS, "Splash.imageset", f));
+  await sharp(LOGO).resize(1024, 1024).flatten({ background: BG }).removeAlpha().png({ compressionLevel: 9 }).toFile(path.join(IOS, "AppIcon.appiconset/AppIcon-512@2x.png"));
+  // the launch picture fills the screen (aspect fill), so a phone shows only its middle
+  // third or so: the logo is drawn smaller to fit in it
+  for (const f of ["splash-2732x2732.png", "splash-2732x2732-1.png", "splash-2732x2732-2.png"]) await splash(2732, 2732, path.join(IOS, "Splash.imageset", f), 0.34);
 }
-console.log("App icons and launch screens written: Android (android/app/src/main/res) and iOS (ios/App/App/Assets.xcassets)");
+console.log("App icons and launch screens written: Android (android/app/src/main/res), iOS (ios/App/App/Assets.xcassets), public/logo.webp and the store and site icons");

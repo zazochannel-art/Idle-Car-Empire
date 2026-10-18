@@ -201,10 +201,17 @@ export function Game() {
 function Splash() {
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-4 px-4 py-6">
-      <motion.div animate={{ x: [-30, 30, -30] }} transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }} className="text-6xl">
-        🏎️
-      </motion.div>
-      <div className="text-sm font-semibold uppercase tracking-[0.3em] text-white/50">Idle Car Empire</div>
+      {/* the game's logo (public/logo.webp, drawn by `npm run app:assets`) */}
+      <motion.img
+        src="/logo.webp"
+        alt="Idle Car Empire"
+        width={720}
+        height={720}
+        draggable={false}
+        animate={{ y: [0, -6, 0] }}
+        transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+        className="h-auto w-[min(64vw,15rem)] select-none"
+      />
       {/* the account and its save load first; a choice, if one is needed, is asked here */}
       <StartGate />
     </div>

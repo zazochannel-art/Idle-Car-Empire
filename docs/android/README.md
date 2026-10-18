@@ -97,7 +97,7 @@ on a connected phone or an emulator). After changing the game, run
 
 Icons, the notification icon and launch screens are drawn by
 `npm run app:assets` (`scripts/app-assets.mjs`, which also draws the iOS ones)
-from the crown-and-car emblem.
+from the game's logo (`assets/logo.webp`).
 
 ## Installing the debug APK on your phone
 
