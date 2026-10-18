@@ -183,9 +183,11 @@ const backsSince = (since) =>
  * 40-60 s, while the ad SDK starts beside the software-rendered map): that wait is the
  * emulator's, so the checks time what Back does from the moment the app has it.
  */
+let lastBack = "";
 async function pressBack(timeoutMs = 150_000) {
   stopOthersNotResponding();
   const since = deviceTime();
+  lastBack = since;
   const t = Date.now();
   adb("shell", "input", "keyevent", "KEYCODE_BACK");
   const did = await until(() => {
@@ -199,6 +201,18 @@ async function pressBack(timeoutMs = 150_000) {
   if (!did) console.log(`      (Back never reached the app in ${s} s)`);
   else if (s > 5) console.log(`      (Back reached the app after ${s} s: ${did})`);
   return did;
+}
+
+/** What Android logged about the game's task, focus and input since `since` (a Back that didn't take the app away). */
+function androidSince(since, tail = 50) {
+  try {
+    const lines = adb("logcat", "-d", "-v", "time")
+      .split("\n")
+      .filter((l) => l.slice(0, 14) >= since && /idlecarempire|minimizeApp|moveTaskToBack|ActivityTaskManager|WindowManager|InputDispatcher|ActivityManager|not responding/i.test(l));
+    console.log(`\nAndroid since that Back (${lines.length} lines, last ${tail}):\n${lines.slice(-tail).join("\n")}\n`);
+  } catch (e) {
+    console.log("android log:", e.message);
+  }
 }
 
 /** The app's lifecycle as Android and Capacitor logged it (pauses, resumes, a WebView recreated). */
@@ -344,6 +358,7 @@ try {
     "Back with nothing open puts the app in the background",
     left ? "" : didLeave === "minimize" ? `the app took Back to go to the background, but is still in front 60 s later: ${focus().join(" · ")}` : `Back: ${didLeave ?? "never reached the app"}`,
   );
+  if (!left) androidSince(lastBack);
   const after = await evaluate(SAVED);
   check(after.savedAt > before, "leaving the app saved the game at once", `${new Date(before).toISOString()} → ${new Date(after.savedAt).toISOString()}`);
   // while it plays, the game saves every 5 s; in the background, after the save of leaving (the
