@@ -3,7 +3,8 @@
 // talks to it: two players A and B (anonymous accounts), saving, restoring,
 // revision conflicts, session restore, what each may (not) reach, the
 // leaderboard, visits and gifts, ghosts and alliances, and a third player C
-// deleting their account.
+// registering (email and password, as playing needs an account) and deleting
+// their account.
 //
 //   NEXT_PUBLIC_SUPABASE_URL=… NEXT_PUBLIC_SUPABASE_ANON_KEY=… node scripts/cloud-e2e.mjs
 //
@@ -198,10 +199,25 @@ check(unknownStep === "unknown", "an unknown funnel step is turned away", JSON.s
 const funnelRead = await anon.client.from("funnel_steps").select("id");
 check(!!funnelRead.error, "the funnel's table is out of the API's reach", funnelRead.error?.code);
 
-// ── account deletion (0007): a third test player deletes their account, and everything with it ──
+// ── registration: playing needs an account, so an email and a password must work at once for any
+// address (Supabase's "Confirm email" off, or an SMTP sender for everyone). A third test player
+// registers the way the game does: a guest that gets an email, then a password ──
 const c = browser();
 const signC = await c.client.auth.signInAnonymously();
 const idC = signC.data.user?.id;
+// (the game's own contact address, tagged: a real mail domain, unique per run, freed when C is deleted)
+const emailC = `idlecarempire+${tag}-c@gmail.com`;
+const passwordC = `${tag}-${Math.random().toString(36).slice(2)}-Pw`;
+const regC = await c.client.auth.updateUser({ email: emailC });
+check(!regC.error && regC.data.user?.email === emailC, "a guest registers an email, with no confirmation to wait for", regC.error?.message ?? (regC.data.user?.new_email ? "the email waits for a confirmation link" : ""));
+const pwC = await c.client.auth.updateUser({ password: passwordC });
+check(!pwC.error && pwC.data.user?.is_anonymous === false, "then a password: a full account (no longer a guest), same id", pwC.error?.message ?? `anonymous: ${pwC.data.user?.is_anonymous}`);
+const c2 = browser();
+const loginC = await c2.client.auth.signInWithPassword({ email: emailC, password: passwordC });
+check(loginC.data.user?.id === idC, "it signs in with that email and password on another device", loginC.error?.message);
+await c2.client.auth.signOut({ scope: "local" });
+
+// ── account deletion (0007): the third test player deletes their account, and everything with it ──
 await c.client.from("profiles").update({ username: `${tag}-C` }).eq("id", idC);
 one(await c.client.rpc("save_game", { p_data: { cash: 5, createdAt: 3 }, p_save_version: 3, p_base_revision: 0, p_device: "e2e" }));
 const giftC = await c.client.rpc("send_gift", { p_to: idB });
