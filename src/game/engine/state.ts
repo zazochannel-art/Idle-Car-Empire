@@ -15,6 +15,7 @@ import { createStory } from "./story";
 import { createEditions } from "./collection";
 import { createPass } from "./pass";
 import { createAds } from "./ads";
+import { createShop } from "./shop";
 import { createProduction } from "./custom-garage";
 import type { CarDesign, CarId, ComponentId, DealerId, DealerState, GameState, ManagerId, ManagerState, Stats } from "../types";
 
@@ -103,6 +104,7 @@ export function createInitialState(now: number): GameState {
     editions: createEditions(),
     pass: createPass(),
     ads: createAds(),
+    shop: createShop(),
     research: [],
     achievements: [],
     missions: { dailyDate: "", daily: [], milestonesClaimed: [] },

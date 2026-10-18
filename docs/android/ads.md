@@ -11,6 +11,15 @@ iOS app shows the same offers ([../ios.md](../ios.md)).
 | Offline report ("Welcome back") | the money earned while away, ×2 | once per report |
 | A construction or an upgrade in progress | finished at once | then a 10-minute pause before the next |
 | The HUD chip "📺 ×2 profit" (asks first) | ×2 margin on every sale for **30 minutes of play** (the time waits while the game is closed) | one at a time |
+| The shop (🛒 top left): cash pack | 30 minutes of income | 5 a day |
+| The shop: research pack | 30 minutes of research output (at least 25 RP) | 5 a day |
+| The shop: ×2 profit, instant build | the same as the chip and the construction button above | as above |
+
+The shop also has a **free crate** every 4 hours and items paid with in-game ⭐
+Stars (time warps of 2 h and 8 h of income, +2 h of ×2 profit up to 4 h in
+all): no ad and no real money for those. Its numbers live in
+`src/game/config/shop.ts`, its rules in `src/game/engine/shop.ts` (tested in
+`src/game/shop.test.ts`).
 
 At most **20 rewarded ads a day**, all kinds together. The numbers live in
 `src/game/config/ads.ts`; the rules in `src/game/engine/ads.ts` (tested in

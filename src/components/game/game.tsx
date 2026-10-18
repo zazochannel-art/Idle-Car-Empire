@@ -66,6 +66,7 @@ const SCREENS = {
   alliance: () => import("../views/alliance-view"),
   winter: () => import("../views/winter-view"),
   pass: () => import("../views/pass-view"),
+  shop: () => import("../views/shop-view"),
   research: () => import("../views/research-view"),
   stats: () => import("../views/stats-view"),
   economy: () => import("../views/economy-view"),
@@ -89,6 +90,7 @@ const LeaderboardView = lazy(() => retry(SCREENS.leaderboard).then((m) => ({ def
 const AllianceView = lazy(() => retry(SCREENS.alliance).then((m) => ({ default: m.AllianceView })));
 const WinterView = lazy(() => retry(SCREENS.winter).then((m) => ({ default: m.WinterView })));
 const PassView = lazy(() => retry(SCREENS.pass).then((m) => ({ default: m.PassView })));
+const ShopView = lazy(() => retry(SCREENS.shop).then((m) => ({ default: m.ShopView })));
 const ResearchView = lazy(() => retry(SCREENS.research).then((m) => ({ default: m.ResearchView })));
 const StatsView = lazy(() => retry(SCREENS.stats).then((m) => ({ default: m.StatsView })));
 const EconomyView = lazy(() => retry(SCREENS.economy).then((m) => ({ default: m.EconomyView })));
@@ -414,6 +416,8 @@ const ViewSwitch = memo(function ViewSwitch({ view, onSettings }: { view: View; 
       return <WinterView />;
     case "pass":
       return <PassView />;
+    case "shop":
+      return <ShopView />;
   }
 });
 

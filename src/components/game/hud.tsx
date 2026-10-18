@@ -1,13 +1,14 @@
 "use client";
 
 import { ProfileButton } from "./account";
-import { Car, Factory, Moon, Settings, Star, Sun, Sunset, SunMoon, TrendingUp } from "lucide-react";
+import { Car, Factory, Moon, Settings, Star, Store, Sun, Sunset, SunMoon, TrendingUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { TIME_MODES } from "@/components/map/lighting";
 import { formatMoney, formatNumber } from "@/game/format";
 import { LANGS } from "@/i18n";
 import { useT } from "@/i18n/use-t";
 import { plantsOf } from "@/game/engine/chain";
+import { crateWait } from "@/game/engine/shop";
 import { useGame } from "@/store/game-store";
 import { EventChip } from "./event-chip";
 import { AdBoostChip } from "./ad-buttons";
@@ -16,7 +17,7 @@ import { AnimatedNumber } from "./animated-number";
 
 const money = (n: number) => formatMoney(n);
 
-/** Top bar floating over the map: cash, profit/s, production rate, factories, ⭐ Stars. */
+/** Top bar floating over the map: the shop, cash, profit/s, production rate, factories, ⭐ Stars. */
 export function Hud({ onSettings }: { onSettings: () => void }) {
   // each number has its own small component, so a tick re-renders only the figures that changed
   // (the bar, its buttons and icons stay as they are)
@@ -26,6 +27,7 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
   return (
     <header className="pointer-events-none absolute inset-x-0 top-0 z-30 pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       <div className="flex items-start gap-2 p-2 sm:p-3">
+        <ShopButton />
         <div className="pointer-events-auto flex min-w-0 flex-1 flex-wrap items-center gap-1.5 rounded-2xl bg-[rgba(36,104,214,0.82)] p-1.5 shadow-[0_3px_0_0_rgba(10,40,110,0.35)] md:flex-nowrap md:gap-2 md:bg-[rgba(36,104,214,0.62)] md:p-2 md:hud-bar">
           {/* the cash never gives way to the other figures */}
           <div className="relative flex shrink-0 items-center gap-2 pl-1 pr-2">
@@ -59,6 +61,23 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
         </div>
       </div>
     </header>
+  );
+}
+
+/** The shop, top left: a red dot when the free crate is ready. */
+function ShopButton() {
+  const crate = useGame((g) => crateWait(g.state, g.state.lastActiveAt) === 0);
+  const setView = useUi((u) => u.setView);
+  const { t } = useT();
+  return (
+    <button
+      onClick={() => setView("shop")}
+      className="pointer-events-auto relative flex size-10 shrink-0 items-center justify-center rounded-full bg-gold text-[#2a1d00] shadow-[0_3px_0_0_#c48300] transition hover:brightness-105 active:translate-y-px md:size-12"
+      aria-label={t("nav.shop")}
+    >
+      <Store className="size-5 stroke-[2.5] md:size-6" />
+      {crate && <span className="absolute -right-0.5 -top-0.5 size-3 rounded-full bg-red-500 ring-2 ring-white" />}
+    </button>
   );
 }
 

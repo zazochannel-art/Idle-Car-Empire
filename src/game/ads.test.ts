@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ADS } from "./config/ads";
+import { SHOP } from "./config/shop";
 import * as A from "./engine/ads";
 import * as Co from "./engine/construction";
 import { snapshot } from "./engine/economy";
@@ -106,7 +107,7 @@ describe("rewarded ads", () => {
     expect(decodeSave(encodeSave(s), T0).ads).toEqual(s.ads);
     // tampered or from a clock set back: clamped
     s.ads = { day: "2026-03-01", count: 1e6, boostLeft: 1e9, buildAt: T0 + 1e9 };
-    expect(decodeSave(encodeSave(s), T0).ads).toEqual({ day: "2026-03-01", count: ADS.perDay, boostLeft: ADS.boostSeconds, buildAt: T0 });
+    expect(decodeSave(encodeSave(s), T0).ads).toEqual({ day: "2026-03-01", count: ADS.perDay, boostLeft: SHOP.boostCap, buildAt: T0 });
     // an old save without it starts empty
     const raw = JSON.parse(JSON.stringify(createInitialState(T0)));
     delete raw.ads;

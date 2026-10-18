@@ -29,10 +29,10 @@ import { snapshot, unlockedCarIds, type EconomySnapshot } from "@/game/engine/ec
 import { activeEvent } from "@/game/engine/events";
 import * as Ev from "@/game/engine/events";
 import { collectOffline, settleOffline } from "@/game/engine/offline";
-import { checkAchievements, claimDaily, claimMilestone, recordHistory, refreshDaily } from "@/game/engine/progress";
+import { checkAchievements, claimDaily, claimMilestone, recordHistory, refreshDaily, rewardCash } from "@/game/engine/progress";
 import { cloneState, createInitialState } from "@/game/engine/state";
 import { tick as engineTick } from "@/game/engine/tick";
-import { formatDuration, formatMoney, formatPercent } from "@/game/format";
+import { formatDuration, formatMoney, formatNumber, formatPercent } from "@/game/format";
 import { decodeSave, encodeSave, SaveManager } from "@/game/save";
 import { askStartChoice, askWelcome, useCloud } from "./cloud-store";
 import type { BuyAmount, CarId, CarRoute, CustomGarageDesign, DealerId, FacilityType, GameState, Lang, ManagerId, PlantType, QualityMode, Specialization, StructureType, ZoneId } from "@/game/types";
@@ -65,6 +65,8 @@ import * as Gh from "@/game/engine/ghost";
 import { allianceReward } from "@/game/engine/alliance";
 import { grantAd } from "@/game/engine/ads";
 import { ADS, type AdReward } from "@/game/config/ads";
+import * as Shop from "@/game/engine/shop";
+import { SHOP_ITEM_BY_ID, type ShopItemId } from "@/game/config/shop";
 import * as Wt from "@/game/engine/winter";
 import * as Ps from "@/game/engine/pass";
 import { funnelDue, funnelMinutes } from "@/game/engine/funnel";
@@ -186,6 +188,8 @@ interface GameStore {
   speedUp: (plot: string) => boolean;
   /** The reward of a rewarded ad the player watched to the end (offline ×2, a job finished, the ×2 profit boost). */
   adReward: (reward: AdReward, plot?: string) => boolean;
+  /** A shop item: the free crate, a ⭐ Star item, or an ad item (only once its ad was watched to the end). */
+  shopBuy: (id: ShopItemId) => boolean;
   upgradeBuilding: (plot: string) => boolean;
   placeFacility: (plot: string, type: FacilityType, x: number, y: number, rot: 0 | 1) => boolean;
   moveFacility: (plot: string, uid: number, x: number, y: number, rot: 0 | 1) => boolean;
@@ -895,6 +899,16 @@ export const useGame = create<GameStore>((set, get) => {
       if (!ok) return false;
       if (reward === "offline") uiEvents.emit({ type: "toast", tone: "gold", icon: "💰", title: tr("toast.collected", { amount: formatMoney(offline * ADS.offlineMult) }), body: tr("toast.collectedBody") });
       else if (reward === "boost") uiEvents.emit({ type: "toast", tone: "gold", icon: "📈", title: tr("ad.boostStarted"), body: tr("ad.boostStartedBody") });
+      persist(true);
+      return true;
+    },
+    shopBuy: (id) => {
+      const snap = get().snap;
+      const r = Shop.shopReward(id, snap);
+      if (!act((s) => Shop.buyShop(s, id, Date.now(), snap))) return false;
+      const got = [r.incomeSeconds ? formatMoney(rewardCash(r, snap)) : "", r.rp ? tr("shop.rp", { n: formatNumber(r.rp) }) : ""].filter(Boolean).join(" · ");
+      const body = got ? tr("shop.got", { what: got }) : tr(id === "build" ? "shop.builtBody" : "ad.boostLeftBody");
+      uiEvents.emit({ type: "toast", tone: "gold", icon: SHOP_ITEM_BY_ID[id].icon, title: tr(`shop.item.${id}` as MessageKey), body });
       persist(true);
       return true;
     },
