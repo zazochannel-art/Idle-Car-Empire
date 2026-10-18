@@ -44,6 +44,17 @@ android {
         }
     }
     signingConfigs {
+        // CI signs debug builds with a debug key of its own, kept from run to run (android.yml),
+        // so a newer test APK installs over an older one. Elsewhere: Android's usual debug key.
+        def debugKeystore = System.getenv('ANDROID_DEBUG_KEYSTORE')
+        if (debugKeystore) {
+            debug {
+                storeFile file(debugKeystore)
+                storePassword 'android'
+                keyAlias 'androiddebugkey'
+                keyPassword 'android'
+            }
+        }
         if (canSignRelease) {
             release {
                 storeFile rootProject.file(releaseStoreFile)

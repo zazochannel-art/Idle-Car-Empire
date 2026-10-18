@@ -69,13 +69,25 @@ jobs:
           else
             echo "No ANDROID_KEYSTORE_BASE64 secret: the release bundle will be unsigned."
           fi
-      # The debug key that signs the debug APK (Gradle makes one when there is none), kept from
-      # run to run: a newer test APK then installs over an older one, which Android refuses
-      # when the key changes. (A cache unused for 7 days is dropped: the next key is new.)
+      # The debug key that signs the debug APK, kept from run to run in the Actions cache: a
+      # newer test APK then installs over an older one, which Android refuses when the key
+      # changes. Made here when the cache has none (the first run, or after 7 days unused).
+      # A debug key with Android's usual passwords, nothing secret; Gradle reads its path from
+      # ANDROID_DEBUG_KEYSTORE (android/app/build.gradle).
       - uses: actions/cache@v4
         with:
-          path: ~/.android/debug.keystore
-          key: android-debug-keystore-v1
+          path: ~/.idle-car-empire/debug.keystore
+          key: android-debug-keystore-v2
+      - name: Debug key
+        run: |
+          f="$HOME/.idle-car-empire/debug.keystore"
+          if [ ! -f "$f" ]; then
+            mkdir -p "$(dirname "$f")"
+            keytool -genkeypair -keystore "$f" -storetype PKCS12 -storepass android -keypass android \
+              -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+            echo "::warning::A new debug key: this test APK does not install over ones signed with the previous key"
+          fi
+          echo "ANDROID_DEBUG_KEYSTORE=$f" >> "$GITHUB_ENV"
       - name: Gradle build (debug APK, release bundle, lint)
         working-directory: android
         env:
@@ -92,6 +104,8 @@ jobs:
           AAB=android/app/build/outputs/bundle/release/app-release.aab
           echo "::group::debug APK"
           "$BT/aapt2" dump badging "$APK" | grep -E "^(package|sdkVersion|targetSdkVersion|application-label|uses-permission)"
+          # the same from run to run while the cached debug key lasts
+          "$BT/apksigner" verify --print-certs "$APK" | grep -m1 "SHA-256 digest"
           echo "::endgroup::"
           # (GitHub's release downloads answer 500 now and then: a few tries before giving up)
           for i in 1 2 3 4; do
