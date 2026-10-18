@@ -5,7 +5,8 @@
 // It installs the APK (a debug build: the only kind whose WebView can be inspected),
 // opens the game and drives it through what a phone does to an app:
 //   - the game itself starts (not a blank or placeholder page);
-//   - the Back button closes a dialog, and with nothing open puts the app in the background;
+//   - the Back button closes a dialog (the daily reward, then Settings), and with nothing
+//     open puts the app in the background;
 //   - leaving the app saves the game (the save on the phone is fresh);
 //   - the game survives the app being killed, an app update (reinstall over it) and,
 //     with --reboot, the phone restarting: same company, same settings;
@@ -115,6 +116,8 @@ const GAME_UP = `(document.querySelector("header .race-type")?.getBoundingClient
 // (a dialog already closing doesn't count, as for the app's own Back button)
 const DIALOG_OPEN = `!!document.querySelector('[role="dialog"]:not([data-state="closed"]), [role="alertdialog"]:not([data-state="closed"])')`;
 const SAVED = `(() => { const r = localStorage.getItem(${JSON.stringify(SAVE)}); if (!r) return null; const d = JSON.parse(r); return { createdAt: d.state.createdAt, lang: d.state.settings.lang, savedAt: d.savedAt }; })()`;
+// the daily reward in the save (its dialog opens by itself after two minutes of a new game's play)
+const LOGIN = `(() => { const r = localStorage.getItem(${JSON.stringify(SAVE)}); if (!r) return null; const s = JSON.parse(r).state; return { day: s.login.day, claimed: s.login.claimed, playTime: Math.round(s.lifetime.playTime) }; })()`;
 
 /** What Android and the WebView said (the app's lifecycle, console errors, crashes), kept in the output folder. */
 function dumpLogcat(name, tail) {
@@ -136,6 +139,24 @@ const focus = () =>
     .map((l) => l.trim());
 const inFront = () => focus().some((l) => l.includes(PKG));
 const noDialog = () => evaluate(`!(${DIALOG_OPEN})`).catch(() => false);
+
+/**
+ * The emulator's own apps can stop answering (the launcher, starved by the software-rendered
+ * map): their "isn't responding" dialog takes the keys meant for the game. Such an app is
+ * stopped, its dialog with it, and the output says so. The game's own is left on screen.
+ */
+function stopOthersNotResponding() {
+  const anr = focus().join(" ").match(/Application Not Responding: ([\w.]+)/);
+  if (anr && anr[1] !== PKG) {
+    console.log(`      (${anr[1]} was not responding and had the focus: stopped)`);
+    adb("shell", "am", "force-stop", anr[1]);
+  }
+}
+
+function pressBack() {
+  stopOthersNotResponding();
+  adb("shell", "input", "keyevent", "KEYCODE_BACK");
+}
 
 /** Polls until the condition holds or the time is up, and returns its last value. On an emulator
  * without a GPU the page can be busy for many seconds, so what Back starts may finish late. */
@@ -229,13 +250,24 @@ try {
   const copies = (await gamePages()).length;
   check(copies === 1, "one copy of the game runs in the app", `${copies} game page(s)`);
 
+  // the daily reward opens by itself after two minutes of a new game's play, so it would be
+  // what a Back of the steps below closes (rightly): it is waited for first, and Back closes
+  // it and collects the reward
+  const loginShown = await until(() => evaluate(`(() => { const l = ${LOGIN}; return !!l?.day && (l.claimed || ${DIALOG_OPEN}); })()`).catch(() => false), 240_000);
+  if (loginShown && (await evaluate(DIALOG_OPEN))) {
+    pressBack();
+    const shut = await until(noDialog, 30_000);
+    const collected = await until(() => evaluate(`(${LOGIN})?.claimed === true`).catch(() => false), 15_000);
+    check(shut && collected, "Back closes the daily reward and collects it", JSON.stringify(await evaluate(LOGIN)));
+  } else if (!loginShown) console.log(`      (no daily reward after 4 min: ${JSON.stringify(await evaluate(LOGIN))})`);
+
   // 2. a setting changed through the game's own screen (Settings → Română)
   const opened = await evaluate(`(() => { const b = [...document.querySelectorAll("header button")].at(-1); b.click(); return true; })()`);
   await waitFor(DIALOG_OPEN, 15_000, "the Settings dialog");
   check(opened, "Settings opens");
   shot("2-settings");
   // 3. Back closes the dialog and the app stays open
-  adb("shell", "input", "keyevent", "KEYCODE_BACK");
+  pressBack();
   const closed = await until(noDialog, 30_000);
   const stayed = inFront();
   check(closed && stayed, "Back closes the dialog (the app stays open)", closed ? (stayed ? "" : `the app left: ${focus().join(" · ")}`) : "the dialog is still open after 30 s");
@@ -245,14 +277,14 @@ try {
   await evaluate(`[...document.querySelectorAll('[role="dialog"] button')].find((b) => /Română/.test(b.textContent)).click()`);
   await waitFor(`(${SAVED})?.lang === "ro"`, 20_000, "the language in the save");
   // Back closes Settings (pressed again only if it is still open a while later)
-  adb("shell", "input", "keyevent", "KEYCODE_BACK");
-  for (let i = 0; i < 2 && !(await until(noDialog, 20_000)); i++) adb("shell", "input", "keyevent", "KEYCODE_BACK");
+  pressBack();
+  for (let i = 0; i < 2 && !(await until(noDialog, 20_000)); i++) pressBack();
 
   // 4. Back with nothing open: the app goes to the background, and leaving saves the game
   await settle();
   const before = (await evaluate(SAVED)).savedAt;
   await sleep(1500);
-  adb("shell", "input", "keyevent", "KEYCODE_BACK");
+  pressBack();
   const left = await until(() => !inFront(), 30_000);
   check(left, "Back with nothing open puts the app in the background", left ? "" : `still in front after 30 s: ${focus().join(" · ")}; dialog open: ${await evaluate(DIALOG_OPEN).catch(() => "?")}`);
   const after = await evaluate(SAVED);
@@ -318,7 +350,7 @@ try {
   const AD_OFFER = `!![...document.querySelectorAll("header button")].find((b) => b.textContent.includes("📺"))`;
   // whatever the restart left open first (the offline report has an ad button of its own)
   for (let i = 0; i < 4 && (await evaluate(DIALOG_OPEN).catch(() => false)); i++) {
-    adb("shell", "input", "keyevent", "KEYCODE_BACK");
+    pressBack();
     await until(noDialog, 10_000);
   }
   const offered = await until(() => evaluate(AD_OFFER).catch(() => false), 120_000);
@@ -336,7 +368,7 @@ try {
       await sleep(35_000);
       shot("5-ad");
       for (let i = 0; i < 8 && onAd(); i++) {
-        adb("shell", "input", "keyevent", "KEYCODE_BACK");
+        pressBack();
         await sleep(5000);
       }
       const rewarded = await until(() => evaluate(`document.querySelector("header")?.textContent.includes("📈")`).catch(() => false), 30_000);
