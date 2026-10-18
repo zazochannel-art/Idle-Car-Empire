@@ -9,11 +9,14 @@ import { useUi } from "@/store/ui-store";
 /** A dialog on screen (one already closing doesn't count: a second Back acts on what is under it). */
 const openDialog = () => document.querySelector('[role="dialog"]:not([data-state="closed"]), [role="alertdialog"]:not([data-state="closed"])');
 
-/** Something the Back button can close: a dialog, or one of the game's screens over the map. */
-function somethingOpen(): boolean {
-  if (openDialog()) return true;
+/** The game's screens over the map, in the order Back looks at them (the race viewer first). */
+const SCREENS = ["race", "view", "plot", "zone", "garage", "floor", "preview", "showcase", "celebrate"] as const;
+
+/** What the Back button would close: a dialog, or one of the game's screens over the map (null: nothing). */
+function onTop(): string | null {
+  if (openDialog()) return "dialog";
   const u = useUi.getState();
-  return !!(u.view || u.plot || u.zone || u.garage || u.floor || u.race || u.preview || u.showcase || u.celebrate);
+  return SCREENS.find((k) => !!u[k]) ?? null;
 }
 
 /**
@@ -24,12 +27,14 @@ function somethingOpen(): boolean {
  * is where it was when the player returns.
  */
 function back() {
-  const u = useUi.getState();
-  if (!openDialog() && u.race) {
-    u.setRace(null);
+  const top = onTop();
+  // a debug build's console reaches logcat: scripts/android-device-check.mjs reads what each Back did
+  console.info(`Back: ${top ? `close ${top}` : "minimize"}`);
+  if (top === "race") {
+    useUi.getState().setRace(null);
     return;
   }
-  if (!somethingOpen()) {
+  if (!top) {
     void App.minimizeApp();
     return;
   }
