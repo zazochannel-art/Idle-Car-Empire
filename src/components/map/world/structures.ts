@@ -8,7 +8,7 @@
 // the road is on the +z side.
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
-import { buildDealer, buildGarage, buildPlant } from "../../three/building-models";
+import { buildDealer, buildGarage, buildPlant, hallLayout } from "../../three/building-models";
 import { materialKit, type MaterialKit } from "../../three/car-models";
 import { ALB, C, box, cone, cylinder, gableRoof, hazeAll, hazed, paint, plainUv, rnd, sphere } from "./kit";
 import { carGeometry } from "./scenery";
@@ -21,7 +21,26 @@ const metal = hazed(new THREE.MeshStandardMaterial({ vertexColors: true, roughne
 const glass = hazed(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.08, metalness: 0.6, envMapIntensity: 1.6 }));
 const lit = hazed(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, emissive: new THREE.Color("#ffffff"), emissiveIntensity: 0.15 }));
 
-/** Bakes a model: one mesh per material, transforms applied, shared by every copy with the same look. */
+/**
+ * The shared material for plain coloured parts of one finish: the model library
+ * makes a material per colour, and baked into vertex colours they become a single
+ * mesh per finish, a draw call each instead of one per colour.
+ */
+const finishes = new Map<string, THREE.MeshStandardMaterial>();
+function finishOf(m: THREE.Material): THREE.MeshStandardMaterial | null {
+  const s = m as THREE.MeshStandardMaterial;
+  // textured, see-through, glowing or already vertex-coloured materials keep their own mesh
+  if (s.type !== "MeshStandardMaterial" || s.transparent || s.vertexColors || s.map || s.emissiveMap || s.normalMap || s.roughnessMap || s.metalnessMap || s.alphaMap || s.emissive.getHex() !== 0) return null;
+  const key = `${s.metalness}|${s.roughness}|${s.envMapIntensity}|${s.side}|${s.flatShading}`;
+  let f = finishes.get(key);
+  if (!f) {
+    f = new THREE.MeshStandardMaterial({ vertexColors: true, metalness: s.metalness, roughness: s.roughness, envMapIntensity: s.envMapIntensity, side: s.side, flatShading: s.flatShading });
+    finishes.set(key, f);
+  }
+  return f;
+}
+
+/** Bakes a model: one mesh per material (plain colours merged per finish), transforms applied, shared by every copy with the same look. */
 export function bake(root: THREE.Object3D, scale = 1): THREE.Group {
   if (scale !== 1) root.scale.setScalar(scale);
   root.updateMatrixWorld(true);
@@ -35,9 +54,12 @@ export function bake(root: THREE.Object3D, scale = 1): THREE.Group {
     for (const k of Object.keys(g.attributes)) if (k !== "position" && k !== "normal" && k !== "uv" && k !== "color") g.deleteAttribute(k);
     if (!g.attributes.normal) g.computeVertexNormals();
     if (!g.attributes.uv) g.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
-    const list = groups.get(m.material) ?? [];
+    const finish = finishOf(m.material);
+    if (finish) g = paint(g, (m.material as THREE.MeshStandardMaterial).color);
+    const mat = finish ?? m.material;
+    const list = groups.get(mat) ?? [];
     list.push(g);
-    groups.set(m.material, list);
+    groups.set(mat, list);
   });
   const out = new THREE.Group();
   for (const [mat, list] of groups) {
@@ -97,12 +119,34 @@ export interface PlantLook {
 const MARGIN = 0.3;
 
 export function plantModel(look: PlantLook, W: number, D: number) {
-  return cached(`plant|${look.type}|${look.level}|${look.big}|${W}|${D}`, () => bake(buildPlant(THREE, kit(), { ...look, dockFront: true }, W - 2 * MARGIN, D - 2 * MARGIN)));
+  return cached(`plant|${look.type}|${look.level}|${look.big}|${W}|${D}`, () => {
+    const w = W - 2 * MARGIN;
+    const d = D - 2 * MARGIN;
+    const g = bake(buildPlant(THREE, kit(), { ...look, dockFront: true }, w, d));
+    // the staff's cars on the front bays (more as the plant grows), clear of the tanks and stock on the right
+    const { hy, hd } = hallLayout(look.level, look.big, w, d, true);
+    const apronZ = hy + hd + 0.02;
+    const apronD = d - (hy + hd) - 0.04;
+    const s = look.big ? 2 : 1;
+    const n = Math.min(look.big ? 5 : 3, (look.big ? 2 : 1) + Math.floor(look.level / 3));
+    if (apronD >= 0.56) {
+      const xs = Array.from({ length: n }, (_, i) => 0.05 + ((w - 0.1) * (i + 0.5)) / (6 * s));
+      g.add(parts({ plain: parked(xs, apronZ + apronD * 0.7, w, d, look.type.length * 13 + look.level) }));
+    }
+    return g;
+  });
 }
 
 export function dealerModel(tier: number, W: number, D: number, chargers = 0) {
   const brand = tier >= 3 ? "#eab308" : "#2563eb";
-  return cached(`dealer|${tier}|${W}|${D}|${chargers}`, () => bake(buildDealer(THREE, kit(), { tier, brand, chargers }, W - 2 * MARGIN, D - 2 * MARGIN)));
+  return cached(`dealer|${tier}|${W}|${D}|${chargers}`, () => {
+    const w = W - 2 * MARGIN;
+    const d = D - 2 * MARGIN;
+    const g = bake(buildDealer(THREE, kit(), { tier, brand, chargers }, w, d));
+    // customers' cars on the painted bays in front (the charging bays have their own)
+    g.add(parts({ plain: parked([0.4, 0.9, 1.4].slice(0, Math.min(3, 1 + tier)), 1.91, w, d, 40 + tier) }));
+    return g;
+  });
 }
 
 export function garageModel(level: number, color: string, W: number, D: number) {
@@ -132,6 +176,11 @@ function carRow(n: number, x0: number, z: number, step: number, seed: number, ya
     out.push(g);
   }
   return out;
+}
+
+/** Cars parked nose-in on painted bays: `xs` are the bay centres, `z` the row's centre (lot-corner units of a w×d yard). */
+function parked(xs: number[], z: number, w: number, d: number, seed: number) {
+  return xs.flatMap((x, i) => carRow(1, x - w / 2, z - d / 2, 0, seed + i * 7));
 }
 
 export function structureModel(type: string, level: number, color: string, roofHex: string, W: number, D: number, seed: number) {
@@ -310,31 +359,101 @@ function buildStructure(type: string, L: number, color: string, roofHex: string,
 
 // ───────────────────────────── market, depot, paddock ─────────────────────────────
 
+/**
+ * The Parts Market: a hall with a glazed front, its sign on the roof and vents,
+ * four stalls behind it under striped awnings with goods on their counters, and a
+ * yard with pallets of crates, barrels, a forklift and lamp posts by the road.
+ */
 export function marketModel(W: number, D: number) {
   return cached(`market|${W}|${D}`, () => {
     const P: THREE.BufferGeometry[] = [slab(W, D, "#a8a29e")];
+    const Mt: THREE.BufferGeometry[] = [];
+    const G: THREE.BufferGeometry[] = [];
+    const Lt: THREE.BufferGeometry[] = [];
     const cols = ["#16a34a", "#f59e0b", "#2563eb", "#dc2626"];
+    const goods = ["#ef4444", "#22c55e", "#3b82f6", "#eab308", "#a855f7", "#f97316"];
+    // stalls: a gabled booth each, a striped awning and a counter of goods
     for (let i = 0; i < 4; i++) {
       const x = -0.9 + i * 0.6;
       P.push(box(0.5, 0.3, 0.45, C("#f5f5f4"), x, 0, -0.6, 0));
       P.push(gableRoof(0.56, 0.55, 0.14, C(cols[i]), x, 0.3, -0.6, 0));
+      for (let k = 0; k < 5; k++) P.push(box(0.1, 0.018, 0.16, C(k % 2 ? "#ffffff" : cols[i]), x - 0.2 + k * 0.1, 0.27, -0.3, 0));
+      P.push(box(0.44, 0.1, 0.07, C("#78716c"), x, 0, -0.33, 0));
+      for (let k = 0; k < 3; k++) P.push(box(0.09, 0.06, 0.05, C(goods[(i * 2 + k) % goods.length]), x - 0.13 + k * 0.13, 0.1, -0.33, 0));
     }
-    P.push(box(2.2, 0.55, 0.7, C("#e7e5e4"), 0, 0, 0.25, 0));
-    P.push(box(2.3, 0.08, 0.8, C("#15803d"), 0, 0.55, 0.25, 0));
-    for (let i = 0; i < 6; i++) P.push(box(0.2, 0.16, 0.2, C(i % 2 ? "#a16207" : "#94a3b8"), -1.0 + i * 0.4, 0.02, 0.85, 0));
-    return parts({ plain: P });
+    // the hall: plinth, walls, a glazed front with a door, a roof with a parapet, vents and the sign
+    P.push(box(2.26, 0.03, 0.76, C("#78716c"), 0, 0, 0.25, 0));
+    P.push(box(2.2, 0.55, 0.7, C("#e7e5e4"), 0, 0.03, 0.25, 0));
+    G.push(box(1.9, 0.2, 0.02, C("#bfdbfe"), 0, 0.26, 0.6, 0));
+    for (let k = 0; k <= 6; k++) Mt.push(box(0.016, 0.22, 0.03, C("#475569"), -0.95 + k * (1.9 / 6), 0.25, 0.61, 0));
+    P.push(box(0.4, 0.24, 0.03, C("#334155"), 0, 0.03, 0.61, 0));
+    G.push(box(0.34, 0.2, 0.02, C("#93c5fd"), 0, 0.03, 0.625, 0));
+    P.push(box(2.3, 0.08, 0.8, C("#15803d"), 0, 0.58, 0.25, 0));
+    for (const [x, z, w, d] of [
+      [0, -0.14, 2.3, 0.03],
+      [0, 0.64, 2.3, 0.03],
+      [-1.14, 0.25, 0.03, 0.8],
+      [1.14, 0.25, 0.03, 0.8],
+    ])
+      P.push(box(w, 0.05, d, C("#166534"), x, 0.66, z, 0));
+    for (const x of [-0.7, 0.7]) Mt.push(cylinder(0.05, 0.08, C("#cbd5e1"), x, 0.66, 0.1, 10), cone(0.08, 0.05, C("#94a3b8"), x, 0.74, 0.1, 10));
+    Mt.push(box(0.03, 0.2, 0.03, C("#334155"), -0.4, 0.66, 0.55, 0), box(0.03, 0.2, 0.03, C("#334155"), 0.4, 0.66, 0.55, 0));
+    Lt.push(box(1.0, 0.18, 0.04, C("#facc15"), 0, 0.82, 0.56, 0));
+    P.push(box(0.8, 0.05, 0.045, C("#1f2937"), 0, 0.885, 0.565, 0));
+    // the yard by the road: pallets of crates, barrels, a forklift and two lamp posts
+    for (let i = 0; i < 4; i++) {
+      const x = -1.0 + i * 0.42;
+      P.push(box(0.26, 0.03, 0.22, C("#a16207"), x, 0, 0.88, 0));
+      const stack = 1 + (i % 3);
+      for (let k = 0; k < stack; k++) P.push(box(0.22 - k * 0.03, 0.1, 0.18 - k * 0.02, C(k % 2 ? "#94a3b8" : "#b45309"), x, 0.03 + k * 0.1, 0.88, 0));
+    }
+    for (const [x, z] of [
+      [0.75, 0.82],
+      [0.86, 0.95],
+      [0.75, 1.0],
+    ])
+      Mt.push(cylinder(0.06, 0.16, C("#1d4ed8"), x, 0, z, 12));
+    P.push(box(0.18, 0.12, 0.26, C("#f59e0b"), 1.05, 0.02, 0.92, 0), box(0.14, 0.08, 0.1, C("#1f2937"), 1.05, 0.14, 0.88, 0));
+    Mt.push(box(0.16, 0.3, 0.02, C("#374151"), 1.05, 0.02, 0.78, 0), box(0.03, 0.01, 0.14, C("#9ca3af"), 1.0, 0.02, 0.7, 0), box(0.03, 0.01, 0.14, C("#9ca3af"), 1.1, 0.02, 0.7, 0));
+    for (const x of [-1.2, 1.2]) {
+      Mt.push(cylinder(0.018, 0.75, C("#475569"), x, 0, 1.18, 8), box(0.16, 0.025, 0.05, C("#475569"), x - Math.sign(x) * 0.06, 0.75, 1.18, 0));
+      Lt.push(box(0.1, 0.012, 0.035, C("#fef9c3"), x - Math.sign(x) * 0.08, 0.738, 1.18, 0));
+    }
+    return parts({ plain: P, metal: Mt, glass: G, lit: Lt });
   });
 }
 
+/**
+ * The Materials Depot: three silos with ladders, joined by a pipe bridge, a
+ * conveyor down to the sand pile, steel bars on racks, and the office by the road.
+ */
 export function depotModel(W: number, D: number) {
   return cached(`depot|${W}|${D}`, () => {
     const P: THREE.BufferGeometry[] = [slab(W, D, "#a8a29e")];
     const Mt: THREE.BufferGeometry[] = [];
-    for (let i = 0; i < 3; i++) Mt.push(cylinder(0.26, 1.0, C("#cbd5e1"), -0.8 + i * 0.6, 0, -0.65, 16), cone(0.27, 0.2, C("#94a3b8"), -0.8 + i * 0.6, 1.0, -0.65, 16));
+    const G: THREE.BufferGeometry[] = [];
+    for (let i = 0; i < 3; i++) {
+      const x = -0.8 + i * 0.6;
+      Mt.push(cylinder(0.26, 1.0, C("#cbd5e1"), x, 0, -0.65, 16), cone(0.27, 0.2, C("#94a3b8"), x, 1.0, -0.65, 16));
+      // a red band and a ladder up the front
+      Mt.push(cylinder(0.265, 0.06, C("#dc2626"), x, 0.72, -0.65, 16));
+      Mt.push(box(0.012, 1.0, 0.012, C("#475569"), x - 0.05, 0, -0.38, 0), box(0.012, 1.0, 0.012, C("#475569"), x + 0.05, 0, -0.38, 0));
+      for (let k = 1; k < 10; k++) Mt.push(box(0.1, 0.008, 0.008, C("#475569"), x, k * 0.1, -0.38, 0));
+    }
+    // the pipe bridge along the silo tops, on a walkway
+    Mt.push(box(1.3, 0.025, 0.08, C("#64748b"), -0.2, 1.05, -0.65, 0));
+    Mt.push(paint(new THREE.CylinderGeometry(0.03, 0.03, 1.3, 10).rotateZ(Math.PI / 2).translate(-0.2, 1.12, -0.6), C("#9ca3af")));
     for (let i = 0; i < 4; i++) for (let q = 0; q < 3; q++) Mt.push(box(0.8, 0.06, 0.08, C("#64748b"), 0.6, 0.02 + q * 0.07, -0.1 + i * 0.12, 0));
+    for (const x of [0.22, 0.98]) Mt.push(box(0.03, 0.26, 0.5, C("#334155"), x, 0, 0.08, 0));
     P.push(cone(0.45, 0.35, C("#78716c"), -0.5, 0, 0.45, 10), cone(0.35, 0.28, C("#a16207"), 0.2, 0, 0.6, 10));
+    // a conveyor from the silos down to the sand pile
+    Mt.push(paint(new THREE.BoxGeometry(0.08, 0.02, 0.9).rotateX(-0.55).translate(-0.5, 0.42, 0.0), C("#6b7280")));
+    Mt.push(box(0.02, 0.5, 0.02, C("#475569"), -0.5, 0, -0.18, 0), box(0.02, 0.25, 0.02, C("#475569"), -0.5, 0, 0.18, 0));
+    // the office: a window, a door and an awning
     P.push(box(0.6, 0.5, 0.45, C("#fef3c7"), 0.95, 0, 0.75, 0), box(0.66, 0.06, 0.5, C("#92400e"), 0.95, 0.5, 0.75, 0));
-    return parts({ plain: P, metal: Mt });
+    G.push(box(0.3, 0.14, 0.015, C("#bfdbfe"), 0.85, 0.24, 0.98, 0));
+    P.push(box(0.12, 0.26, 0.015, C("#7c2d12"), 1.14, 0, 0.98, 0), box(0.24, 0.02, 0.12, C("#b45309"), 1.14, 0.3, 1.04, 0));
+    return parts({ plain: P, metal: Mt, glass: G });
   });
 }
 
@@ -348,16 +467,48 @@ export function paddockModel(W: number, D: number, open: boolean) {
       P.push(box(1.2, 0.5, 0.8, C("#d6d3d1"), 0, 0, -0.3, 0));
       return parts({ plain: P });
     }
+    const Mt: THREE.BufferGeometry[] = [];
+    const G: THREE.BufferGeometry[] = [];
+    const Lt: THREE.BufferGeometry[] = [];
+    const teams = ["#ef4444", "#facc15", "#3b82f6", "#22c55e"];
+    // the pit building: garages under one roof, a window band above the doors
     P.push(box(W - 0.8, 0.5, 1.2, C("#f1f5f9"), 0, 0, -0.5, 0));
     P.push(box(W - 0.7, 0.08, 1.4, C("#dc2626"), 0, 0.5, -0.45, 0));
-    for (let i = 0; i < 4; i++) P.push(door(-(W - 1.2) / 2 + i * ((W - 1.2) / 3), 0.5, 0.36, 0.11, "#1f2937"));
+    G.push(box(W - 1.0, 0.08, 0.02, C("#bfdbfe"), 0, 0.39, 0.105, 0));
+    for (let i = 0; i < 4; i++) {
+      const x = -(W - 1.2) / 2 + i * ((W - 1.2) / 3);
+      // a roller door in the team's colour with its number board and a light above
+      P.push(door(x, 0.5, 0.36, 0.11, "#1f2937"));
+      for (let k = 0; k < 5; k++) Mt.push(box(0.46, 0.012, 0.02, C(k % 2 ? "#e5e7eb" : teams[i]), x, 0.04 + k * 0.065, 0.125, 0));
+      Lt.push(box(0.2, 0.025, 0.02, C("#fefce8"), x, 0.37, 0.13, 0));
+      // tyre stacks and a toolbox cart beside each garage
+      for (let k = 0; k < 3; k++) Mt.push(cylinder(0.05, 0.035, C("#111827"), x + 0.3, k * 0.035, 0.32, 12));
+      P.push(box(0.1, 0.09, 0.06, C(teams[i]), x - 0.3, 0, 0.3, 0));
+    }
+    // the back (seen when the road is behind): a window band, sponsor boards, a staff door; units on the roof
+    G.push(box(W - 1.4, 0.1, 0.02, C("#bfdbfe"), 0, 0.3, -1.105, 0));
+    for (let i = 0; i < 3; i++) P.push(box(0.62, 0.12, 0.02, C(teams[i]), -1.0 + i, 0.1, -1.11, 0), box(0.4, 0.03, 0.022, C("#ffffff"), -1.0 + i, 0.145, -1.112, 0));
+    P.push(door(1.55, 0.18, 0.3, -1.115, "#334155"));
+    for (const x of [-1.25, 1.25]) Mt.push(box(0.26, 0.1, 0.18, C("#cbd5e1"), x, 0.58, -0.85, 0), cylinder(0.05, 0.01, C("#334155"), x, 0.68, -0.85, 12));
+    // race control on the roof: a glazed box with an antenna
+    P.push(box(1.3, 0.28, 0.55, C("#e2e8f0"), 0, 0.58, -0.55, 0));
+    G.push(box(1.24, 0.14, 0.02, C("#93c5fd"), 0, 0.68, -0.27, 0));
+    P.push(box(1.4, 0.04, 0.65, C("#334155"), 0, 0.86, -0.55, 0));
+    Mt.push(cylinder(0.012, 0.35, C("#94a3b8"), 0.5, 0.9, -0.7, 6), sphere(0.03, C("#ef4444"), 0.5, 1.25, -0.7));
+    // the canopy over the pit lane on its columns
     P.push(box(W - 0.8, 0.04, 0.7, C("#f8fafc"), 0, 0.62, 0.45, 0));
     for (const sx of [-1, 1]) P.push(box(0.05, 0.62, 0.05, C("#94a3b8"), sx * (W / 2 - 0.5), 0, 0.75, 0));
+    // the pit lane: an edge line, the speed-limit line and a box marked out in front of each garage
+    P.push(box(W - 0.8, 0.004, 0.03, C("#f8fafc"), 0, 0.02, 1.05, 0), box(W - 0.8, 0.004, 0.03, C("#facc15"), 0, 0.02, 1.35, 0));
+    for (let i = 0; i < 4; i++) {
+      const x = -(W - 1.2) / 2 + i * ((W - 1.2) / 3);
+      for (const dx of [-0.28, 0.28]) P.push(box(0.025, 0.004, 0.5, C("#f8fafc"), x + dx, 0.02, 0.75, 0));
+    }
     for (let i = 0; i < 3; i++) {
       P.push(box(0.02, 0.9, 0.02, C("#e5e7eb"), -0.9 + i * 0.9, 0, D / 2 - 0.35, 0));
       P.push(box(0.3, 0.18, 0.01, C(["#ef4444", "#facc15", "#3b82f6"][i]), -0.75 + i * 0.9, 0.7, D / 2 - 0.35, 0));
     }
-    return parts({ plain: P });
+    return parts({ plain: P, metal: Mt, glass: G, lit: Lt });
   });
 }
 
