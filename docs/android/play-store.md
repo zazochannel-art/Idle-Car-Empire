@@ -30,13 +30,12 @@ manual approval. They can't be done from the repository.
    - Supabase Pro (paid) avoids the pause.
    - Free alternatives: keep the project active (any visit or the CI checks
      count) and restore it from the dashboard if it pauses.
-6. **(you) Registrations must work for every email address.** Playing needs
-   an account, so creating one must work for anyone. Supabase's built-in
-   email sender only delivers to the project's team, so either turn
-   **Confirm email** off, or set up custom SMTP (both in
-   [cloud-save.md](../cloud-save.md), "Supabase setup", step 2). Then create
-   an account in the app with an address outside the project's team, to
-   check.
+6. **Registrations work for every email address: done.** Playing needs an
+   account, so creating one must work for anyone: **Confirm email** is off in
+   Supabase (18 October 2026). The `cloud-e2e` workflow registers a test
+   player with an email and a password and signs in with them, so it fails if
+   that changes. (To turn confirmation back on, set up custom SMTP first:
+   [cloud-save.md](../cloud-save.md), "Supabase setup", step 2.)
 7. **(you) A test account for the reviewers** (see *App access* below).
 8. **(you) Auth redirect URLs.** Email confirmations from the app link to
    `https://zazochannel-art.github.io/Idle-Car-Empire/`. It must be listed

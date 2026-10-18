@@ -299,7 +299,8 @@ Level Security. The game doesn't need it.
 - `scripts/cloud-e2e.mjs` — the same checks against the real project through
   its public API, exactly as the browser does (two anonymous test players;
   they appear on the board for a few seconds, under `e2e-…` names, until
-  they delete their saves).
+  they delete their saves; a third registers with an email and a password,
+  signs in with them, then deletes its account).
   Runs in CI (`.github/workflows/cloud-e2e.yml`) on pull requests that touch
   the save code or the database, and on demand.
 
