@@ -311,7 +311,7 @@ export const ro: Record<MessageKey, string> = {
   "settings.erase": "Șterge tot",
   "settings.credits": "Credite",
   "settings.privacy": "Politica de confidențialitate",
-  "settings.creditsModel": "Modele 3D: MC GT — „Nissan R34 Brians Fast Furious” de vecarz (sketchfab.com/heynic), CC BY 4.0; toate celelalte mașini (și cea din logo) și traficul de pe străzi — „Generic passenger car pack” de Comrade1280 (sketchfab.com/comrade1280), CC BY 4.0. Ambele adaptate (simplificate, fără embleme, revopsite). Fără legătură cu Nissan sau filmele Fast & Furious.",
+  "settings.creditsModel": "Modele 3D: toate mașinile (și cea din logo) și traficul de pe străzi — „Generic passenger car pack” de Comrade1280 (sketchfab.com/comrade1280), CC BY 4.0, adaptat (comprimat, revopsit).",
   "settings.reset": "Resetează jocul",
 
   "toast.achievement": "Realizare: {name}",

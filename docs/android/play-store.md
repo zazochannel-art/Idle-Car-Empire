@@ -12,16 +12,15 @@ manual approval. They can't be done from the repository.
 2. **Contact email: done.** `idlecarempire@gmail.com`, in
    `site/privacy/index.html` and `site/delete-account/index.html`. Show the
    same address on the store listing.
-3. **3D car model licences: done.** The app shows ads, so it is commercial:
-   the three non-commercial (CC BY-NC-SA) models (Porsche 911, Citroën
-   Survolt, DeLorean) are gone. Their platforms use bodies
-   from the CC BY car pack (`public/models/CREDITS.txt`).
-   - **(you) one model left to decide on:** the MC GT is a Nissan R34 from
-     the "Fast & Furious" films (CC BY 4.0, so commercial use is allowed by
-     its licence). The badges are hidden, but the shape is recognisable, and
-     Google Play's [intellectual property policy](https://support.google.com/googleplay/android-developer/answer/9888072)
-     lets the owners file complaints. Replacing it with an original or
-     unbranded CC BY / CC0 model is the safest path for the store.
+3. **3D car models: done.** Every car in the game, the logo's too, comes from
+   one pack of generic, unbranded cars under CC BY 4.0, which allows
+   commercial use (`public/models/CREDITS.txt`). No real make or model is
+   left, so Google Play's [intellectual property policy](https://support.google.com/googleplay/android-developer/answer/9888072)
+   has nothing to object to.
+   - The three non-commercial (CC BY-NC-SA) models (Porsche 911, Citroën
+     Survolt, DeLorean) went first.
+   - The MC GT, a Nissan R34 from the "Fast & Furious" films, is now the
+     pack's coupe with a rear wing (18 October 2026).
 4. **(you) Upload key.** Create it and give it to the build ([signing.md](signing.md)).
 5. **(you) Supabase plan.** The free plan pauses a project after a week
    without activity. Paused, the cloud save and the leaderboards stop, and

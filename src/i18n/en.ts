@@ -312,7 +312,7 @@ export const en = {
   "settings.erase": "Erase everything",
   "settings.credits": "Credits",
   "settings.privacy": "Privacy policy",
-  "settings.creditsModel": "3D models: MC GT — “Nissan R34 Brians Fast Furious” by vecarz (sketchfab.com/heynic), CC BY 4.0; every other car (the one in the logo too) and the street traffic — “Generic passenger car pack” by Comrade1280 (sketchfab.com/comrade1280), CC BY 4.0. Both adapted (simplified, badges removed, repainted). Not affiliated with Nissan or the Fast & Furious films.",
+  "settings.creditsModel": "3D models: every car (the one in the logo too) and the street traffic — “Generic passenger car pack” by Comrade1280 (sketchfab.com/comrade1280), CC BY 4.0, adapted (compressed, repainted).",
   "settings.reset": "Reset game",
 
   "toast.achievement": "Achievement: {name}",
