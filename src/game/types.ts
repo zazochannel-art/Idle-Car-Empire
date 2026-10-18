@@ -619,6 +619,8 @@ export interface GameState {
   pass: import("./engine/pass").PassState;
   /** Rewarded ads (engine/ads.ts): today's count, the sales boost, the instant-build pause. */
   ads: import("./engine/ads").AdsState;
+  /** The shop (engine/shop.ts): the free crate's timer and today's ad packs. */
+  shop: import("./engine/shop").ShopState;
   /** Unlock bonuses already claimed this run ("car:sedan", "plant:engineFactory"). */
   unlocks: string[];
   /** stats: send the anonymous new-player funnel steps (engine/funnel.ts). */

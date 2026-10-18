@@ -17,12 +17,15 @@ import { useGame } from "@/store/game-store";
 
 type T = (key: MessageKey, vars?: Vars) => string;
 
-/** Plays an ad for `reward`; the game gives it only if the ad was watched to the end. */
-async function watch(reward: AdReward, t: T, plot?: string) {
-  const r = await watchAd(() => useGame.getState().adReward(reward, plot));
+/** Plays an ad; `onReward` (the game giving the reward) runs only if the ad was watched to the end. */
+export async function playAd(onReward: () => void, t: T) {
+  const r = await watchAd(onReward);
   if (r === "closed") uiEvents.emit({ type: "toast", tone: "info", icon: "📺", title: t("ad.closed"), body: t("ad.closedBody") });
   else if (r === "failed") uiEvents.emit({ type: "toast", tone: "warn", icon: "📺", title: t("ad.failed"), body: t("ad.failedBody") });
 }
+
+/** Plays an ad for `reward`. */
+const watch = (reward: AdReward, t: T, plot?: string) => playAd(() => useGame.getState().adReward(reward, plot), t);
 
 /** An ad is loaded and not on screen, and what would stop the game giving this reward now. */
 function useAdOffer(reward: AdReward, plot?: string) {

@@ -2,6 +2,7 @@
 // had. The ad itself is shown by the Android app (lib/ads.ts); a reward is
 // granted here only once the ad network says the ad was watched to the end.
 import { ADS, type AdReward } from "../config/ads";
+import { SHOP } from "../config/shop";
 import type { GameState } from "../types";
 import { finishNow, remainingOf } from "./construction";
 import { collectOffline } from "./offline";
@@ -52,10 +53,15 @@ export function grantAd(s: GameState, reward: AdReward, now: number, plot?: stri
   else if (reward === "boost") s.ads.boostLeft = ADS.boostSeconds;
   else if (!finishNow(s, plot!)) return false;
   else s.ads.buildAt = now;
+  countAd(s, now);
+  return true;
+}
+
+/** One more rewarded ad watched today (the shop's ad packs count too). */
+export function countAd(s: GameState, now: number) {
   const day = dateKey(now);
   s.ads.count = (s.ads.day === day ? s.ads.count : 0) + 1;
   s.ads.day = day;
-  return true;
 }
 
 /** The sales boost runs down with play time only (the game closed, it waits). */
@@ -68,7 +74,8 @@ export function migrateAds(a: AdsState, now: number): AdsState {
   return {
     day: a.day,
     count: Math.max(0, Math.min(ADS.perDay, Math.floor(a.count))),
-    boostLeft: Math.max(0, Math.min(ADS.boostSeconds, a.boostLeft)),
+    // an ad gives 30 minutes; the shop's long boost can add up to its cap
+    boostLeft: Math.max(0, Math.min(SHOP.boostCap, a.boostLeft)),
     // a time from the future (a clock set back) would hold the pause for ever
     buildAt: Math.max(0, Math.min(now, a.buildAt)),
   };

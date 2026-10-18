@@ -52,7 +52,13 @@ export function useAdStatus(): AdStatus {
 /** Shows an ad; `onReward` runs once if it was watched to the end. */
 export async function watchAd(onReward: () => void): Promise<AdResult> {
   if (!driver || !status.ready || status.showing) return "failed";
-  return driver.show(onReward);
+  // one ad, one reward, whatever the ad network reports (a shop pack would be given twice)
+  let rewarded = false;
+  return driver.show(() => {
+    if (rewarded) return;
+    rewarded = true;
+    onReward();
+  });
 }
 
 export async function showAdPrivacyForm() {
