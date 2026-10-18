@@ -6,15 +6,12 @@ manual approval. They can't be done from the repository.
 
 ## Before the first upload: open items
 
-1. **(you) Supabase migrations.** In the SQL Editor run, in order:
-   - `0005_ghosts_and_alliances.sql` (still not fully applied: leaving an
-     alliance fails);
-   - `0007_delete_account.sql` (the in-game *Delete account* button needs it).
-
-   The `cloud-e2e` workflow checks both.
-2. **(you) Contact email.** Replace `CONTACT_EMAIL` in
-   `site/privacy/index.html` and `site/delete-account/index.html`. Use the
-   address you will also show on the store listing.
+1. **Supabase migrations: done.** `0005_ghosts_and_alliances.sql` and
+   `0007_delete_account.sql` are applied on the live project (18 October
+   2026); the `cloud-e2e` workflow checks them, and passed.
+2. **Contact email: done.** `idlecarempire@gmail.com`, in
+   `site/privacy/index.html` and `site/delete-account/index.html`. Show the
+   same address on the store listing.
 3. **3D car model licences: done.** The app shows ads, so it is commercial:
    the three non-commercial (CC BY-NC-SA) models (Porsche 911, Citroën
    Survolt, DeLorean) are gone. Their platforms use bodies
@@ -89,7 +86,7 @@ is removed (for example a car model), update the text.
 **Category**: Game → Simulation. **Tags** (pick up to 5 in Play Console):
 Tycoon, Idle, Business, Management, Simulation.
 
-**Contact details (you)**: email (required, public), website
+**Contact details**: email `idlecarempire@gmail.com` (required, public), website
 `https://zazochannel-art.github.io/Idle-Car-Empire/` (optional).
 
 **Privacy policy URL**:
