@@ -50,10 +50,12 @@ Other documents: [signing.md](signing.md) (the upload key),
 - **Links**: an account's confirmation email leads to the game's site
   (`https://zazochannel-art.github.io/Idle-Car-Empire/`), which says the
   address is confirmed. The app signs in with email and password.
-- **Moving a save without an account**: Settings → *Export save* copies a
-  code; on the other phone, paste it and *Import save*.
+- **Moving a save by hand**: Settings → *Export save* copies a code; on the
+  other phone, paste it and *Import save* (signing in to the same account on
+  both phones is simpler: the cloud save follows the account).
 - **Saves** (`src/game/save/`, `docs/cloud-save.md`): on the phone at every
-  change, in the cloud when signed in (guests included). Android's own backup
+  change, and in the cloud save of the player's account (playing needs an
+  account, docs/cloud-save.md). Android's own backup
   also covers the app's data.
 
 ## Building

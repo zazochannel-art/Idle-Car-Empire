@@ -136,8 +136,9 @@ jobs:
           cache: gradle
           cache-dependency-path: android/**/*.gradle*
       - run: npm ci
-      # Without the Supabase settings: the checks play without an account, and a test run must
-      # not create players on the live server. Cloud saves are checked by cloud-e2e.yml.
+      # Without the Supabase settings: such a build goes straight into the game (with them, the
+      # game asks for an account), and a test run must not create players on the live server.
+      # Cloud saves are checked by cloud-e2e.yml.
       - name: Build the game for the app (no cloud)
         run: npm run build:android
       - name: Debug APK

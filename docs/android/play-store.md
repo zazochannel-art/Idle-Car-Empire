@@ -25,11 +25,20 @@ manual approval. They can't be done from the repository.
 4. **(you) Upload key.** Create it and give it to the build ([signing.md](signing.md)).
 5. **(you) Supabase plan.** The free plan pauses a project after a week
    without activity. Paused, the cloud save and the leaderboards stop, and
-   the game falls back to saving on the device.
+   the game falls back to saving on the device; new players can't create an
+   account, so they can't start playing until it is restored.
    - Supabase Pro (paid) avoids the pause.
    - Free alternatives: keep the project active (any visit or the CI checks
      count) and restore it from the dashboard if it pauses.
-6. **(you) Auth redirect URLs.** Email confirmations from the app link to
+6. **(you) Registrations must work for every email address.** Playing needs
+   an account, so creating one must work for anyone. Supabase's built-in
+   email sender only delivers to the project's team, so either turn
+   **Confirm email** off, or set up custom SMTP (both in
+   [cloud-save.md](../cloud-save.md), "Supabase setup", step 2). Then create
+   an account in the app with an address outside the project's team, to
+   check.
+7. **(you) A test account for the reviewers** (see *App access* below).
+8. **(you) Auth redirect URLs.** Email confirmations from the app link to
    `https://zazochannel-art.github.io/Idle-Car-Empire/`. It must be listed
    under Supabase → Authentication → URL Configuration → Redirect URLs, and
    should be the **Site URL** there too (that page now says the address is
@@ -72,8 +81,8 @@ manual approval. They can't be done from the repository.
 >
 > PLAY YOUR WAY
 > • Your factories keep producing while you're offline
-> • Plays offline: no connection needed after installing
-> • Optional account with cloud save to continue on another phone
+> • Plays offline once your account is created
+> • Your account keeps your empire in the cloud: continue on another phone
 > • Leaderboards, alliances and daily gifts with other players
 > • Battery saver and low-graphics mode for older phones
 > • English, Română, Русский
@@ -123,8 +132,13 @@ rendered in software), captured at 1080×1920.
 (the Google Mobile Ads SDK adds the `AD_ID` permission), for **Advertising or
 marketing**.
 
-**App access**: *All functionality is available without special access.*
-Reviewers can tap "Play without an account" on the welcome page.
+**App access**: *All or some functionality in my app is restricted*: the game
+needs an account. Add instructions for the reviewers:
+- **(you)** create an account for them in the app (any name, an email address
+  you own, a password), and enter that email and password in Play Console →
+  App access. Never put the password in this repository.
+- Instructions: "Open the app and tap *Sign in* on the welcome page, then
+  enter the email and password above." 
 
 **Content rating** (IARC questionnaire), as the game is today:
 - Category: Game.
@@ -159,9 +173,9 @@ rating authority decides.
 
 | Data type | Collected | Optional? | Purpose |
 | --- | --- | --- | --- |
-| Personal info → **Email address** | yes | optional (only with an account) | Account management |
-| Personal info → **Name** (player nickname) | yes | required (a generated name, can be changed) | App functionality |
-| Personal info → **User IDs** (account id) | yes | required when online (guest accounts too) | App functionality, Account management |
+| Personal info → **Email address** | yes | required (an account is needed to play) | Account management |
+| Personal info → **Name** (player nickname) | yes | required (chosen when registering, can be changed) | App functionality |
+| Personal info → **User IDs** (account id) | yes | required | App functionality, Account management |
 | App activity → **Other actions** (game progress / save) | yes | required when online | App functionality |
 | App activity → **Other user-generated content** (company and alliance names) | yes | optional | App functionality |
 | App activity → **App interactions** (anonymous beginner steps) | yes | optional (Settings → Anonymous statistics) | Analytics |
