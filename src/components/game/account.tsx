@@ -553,19 +553,22 @@ export function StartGate() {
       </div>
     );
   if (choice) return <ChooseSave {...choice} onKeep={answerStartChoice} />;
-  if (welcome) return <WelcomeGate returning={welcome === "returning"} />;
+  if (welcome) return <WelcomeGate mode={welcome} />;
   return <StartLoading label={t(phase === "account" ? "account.loadingAccount" : "account.loadingSave")} />;
 }
 
-/** Before the game: create an account or sign in (or, at the bottom, play without one). */
-function WelcomeGate({ returning }: { returning: boolean }) {
+/**
+ * Before the game: create an account or sign in (nobody plays without an account). A guest from
+ * when the game could be played without one ("guest") registers its own account, keeping its game.
+ */
+function WelcomeGate({ mode }: { mode: "new" | "returning" | "guest" }) {
   const saves = useGame((g) => g.saves);
   const { t } = useT();
   // the anonymous funnel's first step: a new visitor saw the welcome page
   useEffect(() => {
-    if (!returning) trackGate();
-  }, [returning]);
-  const [tab, setTab] = useState<"register" | "login">(returning ? "login" : "register");
+    if (mode === "new") trackGate();
+  }, [mode]);
+  const [tab, setTab] = useState<"register" | "login">(mode === "returning" ? "login" : "register");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -600,7 +603,7 @@ function WelcomeGate({ returning }: { returning: boolean }) {
         const r = await saves.welcomeLogin(email.trim(), password);
         if (!r.ok) return setMsg({ text: errorText(t, r), bad: true });
       }
-      enterGame("account");
+      enterGame();
     });
 
   // a dark glass card over the start screen, a gold-and-blue stripe along its top
@@ -612,7 +615,7 @@ function WelcomeGate({ returning }: { returning: boolean }) {
         <div className="text-3xl">📬</div>
         <div className="text-lg font-black">{t("welcome.pendingTitle")}</div>
         <p className="text-xs leading-snug text-white/65">{t("welcome.pendingBody", { email: pending })}</p>
-        <Button variant="gold" className="w-full" onClick={() => enterGame("account")}>
+        <Button variant="gold" className="w-full" onClick={() => enterGame()}>
           {t("welcome.enter")}
         </Button>
       </motion.div>
@@ -621,8 +624,8 @@ function WelcomeGate({ returning }: { returning: boolean }) {
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={card}>
       <div className="text-center">
-        <div className="race-type text-2xl leading-none">{t(returning ? "account.welcomeBack" : "welcome.title")}</div>
-        <p className="mt-1.5 text-xs leading-snug text-white/65">{t("welcome.subtitle")}</p>
+        <div className="race-type text-2xl leading-none">{t(mode === "new" ? "welcome.title" : "account.welcomeBack")}</div>
+        <p className="mt-1.5 text-xs leading-snug text-white/65">{t(mode === "guest" ? "welcome.guestNote" : "welcome.subtitle")}</p>
         <div className="mt-2.5 flex flex-wrap justify-center gap-1.5 text-[10px] font-bold text-white/75">
           {(
             [
@@ -675,13 +678,9 @@ function WelcomeGate({ returning }: { returning: boolean }) {
           )}
         </Button>
       </form>
+      {tab === "login" && mode === "guest" && <p className="text-[11px] leading-snug text-amber-300/90">{t("welcome.guestLoginNote")}</p>}
       {msg && <p className={cn("text-center text-xs", msg.bad ? "text-rose-300" : "text-sky-300")}>{msg.text}</p>}
-      <div className="border-t border-white/10 pt-2.5 text-center">
-        <button className="text-[11px] font-bold text-white/55 underline-offset-2 hover:text-white/80 hover:underline" disabled={busy} onClick={() => enterGame("guest")}>
-          {t("welcome.noAccount")}
-        </button>
-        <p className="mt-0.5 text-[10px] leading-snug text-white/35">{t("welcome.noAccountHint")}</p>
-      </div>
+      <p className="border-t border-white/10 pt-2.5 text-center text-[10px] leading-snug text-white/45">{t("welcome.needsAccount")}</p>
     </motion.div>
   );
 }

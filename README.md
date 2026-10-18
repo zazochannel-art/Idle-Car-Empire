@@ -17,7 +17,8 @@ factory-floor view.
 (App Router, static export), TypeScript, Tailwind CSS v4, shadcn/ui-style
 components, Lucide icons, Framer Motion and Zustand, and ships inside each
 app with [Capacitor](https://capacitorjs.com): it starts and plays with no
-connection. Saves stay on the phone, with optional Supabase cloud saves.
+connection once the player's account is created. Saves stay on the phone and
+in the player's account (Supabase cloud saves).
 
 - Android: [`docs/android/`](docs/android/README.md) (APK, Google Play bundle,
   emulator checks).

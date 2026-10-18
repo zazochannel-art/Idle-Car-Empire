@@ -22,19 +22,24 @@ export { encodeSave, decodeSave, migrate } from "./serialize";
 
 /** Set by logging out: the welcome page opens on "sign in" instead of "create account". */
 export const SIGNED_OUT_KEY = "idle-car-empire:signed-out";
-/** Set once this device went past the welcome page (an account, or playing without one). */
-export const WELCOMED_KEY = "idle-car-empire:welcomed";
 
 export interface StartHooks {
   /** Both copies hold progress the other has not: the player keeps one. */
   choose(local: SaveSummary, cloud: SaveSummary, reason: "both-changed" | "different-games"): Promise<"local" | "cloud">;
   /**
-   * The welcome page: nobody is signed in on this device (a new player, or after a logout).
-   * Resolves once the player registered or signed in ("account"), or chose to play without
-   * an account ("guest").
+   * The welcome page: no account is signed in on this device (a new player, after a logout, or
+   * a guest from when the game could be played without an account, `guestGame` when its game is
+   * here). Resolves once the player registered or signed in.
    */
-  signIn(returning: boolean): Promise<"account" | "guest">;
+  signIn(returning: boolean, guestGame: boolean): Promise<void>;
 }
+
+/**
+ * Who may play: an account with an email and a password, or one just registered whose email is
+ * still to be confirmed. A guest (an anonymous account, from when the game could be played
+ * without an account) registers first, keeping its game.
+ */
+export const registered = (a: Account): boolean => !a.guest || !!a.pendingEmail;
 
 export interface StartResult {
   /** The game to play (null: a new company). */
@@ -123,28 +128,15 @@ export class SaveManager {
     const legacy = this.local.read(null);
     if (!this.backend) return { state: legacy ? this.read(legacy.state, now) : null, mode: "local" };
 
-    // who plays: the session on this device, or whoever registers or signs in on the welcome page
+    // who plays: the account signed in on this device, or whoever registers or signs in on the
+    // welcome page. Nobody plays without an account: the page stays until there is one.
     let account = await this.currentAccount();
-    // a guest that never got past the welcome page (it left while registering) sees it again
-    const welcomed = flag(WELCOMED_KEY) || !!legacy || (!!account && !!this.local.read(account.id));
-    // This device went past the welcome page to play without an account, but its guest account
-    // was never made (no connection then): straight back to the game, not the welcome page again.
-    // Not after a logout, nor when an account's copy is here (that player signs in again).
-    const guestHere = flag(WELCOMED_KEY) && !flag(SIGNED_OUT_KEY) && this.local.owners().length === 0;
-    if ((!account && !guestHere) || (account?.guest && !welcomed)) {
-      const how = await hooks.signIn(flag(SIGNED_OUT_KEY));
-      flag(SIGNED_OUT_KEY, false);
-      flag(WELCOMED_KEY, true);
-      if (how === "account") account = await this.currentAccount();
+    while (!account || !registered(account)) {
+      const guestGame = !!account?.guest && !!this.local.read(account.id);
+      await hooks.signIn(flag(SIGNED_OUT_KEY), guestGame);
+      account = await this.currentAccount();
     }
-    if (!account) {
-      try {
-        account = await timeout(this.backend.signInGuest(), 10_000);
-      } catch {
-        // no cloud right now: this device's game, saved here; the cloud comes back at the next start
-        return { state: legacy ? this.read(legacy.state, now) : null, mode: "local" };
-      }
-    }
+    flag(SIGNED_OUT_KEY, false);
     this.account = account;
 
     let cloud: CloudCopy | null = null;
@@ -294,9 +286,17 @@ export class SaveManager {
     return this.backend.register(email, password, redirectTo);
   }
 
-  /** The welcome page's "sign in" (the game then starts with this account's save). */
+  /**
+   * The welcome page's "sign in" (the game then starts with this account's save). A guest's game
+   * left behind by it is kept as a backup on this device, to be played again from the Profile.
+   */
   async welcomeLogin(email: string, password: string): Promise<AuthResult> {
-    return this.backend ? this.backend.login(email, password) : { ok: false, error: "network" };
+    if (!this.backend) return { ok: false, error: "network" };
+    const before = await this.currentAccount();
+    const res = await this.backend.login(email, password);
+    const left = res.ok && before?.guest ? this.local.read(before.id) : null;
+    if (left && (await this.currentAccount())?.id !== before!.id) this.local.backup({ state: left.state, savedAt: left.savedAt }, "device");
+    return res;
   }
 
   async profile(): Promise<Profile | null> {

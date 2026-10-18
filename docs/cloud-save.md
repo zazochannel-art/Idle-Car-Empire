@@ -8,26 +8,25 @@ settings, or while it can't be reached, it saves on the device only.
 
 - **Welcome page**: before the game, a player who isn't signed in on this
   device sees "Create account" (name, email, password) and "Sign in" (email
-  and password). Nothing starts or saves behind it. A small "Play without an
-  account" link at the bottom starts a guest game (Supabase anonymous
-  sign-in, saved to the cloud but reachable only from this phone), which can
-  become an account later from the profile.
+  and password). Nobody plays without an account: nothing starts or saves
+  behind the page, and it stays until the player registered or signed in
+  (`SaveManager.start`). Creating the account needs a connection; after that
+  the game plays offline too.
 - **Create an account**: under the hood it is a guest account that gets the
   name, email and password, so a confirmation email the player hasn't
   clicked yet never blocks the game (they play meanwhile, the profile shows
   the email as waiting). A failed attempt (name or email taken) is retried
-  with the same account; a guest that left the page mid-registration sees
-  the page again on its next visit.
-- **Create an account later** (guests: Profile → Account): email + password
-  are added to the *same* account, so the game, the id and the name stay as
-  they are. From then on the player can sign in on any device.
+  with the same account.
+- **Guests from before** (when the game could be played without an
+  account: a Supabase anonymous account): their next start shows the welcome
+  page with a note. "Create account" adds the name, email and password to
+  their guest account, so their game, id and progress stay as they are.
+  "Sign in" to another account plays that account's game, and the guest's
+  game is kept on the device as a backup (Profile → Backups on this device).
 - **Sign in on another device** (welcome page or profile): the account's game
-  is loaded from the cloud. A guest game that device had is never merged into
-  the account; the profile's sign-in form warns that it is left behind.
+  is loaded from the cloud.
 - **Log out**: the game is saved first, then the account's copy is removed
   from the device; the next start shows the welcome page, opened on "Sign in".
-- Players who already played before the welcome page existed (a guest
-  session and a game on the device) go straight in, as before.
 - **Profile**: name (3–20 characters, unique, case-insensitive) and an avatar;
   company, money, earnings, factories, cars built, the cloud save's status
   and time, "save now", password, switch account, log out. In English,
@@ -255,9 +254,9 @@ Level Security. The game doesn't need it.
 1. **Authentication → Sign In / Providers**: enable **Anonymous sign-ins**
    and **Email**.
 2. **Email confirmation** (Authentication → Sign In / Providers → Email →
-   "Confirm email"). Supabase's built-in email sender only delivers to the
-   project's team members and a few emails per hour, so for public players
-   either:
+   "Confirm email"). Playing needs an account, so registering must work for
+   everyone. Supabase's built-in email sender only delivers to the project's
+   team members and a few emails per hour, so for public players either:
    - turn **Confirm email off**: registering adds email + password right
      away (no email is sent), or
    - keep it on and set up **custom SMTP** (Authentication → Emails → SMTP
@@ -281,9 +280,11 @@ Level Security. The game doesn't need it.
 - `npx vitest run src/game/save` — the start policy, the sync engine
   (grouping, ordering, retries, conflicts, backups) and whole-player
   scenarios against an in-memory server with the same rules as the database:
-  player A (guest → account → second device), player B (isolation, name
-  uniqueness), a save from before accounts, logout/sign-in, offline start, a
-  damaged cloud save.
+  no game without an account (the welcome page stays until there is one),
+  player A (account → second device), player B (isolation, name
+  uniqueness), a guest from before registering or signing in elsewhere, an
+  email still to confirm, a save from before accounts, logout/sign-in,
+  offline start, a damaged cloud save.
 - `supabase/tests/access_rules.sql` — run in the SQL editor: creates two test
   users inside a transaction, checks every access rule as each of them and as
   a signed-out visitor, and rolls everything back. Ends with "all access

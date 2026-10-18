@@ -23,8 +23,11 @@ interface CloudStore {
   sync: SyncInfo;
   /** At the start: which save to keep. */
   startChoice: StartChoice | null;
-  /** The welcome page (register or sign in): a "new" player, or "returning" after a logout. */
-  welcome: "new" | "returning" | null;
+  /**
+   * The welcome page (register or sign in): a "new" player, "returning" after a logout, or a
+   * "guest" whose game from when the game could be played without an account is here.
+   */
+  welcome: "new" | "returning" | "guest" | null;
   /** The cloud save comes from a newer version of the game. */
   outdated: boolean;
   /** What the loading screen is doing. */
@@ -44,7 +47,7 @@ export const useCloud = create<CloudStore>(() => ({
 }));
 
 let choose: ((keep: "local" | "cloud") => void) | null = null;
-let entered: ((how: "account" | "guest") => void) | null = null;
+let entered: (() => void) | null = null;
 
 /** Asks the player which save to keep (the loading screen shows the choice). */
 export function askStartChoice(c: StartChoice): Promise<"local" | "cloud"> {
@@ -60,17 +63,17 @@ export function answerStartChoice(keep: "local" | "cloud") {
   choose = null;
 }
 
-/** Shows the welcome page; resolves once the player registered or signed in ("account"), or plays without an account. */
-export function askWelcome(returning: boolean): Promise<"account" | "guest"> {
-  useCloud.setState({ welcome: returning ? "returning" : "new" });
+/** Shows the welcome page; resolves once the player registered or signed in. */
+export function askWelcome(returning: boolean, guestGame: boolean): Promise<void> {
+  useCloud.setState({ welcome: guestGame ? "guest" : returning ? "returning" : "new" });
   return new Promise((resolve) => {
     entered = resolve;
   });
 }
 
-/** Leaves the welcome page into the game. */
-export function enterGame(how: "account" | "guest") {
+/** Leaves the welcome page into the game (with the account just registered or signed in). */
+export function enterGame() {
   useCloud.setState({ welcome: null });
-  entered?.(how);
+  entered?.();
   entered = null;
 }
