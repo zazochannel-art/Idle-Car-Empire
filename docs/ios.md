@@ -41,7 +41,7 @@ In Xcode, pick a simulator or your iPhone and press Run. After any change to
 the game, run `npm run build:ios` again.
 
 The app's icons and launch screen are drawn by `npm run app:assets` (the same
-emblem as the Android icons).
+logo as the Android icons, `assets/logo.webp`).
 
 ## What you need to do (your Apple account)
 

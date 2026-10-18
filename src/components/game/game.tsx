@@ -29,6 +29,8 @@ import { Sheet } from "../panels/sheet";
 import { passWaiting } from "@/game/engine/pass";
 import { winterWaiting } from "@/game/engine/winter";
 import { ConflictDialog, ProfileView, StartGate } from "./account";
+import { StartScreen } from "./start-screen";
+import { useCloud } from "@/store/cloud-store";
 import { Coach } from "./coach";
 import { FeedbackBridge } from "./feedback-bridge";
 import { NativeApp } from "./native-app";
@@ -199,15 +201,13 @@ export function Game() {
 }
 
 function Splash() {
+  // the logo shrinks to make room when the start asks the player something
+  const asking = useCloud((c) => !!c.welcome || !!c.startChoice || c.outdated);
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center gap-4 px-4 py-6">
-      <motion.div animate={{ x: [-30, 30, -30] }} transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }} className="text-6xl">
-        🏎️
-      </motion.div>
-      <div className="text-sm font-semibold uppercase tracking-[0.3em] text-white/50">Idle Car Empire</div>
+    <StartScreen compact={asking}>
       {/* the account and its save load first; a choice, if one is needed, is asked here */}
       <StartGate />
-    </div>
+    </StartScreen>
   );
 }
 
