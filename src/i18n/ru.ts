@@ -2297,6 +2297,10 @@ export const ru: Record<MessageKey, string> = {
   "shop.rp": "{n} ОИ",
   "shop.got": "Вы получили {what}.",
   "shop.builtBody": "Стройка завершена.",
+  "update.title": "Новая тестовая версия",
+  "update.body": "Вышла сборка {n} (у вас {mine}). Скачайте её и откройте файл: она установится поверх этой, а ваша компания останется как есть.",
+  "update.download": "Скачать",
+  "update.later": "Позже",
 };
 
 export const ruContent: Record<string, string> = {

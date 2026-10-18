@@ -47,6 +47,8 @@ jobs:
           # the rewarded ad unit of the AdMob account, a repository variable (docs/android/ads.md);
           # unset: Google's test ads
           NEXT_PUBLIC_ADMOB_REWARDED_ID: ${{ vars.ADMOB_REWARDED_ID }}
+          # the test app compares it with the test-apk release's and offers a newer build (lib/test-update.ts)
+          NEXT_PUBLIC_TEST_BUILD: ${{ github.run_number }}
       # The upload key signs the release bundle on main and on manual runs, never on pull
       # requests (their code could read it). Without the secrets the bundle is unsigned.
       - name: Upload key (when the repository has it)
@@ -164,13 +166,21 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -e
+          # a slower run of an older commit never replaces a newer build
+          current=$(gh release view test-apk --json body -q .body 2>/dev/null | sed -n 's/.*<!-- test-build: \([0-9]*\) -->.*/\1/p')
+          if [ -n "$current" ] && [ "$current" -gt "$GITHUB_RUN_NUMBER" ]; then
+            echo "build $current is already on the release; this is build $GITHUB_RUN_NUMBER"
+            exit 0
+          fi
           mv apk/app-debug.apk idle-car-empire-test.apk
           cat > notes.md <<EOF
-          The game's latest Android test build, from \`main\` at ${GITHUB_SHA::7} ($(date -u '+%Y-%m-%d %H:%M UTC')). Every change to \`main\` replaces it.
+          The game's latest Android test build (build ${GITHUB_RUN_NUMBER}), from \`main\` at ${GITHUB_SHA::7} ($(date -u '+%Y-%m-%d %H:%M UTC')). Every change to \`main\` replaces it, and the installed test app offers the new build itself.
 
           **Install:** open \`idle-car-empire-test.apk\` on an Android phone, allow installs from that source, and if Play Protect warns, choose *More details → Install anyway*. It installs as **Car Empire DEBUG**, next to the Google Play app, and shows Google's test ads. Playing needs an account.
 
-          **Instalare:** deschide \`idle-car-empire-test.apk\` pe telefon, permite instalarea din această sursă, iar dacă apare Play Protect, alege *Mai multe detalii → Instalează oricum*. Se instalează ca **Car Empire DEBUG**, separat de aplicația din Google Play, cu reclame de test. Pentru joc e nevoie de un cont.
+          **Instalare:** deschide \`idle-car-empire-test.apk\` pe telefon, permite instalarea din această sursă, iar dacă apare Play Protect, alege *Mai multe detalii → Instalează oricum*. Se instalează ca **Car Empire DEBUG**, separat de aplicația din Google Play, cu reclame de test. Pentru joc e nevoie de un cont. Aplicația de test anunță singură când apare un build nou.
+
+          <!-- test-build: ${GITHUB_RUN_NUMBER} -->
           EOF
           if gh release view test-apk >/dev/null 2>&1; then
             # the tag moves to this build's commit; the APK and the notes are replaced

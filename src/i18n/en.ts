@@ -2300,6 +2300,10 @@ export const en = {
   "shop.rp": "{n} RP",
   "shop.got": "You got {what}.",
   "shop.builtBody": "The construction is finished.",
+  "update.title": "New test version",
+  "update.body": "Build {n} is out (you have {mine}). Download it and open the file: it installs over this one, and your company stays as it is.",
+  "update.download": "Download",
+  "update.later": "Later",
 } as const;
 
 export type MessageKey = keyof typeof en;
