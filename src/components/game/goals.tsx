@@ -1,8 +1,6 @@
 "use client";
 
 import { territoryCenterTile } from "@/game/city/layout";
-import { suggestedRestock } from "@/game/engine/materials";
-import { RESTOCK_UNITS } from "@/game/config/economy";
 import { ArrowRight, CheckCircle2, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -88,9 +86,11 @@ export function goalText(g: Goal, t: (k: MessageKey, v?: Vars) => string, n: Con
   }
 }
 
-/** What tapping a goal does. */
-export function runGoal(g: Goal, ready: boolean) {
-  const game = useGame.getState();
+/**
+ * What tapping a goal does: it opens the factory (or the screen) the goal is about, and
+ * the player does what it says from there. A tap never spends money by itself.
+ */
+export function runGoal(g: Goal) {
   const ui = useUi.getState();
   switch (g.kind) {
     case "plant":
@@ -99,68 +99,33 @@ export function runGoal(g: Goal, ready: boolean) {
       ui.setPreview({ plot: g.plot, type: g.plant });
       break;
     case "site":
-      ui.selectPlot(g.plot);
-      break;
     case "upgrade":
-      if (ready) {
-        if (g.what === "speed") game.plantSpeed(g.plot);
-        else game.plantLevel(g.plot);
-      }
+    case "materials":
+    case "warehouse":
+    case "shortage":
       ui.selectPlot(g.plot);
       break;
-    case "materials": {
-      // one tap restocks this plant and every other one running low
-      const st = game.snap.chain.plants[g.plot];
-      if (ready && st && !game.restockLow()) game.buyPlan(g.plot, suggestedRestock(game.state, g.plot, st.need, RESTOCK_UNITS));
-      ui.selectPlot(g.plot);
+    case "autoBuy":
+      ui.selectPlot(g.plots[0]);
       break;
-    }
+    case "made":
+      if (g.plot) ui.selectPlot(g.plot);
+      break;
     case "racing":
-      if (ready) game.unlockRacing();
-      ui.setView("racing");
-      break;
     case "raceCar":
-      ui.setView("racing");
-      break;
     case "sendCar":
-      if (ready) game.sendCar(g.car, "racing");
       ui.setView("racing");
       break;
     case "firstRace":
       ui.setRace({ phase: "prep", event: "amateurCup" });
       break;
-    case "warehouse":
-      if (ready) game.upgradeWarehouse(g.plot);
-      ui.selectPlot(g.plot);
-      break;
-    case "autoBuy":
-      for (const plot of g.plots) game.setAutoBuy(plot, true);
-      ui.selectPlot(g.plots[0]);
-      break;
-    case "shortage":
-      // one tap fixes it: buy the maker's cheapest upgrade
-      if (ready && g.what) {
-        if (g.what === "speed") game.plantSpeed(g.plot);
-        else game.plantLevel(g.plot);
-      }
-      ui.selectPlot(g.plot);
-      break;
     case "dealer":
-      if (ready) game.buyDealer(g.dealer);
-      ui.selectPlot(`d:${g.dealer}`);
-      break;
     case "dealerFull":
-      if (ready) {
-        if (g.open) game.buyDealer(g.dealer);
-        else game.upgradeDealer(g.dealer);
-      }
       ui.selectPlot(`d:${g.dealer}`);
       break;
     case "car":
-      if (g.plot) {
-        if (ready && g.cost !== undefined) game.plantGrade(g.plot);
-        ui.selectPlot(g.plot);
-      } else ui.setView("research");
+      if (g.plot) ui.selectPlot(g.plot);
+      else ui.setView("research");
       break;
     case "imperium":
       ui.setView("imperium");
@@ -173,18 +138,13 @@ export function runGoal(g: Goal, ready: boolean) {
       ui.enterGarage(g.plot);
       break;
     case "zone":
-      if (ready) game.unlockZone(g.zone);
       ui.selectZone(g.zone);
       break;
     case "territory": {
-      if (ready) game.unlockTerritory(g.territory);
       const c = territoryCenterTile(g.territory);
       ui.map({ kind: "look", x: c.x, y: c.y });
       break;
     }
-    case "made":
-      if (g.plot) ui.selectPlot(g.plot);
-      break;
     case "debt":
       ui.setView("economy");
       break;
@@ -211,7 +171,7 @@ export function NextGoals() {
         const keep = !ready && reserve > 0 && cost !== undefined && state.cash >= cost - reserve;
         const eta = cost && !ready && snap.incomePerSec > 0 && (cost - state.cash) / snap.incomePerSec < 86400 * 30 ? (cost - state.cash) / snap.incomePerSec : null;
         const text = goalText(g, t, n);
-        const onGo = () => runGoal(g, ready);
+        const onGo = () => runGoal(g);
         return (
           <div
             key={`${g.kind}:${"plot" in g ? g.plot : ""}`}

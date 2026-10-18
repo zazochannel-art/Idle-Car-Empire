@@ -954,7 +954,7 @@ export const ro: Record<MessageKey, string> = {
   "goal.upgradeDetail": "Producție mai mare cât strângi bani pentru următoarea fabrică.",
   "goal.shortage": "Nu sunt destule {item}",
   "goal.shortageDetail": "Linia de asamblare așteaptă: îmbunătățește {name}.",
-  "goal.shortageFix": "Atinge ca să îmbunătățești {name} și să alimentezi linia.",
+  "goal.shortageFix": "Îmbunătățește {name} ca să alimentezi linia.",
   "goal.dealer": "Construiește primul dealership",
   "goal.dealerDetail": "Mașinile se adună la fabrică — deschide un showroom ca să le vinzi.",
   "map.bigLot": "teren industrial: producție și stoc duble",

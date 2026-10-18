@@ -541,7 +541,7 @@ function GoalTracker() {
         onClick={() => {
           const g = useGame.getState();
           const goal = nextGoals(g.state, g.snap, 1)[0];
-          if (goal) runGoal(goal, goalReady(goal, g.state.cash));
+          if (goal) runGoal(goal);
         }}
         className={cn(
           "pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-xl p-2.5 text-left shadow-[0_4px_0_0_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:brightness-110",

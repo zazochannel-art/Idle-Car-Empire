@@ -378,7 +378,7 @@ export function restockPlan(s: GameState, plotId: string, need: MaterialStock, m
 const OUT_UNITS = 2;
 
 /**
- * A suggested restock (the goal card's one tap): the biggest order up to
+ * A suggested restock (what the materials goal asks for): the biggest order up to
  * `maxUnits` that leaves the wage reserve in the cash; a plant that can't
  * make a single unit still gets its next couple of units from the whole cash.
  */
