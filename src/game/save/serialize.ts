@@ -11,7 +11,6 @@ import { migratePass } from "../engine/pass";
 import { migrateAds } from "../engine/ads";
 import { migrateShop } from "../engine/shop";
 import { migrateCity, unlockOwnedZones } from "../engine/city";
-import { migrateProduction, sanitizeDesign } from "../engine/custom-garage";
 import { createInitialState, MAP_VERSION, SAVE_VERSION } from "../engine/state";
 import { ACHIEVEMENTS } from "../config/achievements";
 import type { GameState } from "../types";
@@ -80,9 +79,9 @@ export function migrate(raw: unknown, now: number): GameState {
   // a save from an older world map: its lots don't exist on this one
   if (raw.mapVersion !== MAP_VERSION) return fromOldMap(raw, now);
   const state = mergeDefaults(fresh, raw);
-  // the Custom Garage build and its production line (a job holds a whole design: no typed default to merge against)
-  state.customGarageDesign = sanitizeDesign(raw.customGarageDesign, now);
-  state.customGarageProduction = migrateProduction(raw.customGarageProduction, now);
+  // the Custom Garage is out of the game for now: a save's build and line stay as they were, for when it comes back
+  if (raw.customGarageDesign != null) state.customGarageDesign = raw.customGarageDesign;
+  if (raw.customGarageProduction != null) state.customGarageProduction = raw.customGarageProduction;
   state.mapVersion = MAP_VERSION;
   // Global Expansion is gone (its regions, Empire Points and perks): each expansion
   // already made becomes a ⭐ Star; the old fields are not carried over

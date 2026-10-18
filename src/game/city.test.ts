@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FACILITY_BY_ID, SERVICE_FEE, TERRITORIES, ZONES } from "./config/city";
-import { DEPOT, DRIVEWAY, FAST_ROAD, MARKET, RACING, STARTER_PLOT, UNITS_PER_TILE, WORLD_MAP, CUSTOM_GARAGE_FACTORY, along, roadOpen, roadRoute, routeLine } from "./city/layout";
+import { DEPOT, DRIVEWAY, FAST_ROAD, MARKET, RACING, STARTER_PLOT, UNITS_PER_TILE, WORLD_MAP, along, roadOpen, roadRoute, routeLine } from "./city/layout";
 import * as T from "./engine/territory";
 import { computeGlobalMods } from "./engine/modifiers";
 import type { GameState } from "./types";
@@ -62,8 +62,6 @@ describe("world layout", () => {
     expect(WORLD_MAP.plots.filter((p) => p.kind === "dealer")).toHaveLength(6);
     expect(WORLD_MAP.plotById[STARTER_PLOT].zone).toBe("town");
     expect(WORLD_MAP.plotById[STARTER_PLOT].use).toBe("bodyWorks");
-    expect(WORLD_MAP.plots.filter((p) => p.id === CUSTOM_GARAGE_FACTORY)).toHaveLength(1);
-    expect(WORLD_MAP.plotById[CUSTOM_GARAGE_FACTORY].kind).toBe("customGarage");
     for (const z of ZONES) expect(WORLD_MAP.plots.filter((p) => p.zone === z.id && p.kind === "plot").length).toBeGreaterThanOrEqual(6);
     // ranks run through the districts in stage order
     const ranked = WORLD_MAP.plots.filter((p) => p.kind === "plot").sort((a, b) => a.rank! - b.rank!);
@@ -83,6 +81,18 @@ describe("world layout", () => {
     const s = migrate(raw, T0);
     expect(s.city.buildings["b:industrial:0"]).toMatchObject({ type: "assemblyPlant", level: 3 });
     expect(s.city.land).toContain("b:industrial:0");
+  });
+
+  it("the Custom Garage is off the map for now; a save keeps its build for when it comes back", () => {
+    expect(WORLD_MAP.plotById["custom-garage-factory"]).toBeUndefined();
+    const raw = JSON.parse(JSON.stringify(createInitialState(T0)));
+    raw.customGarageDesign = { version: 1, name: "Blue Fox", paint: "#ff0000", kit: "widebody", wheels: "mesh", lowered: true, spoiler: false, prompt: "", updatedAt: T0 };
+    raw.customGarageProduction = { workerHired: true, machineLevel: 3, activeJob: null, completedJobs: 4 };
+    const loaded = decodeSave(encodeSave(migrate(raw, T0)), T0);
+    expect(loaded.customGarageDesign).toEqual(raw.customGarageDesign);
+    expect(loaded.customGarageProduction).toEqual(raw.customGarageProduction);
+    // a company that never had one carries nothing
+    expect(createInitialState(T0)).not.toHaveProperty("customGarageDesign");
   });
 
   it("lots never overlap and face their road, with the entry on it", () => {

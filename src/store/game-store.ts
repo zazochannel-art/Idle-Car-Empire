@@ -21,7 +21,6 @@ import * as L from "@/game/engine/logistics";
 import type { LogisticsUpgrade } from "@/game/config/logistics";
 import * as C from "@/game/engine/city";
 import * as Co from "@/game/engine/construction";
-import * as CG from "@/game/engine/custom-garage";
 import { awayEvents } from "@/game/engine/away";
 import { STRUCTURE_BY_ID } from "@/game/config/city";
 import { PLANT_LEVELS } from "@/game/config/chain";
@@ -35,7 +34,7 @@ import { tick as engineTick } from "@/game/engine/tick";
 import { formatDuration, formatMoney, formatNumber, formatPercent } from "@/game/format";
 import { decodeSave, encodeSave, SaveManager } from "@/game/save";
 import { askStartChoice, askWelcome, useCloud } from "./cloud-store";
-import type { BuyAmount, CarId, CarRoute, CustomGarageDesign, DealerId, FacilityType, GameState, Lang, ManagerId, PlantType, QualityMode, Specialization, StructureType, ZoneId } from "@/game/types";
+import type { BuyAmount, CarId, CarRoute, DealerId, FacilityType, GameState, Lang, ManagerId, PlantType, QualityMode, Specialization, StructureType, ZoneId } from "@/game/types";
 import { applyLanguage, detectLanguage, loadLanguage, translate, type MessageKey, type Vars } from "@/i18n";
 import { contentFor } from "@/i18n/content";
 import { uiEvents } from "./events";
@@ -131,11 +130,6 @@ interface GameStore {
   awayNotes: () => AwayNote[];
   /** Runs a player action on a copy of the state and commits it if it succeeded. */
   act: <T>(fn: (s: GameState) => T) => T;
-  /** The Custom Garage factory's production line (engine/custom-garage.ts); its build travels in the normal game save. */
-  hireCustomGarageWorker: () => boolean;
-  upgradeCustomGarageMachine: () => boolean;
-  startCustomGarageJob: (design: CustomGarageDesign) => boolean;
-  claimCustomGarageJob: () => boolean;
 
   plantLevel: (plot: string) => boolean;
   buyBodyMachine: (plot: string) => boolean;
@@ -665,28 +659,6 @@ export const useGame = create<GameStore>((set, get) => {
         setTimeout(social, SOCIAL_FIRST_MS);
         setInterval(social, SOCIAL_EVERY_MS);
       }
-    },
-
-    hireCustomGarageWorker: () => {
-      const ok = act((s) => CG.hireWorker(s));
-      if (ok) persist(true);
-      return ok;
-    },
-    upgradeCustomGarageMachine: () => {
-      const ok = act((s) => CG.upgradeMachine(s));
-      if (ok) persist(true);
-      return ok;
-    },
-    startCustomGarageJob: (design) => {
-      // (the design is checked again there: the screen and imported files are not the only callers)
-      const ok = act((s) => CG.startJob(s, design, Date.now()));
-      if (ok) persist(true);
-      return ok;
-    },
-    claimCustomGarageJob: () => {
-      const ok = act((s) => CG.claimJob(s, Date.now()));
-      if (ok) persist(true);
-      return ok;
     },
 
     plantLevel: (plot) => {

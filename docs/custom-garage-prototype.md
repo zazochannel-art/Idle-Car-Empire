@@ -1,5 +1,15 @@
 # Custom Garage prototype
 
+> **Out of the game for now** (October 2026): its lot on the map, its menu entry,
+> its screen and its rules were taken out until the feature is picked up again.
+> `main` at `8c4fb2b` is the last commit with it; reverting the commit that took
+> it out brings back the code (`src/components/custom-garage/custom-garage.tsx`,
+> `src/game/engine/custom-garage.ts` and its tests, the map lot in
+> `src/game/city/world-data.json`). Players' saves keep their build and
+> production line untouched in the meantime (`customGarageDesign`,
+> `customGarageProduction`), so nothing is lost when it returns: the restored
+> migration validates them again on load.
+
 ## Added on this branch
 - Opens inside the game, as a screen over the map: from its factory on the map (the fixed lot across the road from the industrial district, which takes no building lot) or from the menu.
 - Three.js 3D preview that loads the same production car-model pipeline as the game, with a procedural fallback when assets are unavailable; supports paint, wheel-face style, body-kit overlays and spoiler.
