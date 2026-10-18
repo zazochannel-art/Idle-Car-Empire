@@ -130,7 +130,7 @@ node scripts/android-device-check.mjs path/to/app-debug.apk --reboot
 
 It installs the APK and checks:
 - that the game starts;
-- that Back closes a dialog and then backgrounds the app;
+- that Back closes a dialog (the daily reward a new game shows after two minutes of play, then Settings) and then backgrounds the app;
 - that leaving the app saves at once and stops the loop;
 - that the same company and settings survive the app being killed, an update, and a restart (`--reboot`).
 
