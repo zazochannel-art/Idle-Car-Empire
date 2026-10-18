@@ -17,10 +17,8 @@ import type { DealerId, StructureType, ZoneId } from "../types";
 export const MARKET = "m:market";
 export const DEPOT = "s:depot";
 export const RACING = "r:paddock";
-/** The single, fixed Custom Garage factory on the industrial map. */
-export const CUSTOM_GARAGE_FACTORY = "custom-garage-factory";
 
-export type PlotKind = "plot" | "dealer" | "market" | "depot" | "racing" | "customGarage";
+export type PlotKind = "plot" | "dealer" | "market" | "depot" | "racing";
 /** What a part of the map belongs to for unlocking: a district or a territory. */
 export type AreaId = ZoneId | TerritoryId;
 export type Pt = [number, number];

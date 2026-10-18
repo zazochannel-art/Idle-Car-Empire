@@ -11,7 +11,7 @@ import type { PlotStatus } from "@/game/engine/construction";
 import { chargerLevel } from "@/game/engine/ev";
 import type { DealerId, GameState, StructureType } from "@/game/types";
 import type { MapNames } from "../map-types";
-import { customGarageFactoryModel, dealerModel, depotModel, emptyDealerModel, garageModel, lotMarker, lotOutline, marketModel, paddockModel, plantModel, siteModel, structureModel, worksModel, type SiteModel } from "./structures";
+import { dealerModel, depotModel, emptyDealerModel, garageModel, lotMarker, lotOutline, marketModel, paddockModel, plantModel, siteModel, structureModel, worksModel, type SiteModel } from "./structures";
 import type { Ground } from "./terrain";
 
 export type PlotLook =
@@ -19,7 +19,6 @@ export type PlotLook =
   | { kind: "market" }
   | { kind: "depot" }
   | { kind: "paddock"; open: boolean }
-  | { kind: "customGarage" }
   | { kind: "dealer"; tier: number; owned: boolean; chargers: number }
   | { kind: "plant"; type: string; level: number }
   | { kind: "garage"; level: number; color: string }
@@ -43,8 +42,7 @@ export function plotViews(s: GameState, names: MapNames): Map<string, PlotView> 
   const out = new Map<string, PlotView>();
   for (const plot of WORLD_MAP.plots) {
     let v: PlotView;
-    if (plot.kind === "customGarage") v = { look: { kind: "customGarage" }, sig: "custom-garage-factory", announce: "CUSTOM GARAGE · FACTORY", works: false };
-    else if (plot.kind === "market") v = { look: { kind: "market" }, sig: "built", works: false };
+    if (plot.kind === "market") v = { look: { kind: "market" }, sig: "built", works: false };
     else if (plot.kind === "depot") v = { look: { kind: "depot" }, sig: "built", works: false };
     else if (plot.kind === "racing") v = { look: { kind: "paddock", open: s.racing.unlocked }, sig: s.racing.unlocked ? "built" : "lot", announce: names.racing, works: false };
     else if (plot.kind === "dealer") {
@@ -81,8 +79,6 @@ function model(look: PlotLook, plot: Plot, seed: number): THREE.Object3D | null 
     case "empty":
     case "site":
       return null;
-    case "customGarage":
-      return customGarageFactoryModel(W, D);
     case "market":
       return marketModel(W, D);
     case "depot":
