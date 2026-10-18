@@ -22,28 +22,21 @@ const BG = "#06070a";
 // The emblem on a 512 grid.
 const EMBLEM = `
   <defs>
-    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#fcd34d"/><stop offset="1" stop-color="#f59e0b"/>
-    </linearGradient>
-    <linearGradient id="paint" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#f87171"/><stop offset="1" stop-color="#b91c1c"/>
-    </linearGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f8fafc"/><stop offset=".45" stop-color="#94a3b8"/><stop offset="1" stop-color="#475569"/></linearGradient>
+    <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#67e8f9"/><stop offset="1" stop-color="#0891b2"/></linearGradient>
+    <linearGradient id="amber" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fcd34d"/><stop offset="1" stop-color="#f59e0b"/></linearGradient>
   </defs>
-  <ellipse cx="258" cy="436" rx="148" ry="9" fill="#000" opacity="0.35"/>
-  <path d="M150 170 L180 92 L222 140 L256 66 L290 140 L332 92 L362 170 Z" fill="url(#gold)" stroke="#92400e" stroke-width="6" stroke-linejoin="round"/>
-  <circle cx="180" cy="92" r="12" fill="#fde68a"/>
-  <circle cx="256" cy="62" r="12" fill="#fde68a"/>
-  <circle cx="332" cy="92" r="12" fill="#fde68a"/>
-  <path d="M128 286 L176 222 Q190 204 214 204 L300 204 Q324 204 338 222 L392 286 Z" fill="url(#paint)"/>
-  <rect x="84" y="278" width="348" height="92" rx="34" fill="url(#paint)"/>
-  <path d="M194 278 L232 226 L262 226 L262 278 Z" fill="#bae6fd"/>
-  <path d="M282 226 L316 226 L356 278 L282 278 Z" fill="#bae6fd"/>
-  <rect x="96" y="318" width="34" height="14" rx="7" fill="#fde68a"/>
-  <rect x="390" y="318" width="34" height="14" rx="7" fill="#fecaca"/>
-  <circle cx="164" cy="372" r="40" fill="#151a2b"/>
-  <circle cx="164" cy="372" r="19" fill="#94a3b8"/>
-  <circle cx="352" cy="372" r="40" fill="#151a2b"/>
-  <circle cx="352" cy="372" r="19" fill="#94a3b8"/>`;
+  <path d="M256 48 L408 108 L391 276 Q373 373 256 445 Q139 373 121 276 L104 108 Z" fill="#0b1220" stroke="url(#metal)" stroke-width="9" stroke-linejoin="round"/>
+  <path d="M256 68 L387 120 L371 270 Q355 350 256 412 Q157 350 141 270 L125 120 Z" fill="#111c2e" stroke="#26364d" stroke-width="3"/>
+  <path d="M139 260 L176 238 L211 181 Q222 164 244 161 L298 161 Q319 164 332 184 L361 229 L390 248 L390 291 L355 301 L331 285 L182 285 L160 302 L126 291 Z" fill="url(#metal)" stroke="#e2e8f0" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M220 187 Q228 177 244 177 L296 177 Q309 179 318 194 L339 228 L198 228 Z" fill="#07111f" stroke="#22d3ee" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M266 180 L266 226" stroke="#22d3ee" stroke-width="4"/>
+  <path d="M147 258 L185 243 L203 243 L191 260 Z" fill="url(#amber)"/><path d="M337 243 L357 246 L379 260 L341 260 Z" fill="url(#amber)"/>
+  <path d="M151 278 L185 278 L185 290 L160 294 Z M330 278 L366 278 L359 294 L330 290 Z" fill="#020617"/>
+  <circle cx="190" cy="290" r="22" fill="#020617" stroke="#94a3b8" stroke-width="7"/><circle cx="190" cy="290" r="8" fill="url(#cyan)"/>
+  <circle cx="330" cy="290" r="22" fill="#020617" stroke="#94a3b8" stroke-width="7"/><circle cx="330" cy="290" r="8" fill="url(#cyan)"/>
+  <path d="M256 319 L276 356 L256 369 L236 356 Z" fill="url(#cyan)"/><path d="M256 329 L256 352" stroke="#e0f2fe" stroke-width="4" stroke-linecap="round"/>
+`;
 
 const BACKDROP = `
   <defs>
@@ -153,6 +146,10 @@ const notifyShape = svg(
     .replace(/stroke="[^"]*"/g, 'stroke="#fff"'),
 );
 for (const [d, k] of Object.entries(DENSITIES)) await silhouette(24 * k, path.join(RES, `drawable-${d}/ic_stat_notify.png`), notifyShape);
+
+// Shared web/store icon exports use the same master artwork.
+await png(full, 512, path.resolve("site/icon.png"));
+await png(full, 512, path.resolve("docs/android/store/icon-512.png"));
 
 // iOS: the app icon (opaque: the App Store refuses transparency) and the launch screen.
 const IOS = path.resolve("ios/App/App/Assets.xcassets");
