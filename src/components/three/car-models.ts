@@ -296,8 +296,6 @@ const PACK = "models/car-pack.glb";
  * freer. A non-commercial (NC) model can't be used, on the web either.
  */
 const HERO_FILES: Partial<Record<BodyModel, HeroFile>> = {
-  // "Nissan R34 Brians Fast Furious" by vecarz, CC BY 4.0 — silver with blue graphics, badges left out
-  muscle: { url: "models/gt-r34.glb", hide: /badge|manufacturerplate/i, ownPaint: true },
   // "Generic passenger car pack" by Comrade1280, CC BY 4.0 — unbranded cars, painted in the game's colours
   city: { url: PACK, pick: "Hatchback Body" },
   sedan: { url: PACK, pick: "Sedan Body", facing: "-x" },
@@ -306,6 +304,7 @@ const HERO_FILES: Partial<Record<BodyModel, HeroFile>> = {
   supercar: { url: PACK, pick: "Sport body", facing: "-x" },
   // the pack has no more bodies: these share one with a car above, told apart by paint and spoiler
   sports: { url: PACK, pick: "Coupe Body", wing: "lip" },
+  muscle: { url: PACK, pick: "Coupe Body", wing: "wing" },
   hypercar: { url: PACK, pick: "Sport body", facing: "-x", wing: "gt" },
   electric: { url: PACK, pick: "Sedan Body", facing: "-x" },
   // street traffic
@@ -325,6 +324,8 @@ interface Hero {
   paint: Set<string>;
   /** One repainted copy of each paint material per colour. */
   coats: Map<string, THREE_NS.Material>;
+  /** Its bounds, measured from the vertices (a pack's car is turned straight, so the quick bounds of its parts run wide). */
+  box: THREE_NS.Box3;
 }
 const HEROES: Partial<Record<BodyModel, Hero>> = {};
 let heroLoad: Promise<void> | null = null;
@@ -357,7 +358,9 @@ export function loadHeroes(T: Three): Promise<void> {
             m.geometry.userData.keep = true;
             for (const mm of Array.isArray(m.material) ? m.material : [m.material]) mm.userData.keep = true;
           });
-          HEROES[model] = { car, ownPaint: !!f.ownPaint, wing: f.wing, paint: new Set(paint.map((m) => m.name)), coats: new Map() };
+          car.updateMatrixWorld(true);
+          const box = new T.Box3().setFromObject(car, true);
+          HEROES[model] = { car, ownPaint: !!f.ownPaint, wing: f.wing, paint: new Set(paint.map((m) => m.name)), coats: new Map(), box };
         } catch {
           // no file or no network: the procedural body stays
         }
@@ -484,8 +487,8 @@ export function buildCar(T: Three, look: CarLook): THREE_NS.Group {
   if (!wing && !pod) return car;
   const g = new T.Group();
   g.add(car);
-  if (wing) g.add(spoiler(T, car, wing));
-  if (pod) g.add(sensors(T, car));
+  if (wing) g.add(spoiler(T, car, hero.box, wing));
+  if (pod) g.add(sensors(T, car, hero.box));
   return g;
 }
 
@@ -494,9 +497,8 @@ export function buildCar(T: Three, look: CarLook): THREE_NS.Group {
  * middle of the car finds the roof; a low black pod with a teal band sits on
  * it, the spinning lidar puck on top, and a camera block on each corner.
  */
-function sensors(T: Three, car: THREE_NS.Object3D): THREE_NS.Group {
+function sensors(T: Three, car: THREE_NS.Object3D, box: THREE_NS.Box3): THREE_NS.Group {
   car.updateMatrixWorld(true);
-  const box = new T.Box3().setFromObject(car);
   const L = box.max.x - box.min.x;
   const W = box.max.z - box.min.z;
   const H = box.max.y - box.min.y;
@@ -536,11 +538,11 @@ function sensors(T: Three, car: THREE_NS.Object3D): THREE_NS.Group {
 /**
  * A spoiler for the tail of a ready-made model: a ray down near the back
  * finds the bodywork, the blade sits on it (a lip) or on two struts with end
- * plates (a wing, a tall GT wing). Origin: the car's own (+X forward).
+ * plates (a wing, a tall GT wing). Origin: the car's own (+X forward); `box`,
+ * the car's bounds in it.
  */
-function spoiler(T: Three, car: THREE_NS.Object3D, kind: "lip" | "wing" | "gt"): THREE_NS.Group {
+function spoiler(T: Three, car: THREE_NS.Object3D, box: THREE_NS.Box3, kind: "lip" | "wing" | "gt"): THREE_NS.Group {
   car.updateMatrixWorld(true);
-  const box = new T.Box3().setFromObject(car);
   const L = box.max.x - box.min.x;
   const W = box.max.z - box.min.z;
   const H = box.max.y - box.min.y;

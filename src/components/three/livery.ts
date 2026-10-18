@@ -12,7 +12,7 @@ export const LIVERY: Record<LiveryModel, Livery> = {
   sedan: { color: "#b3b9c0", finish: "metallic" }, // silver box-flared sports sedan
   suv: { color: "#f2f2ef", finish: "gloss" }, // white SUV, black roof
   sports: { color: "#f3c014", finish: "gloss" }, // yellow classic rear-engine coupe
-  muscle: { color: "#1b46b8", finish: "gloss" }, // blue 60s muscle coupe, white stripes
+  muscle: { color: "#1b46b8", finish: "gloss" }, // blue tuner coupe, rear wing
   luxury: { color: "#121418", finish: "gloss" }, // black classic coupe, chrome
   supercar: { color: "#f2681c", finish: "gloss" }, // orange track coupe, big wing
   hypercar: { color: "#6a2fd6", finish: "metallic" }, // purple mid-engine, carbon top

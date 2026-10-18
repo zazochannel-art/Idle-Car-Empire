@@ -311,7 +311,7 @@ export const ru: Record<MessageKey, string> = {
   "settings.erase": "Стереть всё",
   "settings.credits": "Авторы",
   "settings.privacy": "Политика конфиденциальности",
-  "settings.creditsModel": "3D-модели: MC GT — «Nissan R34 Brians Fast Furious», автор vecarz (sketchfab.com/heynic), CC BY 4.0; все остальные машины (и машина на логотипе) и уличный трафик — «Generic passenger car pack», автор Comrade1280 (sketchfab.com/comrade1280), CC BY 4.0. Обе переработаны (упрощены, без эмблем, перекрашены). Не связано с Nissan или фильмами «Форсаж».",
+  "settings.creditsModel": "3D-модели: все машины (и машина на логотипе) и уличный трафик — «Generic passenger car pack», автор Comrade1280 (sketchfab.com/comrade1280), CC BY 4.0, переработано (сжато, перекрашено).",
   "settings.reset": "Сбросить игру",
 
   "toast.achievement": "Достижение: {name}",
