@@ -3,11 +3,12 @@ name: iOS
 # Builds the iPhone/iPad app from the same game code as the Android app, for the
 # iOS Simulator (no signing: that needs the owner's Apple Developer account, see
 # docs/ios.md), then starts it in a simulator and checks that the game comes up.
+# On hold while the work is on the Android app: it runs only on demand (Actions → iOS →
+# Run workflow). To check every pull request and main again, add back
+#   push: { branches: [main] }
+#   pull_request:
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-  pull_request:
 
 permissions:
   contents: read

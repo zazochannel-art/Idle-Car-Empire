@@ -14,8 +14,9 @@ rewarded ads use the network when there is one.
 
 ## What is checked automatically
 
-`.github/workflows/ios.yml` runs on a macOS runner for every pull request
-and every push to `main`:
+`.github/workflows/ios.yml` runs on a macOS runner. It is **on hold** while the
+work is on the Android app: it runs only on demand (Actions → iOS → Run
+workflow); its header says how to run it on every pull request again.
 
 1. builds the game (`npm run build:ios`);
 2. builds the app for the iOS Simulator (no signing);
