@@ -274,6 +274,37 @@ Level Security. The game doesn't need it.
    meanwhile), and anonymous sign-ins are rate limited per IP (30/hour by
    default; Authentication → Rate Limits). A CAPTCHA (e.g. Cloudflare
    Turnstile, free) can be added later against abuse.
+5. **Password resets** (the sign-in form's *Forgot password?*). The game emails
+   a link to `site/reset-password/`, where the player chooses a new password.
+   It needs an email sender for every address, so it is off until you turn
+   it on; meanwhile *Forgot password?* shows the contact address (below).
+   1. Authentication → Emails → **SMTP Settings** → enable custom SMTP. The
+      game's own Gmail works and is free: host `smtp.gmail.com`, port `465`,
+      user `idlecarempire@gmail.com`, password: an **app password** (Google
+      Account → Security → 2-Step Verification on → App passwords), sender
+      `idlecarempire@gmail.com`, name `Idle Car Empire` (Gmail sends up to
+      about 500 a day). Brevo's free plan (300 a day) works the same way.
+      Never put the password in the repository.
+   2. Authentication → URL Configuration → **Redirect URLs**: add
+      `https://zazochannel-art.github.io/Idle-Car-Empire/reset-password/`.
+      (Without it Supabase sends the link to the Site URL; that page passes
+      it on to the reset page, so it still works.)
+   3. GitHub → the repository → Settings → Secrets and variables → Actions →
+      **Variables** → `PASSWORD_RESET` = `on`, then build the app again
+      (Actions → Android / iOS → Run workflow, or the next merge).
+   4. Try it: sign out in the app, *Sign in* → *Forgot password?* with your
+      own email, open the email's link, set a password, sign in with it.
+
+   **Helping a player by hand** (before that, or when an email doesn't
+   arrive): when a player writes from their account's email address, set a
+   temporary password in the SQL Editor, send it to them, and ask them to
+   choose their own in Profile → *New password*:
+
+   ```sql
+   update auth.users
+   set encrypted_password = extensions.crypt('a-temporary-password', extensions.gen_salt('bf'))
+   where email = 'player@example.com';
+   ```
 
 ## Tests
 

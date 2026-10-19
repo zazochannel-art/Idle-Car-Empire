@@ -3,11 +3,12 @@ name: iOS
 # Builds the iPhone/iPad app from the same game code as the Android app, for the
 # iOS Simulator (no signing: that needs the owner's Apple Developer account, see
 # docs/ios.md), then starts it in a simulator and checks that the game comes up.
+# On hold while the work is on the Android app: it runs only on demand (Actions → iOS →
+# Run workflow). To check every pull request and main again, add back
+#   push: { branches: [main] }
+#   pull_request:
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-  pull_request:
 
 permissions:
   contents: read
@@ -37,6 +38,8 @@ jobs:
           # the iOS rewarded ad unit of the AdMob account, a repository variable (docs/ios.md);
           # unset: Google's test ads
           NEXT_PUBLIC_ADMOB_REWARDED_ID_IOS: ${{ vars.ADMOB_REWARDED_ID_IOS }}
+          # "on" once Supabase sends email to every address: password reset links (docs/cloud-save.md)
+          NEXT_PUBLIC_PASSWORD_RESET: ${{ vars.PASSWORD_RESET }}
       - name: Xcode
         run: xcodebuild -version
       - name: Build for the simulator
@@ -68,9 +71,19 @@ jobs:
           xcrun simctl launch --console-pty "$udid" com.zazochannel.idlecarempire > ios-check/app.log 2>&1 &
           console=$!
           sleep 60
+          running() { xcrun simctl spawn "$udid" launchctl list | grep -q "com.zazochannel.idlecarempire"; }
+          # A slow simulator sometimes never starts the app at all (nothing in its output): that is the
+          # simulator, not the app, so it gets one more launch. An app that started and stopped fails.
+          if ! running && [ ! -s ios-check/app.log ]; then
+            echo "::warning::the simulator did not start the app; launching it again"
+            kill "$console" 2>/dev/null || true
+            xcrun simctl launch --console-pty "$udid" com.zazochannel.idlecarempire > ios-check/app.log 2>&1 &
+            console=$!
+            sleep 60
+          fi
           xcrun simctl io "$udid" screenshot ios-check/game.png
           # still running after a minute (no crash at start)
-          xcrun simctl spawn "$udid" launchctl list | grep -q "com.zazochannel.idlecarempire" || { echo "::error::the app is not running"; tail -80 ios-check/app.log; exit 1; }
+          running || { echo "::error::the app is not running"; tail -80 ios-check/app.log; exit 1; }
           kill "$console" 2>/dev/null || true
           # Capacitor loaded the game's page from inside the app
           grep -q "Loading app at capacitor://localhost" ios-check/app.log || { echo "::error::the game's page did not load"; tail -80 ios-check/app.log; exit 1; }

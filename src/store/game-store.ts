@@ -71,6 +71,7 @@ import { funnelDue, funnelMinutes } from "@/game/engine/funnel";
 import { browserOptOut, sendStep } from "@/game/save/funnel";
 import { PASS, type WeeklyId } from "@/game/config/pass";
 import { batteryState, isIdle, isSaving, minTickMs, onSaverChange, setSaverSetting, startPower, type SaverSetting } from "@/lib/power";
+import { maybeAskForReview } from "@/lib/review";
 
 const TICK_MS = 100;
 /** How often the ticks refresh the screens' view of the state (ms). */
@@ -107,6 +108,10 @@ interface GameStore {
   claimGifts: () => Promise<number>;
   /** Pays the thank-you for a gift the server accepted. */
   giftSent: () => void;
+  /** Hides a player from the boards and visits on this account (their name is kept to list them in the Profile). */
+  hidePlayer: (id: string, name: string) => void;
+  /** Shows a hidden player again (null: all of them). */
+  unhidePlayer: (id: string | null) => void;
   /** Publishes the player's ghost (their best race car) if it changed since it was last published. */
   publishGhost: () => Promise<void>;
   /** Races another player's ghost (pays and records it): the race, or null if not allowed now. */
@@ -505,6 +510,20 @@ export const useGame = create<GameStore>((set, get) => {
       act((s) => (money = Gf.giftSent(s, get().snap)) > 0);
       persist(true);
       uiEvents.emit({ type: "toast", tone: "success", icon: "🎁", title: tr("gift.sent"), body: tr("gift.sentBody", { money: formatMoney(money) }) });
+    },
+    hidePlayer: (id, name) => {
+      act((s) => {
+        s.settings.hidden = [...s.settings.hidden.filter((h) => h.id !== id), { id, name: name.slice(0, 40) }].slice(-200);
+        return true;
+      });
+      persist(true);
+    },
+    unhidePlayer: (id) => {
+      act((s) => {
+        s.settings.hidden = id === null ? [] : s.settings.hidden.filter((h) => h.id !== id);
+        return true;
+      });
+      persist(true);
     },
     publishGhost: async () => {
       const social = saves?.social;
@@ -985,6 +1004,8 @@ export const useGame = create<GameStore>((set, get) => {
       act((s) => collectOffline(s) > 0 || s.pendingOffline === null);
       if (amount > 0) uiEvents.emit({ type: "toast", tone: "gold", icon: "💰", title: tr("toast.collected", { amount: formatMoney(amount) }), body: tr("toast.collectedBody") });
       persist(true);
+      // a good moment for the store's rating card (lib/review.ts decides whether it is due)
+      if (amount > 0) setTimeout(() => void maybeAskForReview(get().state), 1500);
     },
     imperium: () => {
       const gained = act((s) => doImperium(s, Date.now()));

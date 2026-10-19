@@ -49,6 +49,9 @@ jobs:
           NEXT_PUBLIC_ADMOB_REWARDED_ID: ${{ vars.ADMOB_REWARDED_ID }}
           # the test app compares it with the test-apk release's and offers a newer build (lib/test-update.ts)
           NEXT_PUBLIC_TEST_BUILD: ${{ github.run_number }}
+          # "on" once Supabase sends email to every address (custom SMTP): the game then emails password
+          # reset links; unset, it shows the contact address instead (docs/cloud-save.md)
+          NEXT_PUBLIC_PASSWORD_RESET: ${{ vars.PASSWORD_RESET }}
       # The upload key signs the release bundle on main and on manual runs, never on pull
       # requests (their code could read it). Without the secrets the bundle is unsigned.
       - name: Upload key (when the repository has it)
@@ -125,7 +128,35 @@ jobs:
           echo "AdMob app id: ${ADMOB:-not found}"
           echo "::endgroup::"
           ls -la "$APK" "$AAB"
-          if jarsigner -verify "$AAB" | grep -q "jar verified"; then echo "release bundle: SIGNED"; else echo "release bundle: unsigned (Google Play needs it signed with the upload key)"; fi
+          SIGNED=no
+          if jarsigner -verify "$AAB" | grep -q "jar verified"; then SIGNED=yes; echo "release bundle: SIGNED"; else echo "release bundle: unsigned (Google Play needs it signed with the upload key)"; fi
+          # Google Play's own checks on an upload, done here first (docs/android/play-store.md)
+          echo "::group::Google Play pre-flight"
+          TARGET=$(grep -oE 'targetSdkVersion="[0-9]+"' "$RUNNER_TEMP/manifest.xml" | grep -oE '[0-9]+' | head -1)
+          if [ "${TARGET:-0}" -lt 35 ]; then echo "::error::targetSdkVersion ${TARGET:-?}: Google Play takes 35 or higher"; exit 1; fi
+          echo "target SDK $TARGET: ok"
+          if grep -q 'android:debuggable="true"' "$RUNNER_TEMP/manifest.xml"; then echo "::error::the release bundle is debuggable: Google Play refuses it"; exit 1; fi
+          echo "not debuggable: ok"
+          # native code must be built for 16 KB memory pages (apps targeting Android 15+): every LOAD
+          # segment of every 64-bit library aligned to 0x4000 or more
+          rm -rf "$RUNNER_TEMP/so" && mkdir -p "$RUNNER_TEMP/so"
+          unzip -q -o "$AAB" 'base/lib/*' -d "$RUNNER_TEMP/so" 2>/dev/null || true
+          LIBS=$(find "$RUNNER_TEMP/so" -name '*.so' \( -path '*arm64-v8a*' -o -path '*x86_64*' \))
+          if [ -z "$LIBS" ]; then
+            echo "16 KB pages: no native code in the bundle, nothing to align"
+          else
+            for f in $LIBS; do
+              for a in $(readelf -lW "$f" | awk '$1 == "LOAD" { print $NF }'); do
+                if [ $((a)) -lt 16384 ]; then echo "::error::$(basename "$f") is aligned to $a, not 16 KB: Google Play refuses it"; exit 1; fi
+              done
+              echo "16 KB pages: $(basename "$f") ok"
+            done
+          fi
+          ADMOB_ID=$(echo "$ADMOB" | grep -oE 'ca-app-pub-[0-9]+~[0-9]+' || true)
+          if [ "$SIGNED" = yes ] && [ "${ADMOB_ID%%~*}" = "ca-app-pub-3940256099942544" ]; then
+            echo "::warning::This signed bundle uses Google's sample AdMob app id: it shows test ads only, which pay nothing (set the ADMOB_APP_ID variable, docs/android/ads.md)"
+          fi
+          echo "::endgroup::"
       - uses: actions/upload-artifact@v4
         with:
           name: idle-car-empire-debug-apk

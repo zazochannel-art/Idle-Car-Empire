@@ -133,7 +133,7 @@ async function silhouette(size, file) {
 for (const [d, k] of Object.entries(DENSITIES)) await silhouette(24 * k, path.join(RES, `drawable-${d}/ic_stat_notify.png`));
 
 // The store icon, and the site's (shown at 96 px and as the tab icon).
-await png(LOGO, 512, path.resolve("docs/android/store/icon-512.png"));
+await png(LOGO, 512, path.resolve("fastlane/metadata/android/en-US/images/icon.png"));
 await png(LOGO, 192, path.resolve("site/icon.png"));
 // The game's loading screen shows the cut-out logo (about 240 px wide on a phone, so 3× that).
 await sharp(CUTOUT).resize(720, 720).webp({ quality: 85, alphaQuality: 90 }).toFile(path.resolve("public/logo.webp"));

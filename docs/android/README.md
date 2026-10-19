@@ -16,8 +16,9 @@ other online features talk to the game's Supabase project.
 | Orientation | portrait on phones; tablets and foldables rotate (Android 16 ignores the lock on large screens) |
 
 Other documents: [signing.md](signing.md) (the upload key),
-[play-store.md](play-store.md) (listing, forms, publication),
-[ads.md](ads.md) (rewarded ads: AdMob, consent, what you set up).
+[play-store.md](play-store.md) (listing, forms, publication, what is left to
+do), [ads.md](ads.md) (rewarded ads: AdMob, consent, what you set up),
+[../moderation.md](../moderation.md) (players' reports and names).
 
 ## Why Capacitor
 
@@ -161,5 +162,8 @@ Screenshots go to `android-check/`.
 ## Releasing an update
 
 1. Raise `versionCode` (by 1) and `versionName` in `android/version.properties`.
-2. Merge to `main`. The workflow builds `app-release.aab`, signed if the key is in the secrets.
-3. Upload it in Play Console (see [play-store.md](play-store.md)).
+2. Add the release notes, `fastlane/metadata/android/<language>/changelogs/<versionCode>.txt`
+   (English, Romanian, Russian; the tests ask for them).
+3. Merge to `main`. The workflow builds `app-release.aab`, signed if the key is in the secrets.
+4. Upload it in Play Console, or run *Actions → Publish to Google Play* (see
+   [play-store.md](play-store.md)).

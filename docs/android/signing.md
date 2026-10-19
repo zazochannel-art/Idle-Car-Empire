@@ -14,6 +14,14 @@ The upload key and its passwords **never go into the repository**. The
 
 You need a JDK for `keytool`; Android Studio includes one.
 
+On Windows, `scripts/make-upload-key.ps1` does steps 1 and 3b in one go: it
+creates the key with a random password in `Documents\IdleCarEmpire-upload-key`
+(with a note holding the password), then sets the four GitHub secrets, by
+GitHub CLI when it's signed in, otherwise one at a time through the clipboard.
+Right-click it → *Run with PowerShell*. It never overwrites an existing key.
+
+By hand:
+
 ```bash
 keytool -genkeypair -v \
   -keystore idle-car-empire-upload.jks \

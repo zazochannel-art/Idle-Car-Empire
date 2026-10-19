@@ -4,6 +4,7 @@ import { Crown, LogOut, RefreshCw, Search, UserMinus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ALLIANCE_EMBLEMS, ALLIANCE_REWARDS } from "@/game/engine/alliance";
+import { isCleanName } from "@/game/engine/names";
 import { rewardCash } from "@/game/engine/progress";
 import { formatDuration, formatMoney, formatNumber } from "@/game/format";
 import type { AllianceSummary, MyAlliance } from "@/game/save";
@@ -12,6 +13,7 @@ import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
+import { FlagAlliance, FlagMember } from "../game/player-safety";
 import { ViewHeader } from "./section-title";
 
 /** The player's alliance (weekly goal, members), or alliances to join and the form to found one. */
@@ -176,6 +178,7 @@ function AllianceHome({ a, onChange }: { a: MyAlliance; onChange: () => void }) 
               </span>
               <span className="block text-[11px] text-white/50">{t("alliance.memberPoints", { n: formatNumber(m.points) })}</span>
             </span>
+            {!m.me && <FlagMember userId={m.userId} name={m.username} />}
             {a.leader &&
               !m.me &&
               (kicking === m.userId ? (
@@ -279,6 +282,7 @@ function AllianceFinder({ onJoined }: { onJoined: () => void }) {
                   {t("alliance.members", { n: r.members, max: 20 })} · {t("alliance.pointsShort", { n: formatNumber(r.points) })}
                 </span>
               </span>
+              {!r.mine && <FlagAlliance id={r.id} name={`${r.name} [${r.tag}]`} />}
               <Button size="sm" variant={r.members >= 20 ? "locked" : "gold"} disabled={r.members >= 20 || busy} onClick={() => void join(r.id)}>
                 {t("alliance.join")}
               </Button>
@@ -308,6 +312,8 @@ function CreateForm({ onCreated }: { onCreated: () => void }) {
     );
   }
   const create = async () => {
+    // the server checks too; this answers at once
+    if (!isCleanName(name) || !isCleanName(tag)) return setMsg(t("alliance.err.blocked"));
     setBusy(true);
     setMsg(null);
     const r = await saves!.social!.createAlliance(name.trim(), tag, emblem).catch(() => "error" as const);

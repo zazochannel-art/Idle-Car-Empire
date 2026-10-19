@@ -57,7 +57,8 @@ export interface Profile {
   listed?: boolean;
 }
 
-export type AuthError = "invalid" | "taken" | "weak" | "credentials" | "unconfirmed" | "rate" | "network" | "unknown";
+/** blocked: a name the terms of use don't allow (engine/names.ts). */
+export type AuthError = "invalid" | "blocked" | "taken" | "weak" | "credentials" | "unconfirmed" | "rate" | "network" | "unknown";
 export type AuthResult = { ok: true; pending?: boolean } | { ok: false; error: AuthError; detail?: string };
 
 /** The cloud: accounts, profiles and revisioned saves. */
@@ -70,6 +71,8 @@ export interface CloudBackend {
   register(email: string, password: string, redirectTo: string): Promise<AuthResult>;
   login(email: string, password: string): Promise<AuthResult>;
   setPassword(password: string): Promise<AuthResult>;
+  /** Emails a link to choose a new password (the page at redirectTo sets it). */
+  resetPassword?(email: string, redirectTo: string): Promise<AuthResult>;
   logout(): Promise<void>;
   /** Deletes the signed-in account and everything the server keeps of it (for good). */
   deleteAccount(): Promise<AuthResult>;

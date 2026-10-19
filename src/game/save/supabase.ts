@@ -110,6 +110,13 @@ export class SupabaseBackend implements CloudBackend {
     return error ? fail(error) : { ok: true };
   }
 
+  async resetPassword(email: string, redirectTo: string): Promise<AuthResult> {
+    const c = await this.client;
+    // the email's link carries a short session for that account to the site's reset page (implicit flow)
+    const { error } = await c.auth.resetPasswordForEmail(email, { redirectTo });
+    return error ? fail(error) : { ok: true };
+  }
+
   async logout(): Promise<void> {
     const c = await this.client;
     // this device only: the player stays signed in elsewhere
@@ -152,6 +159,8 @@ export class SupabaseBackend implements CloudBackend {
     const { error } = await c.from("profiles").update(p).eq("id", id);
     if (!error) return { ok: true };
     if (error.code === "23505") return { ok: false, error: "taken", detail: error.message };
+    // the server's name check (migration 0008) says "name not allowed"; a name's shape, just "invalid"
+    if (error.code === "23514" && error.message.includes("not allowed")) return { ok: false, error: "blocked", detail: error.message };
     if (error.code === "23514" || error.code === "22001") return { ok: false, error: "invalid", detail: error.message };
     return { ok: false, error: "unknown", detail: error.message };
   }
