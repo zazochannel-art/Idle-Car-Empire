@@ -268,6 +268,17 @@ if (delC.data === "ok") {
   await c.client.auth.signOut();
 }
 
+// ── live events and the owner's dashboard (0010): players read the schedule, nothing more ──
+const live = await a.client.rpc("live_events");
+check(!live.error && Array.isArray(live.data), "every player can read the scheduled events", live.error?.message);
+check((await a.client.rpc("admin_check")).data === false, "a player is not an admin");
+const overview = await a.client.rpc("admin_overview");
+check(overview.error?.code === "42501", "the dashboard's figures are refused to a player", overview.error?.code ?? "answered");
+const sneaky = await a.client.rpc("admin_schedule_event", { p_event: "carShow", p_starts: new Date().toISOString(), p_hours: 1 });
+check(sneaky.error?.code === "42501", "a player can't schedule an event", sneaky.error?.code ?? JSON.stringify(sneaky.data));
+const opsTable = await a.client.schema("ops").from("live_events").select("id");
+check(!!opsTable.error, "the events table isn't reachable from the API", opsTable.error?.code ?? "readable");
+
 // ── clean up: each test player deletes its own save (and so its card) ──
 for (const p of [a, b]) {
   const del = await p.client.from("game_saves").delete().not("user_id", "is", null);

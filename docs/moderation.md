@@ -16,6 +16,8 @@ What is left for you is to look at the reports now and then, and act.
 
 ## Reading the reports
 
+The **Reports** tab of the dashboard ([admin.md](admin.md)) lists the open ones, with buttons to rename the player, mark a report done or dismiss it. The same in SQL:
+
 Supabase dashboard → **Table Editor** → `player_reports` (sort by `created_at`),
 or **SQL Editor**:
 

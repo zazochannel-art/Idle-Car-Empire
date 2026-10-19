@@ -19,7 +19,7 @@ your choices or manual approval: they can't be done from the repository.
 | Ads | rewarded ads only, Google AdMob with Google's consent form (UMP); test ads until you set your AdMob ids ([ads.md](ads.md)) |
 | Ratings | the store's own rating card after collecting the offline earnings, for engaged players, at most every 45 days (`src/lib/review.ts`) |
 | Updates | when Google Play has a newer version, the game offers it (Update opens Play's own update screen; Later is always there), once per new version and again every 3 days (`src/lib/play-update.ts`); nothing to set up, it works for any app installed from Play |
-| Servers | Supabase migrations 0001–0008 applied; `keep-alive.yml` calls the API every two days so the free project never pauses, and its run turns red (GitHub emails you) if the project is down |
+| Servers | Supabase migrations 0001–0010 applied; your dashboard (errors, new players, reports, live events) at `/admin/` on the site once you make yourself an admin ([admin.md](../admin.md)); `keep-alive.yml` calls the API every two days so the free project never pauses, and its run turns red (GitHub emails you) if the project is down |
 | Publishing | `play-publish.yml` (Actions → *Publish to Google Play*) uploads a signed bundle, the release notes and, if asked, the listing (once you add a service account) |
 
 ### To do, in this order (you)

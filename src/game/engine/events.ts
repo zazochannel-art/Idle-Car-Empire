@@ -1,5 +1,5 @@
 import { CAR_BY_ID } from "../config/cars";
-import { EVENTS, EVENT_BLOCK_MS, EVENT_LENGTH_MS, EVENT_OFFSET_MS, type EventMetric, type MarketEvent } from "../config/events";
+import { EVENTS, EVENT_BLOCK_MS, EVENT_BY_ID, EVENT_LENGTH_MS, EVENT_OFFSET_MS, type EventMetric, type MarketEvent } from "../config/events";
 import type { CarId, GameState } from "../types";
 import { payReward } from "./materials";
 
@@ -53,17 +53,35 @@ function windowOf(block: number): EventWindow {
   return { event: pick(block), start, end: start + EVENT_LENGTH_MS };
 }
 
-/** The event running at `now`, if any. */
+/**
+ * Events the game's owner scheduled on the server (lib/live-events.ts brings them): while one
+ * runs it takes the place of the regular schedule. Only the game's own events, so a scheduled
+ * one does nothing a regular one doesn't. Kept in memory, never in the save.
+ */
+let scheduled: EventWindow[] = [];
+
+export function setScheduledEvents(list: { id: string; start: number; end: number }[]) {
+  scheduled = list
+    .filter((e) => EVENT_BY_ID[e.id as keyof typeof EVENT_BY_ID] && Number.isFinite(e.start) && e.end > e.start)
+    .map((e) => ({ event: EVENT_BY_ID[e.id as keyof typeof EVENT_BY_ID], start: e.start, end: e.end }))
+    .sort((a, b) => a.start - b.start);
+}
+
+/** The event running at `now`, if any: a scheduled one first, else the regular one. */
 export function activeEvent(now: number): EventWindow | null {
+  const s = scheduled.find((e) => now >= e.start && now < e.end);
+  if (s) return s;
   const w = windowOf(Math.floor(now / EVENT_BLOCK_MS));
   return now >= w.start && now < w.end ? w : null;
 }
 
-/** The next event to start after `now`. */
+/** The next event to start after `now` (scheduled or regular, whichever comes first). */
 export function nextEvent(now: number): EventWindow {
   const block = Math.floor(now / EVENT_BLOCK_MS);
   const w = windowOf(block);
-  return now < w.start ? w : windowOf(block + 1);
+  const regular = now < w.start ? w : windowOf(block + 1);
+  const s = scheduled.find((e) => e.start > now);
+  return s && s.start < regular.start ? s : regular;
 }
 
 // ───────────────────────────── objectives ─────────────────────────────
