@@ -16,7 +16,10 @@
 $ErrorActionPreference = "Stop"
 $Repo = "zazochannel-art/Idle-Car-Empire"
 $Alias = "upload"
-$Dir = Join-Path ([Environment]::GetFolderPath("MyDocuments")) "IdleCarEmpire-upload-key"
+# Documents (or the home folder, where Windows doesn't say)
+$Docs = [Environment]::GetFolderPath("MyDocuments")
+if (-not $Docs) { $Docs = $HOME }
+$Dir = Join-Path $Docs "IdleCarEmpire-upload-key"
 $Jks = Join-Path $Dir "idle-car-empire-upload.jks"
 $Notes = Join-Path $Dir "CITESTE-MA.txt"
 

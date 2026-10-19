@@ -134,7 +134,7 @@ needs an account.
 **Content rating** (IARC questionnaire), as the game is today:
 - Category: Game.
 - Violence, fear, sexuality, language, controlled substances, crude humour: **none**.
-- Gambling or simulated gambling: **none** (no casino games, no paid random items).
+- Gambling or simulated gambling: **none** (no casino games, no paid random items: the shop's mystery box is opened for a rewarded ad, never bought).
 - **Users can interact / share content: yes.** Other players see player names,
   company names and alliance names chosen by players (leaderboards, visits,
   alliances). No chat. Players can report and hide others; names are filtered.
