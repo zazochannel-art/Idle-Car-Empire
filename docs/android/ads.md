@@ -90,6 +90,11 @@ They can't be done from the repository.
    Secrets and variables → Actions → **Variables** tab.
    - Add `ADMOB_APP_ID` (the app id) and `ADMOB_REWARDED_ID` (the ad unit
      id).
+   - Mind which is which: the **app id has a `~`** (`ca-app-pub-…~…`, in
+     AdMob → Apps → App settings), an **ad unit id has a `/`**. An ad unit id
+     in `ADMOB_APP_ID` would make the app close as it starts, so the build
+     refuses it: it uses Google's sample app id instead and says so in the
+     log, and *Publish to Google Play* stops until the app id is right.
    - They are not secrets: every copy of the app contains them. They are
      yours, though, so they live in your settings and not in the code.
    - For a build on your computer, set the same two in the environment:
