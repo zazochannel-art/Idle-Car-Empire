@@ -2263,7 +2263,7 @@ export const en = {
   "race.skin.pulse": "Pulse",
   "race.skin.legend": "Legend",
   "settings.stats": "Anonymous statistics",
-  "settings.statsHint": "Helps us see where new players get stuck: only which step was reached and after how many minutes. No account, no device id, nothing personal.",
+  "settings.statsHint": "Helps us see where new players get stuck (only which step was reached and after how many minutes) and fix errors (what went wrong, where in the game, and the app and Android versions). No account, no device id, nothing personal.",
 
   "nav.shop": "Shop",
   "shop.subtitle": "A free crate every 4 hours, a mystery box every day, rewards for a short ad and items for ⭐ Stars.",

@@ -2261,7 +2261,7 @@ export const ro: Record<MessageKey, string> = {
   "race.skin.pulse": "Puls",
   "race.skin.legend": "Legendă",
   "settings.stats": "Statistici anonime",
-  "settings.statsHint": "Ne ajută să vedem unde se blochează jucătorii noi: doar ce pas a fost atins și după câte minute. Fără cont, fără ID de dispozitiv, nimic personal.",
+  "settings.statsHint": "Ne ajută să vedem unde se blochează jucătorii noi (doar ce pas a fost atins și după câte minute) și să reparăm erorile (ce a mers greșit, unde în joc și versiunile aplicației și Android). Fără cont, fără ID de dispozitiv, nimic personal.",
   "nav.shop": "Magazin",
   "shop.subtitle": "O ladă gratuită la fiecare 4 ore, o cutie surpriză în fiecare zi, recompense pentru o reclamă scurtă și obiecte pe ⭐ Stele.",
   "shop.free": "Gratuit",

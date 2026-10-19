@@ -9,6 +9,8 @@
 // public key), from the environment or a .env.local file; without them the app
 // saves on the phone only.
 import { execSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 
 const platform = process.argv[2] ?? "";
 if (platform && !["android", "ios"].includes(platform)) throw new Error(`unknown platform "${platform}" (android or ios)`);
@@ -16,4 +18,11 @@ if (!process.env.NEXT_PUBLIC_SUPABASE_URL) console.warn("NEXT_PUBLIC_SUPABASE_UR
 
 execSync("node scripts/app-assets.mjs", { stdio: "inherit" });
 execSync("npx next build", { stdio: "inherit" });
+// SOURCE_MAPS=1 (CI): the maps go to source-maps/ with the scripts they describe, not into the app
+if (process.env.SOURCE_MAPS === "1") {
+  const chunks = "out/_next/static/chunks";
+  fs.rmSync("source-maps", { recursive: true, force: true });
+  fs.cpSync(chunks, "source-maps/chunks", { recursive: true });
+  for (const f of fs.readdirSync(chunks)) if (f.endsWith(".map")) fs.rmSync(path.join(chunks, f));
+}
 execSync(`npx cap sync ${platform}`.trim(), { stdio: "inherit" });

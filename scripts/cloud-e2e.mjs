@@ -206,6 +206,17 @@ check(unknownStep === "unknown", "an unknown funnel step is turned away", JSON.s
 const funnelRead = await anon.client.from("funnel_steps").select("id");
 check(!!funnelRead.error, "the funnel's table is out of the API's reach", funnelRead.error?.code);
 
+// ── anonymous error reports (0009): the same way in; an unknown kind writes nothing ──
+const errorReport = await fetch(`${url}/rest/v1/rpc/report_error`, {
+  method: "POST",
+  headers: { apikey: key, "Content-Type": "application/json" },
+  body: JSON.stringify({ p_kind: `${tag}-check`, p_message: "cloud-e2e", p_place: "", p_version: "", p_platform: "", p_engine: "" }),
+});
+const errorAnswer = await errorReport.json().catch(() => null);
+check(errorReport.status === 200 && errorAnswer === "unknown", "error reports answer with the public key alone (an unknown kind is turned away)", `${errorReport.status} ${JSON.stringify(errorAnswer)}`);
+const errorsRead = await anon.client.from("client_errors").select("id");
+check(!!errorsRead.error, "the error reports' table is out of the API's reach", errorsRead.error?.code);
+
 // ── registration: playing needs an account, so an email and a password must work at once for any
 // address (Supabase's "Confirm email" off, or an SMTP sender for everyone). A third test player
 // registers the way the game does: a guest that gets an email, then a password ──

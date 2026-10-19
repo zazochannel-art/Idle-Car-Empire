@@ -4,6 +4,7 @@ import { RefreshCw } from "lucide-react";
 import { Component, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { useT } from "@/i18n/use-t";
+import { reportError } from "@/lib/errors";
 import { useGame } from "@/store/game-store";
 
 /** A screen's code, tried once more after a moment when the first try fails (a dropped connection). */
@@ -45,6 +46,8 @@ export class ScreenBoundary extends Component<{ children: ReactNode; onClose: ()
   }
 
   componentDidCatch(error: unknown) {
+    // reported either way: in the app a screen's code is on the phone, so even one that didn't load is worth knowing about
+    reportError(error, "screen");
     if (missingCode(error)) reloadForUpdate();
   }
 

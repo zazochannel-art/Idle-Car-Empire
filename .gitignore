@@ -46,3 +46,5 @@ next-env.d.ts
 *.jks
 *.keystore
 keystore.properties
+# a build's source maps (SOURCE_MAPS=1, scripts/build-app.mjs)
+/source-maps

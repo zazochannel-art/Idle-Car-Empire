@@ -52,6 +52,8 @@ jobs:
           # "on" once Supabase sends email to every address (custom SMTP): the game then emails password
           # reset links; unset, it shows the contact address instead (docs/cloud-save.md)
           NEXT_PUBLIC_PASSWORD_RESET: ${{ vars.PASSWORD_RESET }}
+          # this build's source maps, kept as an artifact (not in the app) to read players' error reports
+          SOURCE_MAPS: "1"
       # The upload key signs the release bundle on main and on manual runs, never on pull
       # requests (their code could read it). Without the secrets the bundle is unsigned.
       - name: Upload key (when the repository has it)
@@ -167,6 +169,13 @@ jobs:
           name: idle-car-empire-release-aab
           path: android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
+      # the game's scripts and their source maps: node scripts/error-place.mjs reads a report's place with them
+      - uses: actions/upload-artifact@v4
+        with:
+          name: source-maps
+          path: source-maps
+          retention-days: 90
+          if-no-files-found: warn
       - uses: actions/upload-artifact@v4
         if: always()
         with:

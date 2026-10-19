@@ -170,10 +170,16 @@ rating authority decides.
 | App activity → **Other actions** (game progress / save) | yes | required when online | App functionality |
 | App activity → **Other user-generated content** (company and alliance names; reports sent about other players) | yes | optional | App functionality; Fraud prevention, security, and compliance |
 | App activity → **App interactions** (anonymous beginner steps) | yes | optional (Settings → Anonymous statistics) | Analytics |
+| App info and performance → **Crash logs**, **Diagnostics** (the game's anonymous error reports: [errors.md](../errors.md)) | yes | optional (Settings → Anonymous statistics) | Analytics, App functionality |
 | *AdMob:* Device or other IDs → **Device or other IDs** (advertising ID) | yes, **shared** | required (the SDK collects it when an ad is requested) | Advertising or marketing, Analytics, Fraud prevention, security, and compliance |
 | *AdMob:* Location → **Approximate location** (from the IP address) | yes, **shared** | required | Advertising or marketing, Analytics, Fraud prevention, security, and compliance |
 | *AdMob:* App activity → **App interactions** (with the ads) | yes, **shared** | required | Advertising or marketing, Analytics |
 | *AdMob:* App info and performance → **Crash logs**, **Diagnostics** | yes, **shared** | required | Analytics, Fraud prevention, security, and compliance |
+
+The form takes each data type once: **Crash logs** and **Diagnostics** come
+from both the game (collected, not shared, optional) and AdMob (shared,
+required), so answer them collected **and** shared, **required** (AdMob's
+can't be switched off), with both rows' purposes.
 
 Not collected: precise location, contacts, photos/files, messages, financial
 info, health, web history, audio, calendar. The "Android" device label stored
@@ -224,6 +230,8 @@ about every August. Capacitor's next major versions bring the next target.
 - **Reports** about players and alliances: [moderation.md](../moderation.md).
 - **Android vitals** (Play Console → Quality): crashes and ANRs; the pre-launch
   report of every release.
+- **Players' error reports** (the errors inside the game, which Android vitals
+  doesn't see): [errors.md](../errors.md).
 - **Ratings and reviews** (Play Console → Ratings and reviews): you can answer
   them; the rating card in the game asks engaged players.
 - **The keep-alive run**: if *Supabase keep-alive* turns red, restore the
