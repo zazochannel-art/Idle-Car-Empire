@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { COMPONENT_BY_ID, PLANT_BY_ID } from "@/game/config/chain";
 import { STATION_MACHINES } from "@/components/three/industrial-models";
 import { formatDuration, formatMoney, formatNumber } from "@/game/format";
-import type { MessageKey } from "@/i18n";
+import type { Lang, MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
 import { debtVars, stockTotal } from "@/game/engine/materials";
 import { bodyMachineCost, bodyWorkerCost, workshopOf } from "@/game/engine/chain";
@@ -20,6 +20,63 @@ import { itemName, plantName, processSteps, StockBar } from "../panels/plant-pan
 import { FloorEngine } from "./floor-engine";
 
 /** Full-screen view inside a plant: its production line, live. */
+type MachineKind = "coils" | "press" | "welder" | "paintBooth" | "qcTunnel" | "packer" | "finish";
+type WorkshopText = Record<"title" | "machine" | "worker" | "build" | "hire" | "selected" | "idle" | "limit" | "needMachine" | "effect" | "hint" | "assigned" | "vacant" | "hireSelected" | "selectNext" | "operation", string>;
+type FloorText = { staffed: string; vacant: string; unstaffed: string; machines: Record<MachineKind, string>; operations: Record<MachineKind, string>; workshop: WorkshopText };
+
+/** The Body Works hall's own labels (the machines drawn in it), per language. */
+const FLOOR_TEXT: Record<Lang, FloorText> = {
+  en: {
+    staffed: "STAFFED",
+    vacant: "HIRE",
+    unstaffed: "Unstaffed",
+    machines: { coils: "Sheet metal feeder", press: "Hydraulic press", welder: "Welding station", paintBooth: "Paint booth", qcTunnel: "Quality inspection", packer: "Packing station", finish: "Finishing station" },
+    operations: { coils: "Prepare and feed sheet metal", press: "Form body panels", welder: "Weld body panels", paintBooth: "Apply paint finish", qcTunnel: "Inspect body for defects", packer: "Prepare body for shipping", finish: "Finish the part" },
+    workshop: { title: "Body Works workshop", machine: "Machine", worker: "Worker", build: "Build machine", hire: "Hire worker", selected: "Selected machine", idle: "Space reserved for the next machine", limit: "Limit reached", needMachine: "Build another machine before hiring another worker.", effect: "Productivity", hint: "Tap a machine in the hall to select it.", assigned: "Worker assigned", vacant: "Unstaffed", hireSelected: "Hire worker", selectNext: "Select the next unstaffed machine", operation: "Operation" },
+  },
+  ro: {
+    staffed: "OCUPAT",
+    vacant: "LIBER",
+    unstaffed: "Fără muncitor",
+    machines: { coils: "Alimentator de tablă", press: "Presă hidraulică", welder: "Stație de sudură", paintBooth: "Cabină de vopsire", qcTunnel: "Controlul calității", packer: "Stație de ambalare", finish: "Stație de finisare" },
+    operations: { coils: "Pregătește și alimentează tabla", press: "Formează panourile caroseriei", welder: "Sudează panourile caroseriei", paintBooth: "Aplică stratul de vopsea", qcTunnel: "Verifică defectele caroseriei", packer: "Pregătește caroseria pentru transport", finish: "Finisează piesa" },
+    workshop: { title: "Atelier caroserii", machine: "Utilaj", worker: "Muncitor", build: "Construiește utilaj", hire: "Angajează muncitor", selected: "Utilaj selectat", idle: "Loc pregătit pentru următorul utilaj", limit: "Limită atinsă", needMachine: "Construiește mai întâi un utilaj pentru a angaja încă un muncitor.", effect: "Productivitate", hint: "Atinge utilajul din hală pentru a-l selecta.", assigned: "Muncitor repartizat", vacant: "Fără muncitor", hireSelected: "Angajează muncitor", selectNext: "Selectează următorul utilaj liber", operation: "Operațiune" },
+  },
+  ru: {
+    staffed: "ЗАНЯТ",
+    vacant: "СВОБОДНО",
+    unstaffed: "Без рабочего",
+    machines: { coils: "Подача листового металла", press: "Гидравлический пресс", welder: "Сварочная станция", paintBooth: "Покрасочная камера", qcTunnel: "Контроль качества", packer: "Упаковочная станция", finish: "Финишная станция" },
+    operations: { coils: "Подготовка и подача листового металла", press: "Формовка панелей кузова", welder: "Сварка панелей кузова", paintBooth: "Нанесение краски", qcTunnel: "Проверка кузова на дефекты", packer: "Подготовка кузова к перевозке", finish: "Финишная обработка детали" },
+    workshop: { title: "Цех кузовов", machine: "Станок", worker: "Рабочий", build: "Построить станок", hire: "Нанять рабочего", selected: "Выбранный станок", idle: "Место для следующего станка", limit: "Достигнут лимит", needMachine: "Сначала постройте станок, чтобы нанять рабочего.", effect: "Производительность", hint: "Нажмите на станок в цехе, чтобы выбрать его.", assigned: "Рабочий назначен", vacant: "Нет рабочего", hireSelected: "Нанять рабочего", selectNext: "Выберите следующий свободный станок", operation: "Операция" },
+  },
+  es: {
+    staffed: "OCUPADO",
+    vacant: "CONTRATAR",
+    unstaffed: "Sin operario",
+    machines: { coils: "Alimentador de chapa", press: "Prensa hidráulica", welder: "Estación de soldadura", paintBooth: "Cabina de pintura", qcTunnel: "Control de calidad", packer: "Estación de embalaje", finish: "Estación de acabado" },
+    operations: { coils: "Prepara y alimenta la chapa", press: "Forma los paneles de carrocería", welder: "Suelda los paneles de carrocería", paintBooth: "Aplica la pintura", qcTunnel: "Revisa defectos en la carrocería", packer: "Prepara la carrocería para el envío", finish: "Da el acabado a la pieza" },
+    workshop: { title: "Taller de la Fábrica de carrocerías", machine: "Máquina", worker: "Operario", build: "Construir máquina", hire: "Contratar operario", selected: "Máquina seleccionada", idle: "Espacio reservado para la próxima máquina", limit: "Límite alcanzado", needMachine: "Construye otra máquina antes de contratar a otro operario.", effect: "Productividad", hint: "Toca una máquina de la nave para seleccionarla.", assigned: "Operario asignado", vacant: "Sin operario", hireSelected: "Contratar operario", selectNext: "Selecciona la siguiente máquina sin operario", operation: "Operación" },
+  },
+  pt: {
+    staffed: "OCUPADO",
+    vacant: "CONTRATAR",
+    unstaffed: "Sem operador",
+    machines: { coils: "Alimentador de chapa", press: "Prensa hidráulica", welder: "Estação de solda", paintBooth: "Cabine de pintura", qcTunnel: "Controle de qualidade", packer: "Estação de embalagem", finish: "Estação de acabamento" },
+    operations: { coils: "Prepara e alimenta a chapa", press: "Forma os painéis da carroceria", welder: "Solda os painéis da carroceria", paintBooth: "Aplica a pintura", qcTunnel: "Verifica defeitos na carroceria", packer: "Prepara a carroceria para o envio", finish: "Faz o acabamento da peça" },
+    workshop: { title: "Oficina da Fábrica de carrocerias", machine: "Máquina", worker: "Operador", build: "Construir máquina", hire: "Contratar operador", selected: "Máquina selecionada", idle: "Espaço reservado para a próxima máquina", limit: "Limite atingido", needMachine: "Construa outra máquina antes de contratar outro operador.", effect: "Produtividade", hint: "Toque numa máquina do galpão para selecioná-la.", assigned: "Operador designado", vacant: "Sem operador", hireSelected: "Contratar operador", selectNext: "Selecione a próxima máquina sem operador", operation: "Operação" },
+  },
+  de: {
+    staffed: "BESETZT",
+    vacant: "EINSTELLEN",
+    unstaffed: "Unbesetzt",
+    machines: { coils: "Blechzuführung", press: "Hydraulikpresse", welder: "Schweißstation", paintBooth: "Lackierkabine", qcTunnel: "Qualitätsprüfung", packer: "Verpackungsstation", finish: "Endbearbeitung" },
+    operations: { coils: "Blech vorbereiten und zuführen", press: "Karosserieteile formen", welder: "Karosserieteile schweißen", paintBooth: "Lack auftragen", qcTunnel: "Karosserie auf Fehler prüfen", packer: "Karosserie für den Versand vorbereiten", finish: "Teil fertig bearbeiten" },
+    workshop: { title: "Werkstatt des Karosseriewerks", machine: "Maschine", worker: "Arbeiter", build: "Maschine bauen", hire: "Arbeiter einstellen", selected: "Gewählte Maschine", idle: "Platz für die nächste Maschine", limit: "Limit erreicht", needMachine: "Bau eine weitere Maschine, bevor du einen weiteren Arbeiter einstellst.", effect: "Produktivität", hint: "Tippe auf eine Maschine in der Halle, um sie zu wählen.", assigned: "Arbeiter zugeteilt", vacant: "Unbesetzt", hireSelected: "Arbeiter einstellen", selectNext: "Nächste unbesetzte Maschine wählen", operation: "Arbeitsgang" },
+  },
+};
+const floorText = (lang: Lang) => FLOOR_TEXT[lang] ?? FLOOR_TEXT.en;
+
 export function PlantFloor({ plotId }: { plotId: string }) {
   const state = useGame((g) => g.state);
   const st = useGame((g) => g.snap.chain.plants[plotId]);
@@ -70,11 +127,11 @@ export function PlantFloor({ plotId }: { plotId: string }) {
       rawMaterial: cfg.raw,
       machineCount: st.type === "bodyWorks" ? (p.workshop?.machines ?? 1) : undefined,
       workers: st.type === "bodyWorks" ? (p.workshop?.workers ?? 1) : undefined,
-      staffedLabel: state.settings.lang === "ro" ? "OCUPAT" : state.settings.lang === "ru" ? "ЗАНЯТ" : "STAFFED",
-      vacantLabel: state.settings.lang === "ro" ? "LIBER" : state.settings.lang === "ru" ? "СВОБОДНО" : "HIRE",
+      staffedLabel: floorText(state.settings.lang).staffed,
+      vacantLabel: floorText(state.settings.lang).vacant,
       cinematic,
     });
-  }, [p, st, b, t, cinematic]);
+  }, [p, st, b, t, cinematic, state.settings.lang]);
 
   if (!b?.plant || !st) return null;
   const cfg = PLANT_BY_ID[st.type];
@@ -86,31 +143,12 @@ export function PlantFloor({ plotId }: { plotId: string }) {
   const selectedHasWorker = selectedMachine < workshop.workers;
   const isNextHireSlot = selectedMachine === workshop.workers && selectedMachine < workshop.machines;
   const lang = state.settings.lang;
-  const machineLabelFor = (kind: string) => {
-    if (kind === "coils") return lang === "ro" ? "Alimentator de tablă" : lang === "ru" ? "Подача листового металла" : "Sheet metal feeder";
-    if (kind === "press") return lang === "ro" ? "Presă hidraulică" : lang === "ru" ? "Гидравлический пресс" : "Hydraulic press";
-    if (kind === "welder") return lang === "ro" ? "Stație de sudură" : lang === "ru" ? "Сварочная станция" : "Welding station";
-    if (kind === "paintBooth") return lang === "ro" ? "Cabină de vopsire" : lang === "ru" ? "Покрасочная камера" : "Paint booth";
-    if (kind === "qcTunnel") return lang === "ro" ? "Controlul calității" : lang === "ru" ? "Контроль качества" : "Quality inspection";
-    if (kind === "packer") return lang === "ro" ? "Stație de ambalare" : lang === "ru" ? "Упаковочная станция" : "Packing station";
-    return lang === "ro" ? "Stație de finisare" : lang === "ru" ? "Финишная станция" : "Finishing station";
-  };
-  const machineOperationFor = (kind: string) => {
-    if (kind === "coils") return lang === "ro" ? "Pregătește și alimentează tabla" : lang === "ru" ? "Подготовка и подача листового металла" : "Prepare and feed sheet metal";
-    if (kind === "press") return lang === "ro" ? "Formează panourile caroseriei" : lang === "ru" ? "Формовка панелей кузова" : "Form body panels";
-    if (kind === "welder") return lang === "ro" ? "Sudează panourile caroseriei" : lang === "ru" ? "Сварка панелей кузова" : "Weld body panels";
-    if (kind === "paintBooth") return lang === "ro" ? "Aplică stratul de vopsea" : lang === "ru" ? "Нанесение краски" : "Apply paint finish";
-    if (kind === "qcTunnel") return lang === "ro" ? "Verifică defectele caroseriei" : lang === "ru" ? "Проверка кузова на дефекты" : "Inspect body for defects";
-    if (kind === "packer") return lang === "ro" ? "Pregătește caroseria pentru transport" : lang === "ru" ? "Подготовка кузова к перевозке" : "Prepare body for shipping";
-    return lang === "ro" ? "Finisează piesa" : lang === "ru" ? "Финишная обработка детали" : "Finish the part";
-  };
+  const text = floorText(lang);
+  const machineLabelFor = (kind: string) => text.machines[kind as MachineKind] ?? text.machines.finish;
+  const machineOperationFor = (kind: string) => text.operations[kind as MachineKind] ?? text.operations.finish;
   const machineLabel = machineLabelFor(selectedKind);
   const selectedOperation = machineOperationFor(selectedKind);
-  const workshopText = lang === "ro"
-    ? { title: "Atelier caroserii", machine: "Utilaj", worker: "Muncitor", build: "Construiește utilaj", hire: "Angajează muncitor", selected: "Utilaj selectat", idle: "Loc pregătit pentru următorul utilaj", limit: "Limită atinsă", needMachine: "Construiește mai întâi un utilaj pentru a angaja încă un muncitor.", effect: "Productivitate", hint: "Atinge utilajul din hală pentru a-l selecta.", assigned: "Muncitor repartizat", vacant: "Fără muncitor", hireSelected: "Angajează muncitor", selectNext: "Selectează următorul utilaj liber", operation: "Operațiune" }
-    : lang === "ru"
-      ? { title: "Цех кузовов", machine: "Станок", worker: "Рабочий", build: "Построить станок", hire: "Нанять рабочего", selected: "Выбранный станок", idle: "Место для следующего станка", limit: "Достигнут лимит", needMachine: "Сначала постройте станок, чтобы нанять рабочего.", effect: "Производительность", hint: "Нажмите на станок в цехе, чтобы выбрать его.", assigned: "Рабочий назначен", vacant: "Нет рабочего", hireSelected: "Нанять рабочего", selectNext: "Выберите следующий свободный станок", operation: "Операция" }
-      : { title: "Body Works workshop", machine: "Machine", worker: "Worker", build: "Build machine", hire: "Hire worker", selected: "Selected machine", idle: "Space reserved for the next machine", limit: "Limit reached", needMachine: "Build another machine before hiring another worker.", effect: "Productivity", hint: "Tap a machine in the hall to select it.", assigned: "Worker assigned", vacant: "Unstaffed", hireSelected: "Hire worker", selectNext: "Select the next unstaffed machine", operation: "Operation" };
+  const workshopText = text.workshop;
   return (
     <motion.div className="fixed inset-0 z-40 flex flex-col bg-ink" initial={{ opacity: 0, scale: 1.04 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.04 }} transition={{ duration: 0.25 }}>
       <header className="flex items-center gap-2 border-b border-white/10 bg-ink/90 p-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] backdrop-blur-xl">
@@ -161,7 +199,7 @@ export function PlantFloor({ plotId }: { plotId: string }) {
               {Array.from({ length: workshop.machines }, (_, index) => (
                 <button key={index} type="button" onClick={() => setSelectedMachine(index)} className={`rounded-xl border p-2 text-left transition ${selectedMachine === index ? "border-amber-300 bg-amber-300/15" : "border-white/10 bg-white/5"}`}>
                   <div className="flex items-center gap-1.5 text-[10px] font-bold"><Wrench className="size-3 shrink-0" /> <span>{index + 1}. {machineLabelFor(STATION_MACHINES.bodyWorks[index] ?? "coils")}</span></div>
-                  <div className="mt-1 text-[10px] text-white/50">{index < workshop.workers ? workshopText.worker + " " + (index + 1) : lang === "ro" ? "Fără muncitor" : lang === "ru" ? "Без рабочего" : "Unstaffed"}</div>
+                  <div className="mt-1 text-[10px] text-white/50">{index < workshop.workers ? workshopText.worker + " " + (index + 1) : text.unstaffed}</div>
                 </button>
               ))}
               {workshop.machines < BODY_WORKSHOP.max && <div className="flex items-center justify-center rounded-xl border border-dashed border-white/15 p-2 text-[10px] text-white/40">{workshopText.idle}</div>}

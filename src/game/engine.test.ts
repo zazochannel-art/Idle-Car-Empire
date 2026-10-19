@@ -812,6 +812,16 @@ describe("save system", () => {
     expect(back.chain.shipments.map((sh) => [sh.from, sh.to, sh.qty])).toEqual(s.chain.shipments.map((sh) => [sh.from, sh.to, sh.qty]));
   });
 
+  it("keeps the save's language when the game has it, English otherwise", () => {
+    const s = createInitialState(T0);
+    for (const lang of ["es", "pt", "de", "ru"] as const) {
+      s.settings.lang = lang;
+      expect(decodeSave(encodeSave(s), T0).settings.lang).toBe(lang);
+    }
+    (s.settings as { lang: string }).lang = "xx";
+    expect(decodeSave(encodeSave(s), T0).settings.lang).toBe("en");
+  });
+
   it("saves from the old economy start a new company but keep research and settings", () => {
     const old = { version: 2, cash: 5e9, empirePoints: 42, empirePointsEarned: 42, prestigeCount: 3, research: ["advanced_engines"], settings: { lang: "ro", buyAmount: 10 }, factories: { garage: { owned: true, level: 80 } } };
     const s = migrate(old, T0);

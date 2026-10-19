@@ -12,7 +12,7 @@ your choices or manual approval: they can't be done from the repository.
 | --- | --- |
 | App | Android 16 target (API 36), min Android 7.0; edge to edge; Back button (also with predictive back); large screens rotate; any native library checked for 16 KB memory pages in CI |
 | Release bundle | `app-release.aab`, signed when the upload key is in the repository's secrets (CI on `main`), checked with bundletool and Google Play's own rules (target SDK, not debuggable, 16 KB pages) |
-| Store listing | English, Romanian and Russian texts, release notes, icon, feature graphic, phone and tablet screenshots: `fastlane/metadata/android/` (below) |
+| Store listing | English, Romanian, Russian, Spanish, Brazilian Portuguese and German texts, release notes, icon, feature graphic, phone and tablet screenshots: `fastlane/metadata/android/` (below) |
 | Legal pages | [privacy policy](https://zazochannel-art.github.io/Idle-Car-Empire/privacy/), [terms of use](https://zazochannel-art.github.io/Idle-Car-Empire/terms/), [account deletion](https://zazochannel-art.github.io/Idle-Car-Empire/delete-account/) (en/ro/ru), also linked in the game (Settings, the account form) |
 | Players' content (Google Play's [UGC policy](https://support.google.com/googleplay/android-developer/answer/9876937)) | terms accepted when creating an account, a name filter in the game and on the server, in-app reports of players and alliances, hiding players; [moderation.md](../moderation.md) |
 | Accounts | registration works for every address (no confirmation email needed); in-app account deletion; *Forgot password?* (by email once SMTP is set, else the contact address) |
@@ -36,7 +36,8 @@ your choices or manual approval: they can't be done from the repository.
    *Idle Car Empire*, default language English (United States), **Game**,
    **Free**, accept the declarations.
 4. **Store listing**: paste the texts and upload the graphics (below), for
-   English, then *Manage translations* → add Romanian and Russian.
+   English, then *Manage translations* → add Romanian, Russian, Spanish
+   (Spain), Portuguese (Brazil) and German.
 5. **App content**: the forms below (privacy policy, ads, app access, content
    rating, target audience, data safety, the other declarations).
 6. **A reviewer account** (*App access*, below): create one in the game and
