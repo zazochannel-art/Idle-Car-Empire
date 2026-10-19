@@ -68,6 +68,8 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://orffhhsogoymalyogfzl.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_hqGfNt6uaNbq0AgGyp0I8g_QLjjFaJ-
           NEXT_PUBLIC_ADMOB_REWARDED_ID: ${{ vars.ADMOB_REWARDED_ID }}
+          NEXT_PUBLIC_IAP_STARTER_ID: ${{ vars.IAP_STARTER_ID }}
+          NEXT_PUBLIC_IAP_ADFREE_ID: ${{ vars.IAP_ADFREE_ID }}
           NEXT_PUBLIC_PASSWORD_RESET: ${{ vars.PASSWORD_RESET }}
           # this build's source maps, kept below as an artifact (not in the app) to read players' error reports
           SOURCE_MAPS: "1"

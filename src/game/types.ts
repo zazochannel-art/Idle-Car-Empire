@@ -609,6 +609,8 @@ export interface GameState {
   ads: import("./engine/ads").AdsState;
   /** The shop (engine/shop.ts): the free crate's timer and today's ad packs. */
   shop: import("./engine/shop").ShopState;
+  /** In-app purchases (engine/iap.ts): the products owned and the purchases already given. */
+  iap: import("./engine/iap").IapState;
   /** Unlock bonuses already claimed this run ("car:sedan", "plant:engineFactory"). */
   unlocks: string[];
   /** stats: send the anonymous new-player funnel steps (engine/funnel.ts). hidden: players hidden from the boards and visits (Profile lists them). */

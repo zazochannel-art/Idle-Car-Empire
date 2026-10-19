@@ -2,7 +2,10 @@
 // components/game/native-app.tsx): the system Back button (Android), and the
 // app going to the background and coming back.
 import { App } from "@capacitor/app";
+import { setAdFree } from "./ads";
+import { iapConfigured } from "./iap";
 import { cancelAway, scheduleAway } from "./notify";
+import { platform } from "./platform";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 
@@ -68,4 +71,10 @@ export async function startNative() {
   void cancelAway();
   // rewarded ads, always the player's choice: the consent first, then an ad kept ready
   void import("./native-ads").then((m) => m.startAds()).catch(() => {});
+  // ad-free rewards, for the company that bought them (also on a phone or a build that sells nothing)
+  const adFree = () => setAdFree(useGame.getState().ready && useGame.getState().state.iap.owned.includes("adFree"));
+  useGame.subscribe(adFree);
+  adFree();
+  // in-app purchases: Google Play only, and only once the build has its products (docs/android/iap.md)
+  if (platform() === "android" && iapConfigured()) void import("./native-iap").then((m) => m.startIap()).catch(() => {});
 }
