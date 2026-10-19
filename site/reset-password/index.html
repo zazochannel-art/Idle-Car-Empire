@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Idle Car Empire – New password</title>
+<meta name="description" content="Choose a new password for your Idle Car Empire account.">
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="../icon.png">
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #06070a; color: #e7e9ee; font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 480px; margin: 0 auto; padding: 40px 20px 64px; }
+  .logo { width: 80px; height: 80px; border-radius: 18px; display: block; margin: 0 0 16px; }
+  h1 { font-size: 1.7rem; line-height: 1.2; margin: 0 0 12px; }
+  p { color: #c9ccd4; }
+  a { color: #7dd3fc; }
+  .box { background: #12141a; border: 1px solid #23262e; border-radius: 12px; padding: 12px 16px; margin: 12px 0; }
+  .ok { border-color: #166534; }
+  .bad { border-color: #9f1239; }
+  label { display: block; font-size: .85rem; color: #9aa3b2; margin: 12px 0 4px; }
+  input { width: 100%; box-sizing: border-box; font: inherit; color: #e7e9ee; background: #000; border: 1px solid #2c303a; border-radius: 10px; padding: 10px 12px; }
+  input:focus { outline: 2px solid #fcd34d55; }
+  button { margin-top: 16px; width: 100%; font: inherit; font-weight: 800; color: #06070a; background: #fcd34d; border: 0; border-radius: 10px; padding: 11px 14px; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  .muted { color: #8b8f99; font-size: .9rem; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+<img class="logo" src="../icon.png" alt="Idle Car Empire logo">
+<h1 data-t="title">Choose a new password</h1>
+
+<form id="form" hidden>
+  <p data-t="intro">Your account's new password (at least 6 characters).</p>
+  <label for="pw1" data-t="pw1">New password</label>
+  <input id="pw1" type="password" autocomplete="new-password" minlength="6" required>
+  <label for="pw2" data-t="pw2">Repeat it</label>
+  <input id="pw2" type="password" autocomplete="new-password" minlength="6" required>
+  <button id="save" type="submit" data-t="save">Save the new password</button>
+  <div id="formError" class="box bad" hidden><p id="formErrorText"></p></div>
+</form>
+
+<div id="done" class="box ok" hidden><p data-t="done">Your password is changed. Go back to the app and sign in with your email and the new password.</p></div>
+<div id="expired" class="box bad" hidden><p data-t="expired">This link has expired or was already used. In the app, tap Sign in → Forgot password? to get a new one.</p></div>
+<div id="none" class="box" hidden><p data-t="none">Open this page from the link in the email the game sent you. To get one, tap Sign in → Forgot password? in the app.</p></div>
+
+<p class="muted"><a href="../privacy/" data-t="privacy">Privacy policy</a> · <a href="../terms/" data-t="terms">Terms of Use</a> · <a href="mailto:idlecarempire@gmail.com">idlecarempire@gmail.com</a></p>
+</main>
+<script>
+// A password reset email's link leads here (the game asks for it: lib supabase-js,
+// resetPasswordForEmail, implicit flow): the link carries a short-lived session for
+// that account in the address's #fragment. The page sets the new password with it,
+// through Supabase Auth's public API (the project's public key, as in the app), and
+// signs that session out again. Nothing else is read or stored.
+(function () {
+  var SUPABASE_URL = "https://orffhhsogoymalyogfzl.supabase.co";
+  var SUPABASE_KEY = "sb_publishable_hqGfNt6uaNbq0AgGyp0I8g_QLjjFaJ-";
+  var lang = (navigator.language || "en").slice(0, 2).toLowerCase();
+  var T = {
+    ro: {
+      title: "Alege o parolă nouă",
+      intro: "Noua parolă a contului (cel puțin 6 caractere).",
+      pw1: "Parola nouă",
+      pw2: "Repet-o",
+      save: "Salvează parola nouă",
+      done: "Parola a fost schimbată. Întoarce-te în aplicație și conectează-te cu emailul și parola nouă.",
+      expired: "Linkul a expirat sau a fost deja folosit. În aplicație, apasă Conectare → Ai uitat parola? ca să primești altul.",
+      none: "Deschide pagina din linkul din emailul trimis de joc. Ca să primești unul, apasă Conectare → Ai uitat parola? în aplicație.",
+      short: "Parola trebuie să aibă cel puțin 6 caractere.",
+      mismatch: "Cele două parole nu sunt la fel.",
+      failed: "Parola nu s-a putut schimba:",
+      privacy: "Politica de confidențialitate",
+      terms: "Termeni de utilizare"
+    },
+    ru: {
+      title: "Новый пароль",
+      intro: "Новый пароль аккаунта (не меньше 6 символов).",
+      pw1: "Новый пароль",
+      pw2: "Повторите его",
+      save: "Сохранить новый пароль",
+      done: "Пароль изменён. Вернитесь в приложение и войдите с почтой и новым паролем.",
+      expired: "Ссылка устарела или уже использована. В приложении нажмите Вход → Забыли пароль?, чтобы получить новую.",
+      none: "Откройте эту страницу по ссылке из письма, которое прислала игра. Чтобы получить его, нажмите в приложении Вход → Забыли пароль?",
+      short: "Пароль должен быть не короче 6 символов.",
+      mismatch: "Пароли не совпадают.",
+      failed: "Не удалось изменить пароль:",
+      privacy: "Политика конфиденциальности",
+      terms: "Условия использования"
+    },
+    en: { short: "The password needs at least 6 characters.", mismatch: "The two passwords are not the same.", failed: "The password couldn't be changed:" }
+  };
+  var t = T[lang] || T.en;
+  var say = function (k) { return t[k] || T.en[k]; };
+  if (T[lang] && lang !== "en") {
+    document.documentElement.lang = lang;
+    document.querySelectorAll("[data-t]").forEach(function (el) { var v = t[el.getAttribute("data-t")]; if (v) el.textContent = v; });
+  }
+  var show = function (id) { document.getElementById(id).hidden = false; };
+
+  var hash = new URLSearchParams(location.hash.replace(/^#/, ""));
+  var token = hash.get("access_token");
+  var isRecovery = hash.get("type") === "recovery";
+  // the session stays in this page's memory only: off the address bar and the history at once
+  if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+  if (hash.get("error") || hash.get("error_code")) return show("expired");
+  if (!token || !isRecovery) return show("none");
+  show("form");
+
+  var form = document.getElementById("form");
+  var fail = function (text) {
+    document.getElementById("formErrorText").textContent = text;
+    show("formError");
+  };
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    document.getElementById("formError").hidden = true;
+    var pw = document.getElementById("pw1").value;
+    if (pw.length < 6) return fail(say("short"));
+    if (pw !== document.getElementById("pw2").value) return fail(say("mismatch"));
+    var button = document.getElementById("save");
+    button.disabled = true;
+    var headers = { apikey: SUPABASE_KEY, Authorization: "Bearer " + token, "Content-Type": "application/json" };
+    fetch(SUPABASE_URL + "/auth/v1/user", { method: "PUT", headers: headers, body: JSON.stringify({ password: pw }) })
+      .then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (body) {
+          if (r.ok) {
+            form.hidden = true;
+            show("done");
+            // this link's session is done with: signed out (the app signs in with the new password)
+            fetch(SUPABASE_URL + "/auth/v1/logout?scope=local", { method: "POST", headers: headers }).catch(function () {});
+            token = null;
+            return;
+          }
+          if (r.status === 401 || r.status === 403) {
+            form.hidden = true;
+            return show("expired");
+          }
+          button.disabled = false;
+          fail(say("failed") + " " + (body.msg || body.message || body.error_description || r.status));
+        });
+      })
+      .catch(function () {
+        button.disabled = false;
+        fail(say("failed") + " network");
+      });
+  });
+})();
+</script>
+</body>
+</html>

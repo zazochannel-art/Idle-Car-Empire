@@ -110,6 +110,13 @@ export class SupabaseBackend implements CloudBackend {
     return error ? fail(error) : { ok: true };
   }
 
+  async resetPassword(email: string, redirectTo: string): Promise<AuthResult> {
+    const c = await this.client;
+    // the email's link carries a short session for that account to the site's reset page (implicit flow)
+    const { error } = await c.auth.resetPasswordForEmail(email, { redirectTo });
+    return error ? fail(error) : { ok: true };
+  }
+
   async logout(): Promise<void> {
     const c = await this.client;
     // this device only: the player stays signed in elsewhere

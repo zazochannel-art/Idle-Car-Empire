@@ -17,7 +17,7 @@ import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { answerStartChoice, enterGame, useCloud } from "@/store/cloud-store";
 import { trackGate } from "@/game/save/funnel";
-import { SITE_URL } from "@/lib/platform";
+import { CONTACT_EMAIL, PASSWORD_RESET_BY_EMAIL, RESET_PASSWORD_URL, SITE_URL } from "@/lib/platform";
 import { uiEvents } from "@/store/events";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
@@ -95,6 +95,73 @@ function Field({ label, ...rest }: React.InputHTMLAttributes<HTMLInputElement> &
 }
 
 const validEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
+
+/**
+ * Under a sign-in form: a forgotten password. With an email sender set up (PASSWORD_RESET_BY_EMAIL)
+ * the game emails a link to the site's page that sets a new one; until then, the contact address.
+ */
+function ForgotPassword({ email: typed }: { email: string }) {
+  const saves = useGame((g) => g.saves);
+  const { t } = useT();
+  const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState(typed);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null);
+  if (!open)
+    return (
+      <button
+        type="button"
+        className="mx-auto block text-[11px] font-semibold text-white/55 underline decoration-white/25 underline-offset-2 hover:text-white/80"
+        onClick={() => {
+          setEmail(typed);
+          setOpen(true);
+        }}
+      >
+        {t("account.forgot")}
+      </button>
+    );
+  if (!PASSWORD_RESET_BY_EMAIL)
+    return (
+      <p className="rounded-xl bg-white/[0.04] px-3 py-2 text-center text-[11px] leading-snug text-white/65 ring-1 ring-white/[0.07]">
+        🔑{" "}
+        {t("account.resetContact", { email: "\u0001" })
+          .split("\u0001")
+          .map((part, i) => (
+            <span key={i}>
+              {i > 0 && (
+                <a className="font-semibold text-sky-300 underline" href={`mailto:${CONTACT_EMAIL}`}>
+                  {CONTACT_EMAIL}
+                </a>
+              )}
+              {part}
+            </span>
+          ))}
+      </p>
+    );
+  return (
+    <div className="space-y-2 rounded-xl bg-white/[0.04] p-2.5 ring-1 ring-white/[0.07]">
+      <p className="text-[11px] leading-snug text-white/60">🔑 {t("account.resetHint")}</p>
+      <Field label={t("account.email")} type="email" inputMode="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      <Button
+        type="button"
+        size="sm"
+        variant="secondary"
+        className="w-full"
+        disabled={busy || !validEmail(email) || !saves}
+        onClick={async () => {
+          setBusy(true);
+          setMsg(null);
+          const r = await saves!.resetPassword(email.trim(), RESET_PASSWORD_URL).catch(() => ({ ok: false as const, error: "network" as const }));
+          setBusy(false);
+          setMsg(r.ok ? { text: t("account.resetSent", { email: email.trim() }) } : { text: errorText(t, r), bad: true });
+        }}
+      >
+        {t("account.resetSend")}
+      </Button>
+      {msg && <p className={cn("text-center text-xs", msg.bad ? "text-rose-300" : "text-sky-300")}>{msg.text}</p>}
+    </div>
+  );
+}
 
 /**
  * Sign in to an account (login), or, for a guest, register: the guest's
@@ -181,6 +248,7 @@ export function AccountForms({ initial, guest, onDone }: { initial: "login" | "r
           >
             <LogIn /> {t("account.login")}
           </Button>
+          <ForgotPassword email={email} />
         </>
       )}
       {msg && <p className={cn("text-center text-xs", msg.bad ? "text-rose-300" : "text-sky-300")}>{msg.text}</p>}
@@ -686,6 +754,7 @@ function WelcomeGate({ mode }: { mode: "new" | "returning" | "guest" }) {
         </Button>
       </form>
       {tab === "register" && <TermsConsent />}
+      {tab === "login" && <ForgotPassword email={email} />}
       {tab === "login" && mode === "guest" && <p className="text-[11px] leading-snug text-amber-300/90">{t("welcome.guestLoginNote")}</p>}
       {msg && <p className={cn("text-center text-xs", msg.bad ? "text-rose-300" : "text-sky-300")}>{msg.text}</p>}
       <p className="border-t border-white/10 pt-2.5 text-center text-[10px] leading-snug text-white/45">{t("welcome.needsAccount")}</p>

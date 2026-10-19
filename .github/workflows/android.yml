@@ -49,6 +49,9 @@ jobs:
           NEXT_PUBLIC_ADMOB_REWARDED_ID: ${{ vars.ADMOB_REWARDED_ID }}
           # the test app compares it with the test-apk release's and offers a newer build (lib/test-update.ts)
           NEXT_PUBLIC_TEST_BUILD: ${{ github.run_number }}
+          # "on" once Supabase sends email to every address (custom SMTP): the game then emails password
+          # reset links; unset, it shows the contact address instead (docs/cloud-save.md)
+          NEXT_PUBLIC_PASSWORD_RESET: ${{ vars.PASSWORD_RESET }}
       # The upload key signs the release bundle on main and on manual runs, never on pull
       # requests (their code could read it). Without the secrets the bundle is unsigned.
       - name: Upload key (when the repository has it)

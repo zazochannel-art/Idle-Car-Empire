@@ -322,6 +322,11 @@ export class SaveManager {
     return this.backend ? this.backend.setPassword(password) : { ok: false, error: "network" };
   }
 
+  /** A forgotten password: an email with a link to choose a new one (the account itself never says whether it exists). */
+  async resetPassword(email: string, redirectTo: string): Promise<AuthResult> {
+    return this.backend?.resetPassword ? this.backend.resetPassword(email, redirectTo) : { ok: false, error: "network" };
+  }
+
   async refreshAccount(): Promise<Account | null> {
     if (!this.backend) return null;
     this.account = (await this.backend.refreshAccount().catch(() => null)) ?? this.account;

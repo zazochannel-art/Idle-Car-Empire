@@ -37,6 +37,8 @@ jobs:
           # the iOS rewarded ad unit of the AdMob account, a repository variable (docs/ios.md);
           # unset: Google's test ads
           NEXT_PUBLIC_ADMOB_REWARDED_ID_IOS: ${{ vars.ADMOB_REWARDED_ID_IOS }}
+          # "on" once Supabase sends email to every address: password reset links (docs/cloud-save.md)
+          NEXT_PUBLIC_PASSWORD_RESET: ${{ vars.PASSWORD_RESET }}
       - name: Xcode
         run: xcodebuild -version
       - name: Build for the simulator

@@ -2328,6 +2328,11 @@ export const ru: Record<MessageKey, string> = {
   "account.privacyLink": "Политику конфиденциальности",
   "settings.terms": "Условия использования",
   "alliance.err.blocked": "Такое название или тег не допускаются.",
+  "account.forgot": "Забыли пароль?",
+  "account.resetHint": "Мы пришлём на почту ссылку, чтобы задать новый пароль.",
+  "account.resetSend": "Прислать ссылку",
+  "account.resetSent": "Если у {email} есть аккаунт, ссылка уже в пути. Откройте её, задайте новый пароль и войдите здесь.",
+  "account.resetContact": "Напишите на {email} с почты вашего аккаунта, и мы поможем вернуть доступ.",
 };
 
 export const ruContent: Record<string, string> = {

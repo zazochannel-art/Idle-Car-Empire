@@ -2331,6 +2331,11 @@ export const en = {
   "account.privacyLink": "Privacy Policy",
   "settings.terms": "Terms of Use",
   "alliance.err.blocked": "That name or tag isn't allowed.",
+  "account.forgot": "Forgot password?",
+  "account.resetHint": "We'll email you a link to choose a new password.",
+  "account.resetSend": "Email me a link",
+  "account.resetSent": "If {email} has an account, a link is on its way. Open it, choose a new password, then sign in here.",
+  "account.resetContact": "Write to {email} from your account's email address and we'll help you get back in.",
 } as const;
 
 export type MessageKey = keyof typeof en;

@@ -7,6 +7,17 @@ export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://zazochannel
 export const PRIVACY_URL = `${SITE_URL}privacy/`;
 /** What players agree to when they create an account (names, reports, fair play): site/terms/. */
 export const TERMS_URL = `${SITE_URL}terms/`;
+/** Where a password reset email's link leads: the page that sets the new password (site/reset-password/). */
+export const RESET_PASSWORD_URL = `${SITE_URL}reset-password/`;
+/** Players' help address (the store listing's and the legal pages'). */
+export const CONTACT_EMAIL = "idlecarempire@gmail.com";
+
+/**
+ * Reset emails need an email sender for every address (custom SMTP in Supabase: the built-in one
+ * only writes to the project's team), so the game sends them only once the build is told it is set
+ * up (the PASSWORD_RESET repository variable, docs/cloud-save.md); until then it shows the contact.
+ */
+export const PASSWORD_RESET_BY_EMAIL = ["on", "1", "true"].includes((process.env.NEXT_PUBLIC_PASSWORD_RESET ?? "").toLowerCase());
 
 interface CapacitorGlobal {
   isNativePlatform?: () => boolean;

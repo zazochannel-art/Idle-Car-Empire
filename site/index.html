@@ -104,11 +104,17 @@
   }
 
   var hash = new URLSearchParams(location.hash.replace(/^#/, ""));
+  // a password reset link that landed here (Supabase sends players to this page when the reset page's
+  // address isn't on its list): the page that sets the new password takes it
+  if (hash.get("type") === "recovery" && hash.get("access_token")) {
+    location.replace("reset-password/" + location.hash);
+    return;
+  }
   // an account email's link (sign-up or a new address): Supabase confirms it, then sends the player here
   if (hash.get("error_description")) {
     document.getElementById("authErrorText").textContent = hash.get("error_description");
     document.getElementById("authError").hidden = false;
-  } else if (hash.get("access_token") || /signup|email_change|recovery/.test(hash.get("type") || "")) {
+  } else if (hash.get("access_token") || /signup|email_change/.test(hash.get("type") || "")) {
     document.getElementById("confirmed").hidden = false;
   }
   // an old transfer link (#save=z1.…): its save, compressed

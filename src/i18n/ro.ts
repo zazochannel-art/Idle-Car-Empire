@@ -2328,6 +2328,11 @@ export const ro: Record<MessageKey, string> = {
   "account.privacyLink": "Politica de confidențialitate",
   "settings.terms": "Termeni de utilizare",
   "alliance.err.blocked": "Numele sau eticheta nu sunt permise.",
+  "account.forgot": "Ai uitat parola?",
+  "account.resetHint": "Îți trimitem pe email un link ca să alegi o parolă nouă.",
+  "account.resetSend": "Trimite-mi linkul",
+  "account.resetSent": "Dacă {email} are un cont, linkul e pe drum. Deschide-l, alege o parolă nouă, apoi conectează-te aici.",
+  "account.resetContact": "Scrie-ne la {email} de pe adresa de email a contului și te ajutăm să intri din nou.",
 };
 
 export const roContent: Record<string, string> = {
