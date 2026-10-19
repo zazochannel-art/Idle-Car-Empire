@@ -536,6 +536,16 @@ export function buildDealer(T: Three, kit: MaterialKit, spec: DealerSpec, W: num
   // transom bar and a glazed entrance with a dark portal
   g.add(box(T, mull, x0, 0.035 + H * 0.72, z0 + d - 0.006, w, 0.012, 0.016));
   g.add(box(T, darkFrame, x0 + w * 0.42, 0.035, z0 + d - 0.004, w * 0.16, H * 0.6, 0.02));
+  // the solid walls are seen too, where a lot faces away from the camera: office
+  // windows, a staff door, a brand panel and downpipes at the back, a window band on the left
+  g.add(windowBand(T, kit, mull, x0 + w * 0.36, z0, w * 0.5, 0.035 + H * 0.5, H * 0.3, 6, -1));
+  g.add(box(T, darkFrame, x0 + w * 0.1, 0.035, z0 - 0.014, 0.14, H * 0.58, 0.014));
+  g.add(box(T, frame, x0 + w * 0.1 - 0.02, 0.035 + H * 0.58, z0 - 0.04, 0.18, 0.012, 0.04));
+  g.add(box(T, brand, x0 + w * 0.1 - 0.01, 0.035 + H * 0.7, z0 - 0.012, 0.16, H * 0.18, 0.01));
+  for (const px of [x0 + 0.03, x0 + w - 0.03]) g.add(cyl(T, frame, px, 0.035, z0 - 0.016, 0.01, H, 8));
+  g.add(box(T, kit.glass, x0 - 0.014, 0.035 + H * 0.5, z0 + 0.2, 0.012, H * 0.3, d * 0.6));
+  for (let i = 0; i <= 3; i++) g.add(box(T, mull, x0 - 0.02, 0.035 + H * 0.5, z0 + 0.2 + (d * 0.6 * i) / 3 - 0.006, 0.012, H * 0.3, 0.012));
+  for (const y of [0.035 + H * 0.5 - 0.012, 0.035 + H * 0.8]) g.add(box(T, mull, x0 - 0.02, y, z0 + 0.19, 0.012, 0.012, d * 0.6 + 0.02));
   // display podiums inside (the cars on them are drawn by the map)
   for (const px of [0.55, 1.45]) g.add(cyl(T, std(T, "#d1d5db", 0.6, 0.2), x0 + px, 0.04, z0 + 0.55, 0.32, 0.02, 28));
   // ceiling lights seen through the glass
@@ -553,6 +563,33 @@ export function buildDealer(T: Three, kit: MaterialKit, spec: DealerSpec, W: num
     [x0 + w + over - 0.04, z0 + 0.3],
   ])
     g.add(cyl(T, frame, cx, 0.01, cz, 0.012, H + 0.03, 10));
+
+  // on the roof: a parapet, skylights over the showroom, air-conditioning units and,
+  // on dealers without an upper floor, a brand sign facing the road
+  const ry = 0.035 + H + 0.05;
+  const rx = x0 - 0.04;
+  const rz = z0 - 0.04;
+  const rw = w + 0.04 + over;
+  const rd = d + 0.04 + over;
+  for (const [px, pz, pw, pd] of [
+    [rx, rz, rw, 0.02],
+    [rx, rz + rd - 0.02, rw, 0.02],
+    [rx, rz, 0.02, rd],
+    [rx + rw - 0.02, rz, 0.02, rd],
+  ])
+    g.add(box(T, white, px, ry, pz, pw, 0.03, pd));
+  const skylights = tier >= 2 ? [x0 + w - 0.55, x0 + w - 0.28] : [x0 + 0.3, x0 + 0.62, x0 + w - 0.55, x0 + w - 0.28];
+  for (const sx of skylights) {
+    g.add(box(T, frame, sx - 0.01, ry, z0 + 0.24, 0.22, 0.02, 0.52));
+    g.add(box(T, kit.glass, sx, ry + 0.02, z0 + 0.25, 0.2, 0.012, 0.5));
+  }
+  g.add(hvac(T, std(T, "#cfd5dc", 0.4, 0.5), darkFrame, x0 + w - 0.5, ry, z0 + 0.82));
+  if (tier < 2) {
+    g.add(hvac(T, std(T, "#cfd5dc", 0.4, 0.5), darkFrame, x0 + 0.95, ry, z0 + 0.3));
+    for (const px of [x0 + 0.42, x0 + 1.02]) g.add(box(T, darkFrame, px, ry, z0 + d - 0.1, 0.012, 0.14, 0.012));
+    g.add(box(T, brand, x0 + 0.36, ry + 0.06, z0 + d - 0.088, 0.72, 0.13, 0.016));
+    g.add(box(T, white, x0 + 0.42, ry + 0.11, z0 + d - 0.07, 0.6, 0.03, 0.002));
+  }
 
   // upper floor (offices) from city dealers, set back with a terrace
   if (tier >= 2) {
