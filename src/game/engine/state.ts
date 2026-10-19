@@ -121,7 +121,7 @@ export function createInitialState(now: number): GameState {
     season: createSeason(),
     show: createShow(),
     quality: { rep: 50, defects: 0, recall: null, scandalUntil: 0, recalls: 0 },
-    settings: { buyAmount: 1, lang: "en", lowGraphics: false, sound: true, haptics: true, notify: false, saver: "auto", stats: true, hidden: [] },
+    settings: { buyAmount: 1, lang: "en", lowGraphics: false, sound: true, music: true, haptics: true, notify: false, saver: "auto", stats: true, hidden: [] },
     funnel: [],
     createdAt: now,
     runStartedAt: now,

@@ -34,6 +34,7 @@ import { StartScreen } from "./start-screen";
 import { useCloud } from "@/store/cloud-store";
 import { Coach } from "./coach";
 import { FeedbackBridge } from "./feedback-bridge";
+import { MusicBridge } from "./music-bridge";
 import { NativeApp } from "./native-app";
 import { TestUpdate } from "./test-update";
 import { retry, ScreenBoundary } from "./screen-boundary";
@@ -348,6 +349,7 @@ function Shell() {
 
       <Toasts />
       <FeedbackBridge />
+      <MusicBridge />
       <LoginDialog />
       <OfflineDialog />
       <ImperiumOverlay />

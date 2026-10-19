@@ -305,6 +305,8 @@ export const en = {
   "saver.autoOn": "Battery saver on",
   "saver.autoOnBody": "The battery is at {n}%: fewer frames until it charges. Your empire earns the same.",
   "settings.sound": "Sounds",
+  "settings.music": "Music",
+  "settings.musicHint": "Calm background music, made by the game itself. Quieter inside a factory, off in the background and with the battery saver.",
   "settings.haptics": "Vibration",
   "settings.copied": "Save code copied to clipboard.",
   "settings.copyBelow": "Copy the save code below.",

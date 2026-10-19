@@ -24,6 +24,16 @@ export function audio(): AudioContext | null {
   }
 }
 
+/**
+ * In the background the audio stops altogether (a phone does no silent mixing on its battery);
+ * back in the game it goes on. Nothing happens before the first sound was played.
+ */
+export function pauseAudio(paused: boolean) {
+  if (!ctx) return;
+  if (paused && ctx.state === "running") void ctx.suspend().catch(() => {});
+  else if (!paused && ctx.state === "suspended") void ctx.resume().catch(() => {});
+}
+
 function tone(a: AudioContext, freq: number, start: number, dur: number, vol: number, type: OscillatorType = "sine") {
   const o = a.createOscillator();
   const g = a.createGain();

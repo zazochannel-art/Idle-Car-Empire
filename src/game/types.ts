@@ -611,7 +611,7 @@ export interface GameState {
   /** Unlock bonuses already claimed this run ("car:sedan", "plant:engineFactory"). */
   unlocks: string[];
   /** stats: send the anonymous new-player funnel steps (engine/funnel.ts). hidden: players hidden from the boards and visits (Profile lists them). */
-  settings: { buyAmount: BuyAmount; lang: Lang; lowGraphics: boolean; sound: boolean; haptics: boolean; notify: boolean; /** Battery saver: "auto" (on when the battery is low), "on" or "off". */ saver: "auto" | "on" | "off"; stats: boolean; hidden: HiddenPlayer[] };
+  settings: { buyAmount: BuyAmount; lang: Lang; lowGraphics: boolean; sound: boolean; /** The background music (separate from the game's sounds). */ music: boolean; haptics: boolean; notify: boolean; /** Battery saver: "auto" (on when the battery is low), "on" or "off". */ saver: "auto" | "on" | "off"; stats: boolean; hidden: HiddenPlayer[] };
   /** Funnel steps already sent for this company ("legacy": a company from before the funnel, never counted). */
   funnel: string[];
   createdAt: number;

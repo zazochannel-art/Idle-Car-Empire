@@ -123,4 +123,18 @@ describe("save migration across the economy overhaul", () => {
     bad.settings.hidden = "everyone";
     expect(migrate(bad, NOW).settings.hidden).toEqual([]);
   });
+
+  it("the music: on in an older save, unless its sounds were off; a saved choice stays", () => {
+    const old = JSON.parse(JSON.stringify(before)) as Raw & { settings: Record<string, unknown> };
+    delete old.settings.music;
+    old.settings.sound = true;
+    expect(migrate(old, NOW).settings.music).toBe(true);
+    old.settings.sound = false;
+    expect(migrate(old, NOW).settings.music).toBe(false);
+    old.settings.music = true;
+    expect(migrate(old, NOW).settings.music).toBe(true);
+    old.settings.sound = true;
+    old.settings.music = false;
+    expect(migrate(old, NOW).settings.music).toBe(false);
+  });
 });

@@ -25,8 +25,10 @@ const isObject = (v: unknown): v is Json => typeof v === "object" && v !== null 
  * type are ignored, so a corrupted field cannot crash the game.
  */
 /** A setting with a fixed set of values: anything else from a save is the default. */
-function cleanSettings(state: GameState): GameState {
+function cleanSettings(state: GameState, saved: unknown): GameState {
   if (!["auto", "on", "off"].includes(state.settings.saver)) state.settings.saver = "auto";
+  // a save from before the music: a player who turned the sounds off doesn't get music either
+  if (isObject(saved) && typeof saved.music !== "boolean") state.settings.music = state.settings.sound;
   // hidden players: account ids with the name they had, at most the last 200
   const hidden: unknown[] = Array.isArray(state.settings.hidden) ? state.settings.hidden : [];
   state.settings.hidden = hidden
@@ -64,7 +66,7 @@ function fromOldEconomy(raw: Json, now: number): GameState {
   );
   Object.assign(state, kept);
   state.research = kept.research.filter((r) => typeof r === "string");
-  return cleanSettings(state);
+  return cleanSettings(state, raw.settings);
 }
 
 /**
@@ -75,7 +77,7 @@ function fromOldEconomy(raw: Json, now: number): GameState {
 function fromOldMap(raw: Json, now: number): GameState {
   const state = createInitialState(now);
   state.settings = mergeDefaults(state.settings, raw.settings);
-  return cleanSettings(state);
+  return cleanSettings(state, raw.settings);
 }
 
 export function migrate(raw: unknown, now: number): GameState {
@@ -137,7 +139,7 @@ export function migrate(raw: unknown, now: number): GameState {
   if (!(state.createdAt > 0 && state.createdAt <= now)) state.createdAt = Math.min(now, state.lastActiveAt > 0 ? state.lastActiveAt : now);
   unlockOwnedZones(state);
   state.version = SAVE_VERSION;
-  return cleanSettings(state);
+  return cleanSettings(state, raw.settings);
 }
 
 export function encodeSave(state: GameState): string {
