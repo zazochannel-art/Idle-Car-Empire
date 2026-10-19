@@ -8,14 +8,18 @@ import { formatMoney } from "@/game/format";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { useGame } from "@/store/game-store";
+import { useUi } from "@/store/ui-store";
 
 /** Once a day: the streak calendar and today's reward. */
 export function LoginDialog() {
-  // not in the first minutes of a brand-new game, and not over the offline report
-  const open = useGame((g) => {
+  // not in the first minutes of a brand-new game, not over the offline report, and not over the
+  // first-company tour (it waits until the tour is done or skipped)
+  const tutorial = useUi((u) => u.tutorial);
+  const due = useGame((g) => {
     const s = g.state;
     return !!s.login.day && !s.login.claimed && s.lifetime.playTime > 120 && !s.pendingOffline;
   });
+  const open = due && !tutorial;
   const claimLogin = useGame((g) => g.claimLogin);
   return (
     <Dialog open={open} onOpenChange={(o) => !o && claimLogin()}>

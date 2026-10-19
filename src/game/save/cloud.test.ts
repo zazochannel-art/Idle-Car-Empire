@@ -38,6 +38,8 @@ class FakeCloud implements CloudBackend {
   offline = false;
   /** The project confirms emails by link: a registration stays a guest with a pending email until then. */
   confirmByLink = false;
+  /** A slow connection: the save arrives this many ms after it was asked for. */
+  slowLoad = 0;
   constructor(public server: Server) {}
 
   private acc(id: string): Account {
@@ -102,6 +104,7 @@ class FakeCloud implements CloudBackend {
   }
   async load(): Promise<CloudCopy> {
     if (this.offline) throw new Error("network");
+    if (this.slowLoad) await new Promise((r) => setTimeout(r, this.slowLoad));
     if (this.fail > 0) {
       this.fail--;
       throw new Error("network");
@@ -660,6 +663,50 @@ describe("players and devices", () => {
     expect((await repair.saves.start(T0, hooks())).state?.cash).toBe(64);
     await vi.advanceTimersByTimeAsync(2_100);
     expect((server.rows.get(pc.cloud.user!)!.data as GameState).cash).toBe(64);
+  });
+});
+
+describe("a slow connection at the start", () => {
+  it("plays this device's copy after a short wait, and a newer cloud save still asks at the first save", async () => {
+    const server = new Server();
+    const pc = device(server);
+    await pc.saves.start(T0, registers(pc));
+    pc.saves.save(game(64), true);
+    await vi.advanceTimersByTimeAsync(2_100);
+
+    // the same device, the cloud answering after 10 s: the game starts from the copy here
+    const slow = device(server, pc.storage);
+    slow.cloud.user = pc.cloud.user;
+    slow.cloud.slowLoad = 10_000;
+    let started: Awaited<ReturnType<typeof slow.saves.start>> | null = null;
+    void slow.saves.start(T0, hooks()).then((r) => (started = r));
+    await vi.advanceTimersByTimeAsync(3_100);
+    expect(started!.state?.cash).toBe(64);
+
+    // meanwhile another device moved the cloud on: this one's next save is not allowed over it
+    const row = server.rows.get(pc.cloud.user!)!;
+    server.rows.set(pc.cloud.user!, { ...row, revision: row.revision + 1, data: { ...(row.data as GameState), cash: 999 } });
+    slow.saves.save(game(70), true);
+    await vi.advanceTimersByTimeAsync(2_100);
+    expect((server.rows.get(pc.cloud.user!)!.data as GameState).cash).toBe(999);
+  });
+
+  it("with no copy on this device, waits for the cloud's save rather than starting a new company", async () => {
+    const server = new Server();
+    const pc = device(server);
+    await pc.saves.start(T0, registers(pc));
+    pc.saves.save(game(64), true);
+    await vi.advanceTimersByTimeAsync(2_100);
+
+    const phone = device(server);
+    phone.cloud.user = pc.cloud.user;
+    phone.cloud.slowLoad = 8_000;
+    let started: Awaited<ReturnType<typeof phone.saves.start>> | null = null;
+    void phone.saves.start(T0, hooks()).then((r) => (started = r));
+    await vi.advanceTimersByTimeAsync(3_100);
+    expect(started).toBeNull();
+    await vi.advanceTimersByTimeAsync(5_100);
+    expect(started!.state?.cash).toBe(64);
   });
 });
 

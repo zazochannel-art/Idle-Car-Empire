@@ -29,6 +29,9 @@ export function authError(e: Pick<SbAuthError, "message"> & { code?: string; sta
 
 const fail = (e: Parameters<typeof authError>[0]): AuthResult => ({ ok: false, error: authError(e), detail: e.message });
 
+/** How long the start waits for supabase-js to restore the session before trusting the one stored here (ms). */
+const SESSION_WAIT = 3_000;
+
 /** The account of a session as supabase-js keeps it in storage ({ refresh_token, user, … }), read without the network. */
 export function storedAccount(raw: string | null): Account | null {
   try {
@@ -64,20 +67,26 @@ export class SupabaseBackend implements CloudBackend {
 
   async session(): Promise<Account | null> {
     const c = await this.client;
-    const { data, error } = await c.auth.getSession();
+    // On a slow connection, refreshing an access token past its hour can take longer than a
+    // player waits: supabase-js finishes it in the background, so the player is the one stored here.
+    const res = await Promise.race([c.auth.getSession(), new Promise<null>((r) => setTimeout(() => r(null), SESSION_WAIT))]);
+    if (!res) return this.storedSession();
+    const { data, error } = res;
     if (data.session) return account(data.session.user);
     // With no connection and an access token past its hour, supabase-js can't refresh it and
     // answers "no session", but keeps the session and refreshes it once the connection is back.
     // The player is still signed in: their own game (saved here, uploaded later), not the
     // welcome page and a new company.
-    if (error?.name === "AuthRetryableFetchError") {
-      try {
-        return storedAccount(window.localStorage.getItem(this.storageKey));
-      } catch {
-        return null;
-      }
-    }
+    if (error?.name === "AuthRetryableFetchError") return this.storedSession();
     return null;
+  }
+
+  private storedSession(): Account | null {
+    try {
+      return storedAccount(window.localStorage.getItem(this.storageKey));
+    } catch {
+      return null;
+    }
   }
 
   async signInGuest(): Promise<Account> {

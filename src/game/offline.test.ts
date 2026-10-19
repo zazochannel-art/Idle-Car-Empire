@@ -122,3 +122,19 @@ describe("offline production: the same economy as online", () => {
     expect(eff).toBeLessThan(1);
   });
 });
+
+describe("a short absence", () => {
+  it("is credited without the report; from five minutes away the report shows", () => {
+    const short = stocked();
+    short.s.lastActiveAt = T0;
+    const cash = short.s.cash;
+    expect(settleOffline(short.s, T0 + 2 * 60_000)).toBeNull();
+    expect(short.s.pendingOffline).toBeNull();
+    expect(short.s.cash).toBeGreaterThan(cash);
+
+    const long = stocked();
+    long.s.lastActiveAt = T0;
+    expect(settleOffline(long.s, T0 + 6 * 60_000)?.seconds).toBeCloseTo(360);
+    expect(long.s.pendingOffline).not.toBeNull();
+  });
+});

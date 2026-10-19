@@ -27,6 +27,7 @@ import { PLANT_LEVELS } from "@/game/config/chain";
 import { snapshot, unlockedCarIds, type EconomySnapshot } from "@/game/engine/economy";
 import { activeEvent } from "@/game/engine/events";
 import * as Ev from "@/game/engine/events";
+import { OFFLINE } from "@/game/config/offline";
 import { collectOffline, settleOffline } from "@/game/engine/offline";
 import { checkAchievements, claimDaily, claimMilestone, recordHistory, refreshDaily, rewardCash } from "@/game/engine/progress";
 import { cloneState, createInitialState } from "@/game/engine/state";
@@ -81,6 +82,15 @@ const SAVE_MS = 5_000;
 const FUNNEL_MS = 30_000;
 /** A gap this long between ticks (sleeping laptop, frozen tab) counts as being away. */
 const AWAY_GAP_S = 30;
+
+/** Settles time away; an absence too short for the report is told in a toast. */
+function settleAway(s: GameState, now: number) {
+  const away = (now - s.lastActiveAt) / 1000;
+  const cash = s.cash;
+  if (settleOffline(s, now) || away < OFFLINE.minToastSeconds || s.cash <= cash) return;
+  uiEvents.emit({ type: "toast", tone: "gold", icon: "🏭", title: translate(s.settings.lang, "offline.short", { money: formatMoney(s.cash - cash) }) });
+}
+
 /** Gifts from other players and the player's ghost: first this long after the start, then this often. */
 const SOCIAL_FIRST_MS = 8_000;
 const SOCIAL_EVERY_MS = 10 * 60_000;
@@ -324,7 +334,7 @@ export const useGame = create<GameStore>((set, get) => {
     if (dt > AWAY_GAP_S) {
       // The page was frozen: settle it like a normal absence.
       next.lastActiveAt = now - dt * 1000;
-      settleOffline(next, now);
+      settleAway(next, now);
       commit(next);
       return;
     }
@@ -474,7 +484,7 @@ export const useGame = create<GameStore>((set, get) => {
       const now = Date.now();
       const state = await saves.resolveConflict(keep, now);
       if (keep === "cloud" && state) {
-        settleOffline(state, now);
+        settleAway(state, now);
         refreshDaily(state, now);
         lastTick = Date.now();
         commit(state);
@@ -621,7 +631,7 @@ export const useGame = create<GameStore>((set, get) => {
       // the profile too before the game shows (a slow answer does not hold it up: it follows in the background)
       if (saves?.account) {
         const loading = saves.profile().catch(() => null);
-        const profile = await Promise.race([loading, new Promise<null>((r) => setTimeout(() => r(null), 4_000))]);
+        const profile = await Promise.race([loading, new Promise<null>((r) => setTimeout(() => r(null), 1_500))]);
         if (profile) useCloud.setState({ profile });
         else void loading.then((p) => p && useCloud.setState({ profile: p }));
       }
@@ -630,7 +640,7 @@ export const useGame = create<GameStore>((set, get) => {
         state = createInitialState(now);
         state.settings.lang = detectLanguage();
       } else {
-        settleOffline(state, now);
+        settleAway(state, now);
       }
       refreshDaily(state, now);
       // the player's language before the first screen (English if it cannot load)

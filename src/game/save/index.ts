@@ -51,6 +51,10 @@ export interface StartResult {
   mode: "local" | "cloud";
 }
 
+/** How long the start waits for the cloud's save: with no copy on this device, and with one (ms). */
+const CLOUD_WAIT = 12_000;
+const CLOUD_WAIT_WITH_COPY = 3_000;
+
 function timeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return Promise.race([p, new Promise<T>((_, reject) => setTimeout(() => reject(new Error("timeout")), ms))]);
 }
@@ -140,13 +144,15 @@ export class SaveManager {
     flag(SIGNED_OUT_KEY, false);
     this.account = account;
 
+    const own = this.local.read(account.id);
     let cloud: CloudCopy | null = null;
     try {
-      cloud = await timeout(this.backend.load(), 12_000);
+      // with this account's copy here, a slow connection doesn't hold the game up for long: the
+      // copy plays, and its first save is checked against the cloud (a newer one there asks)
+      cloud = await timeout(this.backend.load(), own ? CLOUD_WAIT_WITH_COPY : CLOUD_WAIT);
     } catch {
       cloud = null;
     }
-    const own = this.local.read(account.id);
     // a damaged cloud save is never offered: this device's copy (if any) takes over and repairs it
     if (cloud && cloud.revision > 0 && cloud.version <= SAVE_VERSION && !this.read(cloud.state, now)) {
       const fallback = own ?? legacy;
