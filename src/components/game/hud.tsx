@@ -82,11 +82,20 @@ function ShopButton() {
 }
 
 function IncomePill() {
-  const income = useGame((g) => formatMoney(g.snap.incomePerSec));
   const losing = useGame((g) => g.snap.incomePerSec < 0);
+  // a new company's first seconds: only wages so far, before the first unit comes off the line,
+  // read as "nothing yet" rather than as a loss
+  const starting = useGame((g) => g.snap.incomePerSec <= 0 && g.state.lifetime.moneyEarned <= 0);
+  const income = useGame((g) => formatMoney(starting ? 0 : g.snap.incomePerSec));
   const { t } = useT();
   // a loss (costs running ahead of sales for a while) reads as one: arrow down, in red
-  const icon = losing ? <TrendingDown className="size-4 stroke-[3] text-rose-300" /> : <TrendingUp className="size-4 stroke-[3] text-lime" />;
+  const icon = starting ? (
+    <TrendingUp className="size-4 stroke-[3] text-white/50" />
+  ) : losing ? (
+    <TrendingDown className="size-4 stroke-[3] text-rose-300" />
+  ) : (
+    <TrendingUp className="size-4 stroke-[3] text-lime" />
+  );
   return <Pill icon={icon} label={t("hud.profit")} value={`${income}${t("unit.perSec")}`} />;
 }
 
