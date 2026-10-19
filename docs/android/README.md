@@ -163,7 +163,7 @@ Screenshots go to `android-check/`.
 
 1. Raise `versionCode` (by 1) and `versionName` in `android/version.properties`.
 2. Add the release notes, `fastlane/metadata/android/<language>/changelogs/<versionCode>.txt`
-   (English, Romanian, Russian; the tests ask for them).
+   (every language of the listing; the tests ask for them).
 3. Merge to `main`. The workflow builds `app-release.aab`, signed if the key is in the secrets.
 4. Upload it in Play Console, or run *Actions → Publish to Google Play* (see
    [play-store.md](play-store.md)).

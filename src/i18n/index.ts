@@ -8,6 +8,9 @@ export const LANGS: { id: Lang; label: string; short: string; flag: string }[] =
   { id: "en", label: "English", short: "EN", flag: "🇬🇧" },
   { id: "ro", label: "Română", short: "RO", flag: "🇷🇴" },
   { id: "ru", label: "Русский", short: "RU", flag: "🇷🇺" },
+  { id: "es", label: "Español", short: "ES", flag: "🇪🇸" },
+  { id: "pt", label: "Português", short: "PT", flag: "🇧🇷" },
+  { id: "de", label: "Deutsch", short: "DE", flag: "🇩🇪" },
 ];
 
 // English ships with the game (it is every text's fallback); the other
@@ -16,6 +19,14 @@ const MESSAGES: Partial<Record<Lang, Record<MessageKey, string>>> = { en };
 /** Game content (car, factory, research… names). English lives in config/. */
 const CONTENT: Partial<Record<Lang, Record<string, string>>> = { en: {} };
 const loading: Partial<Record<Lang, Promise<void>>> = {};
+type Pack = readonly [Record<MessageKey, string>, Record<string, string>];
+const PACKS: Record<Exclude<Lang, "en">, () => Promise<Pack>> = {
+  ro: () => import("./ro").then((m) => [m.ro, m.roContent] as const),
+  ru: () => import("./ru").then((m) => [m.ru, m.ruContent] as const),
+  es: () => import("./es").then((m) => [m.es, m.esContent] as const),
+  pt: () => import("./pt").then((m) => [m.pt, m.ptContent] as const),
+  de: () => import("./de").then((m) => [m.de, m.deContent] as const),
+};
 
 /** Bumped whenever a language finishes loading (components showing text re-render). */
 let version = 0;
@@ -28,8 +39,8 @@ export function onI18nChange(fn: () => void) {
 
 /** Loads a language's texts (at once for English, and for one already loaded). */
 export function loadLanguage(lang: Lang): Promise<void> {
-  if (MESSAGES[lang]) return Promise.resolve();
-  return (loading[lang] ??= (lang === "ro" ? import("./ro").then((m) => [m.ro, m.roContent] as const) : import("./ru").then((m) => [m.ru, m.ruContent] as const)).then(
+  if (MESSAGES[lang] || lang === "en") return Promise.resolve();
+  return (loading[lang] ??= PACKS[lang]().then(
     ([messages, content]) => {
       MESSAGES[lang] = messages;
       CONTENT[lang] = content;
@@ -48,6 +59,9 @@ const UNITS: Record<Lang, { d: string; h: string; m: string; s: string }> = {
   en: { d: "d", h: "h", m: "m", s: "s" },
   ro: { d: "z", h: "h", m: "m", s: "s" },
   ru: { d: "д", h: "ч", m: "м", s: "с" },
+  es: { d: "d", h: "h", m: "m", s: "s" },
+  pt: { d: "d", h: "h", m: "m", s: "s" },
+  de: { d: "T", h: "h", m: "m", s: "s" },
 };
 
 export type Vars = Record<string, string | number>;
@@ -80,5 +94,8 @@ export function detectLanguage(): Lang {
   const tag = (navigator.languages?.[0] ?? navigator.language ?? "en").toLowerCase();
   if (tag.startsWith("ro") || tag.startsWith("mo")) return "ro";
   if (tag.startsWith("ru") || tag.startsWith("uk") || tag.startsWith("be") || tag.startsWith("kk")) return "ru";
+  if (tag.startsWith("es")) return "es";
+  if (tag.startsWith("pt")) return "pt";
+  if (tag.startsWith("de") || tag.startsWith("gsw")) return "de";
   return "en";
 }

@@ -13,7 +13,7 @@ import { migrateShop } from "../engine/shop";
 import { migrateCity, unlockOwnedZones } from "../engine/city";
 import { createInitialState, MAP_VERSION, SAVE_VERSION } from "../engine/state";
 import { ACHIEVEMENTS } from "../config/achievements";
-import type { GameState } from "../types";
+import type { GameState, Lang } from "../types";
 
 type Json = Record<string, unknown>;
 
@@ -24,9 +24,12 @@ const isObject = (v: unknown): v is Json => typeof v === "object" && v !== null 
  * about (added in newer versions) keep their defaults; values with the wrong
  * type are ignored, so a corrupted field cannot crash the game.
  */
+const LANGS: Record<Lang, true> = { en: true, ro: true, ru: true, es: true, pt: true, de: true };
+
 /** A setting with a fixed set of values: anything else from a save is the default. */
 function cleanSettings(state: GameState, saved: unknown): GameState {
   if (!["auto", "on", "off"].includes(state.settings.saver)) state.settings.saver = "auto";
+  if (!Object.hasOwn(LANGS, state.settings.lang)) state.settings.lang = "en";
   // a save from before the music: a player who turned the sounds off doesn't get music either
   if (isObject(saved) && typeof saved.music !== "boolean") state.settings.music = state.settings.sound;
   // hidden players: account ids with the name they had, at most the last 200

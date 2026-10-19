@@ -9,12 +9,12 @@ import { PLANTS } from "./game/config/chain";
 
 const ROOT = join(__dirname, "..");
 const LISTING = join(ROOT, "fastlane/metadata/android");
-const LOCALES = ["en-US", "ro", "ru-RU"];
+const LOCALES = ["en-US", "ro", "ru-RU", "es-ES", "pt-BR", "de-DE"];
 const read = (...p: string[]) => readFileSync(join(LISTING, ...p), "utf8");
 const versionCode = Number(/versionCode=(\d+)/.exec(readFileSync(join(ROOT, "android/version.properties"), "utf8"))?.[1]);
 
 describe("the Google Play listing", () => {
-  it("has the game's three languages and nothing else", () => {
+  it("has the game's languages and nothing else", () => {
     expect(readdirSync(LISTING).sort()).toEqual([...LOCALES].sort());
   });
 

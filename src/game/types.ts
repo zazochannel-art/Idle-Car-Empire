@@ -201,7 +201,8 @@ export interface OfflineRacing {
 
 export type BuyAmount = 1 | 10 | 100 | "max";
 
-export type Lang = "en" | "ro" | "ru";
+/** UI languages; "pt" is Brazilian Portuguese. */
+export type Lang = "en" | "ro" | "ru" | "es" | "pt" | "de";
 
 // ───────────────────────────── city (Empire Map) ─────────────────────────────
 

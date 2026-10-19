@@ -29,8 +29,8 @@ settings, or while it can't be reached, it saves on the device only.
   from the device; the next start shows the welcome page, opened on "Sign in".
 - **Profile**: name (3–20 characters, unique, case-insensitive) and an avatar;
   company, money, earnings, factories, cars built, the cloud save's status
-  and time, "save now", password, switch account, log out. In English,
-  Romanian and Russian.
+  and time, "save now", password, switch account, log out. In every language
+  of the game.
 
 ## Saving
 
