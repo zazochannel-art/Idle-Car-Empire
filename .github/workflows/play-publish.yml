@@ -90,6 +90,11 @@ jobs:
         env:
           ADMOB_APP_ID: ${{ vars.ADMOB_APP_ID }}
         run: |
+          # a wrong AdMob app id would fall back to Google's test one: not in a release for players
+          if [ -n "$ADMOB_APP_ID" ] && ! echo "$ADMOB_APP_ID" | grep -qE '^ca-app-pub-[0-9]+~[0-9]+$'; then
+            echo "::error::Set the ADMOB_APP_ID variable to your AdMob app id, ca-app-pub-…~… (AdMob → Apps → App settings; an ad unit id has a / instead): docs/android/ads.md"
+            exit 1
+          fi
           ./gradlew --no-daemon --stacktrace bundleRelease
           jarsigner -verify app/build/outputs/bundle/release/app-release.aab | grep -q "jar verified" || { echo "::error::the bundle is not signed"; exit 1; }
           grep -E "versionCode|versionName" version.properties

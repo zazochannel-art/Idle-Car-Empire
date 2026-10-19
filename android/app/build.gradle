@@ -24,7 +24,11 @@ def canSignRelease = releaseStoreFile && signingValue('storePassword', 'ANDROID_
 // ADMOB_APP_ID variable (docs/android/ads.md). Without one, Google's sample app id:
 // the app then shows test ads only, which pay nothing. Never invent one.
 def admobSampleAppId = 'ca-app-pub-3940256099942544~3347511713'
-def admobAppId = (project.findProperty('admobAppId') ?: System.getenv('ADMOB_APP_ID') ?: admobSampleAppId) as String
+def admobAppIdGiven = (project.findProperty('admobAppId') ?: System.getenv('ADMOB_APP_ID') ?: '') as String
+// An app id has a "~" (ca-app-pub-...~...). An ad unit id ("/") or anything else in its place makes
+// Google Mobile Ads stop the app as it launches, before the game runs: the sample id instead.
+def admobAppIdValid = admobAppIdGiven ==~ /ca-app-pub-\d+~\d+/
+def admobAppId = admobAppIdValid ? admobAppIdGiven : admobSampleAppId
 
 android {
     namespace = "com.zazochannel.idlecarempire"
@@ -81,7 +85,10 @@ android {
     }
 }
 
-if (admobAppId == admobSampleAppId) {
+if (admobAppIdGiven && !admobAppIdValid) {
+    logger.warn("ADMOB_APP_ID is not an AdMob app id (ca-app-pub-...~..., from AdMob > Apps > App settings): '${admobAppIdGiven}'" +
+        (admobAppIdGiven.contains('/') ? " is an ad unit id" : "") + ". This build uses Google's sample app id instead (test ads only).")
+} else if (admobAppId == admobSampleAppId) {
     logger.lifecycle("No AdMob app id (ADMOB_APP_ID or -PadmobAppId): this build shows Google's test ads only.")
 }
 
