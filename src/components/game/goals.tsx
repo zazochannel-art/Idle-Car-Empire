@@ -318,7 +318,7 @@ export function MissionStrip() {
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-white/45">{t("nav.missions")}</h2>
-        <button onClick={() => setView("missions")} className="text-xs text-sky-300 hover:underline">
+        <button onClick={() => setView("missions")} className="-my-2 py-2 text-xs text-sky-300 hover:underline">
           {t("mission.all", { n: left + daily.length })}
         </button>
       </div>

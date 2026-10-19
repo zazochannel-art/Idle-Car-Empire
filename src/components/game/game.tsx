@@ -517,6 +517,7 @@ function BottomDock() {
         {DOCK.map((d) => {
           const active = view === d.id;
           const badge = d.badge ? badges[d.badge] : 0;
+          const label = t(d.label);
           return (
             <button
               key={d.id}
@@ -532,7 +533,8 @@ function BottomDock() {
             >
               <span className="flex skew-x-[9deg] flex-col items-center gap-0.5">
                 <d.icon className="size-5 stroke-[2.5]" />
-                {t(d.label)}
+                {/* a long word ("Construiește") a size smaller, so it doesn't touch the tab's edges */}
+                <span className={cn("max-w-full", label.length > 9 && "text-[11px] tracking-tight")}>{label}</span>
               </span>
               <NavBadge n={badge} gold={d.badge === "imperium"} className="absolute right-1 top-0.5 skew-x-[9deg]" />
             </button>

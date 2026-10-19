@@ -283,6 +283,9 @@ export const ru: Record<MessageKey, string> = {
 
   "settings.title": "Настройки",
   "settings.autosave": "Прогресс сохраняется автоматически каждые несколько секунд ({backend}).",
+  "settings.saveWhere.cloud": "на этом телефоне и в облаке",
+  "settings.saveWhere.cloudOffline": "на этом телефоне; в облаке, когда снова будете онлайн",
+  "settings.saveWhere.local": "на этом телефоне",
   "settings.language": "Язык",
   "settings.lowGraphics": "Упрощённая графика",
   "settings.lowGraphicsHint": "Ниже разрешение, 30 FPS и меньше трафика: плавнее на старых телефонах.",

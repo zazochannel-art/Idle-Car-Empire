@@ -304,7 +304,7 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
     >
       <DialogContent>
         <DialogTitle>{t("settings.title")}</DialogTitle>
-        <DialogDescription className="mt-1">{t("settings.autosave", { backend })}</DialogDescription>
+        <DialogDescription className="mt-1">{t("settings.autosave", { backend: t(`settings.saveWhere.${backend}`) })}</DialogDescription>
 
         <div className="mt-4">
           <div className="mb-1.5 text-xs font-semibold text-white/60">{t("settings.language")}</div>

@@ -135,7 +135,7 @@ export function IncomeChart() {
           </div>
           <div className="mt-1 flex justify-between text-[10px] text-white/40">
             <span>{t("chart.log")}</span>
-            <button onClick={() => setTable(!table)} className="text-sky-300">
+            <button onClick={() => setTable(!table)} className="-my-2 py-2 pl-3 text-sky-300">
               {table ? t("chart.hideTable") : t("chart.showTable")}
             </button>
           </div>

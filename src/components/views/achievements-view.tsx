@@ -32,7 +32,14 @@ export function AchievementsView() {
           const p = conditionProgress(state, a.condition, snap);
           const isMoney = (a.condition.type === "metric" && a.condition.metric === "moneyEarned") || a.condition.type === "income";
           const fmt = (n: number) => (isMoney ? formatMoney(n) : formatNumber(Math.floor(n)));
-          const reward = [a.reward.cash ? formatMoney(a.reward.cash) : null, a.reward.rp ? `${formatNumber(a.reward.rp)} ${t("unit.rp")}` : null].filter(Boolean).join(" + ");
+          const reward = [
+            a.reward.cash ? formatMoney(a.reward.cash) : null,
+            // paid as minutes of the income at the time (game/engine/progress.ts rewardCash)
+            a.reward.incomeSeconds ? t("eventGoal.reward", { min: Math.round(a.reward.incomeSeconds / 60) }) : null,
+            a.reward.rp ? `${formatNumber(a.reward.rp)} ${t("unit.rp")}` : null,
+          ]
+            .filter(Boolean)
+            .join(" + ");
           return (
             <div
               key={a.id}

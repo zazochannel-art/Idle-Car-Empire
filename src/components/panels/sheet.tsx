@@ -2,8 +2,12 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
+import { createContext } from "react";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
+
+/** The title the open sheet shows, so a screen inside it doesn't say it a second time (ViewHeader). */
+export const SheetTitle = createContext<string | null>(null);
 
 /**
  * A panel over the map: a bottom sheet on phones, a side panel on desktop.
@@ -53,7 +57,9 @@ export function Sheet({
               <X className="size-6 stroke-[3.5]" />
             </button>
           </div>
-          <div className="@container min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:px-4">{children}</div>
+          <div className="@container min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:px-4">
+            <SheetTitle.Provider value={typeof title === "string" ? title : null}>{children}</SheetTitle.Provider>
+          </div>
         </motion.aside>
       )}
     </AnimatePresence>

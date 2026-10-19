@@ -283,6 +283,9 @@ export const ro: Record<MessageKey, string> = {
 
   "settings.title": "Setări",
   "settings.autosave": "Progresul se salvează automat la câteva secunde ({backend}).",
+  "settings.saveWhere.cloud": "pe acest telefon și în cloud",
+  "settings.saveWhere.cloudOffline": "pe acest telefon; în cloud când revii online",
+  "settings.saveWhere.local": "pe acest telefon",
   "settings.language": "Limbă",
   "settings.lowGraphics": "Grafică redusă",
   "settings.lowGraphicsHint": "Rezoluție mai mică, 30 FPS și mai puțin trafic: mai fluid pe telefoane mai vechi.",

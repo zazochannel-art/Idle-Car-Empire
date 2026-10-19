@@ -1,7 +1,7 @@
 "use client";
 
 import { ProfileButton } from "./account";
-import { Car, Factory, Moon, Settings, Star, Store, Sun, Sunset, SunMoon, TrendingUp } from "lucide-react";
+import { Car, Factory, Moon, Settings, Star, Store, Sun, Sunset, SunMoon, TrendingDown, TrendingUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { TIME_MODES } from "@/components/map/lighting";
 import { formatMoney, formatNumber } from "@/game/format";
@@ -83,8 +83,11 @@ function ShopButton() {
 
 function IncomePill() {
   const income = useGame((g) => formatMoney(g.snap.incomePerSec));
+  const losing = useGame((g) => g.snap.incomePerSec < 0);
   const { t } = useT();
-  return <Pill icon={<TrendingUp className="size-4 stroke-[3] text-lime" />} label={t("hud.profit")} value={`${income}${t("unit.perSec")}`} />;
+  // a loss (costs running ahead of sales for a while) reads as one: arrow down, in red
+  const icon = losing ? <TrendingDown className="size-4 stroke-[3] text-rose-300" /> : <TrendingUp className="size-4 stroke-[3] text-lime" />;
+  return <Pill icon={icon} label={t("hud.profit")} value={`${income}${t("unit.perSec")}`} />;
 }
 
 /** Production rate: cars per minute once an assembly plant runs, parts before. */

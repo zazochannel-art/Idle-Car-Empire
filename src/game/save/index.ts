@@ -84,6 +84,9 @@ export function cloudBackendFromEnv(): CloudBackend | null {
   return url && key ? new SupabaseBackend(url, key) : null;
 }
 
+/** Where the game is saved (Settings). */
+export type SaveWhere = "cloud" | "cloudOffline" | "local";
+
 export class SaveManager {
   readonly backend: CloudBackend | null;
   readonly local: LocalStore;
@@ -101,8 +104,9 @@ export class SaveManager {
     this.device = opts.device ?? deviceLabel();
   }
 
-  get backendName(): string {
-    return this.backend ? (this.account ? "localStorage + cloud" : "localStorage (cloud offline)") : "localStorage";
+  /** Where the game is being saved, as Settings says it: on the phone, and in the cloud when signed in. */
+  get saveWhere(): SaveWhere {
+    return this.backend ? (this.account ? "cloud" : "cloudOffline") : "local";
   }
 
   /** A save as the game can play it, or null when it is damaged. */
