@@ -9,6 +9,7 @@ import { migrateFunnel } from "../engine/funnel";
 import { migrateEv } from "../engine/ev";
 import { migratePass } from "../engine/pass";
 import { migrateAds } from "../engine/ads";
+import { migrateIap } from "../engine/iap";
 import { migrateShop } from "../engine/shop";
 import { migrateCity, unlockOwnedZones } from "../engine/city";
 import { createInitialState, MAP_VERSION, SAVE_VERSION } from "../engine/state";
@@ -133,6 +134,7 @@ export function migrate(raw: unknown, now: number): GameState {
   state.pass = migratePass(raw.pass);
   state.ads = migrateAds(state.ads, now);
   state.shop = migrateShop(state.shop, now);
+  state.iap = migrateIap(raw.iap);
   migrateLive(raw, state);
   state.classics = migrateClassics(raw.classics);
   migrateExpansion(raw, state);

@@ -2,21 +2,27 @@
 
 // The shop (the HUD's top-left button): a free crate every 4 hours, a mystery box
 // and packs for a rewarded ad (the reward comes only once the ad was watched to
-// the end), and items for ⭐ Stars. Nothing in it costs real money.
+// the end), and items for ⭐ Stars. Premium items for real money only in an app
+// build whose products are set up on Google Play (lib/iap.ts): otherwise nothing
+// in it costs real money.
 import { playAd } from "@/components/game/ad-buttons";
 import { Button } from "@/components/ui/button";
 import { ADS } from "@/game/config/ads";
+import { IAP, IAP_ICON, IAP_PRODUCTS, type IapProduct } from "@/game/config/iap";
 import { SHOP, SHOP_ITEMS, SHOP_ITEM_BY_ID, type ShopItem, type ShopTone } from "@/game/config/shop";
 import { adsToday, buildWait } from "@/game/engine/ads";
 import { remainingOf } from "@/game/engine/construction";
 import type { EconomySnapshot } from "@/game/engine/economy";
 import { rewardCash } from "@/game/engine/progress";
+import { starterReward } from "@/game/engine/iap";
 import { crateWait, longestJob, packsToday, shopBlock, shopReward, type ShopBlock } from "@/game/engine/shop";
 import { formatDuration, formatMoney, formatNumber } from "@/game/format";
 import type { GameState } from "@/game/types";
 import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
-import { useAdStatus } from "@/lib/ads";
+import { canWatch, useAdStatus } from "@/lib/ads";
+import { buyProduct, iapConfigured, restorePurchases, useIapStatus } from "@/lib/iap";
+import { uiEvents } from "@/store/events";
 import { cn } from "@/lib/utils";
 import { useGame } from "@/store/game-store";
 import { ViewHeader } from "./section-title";
@@ -44,6 +50,7 @@ const TAGS: Record<NonNullable<ShopItem["tag"]>, string> = {
 export function ShopView() {
   const state = useGame((g) => g.view.state);
   const { t } = useT();
+  const { adFree } = useAdStatus();
   const ads = SHOP_ITEMS.filter((i) => i.price === "ad");
   const stars = SHOP_ITEMS.filter((i) => typeof i.price === "number");
 
@@ -57,16 +64,17 @@ export function ShopView() {
           <span className="text-lg font-black tabular-nums text-gold">{formatNumber(state.stars, 0)}</span>
         </div>
         <div className="flex flex-1 items-center gap-2 rounded-xl bg-white/[0.05] px-3 py-2 ring-1 ring-white/10">
-          <span className="text-xl">📺</span>
-          <span className="text-xs font-bold leading-tight text-white/70">{t("shop.adsToday", { n: adsToday(state, state.lastActiveAt), max: ADS.perDay })}</span>
+          <span className="text-xl">{adFree ? "🎟️" : "📺"}</span>
+          <span className="text-xs font-bold leading-tight text-white/70">{t(adFree ? "shop.rewardsToday" : "shop.adsToday", { n: adsToday(state, state.lastActiveAt), max: ADS.perDay })}</span>
         </div>
       </div>
       <CrateHero />
-      <Section title={t("shop.ads")} icon="📺" items={ads} />
+      <Premium />
+      <Section title={t(adFree ? "shop.adsFree" : "shop.ads")} icon={adFree ? "🎟️" : "📺"} items={ads} />
       <Section title={t("shop.stars")} icon="⭐" items={stars} right={<span className="text-xs font-black text-gold">{t("shop.have", { n: formatNumber(state.stars, 0) })}</span>}>
         <p className="px-1 text-[11px] text-white/45">{t("shop.starsHow")}</p>
       </Section>
-      <p className="px-1 text-center text-[11px] text-white/40">{t("shop.footer")}</p>
+      <p className="px-1 text-center text-[11px] text-white/40">{t(iapConfigured() ? "shop.footerIap" : "shop.footer")}</p>
     </div>
   );
 }
@@ -123,6 +131,76 @@ function CrateHero() {
   );
 }
 
+/**
+ * Premium: the products Google Play sells in this build, with the store's price, or
+ * "Owned" once bought (shown also where nothing is sold, so a buyer sees what they
+ * have). Hidden when there is neither.
+ */
+function Premium() {
+  const iap = useIapStatus();
+  const owned = useGame((g) => g.view.state.iap.owned);
+  const snap = useGame((g) => g.view.snap);
+  const { t } = useT();
+  const shown = IAP_PRODUCTS.filter((p) => iap.prices[p] || owned.includes(p));
+  if (!shown.length) return null;
+
+  const buy = async (p: IapProduct) => {
+    const r = await buyProduct(p);
+    // "granted": the game's own toast says what came; "cancelled": the player changed their mind
+    if (r === "pending") uiEvents.emit({ type: "toast", tone: "info", icon: "⏳", title: t("iap.pending"), body: t("iap.pendingBody") });
+    else if (r === "owned") uiEvents.emit({ type: "toast", tone: "info", icon: IAP_ICON[p], title: t("iap.alreadyOwned"), body: t("iap.alreadyOwnedBody") });
+    else if (r === "failed") uiEvents.emit({ type: "toast", tone: "warn", icon: "🛒", title: t("iap.failed"), body: t("iap.failedBody") });
+  };
+  const restore = async () => {
+    const n = await restorePurchases();
+    if (n > 0) uiEvents.emit({ type: "toast", tone: "gold", icon: "🛒", title: t("iap.restored", { n }) });
+    else uiEvents.emit({ type: "toast", tone: "info", icon: "🛒", title: t("iap.restoredNone"), body: t("iap.restoredNoneBody") });
+  };
+  const r = starterReward(snap);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-1.5 px-1 text-[12px] font-black uppercase tracking-wider text-white/75">
+        <span>💎</span>
+        {t("iap.title")}
+      </div>
+      {shown.map((p) => {
+        const has = owned.includes(p);
+        return (
+          <div key={p} className="relative flex items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-br from-violet-500/30 via-fuchsia-500/10 to-white/[0.03] p-3 ring-1 ring-violet-300/40">
+            <span className="flex size-16 shrink-0 items-center justify-center rounded-2xl bg-violet-500/25 text-[40px] ring-1 ring-violet-300/45">{IAP_ICON[p]}</span>
+            <div className="min-w-0 flex-1">
+              <div className="text-[13px] font-black leading-tight">{t(`iap.item.${p}` as MessageKey)}</div>
+              <div className="mt-1 text-[10.5px] leading-snug text-white/60">{t(`iap.desc.${p}` as MessageKey, { stars: IAP.starterStars })}</div>
+              {p === "starter" && !has && (
+                <div className="mt-1 flex flex-wrap gap-1 text-[11px] font-black tabular-nums">
+                  <span className="rounded-md bg-black/25 px-1.5 py-0.5 text-gold">⭐ {r.stars}</span>
+                  <span className="rounded-md bg-black/25 px-1.5 py-0.5 text-lime">💵 {formatMoney(rewardCash(r, snap))}</span>
+                  <span className="rounded-md bg-black/25 px-1.5 py-0.5 text-cyan-glow">🔬 {t("shop.rp", { n: formatNumber(r.rp ?? 0, 0) })}</span>
+                </div>
+              )}
+            </div>
+            {has ? (
+              <Button size="sm" variant="locked" disabled className="w-24 shrink-0">
+                ✓ {t("iap.owned")}
+              </Button>
+            ) : (
+              <Button size="sm" variant="gold" disabled={!iap.ready || iap.busy} className="w-24 shrink-0 tabular-nums" onClick={() => void buy(p)}>
+                {iap.prices[p]}
+              </Button>
+            )}
+          </div>
+        );
+      })}
+      {iap.ready && (
+        <Button variant="ghost" size="sm" className="w-full" disabled={iap.busy} onClick={() => void restore()}>
+          {t("iap.restore")}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function Section({ title, icon, right, items, children }: { title: string; icon: string; right?: React.ReactNode; items: ShopItem[]; children?: React.ReactNode }) {
   return (
     <div className="space-y-2">
@@ -163,14 +241,14 @@ function headline(item: ShopItem, s: GameState, snap: EconomySnapshot, t: T): st
   }
 }
 
-function buttonLabel(item: ShopItem, block: ShopBlock, ready: boolean, s: GameState, t: T): string {
+function buttonLabel(item: ShopItem, block: ShopBlock, ready: boolean, adFree: boolean, s: GameState, t: T): string {
   if (block === "wait") return t("shop.in", { time: formatDuration(buildWait(s, s.lastActiveAt) / 1000) });
   if (block === "limit") return t("shop.limit");
   if (block === "active") return `${t("shop.active")} · ${formatDuration(s.ads.boostLeft)}`;
   if (block === "full") return t("shop.full");
   if (block === "nothing") return t("shop.nothing");
   if (item.price === "free") return t("shop.open");
-  if (item.price === "ad") return ready ? `📺 ${t("shop.watch")}` : t("shop.noAd");
+  if (item.price === "ad") return !ready ? t("shop.noAd") : adFree ? `🎟️ ${t("shop.take")}` : `📺 ${t("shop.watch")}`;
   return `⭐ ${item.price}`;
 }
 
@@ -188,7 +266,7 @@ function ShopCard({ item }: { item: ShopItem }) {
   const block = shopBlock(state, item.id, now);
   const big = headline(item, state, snap, t);
   const packs = item.id === "cash" || item.id === "research" ? SHOP.packsPerDay - packsToday(state, item.id, now) : null;
-  const ready = !block && (item.price !== "ad" || (ad.ready && !ad.showing));
+  const ready = !block && (item.price !== "ad" || canWatch(ad));
   const tone = TONES[item.tone];
 
   const buy = () => {
@@ -198,7 +276,7 @@ function ShopCard({ item }: { item: ShopItem }) {
 
   const button = (
     <Button size="sm" variant={!ready ? "locked" : item.price === "ad" ? "go" : "gold"} disabled={!ready} className={cn("tabular-nums", item.wide ? "w-28 shrink-0" : "mt-2 w-full")} onClick={buy}>
-      {buttonLabel(item, block, ready, state, t)}
+      {buttonLabel(item, block, ready, ad.adFree, state, t)}
     </Button>
   );
   const prizes = item.id === "box" && (

@@ -66,6 +66,8 @@ import { grantAd } from "@/game/engine/ads";
 import { ADS, type AdReward } from "@/game/config/ads";
 import * as Shop from "@/game/engine/shop";
 import { SHOP_ITEM_BY_ID, type ShopItemId } from "@/game/config/shop";
+import * as Iap from "@/game/engine/iap";
+import { IAP_ICON, type IapProduct } from "@/game/config/iap";
 import * as Wt from "@/game/engine/winter";
 import * as Ps from "@/game/engine/pass";
 import { funnelDue, funnelMinutes } from "@/game/engine/funnel";
@@ -198,6 +200,8 @@ interface GameStore {
   adReward: (reward: AdReward, plot?: string) => boolean;
   /** A shop item: the free crate, a ⭐ Star item, or an ad item (only once its ad was watched to the end). */
   shopBuy: (id: ShopItemId) => boolean;
+  /** A purchase from Google Play (`token`: its iapTokenKey), given once and saved at once; acknowledge it only if not "duplicate". */
+  iapGrant: (p: IapProduct, token: string) => Iap.GrantResult;
   upgradeBuilding: (plot: string) => boolean;
   placeFacility: (plot: string, type: FacilityType, x: number, y: number, rot: 0 | 1) => boolean;
   moveFacility: (plot: string, uid: number, x: number, y: number, rot: 0 | 1) => boolean;
@@ -911,6 +915,17 @@ export const useGame = create<GameStore>((set, get) => {
       uiEvents.emit({ type: "toast", tone: "gold", icon: SHOP_ITEM_BY_ID[id].icon, title: tr(`shop.item.${id}` as MessageKey), body });
       persist(true);
       return true;
+    },
+    iapGrant: (p, token) => {
+      const { snap } = get();
+      const r = Iap.starterReward(snap);
+      const result = act((s) => Iap.grantPurchase(s, p, token, snap));
+      if (result !== "granted") return result;
+      const body = p === "starter" ? tr("shop.got", { what: [formatMoney(rewardCash(r, snap)), tr("shop.rp", { n: formatNumber(r.rp ?? 0) }), `⭐ ${r.stars}`].join(" · ") }) : tr("iap.adFreeBody");
+      uiEvents.emit({ type: "toast", tone: "gold", icon: IAP_ICON[p], title: tr("iap.thanks", { name: tr(`iap.item.${p}` as MessageKey) }), body });
+      // saved before the store hears it was given: a purchase is never acknowledged and then lost
+      persist(true);
+      return result;
     },
     upgradeBuilding: (plot) => act((s) => C.upgradeBuilding(s, plot)),
     placeFacility: (plot, type, x, y, rot) => act((s) => C.placeFacility(s, plot, type, x, y, rot)),

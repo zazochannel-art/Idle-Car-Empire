@@ -2,7 +2,8 @@
 
 // The rewarded-ad offers (Android app only: on the web no ad is ever ready, so
 // none of these show). Each says what the ad gives before it plays; the reward
-// comes only when the ad network reports the ad watched to the end.
+// comes only when the ad network reports the ad watched to the end. With the
+// ad-free rewards purchase, each offer gives its reward at once (🎟️ instead of 📺).
 import { useState } from "react";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -11,7 +12,7 @@ import { adBlock, buildWait } from "@/game/engine/ads";
 import { formatDuration, formatMoney } from "@/game/format";
 import type { MessageKey, Vars } from "@/i18n";
 import { useT } from "@/i18n/use-t";
-import { showAdPrivacyForm, useAdStatus, watchAd } from "@/lib/ads";
+import { canWatch, showAdPrivacyForm, useAdStatus, watchAd } from "@/lib/ads";
 import { uiEvents } from "@/store/events";
 import { useGame } from "@/store/game-store";
 
@@ -27,21 +28,21 @@ export async function playAd(onReward: () => void, t: T) {
 /** Plays an ad for `reward`. */
 const watch = (reward: AdReward, t: T, plot?: string) => playAd(() => useGame.getState().adReward(reward, plot), t);
 
-/** An ad is loaded and not on screen, and what would stop the game giving this reward now. */
+/** An ad is loaded and not on screen (or ad-free rewards), and what would stop the game giving this reward now. */
 function useAdOffer(reward: AdReward, plot?: string) {
-  const { ready, showing } = useAdStatus();
+  const status = useAdStatus();
   const block = useGame((g) => adBlock(g.state, reward, g.state.lastActiveAt, plot));
-  return { ready: ready && !showing, block };
+  return { ready: canWatch(status), free: status.adFree, block };
 }
 
 /** Offline report: collect twice the money for an ad. */
 export function OfflineAdButton({ amount }: { amount: number }) {
   const { t } = useT();
-  const { ready, block } = useAdOffer("offline");
+  const { ready, free, block } = useAdOffer("offline");
   if (!ready || block) return null;
   return (
     <Button variant="go" size="lg" className="mt-2 w-full text-base" onClick={() => void watch("offline", t)}>
-      📺 {t("ad.offline", { amount: formatMoney(amount * ADS.offlineMult) })}
+      {free ? "🎟️" : "📺"} {t(free ? "ad.offlineFree" : "ad.offline", { amount: formatMoney(amount * ADS.offlineMult) })}
     </Button>
   );
 }
@@ -49,18 +50,18 @@ export function OfflineAdButton({ amount }: { amount: number }) {
 /** A construction or an upgrade: finish it for an ad (then a pause before the next). */
 export function BuildAdButton({ plot, size }: { plot: string; size?: ButtonProps["size"] }) {
   const { t } = useT();
-  const { ready, block } = useAdOffer("build", plot);
+  const { ready, free, block } = useAdOffer("build", plot);
   const wait = useGame((g) => (block === "wait" ? Math.ceil(buildWait(g.state, g.state.lastActiveAt) / 1000) : 0));
   if (!ready || (block && block !== "wait")) return null;
   if (block === "wait")
     return (
       <Button variant="locked" size={size} disabled className="w-full">
-        {t("ad.buildWait", { time: formatDuration(wait) })}
+        {t(free ? "ad.buildWaitFree" : "ad.buildWait", { time: formatDuration(wait) })}
       </Button>
     );
   return (
     <Button variant="go" size={size} className="w-full" onClick={() => void watch("build", t, plot)}>
-      {t("ad.build")}
+      {t(free ? "ad.buildFree" : "ad.build")}
     </Button>
   );
 }
@@ -69,7 +70,7 @@ export function BuildAdButton({ plot, size }: { plot: string; size?: ButtonProps
 export function AdBoostChip() {
   const { t } = useT();
   const left = useGame((g) => Math.ceil(g.state.ads.boostLeft));
-  const { ready, block } = useAdOffer("boost");
+  const { ready, free, block } = useAdOffer("boost");
   const [open, setOpen] = useState(false);
   const style = "pointer-events-auto flex items-center gap-1 whitespace-nowrap rounded-lg bg-black/20 px-2 py-1 text-[13px] font-bold text-lime md:py-1.5";
   if (left > 0)
@@ -82,13 +83,13 @@ export function AdBoostChip() {
   return (
     <>
       <button className={style} onClick={() => setOpen(true)}>
-        📺 {t("ad.boost")}
+        {free ? "🎟️" : "📺"} {t("ad.boost")}
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="text-center">
           <div className="mx-auto mb-2 text-5xl">📈</div>
           <DialogTitle className="text-2xl">{t("ad.boostTitle")}</DialogTitle>
-          <DialogDescription className="mt-2">{t("ad.boostBody")}</DialogDescription>
+          <DialogDescription className="mt-2">{t(free ? "ad.boostBodyFree" : "ad.boostBody")}</DialogDescription>
           <div className="mt-5 flex gap-2">
             <Button variant="secondary" className="flex-1" onClick={() => setOpen(false)}>
               {t("ad.notNow")}
@@ -101,7 +102,7 @@ export function AdBoostChip() {
                 void watch("boost", t);
               }}
             >
-              📺 {t("ad.watch")}
+              {free ? `🎟️ ${t("ad.start")}` : `📺 ${t("ad.watch")}`}
             </Button>
           </div>
         </DialogContent>

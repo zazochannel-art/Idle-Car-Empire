@@ -17,6 +17,7 @@ your choices or manual approval: they can't be done from the repository.
 | Players' content (Google Play's [UGC policy](https://support.google.com/googleplay/android-developer/answer/9876937)) | terms accepted when creating an account, a name filter in the game and on the server, in-app reports of players and alliances, hiding players; [moderation.md](../moderation.md) |
 | Accounts | registration works for every address (no confirmation email needed); in-app account deletion; *Forgot password?* (by email once SMTP is set, else the contact address) |
 | Ads | rewarded ads only, Google AdMob with Google's consent form (UMP); test ads until you set your AdMob ids ([ads.md](ads.md)) |
+| In-app purchases | a starter pack and ad-free rewards through Google Play Billing, **off** until you create the products and set their ids ([iap.md](iap.md)) |
 | Ratings | the store's own rating card after collecting the offline earnings, for engaged players, at most every 45 days (`src/lib/review.ts`) |
 | Updates | when Google Play has a newer version, the game offers it (Update opens Play's own update screen; Later is always there), once per new version and again every 3 days (`src/lib/play-update.ts`); nothing to set up, it works for any app installed from Play |
 | Servers | Supabase migrations 0001–0010 applied; your dashboard (errors, new players, reports, live events) at `/admin/` on the site once you make yourself an admin ([admin.md](../admin.md)); `keep-alive.yml` calls the API every two days so the free project never pauses, and its run turns red (GitHub emails you) if the project is down |
@@ -141,7 +142,7 @@ needs an account.
   company names and alliance names chosen by players (leaderboards, visits,
   alliances). No chat. Players can report and hide others; names are filtered.
 - Shares the user's location: no.
-- Digital purchases: no.
+- Digital purchases: no (yes once the in-app purchases are on: [iap.md](iap.md), step 7).
 
 The likely outcome is *Everyone / PEGI 3* with a "Users Interact" notice. The
 rating authority decides.
