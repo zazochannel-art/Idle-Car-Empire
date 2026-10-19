@@ -16,4 +16,6 @@ ext {
     // rewarded ads (@capacitor-community/admob): exact versions, not the plugin's open '25.4.+'
     playServicesAdsVersion = '25.4.0'
     userMessagingPlatformVersion = '4.0.0'
+    // the store's rating card (@capacitor-community/in-app-review, lib/review.ts): exact, as above
+    googleAndroidPlayReviewVersion = '2.0.2'
 }

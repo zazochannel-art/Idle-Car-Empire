@@ -71,6 +71,7 @@ import { funnelDue, funnelMinutes } from "@/game/engine/funnel";
 import { browserOptOut, sendStep } from "@/game/save/funnel";
 import { PASS, type WeeklyId } from "@/game/config/pass";
 import { batteryState, isIdle, isSaving, minTickMs, onSaverChange, setSaverSetting, startPower, type SaverSetting } from "@/lib/power";
+import { maybeAskForReview } from "@/lib/review";
 
 const TICK_MS = 100;
 /** How often the ticks refresh the screens' view of the state (ms). */
@@ -1003,6 +1004,8 @@ export const useGame = create<GameStore>((set, get) => {
       act((s) => collectOffline(s) > 0 || s.pendingOffline === null);
       if (amount > 0) uiEvents.emit({ type: "toast", tone: "gold", icon: "💰", title: tr("toast.collected", { amount: formatMoney(amount) }), body: tr("toast.collectedBody") });
       persist(true);
+      // a good moment for the store's rating card (lib/review.ts decides whether it is due)
+      if (amount > 0) setTimeout(() => void maybeAskForReview(get().state), 1500);
     },
     imperium: () => {
       const gained = act((s) => doImperium(s, Date.now()));
