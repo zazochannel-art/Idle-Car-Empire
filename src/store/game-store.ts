@@ -33,7 +33,7 @@ import { checkAchievements, claimDaily, claimMilestone, recordHistory, refreshDa
 import { cloneState, createInitialState } from "@/game/engine/state";
 import { tick as engineTick } from "@/game/engine/tick";
 import { formatDuration, formatMoney, formatNumber, formatPercent } from "@/game/format";
-import { decodeSave, encodeSave, SaveManager } from "@/game/save";
+import { decodeSave, encodeSave, SaveManager, type SaveWhere } from "@/game/save";
 import { askStartChoice, askWelcome, useCloud } from "./cloud-store";
 import type { BuyAmount, CarId, CarRoute, DealerId, FacilityType, GameState, Lang, ManagerId, PlantType, QualityMode, Specialization, StructureType, ZoneId } from "@/game/types";
 import { applyLanguage, detectLanguage, loadLanguage, translate, type MessageKey, type Vars } from "@/i18n";
@@ -105,7 +105,8 @@ interface GameStore {
    * work than redrawing a whole screen ten times a second.
    */
   view: { state: GameState; snap: EconomySnapshot };
-  backend: string;
+  /** Where the game is saved (Settings): on the phone, and in the cloud when signed in. */
+  backend: SaveWhere;
   /** Saves to the cloud now. */
   syncNow: () => Promise<void>;
   /** The account's save changed on another device meanwhile: keep this game ("local") or play the cloud's. */
@@ -473,7 +474,7 @@ export const useGame = create<GameStore>((set, get) => {
     state: initial,
     snap: snapshot(initial),
     view: { state: initial, snap: snapshot(initial) },
-    backend: saves?.backendName ?? "memory",
+    backend: saves?.saveWhere ?? "local",
     saves,
     syncNow: async () => {
       persist(true);
@@ -623,7 +624,7 @@ export const useGame = create<GameStore>((set, get) => {
         ? await saves.start(now, { choose: (local, cloud, reason) => askStartChoice({ local, cloud, reason }), signIn: askWelcome })
         : { state: null, mode: "local" as const };
       useCloud.setState({ mode: start.mode, account: saves?.account ?? null, outdated: !!start.outdated, phase: "save" });
-      set({ backend: saves?.backendName ?? "memory" });
+      set({ backend: saves?.saveWhere ?? "local" });
       if (start.outdated) {
         starting = false;
         return;

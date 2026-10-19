@@ -122,8 +122,9 @@ function AllianceHome({ a, onChange }: { a: MyAlliance; onChange: () => void }) 
             <span className="text-sm font-black tabular-nums text-gold">
               {formatNumber(a.points)} / {formatNumber(top)}
             </span>
-            <button aria-label={t("alliance.refresh")} className="rounded-lg p-1 text-white/45 hover:bg-white/10 hover:text-white" onClick={onChange}>
-              <RefreshCw className="size-3.5" />
+            {/* a finger-sized target, without making the row taller */}
+            <button aria-label={t("alliance.refresh")} className="-my-1.5 flex size-8 items-center justify-center rounded-lg text-white/45 hover:bg-white/10 hover:text-white" onClick={onChange}>
+              <RefreshCw className="size-4" />
             </button>
           </span>
         </div>

@@ -467,19 +467,31 @@ export function MenuPanel({ onSettings }: { onSettings: () => void }) {
     { icon: "🚚", label: t("nav.logistics"), go: () => setView("logistics") },
     { icon: "⚙️", label: t("menu.settings"), go: onSettings },
   ];
-  return (
-    <div className="grid grid-cols-2 gap-2 pb-2 sm:grid-cols-3">
-      {tiles.map((x) => (
+  // four to a row, so the whole menu fits without scrolling on a phone; the gold group (you, your
+  // company, other players) first, then the company's departments
+  const grid = (list: typeof tiles) => (
+    <div className="grid grid-cols-4 gap-2">
+      {list.map((x) => (
         <button
           key={x.label}
           onClick={x.go}
-          className={cn("relative flex flex-col items-center gap-1.5 rounded-2xl p-4 text-sm font-semibold ring-1 transition hover:bg-white/[0.07]", x.gold ? "bg-gold/[0.08] ring-gold/30" : "bg-white/[0.04] ring-white/[0.07]")}
+          className={cn(
+            "relative flex min-h-[78px] flex-col items-center justify-center gap-1.5 rounded-2xl px-1 py-2.5 text-[12px] font-semibold ring-1 transition hover:bg-white/[0.07] active:scale-[0.97]",
+            x.gold ? "bg-gold/[0.08] ring-gold/30" : "bg-white/[0.04] ring-white/[0.07]",
+          )}
         >
-          {x.badge && <span className="absolute right-2 top-2 size-3 animate-pulse rounded-full bg-red-500 ring-2 ring-[#2b2b2e]" />}
-          <span className="text-2xl">{x.icon}</span>
-          <span className="text-center leading-tight">{x.label}</span>
+          {x.badge && <span className="absolute right-1.5 top-1.5 size-2.5 animate-pulse rounded-full bg-red-500 ring-2 ring-[#2b2b2e]" />}
+          <span className="text-[24px] leading-none">{x.icon}</span>
+          <span className="text-center leading-tight break-words hyphens-auto">{x.label}</span>
         </button>
       ))}
+    </div>
+  );
+  return (
+    // (a pixel of room on top: the first row's rings would be cut by the scrolling edge)
+    <div className="space-y-3 pb-2 pt-px">
+      {grid(tiles.filter((x) => x.gold))}
+      {grid(tiles.filter((x) => !x.gold))}
     </div>
   );
 }

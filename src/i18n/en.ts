@@ -284,6 +284,9 @@ export const en = {
 
   "settings.title": "Settings",
   "settings.autosave": "Progress saves automatically every few seconds ({backend}).",
+  "settings.saveWhere.cloud": "on this phone and in the cloud",
+  "settings.saveWhere.cloudOffline": "on this phone; in the cloud once you're back online",
+  "settings.saveWhere.local": "on this phone",
   "settings.language": "Language",
   "settings.lowGraphics": "Low graphics",
   "settings.lowGraphicsHint": "Lower resolution, 30 FPS and less traffic: smoother on older phones.",

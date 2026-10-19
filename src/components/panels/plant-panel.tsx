@@ -399,7 +399,7 @@ function ManagerSlot({ id }: { id: string }) {
               useUi.getState().openFloor(null);
               setView("managers");
             }}
-            className="text-[11px] font-semibold text-sky-300 hover:text-sky-200"
+            className="-my-2 py-2 text-[11px] font-semibold text-sky-300 hover:text-sky-200"
           >
             {t("plant.allManagers")} →
           </button>

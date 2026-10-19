@@ -128,19 +128,20 @@ function MaterialRow({ id, m, per }: { id: string; m: MaterialId; per: number })
         <span>{t("mat.perUnit", { n: formatNumber(per) })}</span>
       </div>
       {short && <div className="mt-1 text-[10px] font-semibold text-amber-300">⚠️ {t("mat.need", { need: formatNumber(per), have: formatNumber(Math.floor(have)), n: formatNumber(Math.ceil(per - have)) })}</div>}
+      {/* finger-sized controls (at least 32 px): this row is used a lot, often in a hurry */}
       <div className="mt-1.5 flex items-center gap-1">
-        <button className="rounded-lg bg-white/[0.06] p-1.5 ring-1 ring-white/10 disabled:opacity-30" disabled={q <= 10} onClick={() => setQty(stepDown(q))} aria-label="-">
-          <Minus className="size-3.5" />
+        <button className="flex size-8 items-center justify-center rounded-lg bg-white/[0.06] ring-1 ring-white/10 disabled:opacity-30" disabled={q <= 10} onClick={() => setQty(stepDown(q))} aria-label="-">
+          <Minus className="size-4" />
         </button>
-        <div className="min-w-[3.6rem] rounded-lg bg-black/30 px-2 py-1 text-center text-xs font-bold tabular-nums">{formatNumber(q)}</div>
-        <button className="rounded-lg bg-white/[0.06] p-1.5 ring-1 ring-white/10 disabled:opacity-30" disabled={q >= room} onClick={() => setQty(stepUp(q))} aria-label="+">
-          <Plus className="size-3.5" />
+        <div className="flex h-8 min-w-[3.6rem] items-center justify-center rounded-lg bg-black/30 px-2 text-xs font-bold tabular-nums">{formatNumber(q)}</div>
+        <button className="flex size-8 items-center justify-center rounded-lg bg-white/[0.06] ring-1 ring-white/10 disabled:opacity-30" disabled={q >= room} onClick={() => setQty(stepUp(q))} aria-label="+">
+          <Plus className="size-4" />
         </button>
-        <button className="rounded-lg bg-white/[0.06] px-2 py-1 text-[10px] font-bold ring-1 ring-white/10 disabled:opacity-30" disabled={max < 1} onClick={() => setQty(Math.max(1, max))}>
+        <button className="h-8 rounded-lg bg-white/[0.06] px-2.5 text-[10px] font-bold ring-1 ring-white/10 disabled:opacity-30" disabled={max < 1} onClick={() => setQty(Math.max(1, max))}>
           {t("mat.max")}
         </button>
         <button
-          className="ml-auto rounded-lg bg-emerald-500/90 px-2.5 py-1 text-[11px] font-black text-black shadow disabled:bg-white/10 disabled:text-white/40"
+          className="ml-auto h-8 rounded-lg bg-emerald-500/90 px-3 text-[11px] font-black text-black shadow disabled:bg-white/10 disabled:text-white/40"
           disabled={cost > state.cash || q > room || room < 1}
           onClick={() => buy(id, m, q)}
         >
