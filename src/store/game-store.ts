@@ -257,7 +257,7 @@ interface GameStore {
   setAutoRacing: (on: boolean) => boolean;
   setAutoRepair: (on: boolean) => void;
   setBuyAmount: (a: BuyAmount) => void;
-  setPref: (key: "lowGraphics" | "sound" | "haptics" | "notify" | "stats", on: boolean) => void;
+  setPref: (key: "lowGraphics" | "sound" | "music" | "haptics" | "notify" | "stats", on: boolean) => void;
   setSaver: (saver: SaverSetting) => void;
   setLang: (lang: Lang) => void;
   exportSave: () => string;

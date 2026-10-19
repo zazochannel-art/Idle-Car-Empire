@@ -304,6 +304,8 @@ export const ro: Record<MessageKey, string> = {
   "saver.autoOn": "Economie baterie pornită",
   "saver.autoOnBody": "Bateria are {n}%: mai puține cadre până se încarcă. Imperiul tău câștigă la fel.",
   "settings.sound": "Sunete",
+  "settings.music": "Muzică",
+  "settings.musicHint": "Muzică de fundal liniștită, compusă de joc. Mai încet în fabrică, oprită în fundal și la economisirea bateriei.",
   "settings.haptics": "Vibrații",
   "settings.copied": "Codul salvării a fost copiat.",
   "settings.copyBelow": "Copiază codul salvării de mai jos.",

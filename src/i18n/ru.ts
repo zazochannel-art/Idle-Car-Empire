@@ -304,6 +304,8 @@ export const ru: Record<MessageKey, string> = {
   "saver.autoOn": "Экономия батареи включена",
   "saver.autoOnBody": "Заряд {n}%: меньше кадров, пока телефон не зарядится. Доход империи тот же.",
   "settings.sound": "Звуки",
+  "settings.music": "Музыка",
+  "settings.musicHint": "Спокойная фоновая музыка, которую создаёт сама игра. Тише внутри завода, выключается в фоне и в режиме экономии батареи.",
   "settings.haptics": "Вибрация",
   "settings.copied": "Код сохранения скопирован.",
   "settings.copyBelow": "Скопируй код сохранения ниже.",
