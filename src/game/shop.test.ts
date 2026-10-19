@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { ADS } from "./config/ads";
-import { SHOP } from "./config/shop";
+import { SHOP, SHOP_ITEM_BY_ID } from "./config/shop";
 import * as A from "./engine/ads";
 import * as Co from "./engine/construction";
 import { snapshot } from "./engine/economy";
-import { rewardCash } from "./engine/progress";
+import { dateKey, rewardCash } from "./engine/progress";
 import * as S from "./engine/shop";
 import { createInitialState } from "./engine/state";
 import { tick } from "./engine/tick";
@@ -119,16 +119,91 @@ describe("the shop", () => {
 
   it("a save keeps the shop, within bounds", () => {
     const s = createInitialState(T0);
-    s.shop = { crateAt: T0 - HOUR, day: "2026-03-01", cash: 2, research: 1 };
+    s.shop = { crateAt: T0 - HOUR, day: "2026-03-01", cash: 2, research: 1, boxDay: "2026-03-01" };
     expect(decodeSave(encodeSave(s), T0).shop).toEqual(s.shop);
     // tampered or from a clock set back: clamped
-    s.shop = { crateAt: T0 + 1e9, day: "2026-03-01", cash: 1e6, research: -4 };
-    expect(decodeSave(encodeSave(s), T0).shop).toEqual({ crateAt: T0, day: "2026-03-01", cash: SHOP.packsPerDay, research: 0 });
+    s.shop = { crateAt: T0 + 1e9, day: "2026-03-01", cash: 1e6, research: -4, boxDay: "<b>" };
+    expect(decodeSave(encodeSave(s), T0).shop).toEqual({ crateAt: T0, day: "2026-03-01", cash: SHOP.packsPerDay, research: 0, boxDay: "" });
     // an old save without it: the first crate is ready
     const raw = JSON.parse(JSON.stringify(createInitialState(T0)));
     delete raw.shop;
     const loaded = decodeSave(JSON.stringify(raw), T0);
     expect(loaded.shop).toEqual(S.createShop());
     expect(S.shopBlock(loaded, "crate", T0)).toBeNull();
+    // a save from before the mystery box: today's box is ready
+    const old = JSON.parse(JSON.stringify(createInitialState(T0)));
+    delete old.shop.boxDay;
+    const before = decodeSave(JSON.stringify(old), T0);
+    expect(before.shop.boxDay).toBe("");
+    expect(S.shopBlock(before, "box", T0)).toBeNull();
+  });
+
+  it("the mystery box: one a day for an ad, its prize fixed for the day", () => {
+    const s = createInitialState(T0);
+    const snap = snapshot(s);
+    const prize = S.boxPrize(s, T0);
+    // the same all day long: opening it later can't draw a better one
+    expect(S.boxPrize(s, T0 + 5 * HOUR)).toBe(prize);
+    const r = S.shopReward("box", snap, s, T0);
+    const cash = s.cash;
+    const [rp, stars] = [s.rp, s.stars];
+    expect(S.buyShop(s, "box", T0, snap)).toBe(true);
+    expect(s.cash).toBeCloseTo(cash + rewardCash(r, snap));
+    expect(s.rp).toBe(rp + (r.rp ?? 0));
+    expect(s.stars).toBe(stars + (r.stars ?? 0));
+    expect(A.adsToday(s, T0)).toBe(1);
+    expect(S.shopBlock(s, "box", T0 + HOUR)).toBe("limit");
+    expect(S.buyShop(s, "box", T0 + HOUR, snap)).toBe(false);
+    // tomorrow, a new box
+    expect(S.shopBlock(s, "box", T0 + 24 * HOUR)).toBeNull();
+    // the day's ad limit stops it too
+    s.ads.day = dateKey(T0 + 24 * HOUR);
+    s.ads.count = ADS.perDay;
+    expect(S.shopBlock(s, "box", T0 + 24 * HOUR)).toBe("limit");
+    // without the company and the day, the box is a surprise
+    expect(S.shopReward("box", snap)).toEqual({});
+  });
+
+  it("the mystery box's prizes come about as often as their weights say", () => {
+    const s = createInitialState(T0);
+    const seen = SHOP.box.map(() => 0);
+    const days = 2000;
+    for (let d = 0; d < days; d++) seen[S.boxPrize(s, T0 + d * 24 * HOUR)] += 1;
+    SHOP.box.forEach((p, i) => expect(Math.abs(seen[i] / days - p.weight / 100)).toBeLessThan(0.04));
+    expect(SHOP.box.reduce((n, p) => n + p.weight, 0)).toBe(100);
+    // two companies don't open the same box every day
+    const other = { ...s, createdAt: s.createdAt + 1 };
+    let same = 0;
+    for (let d = 0; d < 100; d++) if (S.boxPrize(s, T0 + d * 24 * HOUR) === S.boxPrize(other, T0 + d * 24 * HOUR)) same += 1;
+    expect(same).toBeLessThan(60);
+  });
+
+  it("the new Star items: a day's warp, a research warp and the tycoon pack", () => {
+    const s = createInitialState(T0);
+    const snap = { ...snapshot(s), rpPerSec: 0.5 };
+    s.stars = 12;
+    const cash = s.cash;
+    expect(S.buyShop(s, "warp24", T0, snap)).toBe(true);
+    expect(s.cash).toBeCloseTo(cash + rewardCash({ incomeSeconds: 24 * 3600 }, snap));
+    expect(s.stars).toBe(6);
+    const rp = s.rp;
+    expect(S.buyShop(s, "rp8", T0, snap)).toBe(true);
+    expect(s.rp).toBe(rp + Math.max(SHOP.rpWarpMin, Math.round(0.5 * SHOP.rpWarp)));
+    expect(s.stars).toBe(4);
+    // the pack: a warp and a research warp of 8 hours, for a Star less than the two
+    const pack = S.shopReward("bundle", snap);
+    expect(pack).toEqual({ incomeSeconds: SHOP.warp.warp8, rp: S.shopReward("rp8", snap).rp });
+    expect(SHOP_ITEM_BY_ID.bundle.price).toBe((SHOP_ITEM_BY_ID.warp8.price as number) + (SHOP_ITEM_BY_ID.rp8.price as number) - 1);
+    expect(S.buyShop(s, "bundle", T0, snap)).toBe(true);
+    expect(s.stars).toBe(0);
+    expect(S.shopBlock(s, "bundle", T0)).toBe("stars");
+    // Stars don't count as ads
+    expect(A.adsToday(s, T0)).toBe(0);
+  });
+
+  it("a longer warp is never worse value per Star", () => {
+    const perStar = (id: "warp2" | "warp8" | "warp24") => SHOP.warp[id] / (SHOP_ITEM_BY_ID[id].price as number);
+    expect(perStar("warp8")).toBeGreaterThanOrEqual(perStar("warp2"));
+    expect(perStar("warp24")).toBeGreaterThanOrEqual(perStar("warp8"));
   });
 });
