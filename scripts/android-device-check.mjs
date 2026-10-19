@@ -145,13 +145,16 @@ const noDialog = () => evaluate(`!(${DIALOG_OPEN})`).catch(() => false);
  * The emulator's own apps can stop answering (the launcher, starved by the software-rendered
  * map): their "isn't responding" dialog takes the keys meant for the game. Such an app is
  * stopped, its dialog with it, and the output says so. The game's own is left on screen.
- * True if one was stopped.
+ * Then it waits for the game to have the focus again: a key sent while the dialog is going
+ * away is lost (seen: a Back that never reached the game). True if one was stopped.
  */
-function stopOthersNotResponding() {
+async function stopOthersNotResponding() {
   const anr = focus().join(" ").match(/Application Not Responding: ([\w.]+)/);
   if (!anr || anr[1] === PKG) return false;
   console.log(`      (${anr[1]} was not responding and had the focus: stopped)`);
   adb("shell", "am", "force-stop", anr[1]);
+  const back = await until(() => inFront() && !/Not Responding/.test(focus().join(" ")), 20_000);
+  if (!back) console.log(`      (the game didn't get the focus back: ${focus().join(" · ")})`);
   return true;
 }
 
@@ -185,16 +188,16 @@ const backsSince = (since) =>
  */
 let lastBack = "";
 async function pressBack(timeoutMs = 150_000) {
-  stopOthersNotResponding();
+  await stopOthersNotResponding();
   const since = deviceTime();
   lastBack = since;
   const t = Date.now();
   adb("shell", "input", "keyevent", "KEYCODE_BACK");
-  const did = await until(() => {
+  const did = await until(async () => {
     const got = backsSince(since)[0];
     if (got) return got;
     // another app's "isn't responding" dialog that came up meanwhile took the key: once more
-    if (stopOthersNotResponding()) adb("shell", "input", "keyevent", "KEYCODE_BACK");
+    if (await stopOthersNotResponding()) adb("shell", "input", "keyevent", "KEYCODE_BACK");
     return null;
   }, timeoutMs);
   const s = Math.round((Date.now() - t) / 1000);
@@ -331,6 +334,7 @@ try {
     "Back closes the dialog (the app stays open)",
     !didClose ? "Back never reached the app" : !closed ? `Back: ${didClose}, and the dialog is still open 30 s later` : stayed ? "" : `the app left: ${focus().join(" · ")}`,
   );
+  if (!didClose) androidSince(lastBack);
 
   await evaluate(`[...document.querySelectorAll("header button")].at(-1).click()`);
   await waitFor(DIALOG_OPEN, 15_000, "the Settings dialog");
@@ -442,7 +446,7 @@ try {
       await sleep(35_000);
       shot("5-ad");
       for (let i = 0; i < 8 && onAd(); i++) {
-        stopOthersNotResponding();
+        await stopOthersNotResponding();
         adb("shell", "input", "keyevent", "KEYCODE_BACK");
         await sleep(5000);
       }
