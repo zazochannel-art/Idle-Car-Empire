@@ -5,6 +5,8 @@
 /** The game's public site: the privacy policy, account deletion, and where account emails lead back to. */
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://zazochannel-art.github.io/Idle-Car-Empire/";
 export const PRIVACY_URL = `${SITE_URL}privacy/`;
+/** What players agree to when they create an account (names, reports, fair play): site/terms/. */
+export const TERMS_URL = `${SITE_URL}terms/`;
 
 interface CapacitorGlobal {
   isNativePlatform?: () => boolean;

@@ -12,7 +12,7 @@ import { LANGS } from "@/i18n";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { batteryState, isSaving, powerVersion, watchPower, type SaverSetting } from "@/lib/power";
-import { PRIVACY_URL } from "@/lib/platform";
+import { PRIVACY_URL, TERMS_URL } from "@/lib/platform";
 import { uiEvents, type UiEvent, type UiToastAction } from "@/store/events";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
@@ -399,6 +399,10 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
           <p className="mt-1.5">
             <a className="underline" href={PRIVACY_URL} target="_blank" rel="noreferrer">
               {t("settings.privacy")}
+            </a>
+            {" · "}
+            <a className="underline" href={TERMS_URL} target="_blank" rel="noreferrer">
+              {t("settings.terms")}
             </a>
           </p>
           <AdPrivacyButton />

@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { plantsOf } from "@/game/engine/chain";
+import { isCleanName } from "@/game/engine/names";
 import { formatDuration, formatMoney, formatNumber } from "@/game/format";
 import { summarize, type AuthResult, type SaveSummary } from "@/game/save";
 import type { MessageKey } from "@/i18n";
@@ -21,6 +22,7 @@ import { uiEvents } from "@/store/events";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { ViewHeader } from "../views/section-title";
+import { HiddenPlayersCard, TermsConsent } from "./player-safety";
 import { StartLoading } from "./start-screen";
 
 type T = ReturnType<typeof useT>["t"];
@@ -137,6 +139,7 @@ export function AccountForms({ initial, guest, onDone }: { initial: "login" | "r
         </div>
       )}
       {tab === "register" && <p className="text-[11px] leading-snug text-white/55">{t("account.registerHint")}</p>}
+      {tab === "register" && <TermsConsent className="text-left" />}
       {tab === "login" && guest && <p className="text-[11px] leading-snug text-amber-300/90">{t("account.loginGuestWarn")}</p>}
       <Field label={t("account.email")} type="email" inputMode="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
       <Field label={t("account.password")} type="password" autoComplete={tab === "register" ? "new-password" : "current-password"} value={password} onChange={(e) => setPassword(e.target.value)} />
@@ -206,6 +209,8 @@ function ProfileEditor() {
   if (!saves || !profile) return null;
   const save = async (p: { username?: string; avatar?: string; listed?: boolean }) => {
     setMsg(null);
+    // the server checks the name too; this answers at once
+    if (p.username !== undefined && !isCleanName(p.username)) return setMsg({ text: t("account.err.blocked"), bad: true });
     const r = await saves.updateProfile(p).catch(() => ({ ok: false as const, error: "network" as const }));
     if (!r.ok) return setMsg({ text: r.error === "taken" ? t("account.err.nameTaken") : r.error === "invalid" ? t("account.err.nameInvalid") : errorText(t, r), bad: true });
     useCloud.setState({ profile: { ...profile, ...p } });
@@ -337,6 +342,8 @@ export function ProfileView() {
       </div>
 
       <BackupsCard />
+
+      <HiddenPlayersCard />
 
       {/* the account */}
       {enabled && account && (
@@ -597,7 +604,7 @@ function WelcomeGate({ mode }: { mode: "new" | "returning" | "guest" }) {
     run(async () => {
       if (tab === "register") {
         const r = await saves.welcomeRegister(name.trim(), email.trim(), password, here());
-        if (!r.ok) return setMsg({ text: r.field === "name" ? t(r.error === "taken" ? "account.err.nameTaken" : r.error === "invalid" ? "account.err.nameInvalid" : "account.err.unknown") : errorText(t, r), bad: true });
+        if (!r.ok) return setMsg({ text: r.field === "name" ? t(r.error === "taken" ? "account.err.nameTaken" : r.error === "invalid" ? "account.err.nameInvalid" : r.error === "blocked" ? "account.err.blocked" : "account.err.unknown") : errorText(t, r), bad: true });
         if (r.pending) return setPending(email.trim());
       } else {
         const r = await saves.welcomeLogin(email.trim(), password);
@@ -678,6 +685,7 @@ function WelcomeGate({ mode }: { mode: "new" | "returning" | "guest" }) {
           )}
         </Button>
       </form>
+      {tab === "register" && <TermsConsent />}
       {tab === "login" && mode === "guest" && <p className="text-[11px] leading-snug text-amber-300/90">{t("welcome.guestLoginNote")}</p>}
       {msg && <p className={cn("text-center text-xs", msg.bad ? "text-rose-300" : "text-sky-300")}>{msg.text}</p>}
       <p className="border-t border-white/10 pt-2.5 text-center text-[10px] leading-snug text-white/45">{t("welcome.needsAccount")}</p>

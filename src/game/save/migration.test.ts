@@ -109,4 +109,18 @@ describe("save migration across the economy overhaul", () => {
     expect(s.chain.ledger.run.rewards).toBe(0);
     expect(checkInvariants(s)).toEqual([]);
   });
+
+  it("the players a player hid: none in an older save, and only well-formed entries kept", () => {
+    expect(load().settings.hidden).toEqual([]);
+    const bad = JSON.parse(JSON.stringify(before)) as Raw & { settings: Record<string, unknown> };
+    bad.settings.hidden = [{ id: "a1", name: "Rude" }, { id: 5 }, "b2", null, { id: "c3", name: 7 }, { id: "d4", name: "x".repeat(99) }];
+    const s = migrate(bad, NOW);
+    expect(s.settings.hidden).toEqual([
+      { id: "a1", name: "Rude" },
+      { id: "c3", name: "" },
+      { id: "d4", name: "x".repeat(40) },
+    ]);
+    bad.settings.hidden = "everyone";
+    expect(migrate(bad, NOW).settings.hidden).toEqual([]);
+  });
 });

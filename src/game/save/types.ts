@@ -57,7 +57,8 @@ export interface Profile {
   listed?: boolean;
 }
 
-export type AuthError = "invalid" | "taken" | "weak" | "credentials" | "unconfirmed" | "rate" | "network" | "unknown";
+/** blocked: a name the terms of use don't allow (engine/names.ts). */
+export type AuthError = "invalid" | "blocked" | "taken" | "weak" | "credentials" | "unconfirmed" | "rate" | "network" | "unknown";
 export type AuthResult = { ok: true; pending?: boolean } | { ok: false; error: AuthError; detail?: string };
 
 /** The cloud: accounts, profiles and revisioned saves. */

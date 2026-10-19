@@ -27,6 +27,12 @@ const isObject = (v: unknown): v is Json => typeof v === "object" && v !== null 
 /** A setting with a fixed set of values: anything else from a save is the default. */
 function cleanSettings(state: GameState): GameState {
   if (!["auto", "on", "off"].includes(state.settings.saver)) state.settings.saver = "auto";
+  // hidden players: account ids with the name they had, at most the last 200
+  const hidden: unknown[] = Array.isArray(state.settings.hidden) ? state.settings.hidden : [];
+  state.settings.hidden = hidden
+    .filter((h): h is { id: string; name: unknown } => isObject(h) && typeof h.id === "string" && h.id.length > 0 && h.id.length <= 64)
+    .map((h) => ({ id: h.id, name: typeof h.name === "string" ? h.name.slice(0, 40) : "" }))
+    .slice(-200);
   return state;
 }
 

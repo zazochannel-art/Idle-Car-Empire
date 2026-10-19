@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { useCloud } from "@/store/cloud-store";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
+import { PlayerActions } from "../game/player-safety";
 import { ViewHeader } from "./section-title";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
@@ -24,6 +25,7 @@ const MEDALS = ["🥇", "🥈", "🥉"];
 /** The global leaderboard (this week, all time); a tap on a player visits their empire. */
 export function LeaderboardView() {
   const saves = useGame((g) => g.saves);
+  const hidden = useGame((g) => g.view.state.settings.hidden);
   const listed = useCloud((c) => c.profile?.listed !== false);
   const setView = useUi((u) => u.setView);
   const { t } = useT();
@@ -74,7 +76,11 @@ export function LeaderboardView() {
   }
 
   const me = rows?.find((r) => r.me);
-  const top = rows?.filter((r) => r.rank <= 50 || !r.me) ?? [];
+  // players this one hid stay off their board (the ranks stay the server's)
+  const hiddenIds = new Set(hidden.map((h) => h.id));
+  const shown = rows?.filter((r) => r.me || !hiddenIds.has(r.userId)) ?? [];
+  const hiddenHere = (rows?.length ?? 0) - shown.length;
+  const top = shown.filter((r) => r.rank <= 50 || !r.me);
   const meBelow = me && me.rank > 50 ? me : null;
   return (
     <div className="space-y-4">
@@ -118,6 +124,7 @@ export function LeaderboardView() {
             </>
           )}
           {!me && <p className="px-1 pt-1 text-center text-[11px] text-white/50">{t("board.notYet")}</p>}
+          {hiddenHere > 0 && <p className="px-1 pt-1 text-center text-[11px] text-white/40">🙈 {t("board.hiddenCount", { n: hiddenHere })}</p>}
         </div>
       )}
 
@@ -154,13 +161,13 @@ function Row({ r, onVisit }: { r: BoardRow; onVisit: () => void }) {
 function VisitDialog({ userId, sent, onSent, onClose }: { userId: string | null; sent: number | null; onSent: () => void; onClose: () => void }) {
   return (
     <Dialog open={userId !== null} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>{userId && <Visit key={userId} userId={userId} sent={sent} onSent={onSent} />}</DialogContent>
+      <DialogContent>{userId && <Visit key={userId} userId={userId} sent={sent} onSent={onSent} onClose={onClose} />}</DialogContent>
     </Dialog>
   );
 }
 
 /** One visit (mounted afresh for every player visited). */
-function Visit({ userId, sent, onSent }: { userId: string; sent: number | null; onSent: () => void }) {
+function Visit({ userId, sent, onSent, onClose }: { userId: string; sent: number | null; onSent: () => void; onClose: () => void }) {
   const saves = useGame((g) => g.saves);
   const { t } = useT();
   // the card, and when it came (for "last save: … ago")
@@ -268,6 +275,8 @@ function Visit({ userId, sent, onSent }: { userId: string; sent: number | null; 
               {gift !== "sent" && out && <p className="text-center text-xs text-amber-300">{t("gift.limit")}</p>}
             </div>
           )}
+
+          {!mine && <PlayerActions userId={c.userId} name={c.username} onHidden={onClose} />}
         </div>
       )}
     </>

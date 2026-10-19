@@ -46,6 +46,9 @@ const rename = await a.client.from("profiles").update({ username: `${tag}-A` }).
 check(!rename.error && rename.data?.[0]?.username === `${tag}-A`, "A renames themselves", rename.error?.message);
 const badName = await a.client.from("profiles").update({ username: "x" }).eq("id", idA);
 check(!!badName.error, "a too-short name is refused", badName.error?.code);
+// (0008) the server's name check, the game's own list (src/game/engine/names.ts)
+const rudeName = await a.client.from("profiles").update({ username: "Sh1t Motors" }).eq("id", idA);
+check(rudeName.error?.code === "23514" && /not allowed/.test(rudeName.error.message), "an offensive name is refused", rudeName.error?.message ?? "accepted");
 
 const empty = one(await a.client.rpc("load_game"));
 check(empty && Number(empty.revision) === 0 && empty.data === null && !!empty.server_now, "A starts with no save");
@@ -149,6 +152,8 @@ check(!!badGhost.error, "an invalid ghost is refused", badGhost.error?.code);
 const canLeave = await a.client.rpc("leave_alliance");
 check(canLeave.data === "none", "leaving works (0005 fully applied)", canLeave.error?.message ?? canLeave.data);
 if (canLeave.data === "none") {
+  const rude = await a.client.rpc("create_alliance", { p_name: "Pula Club", p_tag: "OK", p_emblem: "🏁" });
+  check(rude.data === "blocked", "an offensive alliance name is refused (0008)", rude.error?.message ?? rude.data);
   const allianceTag = `E${Date.now().toString(36).slice(-3).toUpperCase()}`;
   const founded = await a.client.rpc("create_alliance", { p_name: tag, p_tag: allianceTag, p_emblem: "🏁" });
   check(founded.data === "ok", "A founds an alliance", founded.error?.message ?? founded.data);
@@ -158,6 +163,8 @@ if (canLeave.data === "none") {
   const mineB = (await b.client.rpc("my_alliance")).data;
   check(mineB?.members?.length === 2 && mineB.leader === false && mineB.tiers?.length === 3, "B sees the alliance, its members and goal", JSON.stringify(mineB)?.slice(0, 160));
   check((await b.client.rpc("claim_alliance_tier", { p_tier: 1 })).data === "new", "a new member can't take rewards yet");
+  // (the report goes with the alliance when it closes below)
+  check(found && (await b.client.rpc("report_alliance", { p_alliance: found.id })).data === "ok", "B reports the alliance's name (0008)");
   const membersTable = await b.client.from("alliance_members").select("user_id");
   check(!!membersTable.error || (membersTable.data ?? []).length === 0, "the alliance tables are closed", membersTable.error?.code);
   check((await b.client.rpc("kick_member", { p_user: idA })).data === "leader", "only the leader removes members");
@@ -219,9 +226,22 @@ await c2.client.auth.signOut({ scope: "local" });
 
 // ── account deletion (0007): the third test player deletes their account, and everything with it ──
 await c.client.from("profiles").update({ username: `${tag}-C` }).eq("id", idC);
-one(await c.client.rpc("save_game", { p_data: { cash: 5, createdAt: 3 }, p_save_version: 3, p_base_revision: 0, p_device: "e2e" }));
+one(await c.client.rpc("save_game", { p_data: { cash: 5, createdAt: 3, brand: { name: "Sh1t Motors" } }, p_save_version: 3, p_base_revision: 0, p_device: "e2e" }));
 const giftC = await c.client.rpc("send_gift", { p_to: idB });
-check(((await a.client.rpc("leaderboard", { p_kind: "all" })).data ?? []).some((r) => r.user_id === idC) && giftC.data === "sent", "C saves, is on the board and sends B a gift");
+const rowC = ((await a.client.rpc("leaderboard", { p_kind: "all" })).data ?? []).find((r) => r.user_id === idC);
+check(!!rowC && giftC.data === "sent", "C saves, is on the board and sends B a gift");
+check(rowC?.company === "", "an offensive company name is not shown (0008)", JSON.stringify(rowC?.company));
+
+// ── reports (0008): B reports C (the reports go with C's account below) ──
+const report = (p, user, reason) => p.client.rpc("report_player", { p_user: user, p_reason: reason });
+check((await report(b, idC, "name")).data === "ok", "B reports C's name");
+check((await report(b, idC, "name")).data === "ok", "the same report again the same day is taken (and counted once)");
+check((await report(b, idC, "nonsense")).data === "invalid", "an unknown reason is turned away");
+check((await report(b, idB, "name")).data === "self", "nobody reports themselves");
+const reportsTable = await b.client.from("player_reports").select("id");
+check(!!reportsTable.error || (reportsTable.data ?? []).length === 0, "players can't read the reports", reportsTable.error?.code);
+const banSelf = await c.client.from("profiles").update({ banned: false }).eq("id", idC).select("id");
+check(!!banSelf.error || (banSelf.data ?? []).length === 0, "players can't touch the ban flag", banSelf.error?.code);
 const delC = await c.client.rpc("delete_my_account");
 check(delC.data === "ok", "a player deletes their account (0007 applied)", delC.error?.message ?? delC.data);
 if (delC.data === "ok") {

@@ -152,6 +152,8 @@ export class SupabaseBackend implements CloudBackend {
     const { error } = await c.from("profiles").update(p).eq("id", id);
     if (!error) return { ok: true };
     if (error.code === "23505") return { ok: false, error: "taken", detail: error.message };
+    // the server's name check (migration 0008) says "name not allowed"; a name's shape, just "invalid"
+    if (error.code === "23514" && error.message.includes("not allowed")) return { ok: false, error: "blocked", detail: error.message };
     if (error.code === "23514" || error.code === "22001") return { ok: false, error: "invalid", detail: error.message };
     return { ok: false, error: "unknown", detail: error.message };
   }

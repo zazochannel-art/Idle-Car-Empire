@@ -81,9 +81,14 @@ export interface MyAlliance {
   members: AllianceMember[];
 }
 
-export type CreateAllianceResult = "ok" | "member" | "invalid" | "name" | "tag";
+export type CreateAllianceResult = "ok" | "member" | "invalid" | "blocked" | "name" | "tag";
 export type JoinAllianceResult = "ok" | "member" | "full" | "unknown";
 export type ClaimTierResult = "ok" | "none" | "new" | "short" | "claimed" | "invalid";
+
+/** Why a player is reported (supabase/migrations/0008: report_player). */
+export type ReportReason = "name" | "company" | "cheating" | "other";
+export const REPORT_REASONS: ReportReason[] = ["name", "company", "cheating", "other"];
+export type ReportResult = "ok" | "limit" | "unknown";
 
 /** Gifts a player may send each day (supabase: gifts_per_day()). */
 export const GIFTS_PER_DAY = 5;
@@ -177,7 +182,7 @@ export class Social {
 
   async createAlliance(name: string, tag: string, emblem: string): Promise<CreateAllianceResult> {
     const r = str(await this.call("create_alliance", { p_name: name, p_tag: tag, p_emblem: emblem }));
-    return r === "ok" || r === "member" || r === "name" || r === "tag" ? r : "invalid";
+    return r === "ok" || r === "member" || r === "blocked" || r === "name" || r === "tag" ? r : "invalid";
   }
 
   async joinAlliance(id: string): Promise<JoinAllianceResult> {
@@ -197,6 +202,20 @@ export class Social {
   async claimAllianceTier(tier: number): Promise<ClaimTierResult> {
     const r = str(await this.call("claim_alliance_tier", { p_tier: tier }));
     return r === "ok" || r === "none" || r === "new" || r === "short" || r === "claimed" ? r : "invalid";
+  }
+
+  // ───────────────────────── reports (0008) ─────────────────────────
+
+  /** Reports a player to the developer (a report made again the same day counts once). */
+  async reportPlayer(userId: string, reason: ReportReason): Promise<ReportResult> {
+    const r = str(await this.call("report_player", { p_user: userId, p_reason: reason }));
+    return r === "ok" || r === "limit" ? r : "unknown";
+  }
+
+  /** Reports an alliance's name or tag to the developer. */
+  async reportAlliance(id: string): Promise<ReportResult> {
+    const r = str(await this.call("report_alliance", { p_alliance: id }));
+    return r === "ok" || r === "limit" ? r : "unknown";
   }
 
   async sendGift(userId: string): Promise<GiftResult> {

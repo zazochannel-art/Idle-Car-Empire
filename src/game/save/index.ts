@@ -2,6 +2,7 @@
 // cloud is set up, the player's account and its cloud copy. SaveManager
 // decides at the start which copy to play (see policy.ts), asks the player
 // when both moved on, then keeps the cloud up to date (see sync.ts).
+import { isCleanName } from "../engine/names";
 import { SAVE_VERSION } from "../engine/state";
 import type { GameState } from "../types";
 import { LocalStore } from "./local";
@@ -16,8 +17,8 @@ export type { Account, AuthResult, CloudBackend, CloudCopy, LocalCopy, Profile, 
 export type { SaveSummary } from "./policy";
 export { summarize } from "./policy";
 export type { SyncInfo, SyncStatus } from "./sync";
-export type { AllianceMember, AllianceSummary, BoardKind, BoardRow, ClaimTierResult, CreateAllianceResult, EmpireCard, GiftResult, JoinAllianceResult, MyAlliance } from "./social";
-export { GIFTS_PER_DAY } from "./social";
+export type { AllianceMember, AllianceSummary, BoardKind, BoardRow, ClaimTierResult, CreateAllianceResult, EmpireCard, GiftResult, JoinAllianceResult, MyAlliance, ReportReason, ReportResult } from "./social";
+export { GIFTS_PER_DAY, REPORT_REASONS } from "./social";
 export { encodeSave, decodeSave, migrate } from "./serialize";
 
 /** Set by logging out: the welcome page opens on "sign in" instead of "create account". */
@@ -275,6 +276,8 @@ export class SaveManager {
    * it goes on with the same account.
    */
   async welcomeRegister(username: string, email: string, password: string, redirectTo: string): Promise<AuthResult & { field?: "name" }> {
+    // the server checks the name too; this answers at once, before an account is made
+    if (!isCleanName(username)) return { ok: false, error: "blocked", field: "name" };
     if (!this.backend) return { ok: false, error: "network" };
     try {
       if (!(await this.currentAccount())) await timeout(this.backend.signInGuest(), 10_000);
