@@ -135,6 +135,17 @@ body {
   }
 }
 
+/* the shop's crate when it's ready to open */
+@keyframes shop-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(3deg);
+  }
+}
+
 @keyframes pulse-soft {
   0%,
   100% {

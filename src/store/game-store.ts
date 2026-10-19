@@ -891,10 +891,11 @@ export const useGame = create<GameStore>((set, get) => {
       return true;
     },
     shopBuy: (id) => {
-      const snap = get().snap;
-      const r = Shop.shopReward(id, snap);
-      if (!act((s) => Shop.buyShop(s, id, Date.now(), snap))) return false;
-      const got = [r.incomeSeconds ? formatMoney(rewardCash(r, snap)) : "", r.rp ? tr("shop.rp", { n: formatNumber(r.rp) }) : ""].filter(Boolean).join(" · ");
+      const { snap, state } = get();
+      const now = Date.now();
+      const r = Shop.shopReward(id, snap, state, now);
+      if (!act((s) => Shop.buyShop(s, id, now, snap))) return false;
+      const got = [r.incomeSeconds ? formatMoney(rewardCash(r, snap)) : "", r.rp ? tr("shop.rp", { n: formatNumber(r.rp) }) : "", r.stars ? `⭐ ${r.stars}` : ""].filter(Boolean).join(" · ");
       const body = got ? tr("shop.got", { what: got }) : tr(id === "build" ? "shop.builtBody" : "ad.boostLeftBody");
       uiEvents.emit({ type: "toast", tone: "gold", icon: SHOP_ITEM_BY_ID[id].icon, title: tr(`shop.item.${id}` as MessageKey), body });
       persist(true);
