@@ -70,9 +70,19 @@ jobs:
           xcrun simctl launch --console-pty "$udid" com.zazochannel.idlecarempire > ios-check/app.log 2>&1 &
           console=$!
           sleep 60
+          running() { xcrun simctl spawn "$udid" launchctl list | grep -q "com.zazochannel.idlecarempire"; }
+          # A slow simulator sometimes never starts the app at all (nothing in its output): that is the
+          # simulator, not the app, so it gets one more launch. An app that started and stopped fails.
+          if ! running && [ ! -s ios-check/app.log ]; then
+            echo "::warning::the simulator did not start the app; launching it again"
+            kill "$console" 2>/dev/null || true
+            xcrun simctl launch --console-pty "$udid" com.zazochannel.idlecarempire > ios-check/app.log 2>&1 &
+            console=$!
+            sleep 60
+          fi
           xcrun simctl io "$udid" screenshot ios-check/game.png
           # still running after a minute (no crash at start)
-          xcrun simctl spawn "$udid" launchctl list | grep -q "com.zazochannel.idlecarempire" || { echo "::error::the app is not running"; tail -80 ios-check/app.log; exit 1; }
+          running || { echo "::error::the app is not running"; tail -80 ios-check/app.log; exit 1; }
           kill "$console" 2>/dev/null || true
           # Capacitor loaded the game's page from inside the app
           grep -q "Loading app at capacitor://localhost" ios-check/app.log || { echo "::error::the game's page did not load"; tail -80 ios-check/app.log; exit 1; }
