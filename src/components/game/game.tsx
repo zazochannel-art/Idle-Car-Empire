@@ -35,6 +35,7 @@ import { useCloud } from "@/store/cloud-store";
 import { Coach } from "./coach";
 import { FeedbackBridge } from "./feedback-bridge";
 import { MusicBridge } from "./music-bridge";
+import { LiveEvents } from "./live-events";
 import { NativeApp } from "./native-app";
 import { TestUpdate } from "./test-update";
 import { PlayUpdate } from "./play-update";
@@ -351,6 +352,7 @@ function Shell() {
       <Toasts />
       <FeedbackBridge />
       <MusicBridge />
+      <LiveEvents />
       <LoginDialog />
       <OfflineDialog />
       <ImperiumOverlay />

@@ -51,6 +51,8 @@ The list lives in `src/game/config/funnel.ts` and, on the server, in `analytics.
 
 ## Reading the report
 
+The **New players** tab of the dashboard ([admin.md](admin.md)) shows it as a chart. The same report in SQL:
+
 In the Supabase dashboard, open the **SQL Editor** and run:
 
 ```sql

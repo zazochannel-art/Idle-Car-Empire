@@ -30,6 +30,8 @@ The same error on the same day is counted (`times`), not stored again.
 
 ## Reading the reports
 
+The easiest way is the **Errors** tab of the dashboard ([admin.md](admin.md)). The same report in SQL:
+
 In the Supabase dashboard, open the **SQL Editor** and run:
 
 ```sql
