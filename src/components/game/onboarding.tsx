@@ -30,9 +30,9 @@ const STEPS: Step[] = [
     icon: Factory,
     title: { en: "Watch production", ro: "Urmărește producția", ru: "Наблюдай за производством" },
     body: {
-      en: "Production is automatic. The factory consumes materials, creates parts and sends them through the supply chain. You manage the business instead of clicking every cycle.",
-      ro: "Producția este automată. Fabrica consumă materiale, creează componente și le trimite prin lanțul de producție. Tu conduci afacerea, fără să apeși la fiecare ciclu.",
-      ru: "Производство автоматическое. Завод использует материалы, выпускает детали и отправляет их по цепочке. Ты управляешь бизнесом, а не нажимаешь кнопку каждого цикла.",
+      en: "Production is automatic. The factory consumes materials, creates parts and sends them through the supply chain. When its materials run low, buy more in the factory's 📦 MATERIALS menu (or tap the goal card): a factory without steel stops.",
+      ro: "Producția este automată. Fabrica consumă materiale, creează componente și le trimite prin lanțul de producție. Când se termină materialele, cumpără altele din meniul 📦 MATERIALE al fabricii (sau apasă pe obiectivul de jos): fără oțel, fabrica se oprește.",
+      ru: "Производство автоматическое. Завод использует материалы, выпускает детали и отправляет их по цепочке. Когда материалы заканчиваются, купи ещё в меню завода 📦 МАТЕРИАЛЫ (или нажми на цель внизу): без стали завод встаёт.",
     },
     action: { en: "Show factory floor", ro: "Vezi hala de producție", ru: "Открыть цех" },
   },
@@ -44,7 +44,7 @@ const STEPS: Step[] = [
       ro: "Prima fabrică este doar începutul. Cumpără teren și construiește următoarea etapă când îți permiți. Fabricile noi deschid lanțul de producție auto.",
       ru: "Первый завод — только начало. Покупай землю и строй следующий этап, когда хватит денег. Новые заводы открывают автомобильную цепочку.",
     },
-    action: { en: "Open Build", ro: "Deschide Build", ru: "Открыть строительство" },
+    action: { en: "Open Build", ro: "Deschide Construiește", ru: "Открыть строительство" },
   },
   {
     icon: MapPin,

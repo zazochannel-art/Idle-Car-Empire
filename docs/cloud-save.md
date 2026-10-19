@@ -58,6 +58,14 @@ settings, or while it can't be reached, it saves on the device only.
   (with time and revision), save failed / offline (retrying), conflict.
 - **Loading**: the game doesn't start (and saves nothing) until the account,
   its cloud save and its profile are known; a loading screen shows meanwhile.
+  A slow connection holds it up only so long:
+  - the session: after 3 s the account stored on this device is used (supabase-js
+    finishes refreshing an expired token in the background), so a signed-in
+    player is never sent to the sign-in page by a slow network;
+  - the cloud save: with this account's copy on the device, after 3 s that copy
+    plays and its first save is checked against the cloud's revision (a newer
+    save there brings the conflict choice); with no copy here, up to 12 s;
+  - the profile: after 1.5 s the game shows and the name follows.
 
 ## Which copy is played at the start
 
