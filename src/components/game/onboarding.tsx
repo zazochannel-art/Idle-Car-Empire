@@ -1,7 +1,11 @@
 "use client";
 
-import { ArrowRight, Check, Factory, Flag, Hammer, MapPin, X } from "lucide-react";
+import { ArrowRight, Check, Factory, Flag, Hammer, MapPin, Package, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { suggestedRestock, unitsInStock, type RestockPlan } from "@/game/engine/materials";
+import { formatMoney } from "@/game/format";
+import type { GameState } from "@/game/types";
+import type { EconomySnapshot } from "@/game/engine/economy";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { cn } from "@/lib/utils";
@@ -30,11 +34,21 @@ const STEPS: Step[] = [
     icon: Factory,
     title: { en: "Watch production", ro: "Urmărește producția", ru: "Наблюдай за производством" },
     body: {
-      en: "Production is automatic. The factory consumes materials, creates parts and sends them through the supply chain. When its materials run low, buy more in the factory's 📦 MATERIALS menu (or tap the goal card): a factory without steel stops.",
-      ro: "Producția este automată. Fabrica consumă materiale, creează componente și le trimite prin lanțul de producție. Când se termină materialele, cumpără altele din meniul 📦 MATERIALE al fabricii (sau apasă pe obiectivul de jos): fără oțel, fabrica se oprește.",
-      ru: "Производство автоматическое. Завод использует материалы, выпускает детали и отправляет их по цепочке. Когда материалы заканчиваются, купи ещё в меню завода 📦 МАТЕРИАЛЫ (или нажми на цель внизу): без стали завод встаёт.",
+      en: "Production is automatic. The factory consumes materials, creates parts and sends them through the supply chain.",
+      ro: "Producția este automată. Fabrica consumă materiale, creează componente și le trimite prin lanțul de producție.",
+      ru: "Производство автоматическое. Завод использует материалы, выпускает детали и отправляет их по цепочке.",
     },
     action: { en: "Show factory floor", ro: "Vezi hala de producție", ru: "Открыть цех" },
+  },
+  {
+    icon: Package,
+    title: { en: "Keep it supplied", ro: "Aprovizionează fabrica", ru: "Снабжай завод" },
+    body: {
+      en: "A factory without steel stops, and the materials it started with last only a couple of minutes. Buy a few more now. Later, when the goal card asks for materials, buy them in the factory's 📦 MATERIALS menu.",
+      ro: "Fără oțel, fabrica se oprește, iar materialele de la început ajung doar câteva minute. Cumpără câteva acum. Mai târziu, când obiectivul de jos cere materiale, le cumperi din meniul 📦 MATERIALE al fabricii.",
+      ru: "Без стали завод встаёт, а стартовых материалов хватит лишь на пару минут. Купи ещё немного сейчас. Позже, когда цель внизу попросит материалы, покупай их в меню завода 📦 МАТЕРИАЛЫ.",
+    },
+    action: { en: "Buy materials", ro: "Cumpără materiale", ru: "Купить материалы" },
   },
   {
     icon: Hammer,
@@ -78,12 +92,36 @@ function languageOf(lang: string): keyof typeof copy {
   return lang === "ro" || lang === "ru" ? lang : "en";
 }
 
+/** The tour step that buys the starter works its next materials. */
+const SUPPLY_STEP = 2;
+/** Units' worth bought there on top of the stock: a couple more minutes of work, leaving cash for the Engine Factory. */
+const SUPPLY_UNITS = 2;
+
+const starterPlot = (s: GameState) => Object.keys(s.city.buildings).find((id) => s.city.buildings[id]?.type === "bodyWorks");
+
+/**
+ * The order the supply step places: SUPPLY_UNITS more units of material than the starter works
+ * has (a player who reaches the step in the first seconds still has all the starting stock), as
+ * the materials menu would offer them; null when nothing fits the cash or the warehouse.
+ */
+function starterRestock(s: GameState, snap: EconomySnapshot): { plot: string; plan: RestockPlan } | null {
+  const plot = starterPlot(s);
+  const plant = plot ? s.city.buildings[plot]?.plant : undefined;
+  const need = plot ? snap.chain.plants[plot]?.need : undefined;
+  const have = plant && need ? unitsInStock(plant, need).n : NaN;
+  if (!plot || !need || !Number.isFinite(have)) return null;
+  const plan = suggestedRestock(s, plot, need, have + SUPPLY_UNITS);
+  return plan.units > 0 && plan.cost > 0 ? { plot, plan } : null;
+}
+
 export function Onboarding() {
   const ready = useGame((g) => g.ready);
   const lang = useGame((g) => g.state.settings.lang);
   const [dismissed, setDismissed] = useState(true);
   const [step, setStep] = useState(0);
   const setTutorial = useUi((u) => u.setTutorial);
+  // the supply step's button says what the order costs before it is placed
+  const supplyCost = useGame((g) => (step === SUPPLY_STEP ? (starterRestock(g.state, g.snap)?.plan.cost ?? 0) : 0));
 
   useEffect(() => {
     // decided once the save has loaded: a returning player whose plants already
@@ -115,16 +153,21 @@ export function Onboarding() {
 
   const go = () => {
     const ui = useUi.getState();
-    const state = useGame.getState().state;
+    const game = useGame.getState();
+    const starter = starterPlot(game.state);
     if (step === 0) {
-      const starter = Object.keys(state.city.buildings).find((id) => state.city.buildings[id]?.type === "bodyWorks");
       if (starter) ui.selectPlot(starter);
     } else if (step === 1) {
-      const starter = Object.keys(state.city.buildings).find((id) => state.city.buildings[id]?.type === "bodyWorks");
       if (starter) ui.openFloor(starter);
-    } else if (step === 2) {
-      ui.setView("build");
+    } else if (step === SUPPLY_STEP) {
+      // the order the button showed (nothing if the cash can't cover it: the goal card asks again later)
+      const order = starterRestock(game.state, game.snap);
+      if (order) game.buyPlan(order.plot, order.plan);
+      ui.openFloor(null);
+      if (starter) ui.selectPlot(starter);
     } else if (step === 3) {
+      ui.setView("build");
+    } else if (step === 4) {
       ui.closeAll();
       ui.map({ kind: "home" });
     } else {
@@ -181,7 +224,11 @@ export function Onboarding() {
             </button>
             <button onClick={go} className="flex flex-[1.5] items-center justify-center gap-2 rounded-xl bg-gold px-4 py-2.5 text-sm font-black text-[#241900] shadow-[0_3px_0_0_#b47700] transition hover:brightness-105 active:translate-y-0.5">
               {step === STEPS.length - 1 ? <Check className="size-4" /> : <ArrowRight className="size-4" />}
-              {step === STEPS.length - 1 ? c.done : text.action[l]}
+              {/* the supply step's price goes under its label: side by side they don't fit a phone */}
+              <span className="flex flex-col items-start leading-tight">
+                <span>{step === STEPS.length - 1 ? c.done : text.action[l]}</span>
+                {step === SUPPLY_STEP && supplyCost > 0 && <span className="text-xs font-bold tabular-nums text-[#241900]/70">{formatMoney(supplyCost)}</span>}
+              </span>
             </button>
           </div>
         </div>

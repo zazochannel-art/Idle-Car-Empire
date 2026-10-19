@@ -36,6 +36,7 @@ import { Coach } from "./coach";
 import { FeedbackBridge } from "./feedback-bridge";
 import { NativeApp } from "./native-app";
 import { TestUpdate } from "./test-update";
+import { PlayUpdate } from "./play-update";
 import { retry, ScreenBoundary } from "./screen-boundary";
 import { LoginDialog } from "./login-dialog";
 import { goalText, runGoal } from "./goals";
@@ -355,6 +356,7 @@ function Shell() {
       <ConflictDialog />
       <SettingsDialog open={settings} onOpenChange={setSettings} />
       <TestUpdate />
+      <PlayUpdate />
     </div>
   );
 }
