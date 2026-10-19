@@ -69,6 +69,8 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_hqGfNt6uaNbq0AgGyp0I8g_QLjjFaJ-
           NEXT_PUBLIC_ADMOB_REWARDED_ID: ${{ vars.ADMOB_REWARDED_ID }}
           NEXT_PUBLIC_PASSWORD_RESET: ${{ vars.PASSWORD_RESET }}
+          # this build's source maps, kept below as an artifact (not in the app) to read players' error reports
+          SOURCE_MAPS: "1"
       - name: Upload key
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -126,3 +128,10 @@ jobs:
           name: idle-car-empire-play-aab
           path: android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
+      # the uploaded build's scripts and source maps, 90 days: node scripts/error-place.mjs reads a report's place with them
+      - uses: actions/upload-artifact@v4
+        with:
+          name: source-maps
+          path: source-maps
+          retention-days: 90
+          if-no-files-found: warn

@@ -46,7 +46,7 @@ The list lives in `src/game/config/funnel.ts` and, on the server, in `analytics.
 
 ## Turning it off
 
-- **Settings → Anonymous statistics** turns it off for that player.
+- **Settings → Anonymous statistics** turns it off for that player, together with the anonymous error reports ([errors.md](errors.md)).
 - It is also off in any browser that asks not to be tracked (Do Not Track or Global Privacy Control).
 
 ## Reading the report

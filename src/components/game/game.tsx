@@ -20,6 +20,7 @@ import { useShallow } from "zustand/react/shallow";
 import type { GameState } from "@/game/types";
 import type { EconomySnapshot } from "@/game/engine/economy";
 import { useT } from "@/i18n/use-t";
+import { flushErrorReports, installErrorReports } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import { useGame } from "@/store/game-store";
 import { useUi, type View } from "@/store/ui-store";
@@ -189,8 +190,24 @@ export function Game() {
   const init = useGame((g) => g.init);
 
   useEffect(() => {
+    // anonymous error reports (lib/errors.ts), as the player's "Anonymous statistics" allows
+    installErrorReports({
+      allowed: () => {
+        const g = useGame.getState();
+        return g.ready ? g.state.settings.stats : null;
+      },
+      screen: () => {
+        const u = useUi.getState();
+        return u.floor ? "floor" : u.garage ? "garage" : (u.view ?? "map");
+      },
+    });
     void init();
   }, [init]);
+
+  // the player's choice is known once the save has loaded: errors from the start go (or are dropped) then
+  useEffect(() => {
+    if (ready) flushErrorReports();
+  }, [ready]);
 
   return (
     <>
