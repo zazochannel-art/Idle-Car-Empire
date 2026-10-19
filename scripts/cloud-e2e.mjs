@@ -8,8 +8,8 @@
 //
 //   NEXT_PUBLIC_SUPABASE_URL=… NEXT_PUBLIC_SUPABASE_ANON_KEY=… node scripts/cloud-e2e.mjs
 //
-// It leaves no save behind (each test player deletes its own); the anonymous
-// accounts of A and B stay, named "e2e-…" (see docs/cloud-save.md to clear them).
+// It leaves nothing behind: each test player deletes its own save, then its
+// account.
 import { createClient } from "@supabase/supabase-js";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -279,14 +279,17 @@ check(sneaky.error?.code === "42501", "a player can't schedule an event", sneaky
 const opsTable = await a.client.schema("ops").from("live_events").select("id");
 check(!!opsTable.error, "the events table isn't reachable from the API", opsTable.error?.code ?? "readable");
 
-// ── clean up: each test player deletes its own save (and so its card) ──
+// ── clean up: each test player deletes its own save (and so its card), then its account: no
+// test account stays on the project (they counted as players on the owner's dashboard) ──
 for (const p of [a, b]) {
   const del = await p.client.from("game_saves").delete().not("user_id", "is", null);
   if (del.error) console.log("cleanup:", del.error.message);
 }
 check(!((await a.client.rpc("leaderboard", { p_kind: "all" })).data ?? []).some((r) => r.me), "a deleted save takes its card off the board");
-await a.client.auth.signOut();
-await b.client.auth.signOut();
+for (const [name, p] of [["A", a], ["B", b]]) {
+  const gone = await p.client.rpc("delete_my_account");
+  check(gone.data === "ok", `test player ${name} deletes its account`, gone.error?.message ?? gone.data);
+}
 
 console.log(failed ? `\n${failed} check(s) failed` : "\nall cloud checks passed");
 process.exit(failed ? 1 : 0);

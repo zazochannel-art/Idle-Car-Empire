@@ -82,8 +82,16 @@ jobs:
             sleep 60
           fi
           xcrun simctl io "$udid" screenshot ios-check/game.png
+          # Why an app isn't running: a crash report (the simulator's go to the Mac's), or what the
+          # simulator logged about it (no report and nothing logged: the simulator never started it)
+          why() {
+            echo "--- the app's output"; tail -80 ios-check/app.log
+            echo "--- crash reports"; find ~/Library/Logs/DiagnosticReports -newer ios-check/app.log -name 'App*' 2>/dev/null | while read -r f; do head -60 "$f"; done
+            echo "--- the simulator's log about the app"
+            xcrun simctl spawn "$udid" log show --last 4m --style compact --predicate 'process == "App" OR eventMessage CONTAINS "idlecarempire"' 2>/dev/null | tail -60
+          }
           # still running after a minute (no crash at start)
-          running || { echo "::error::the app is not running"; tail -80 ios-check/app.log; exit 1; }
+          running || { echo "::error::the app is not running"; why; exit 1; }
           kill "$console" 2>/dev/null || true
           # Capacitor loaded the game's page from inside the app
           grep -q "Loading app at capacitor://localhost" ios-check/app.log || { echo "::error::the game's page did not load"; tail -80 ios-check/app.log; exit 1; }
