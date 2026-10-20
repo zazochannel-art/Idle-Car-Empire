@@ -343,6 +343,14 @@ const sneaky = await a.client.rpc("admin_schedule_event", { p_event: "carShow", 
 check(sneaky.error?.code === "42501", "a player can't schedule an event", sneaky.error?.code ?? JSON.stringify(sneaky.data));
 const opsTable = await a.client.schema("ops").from("live_events").select("id");
 check(!!opsTable.error, "the events table isn't reachable from the API", opsTable.error?.code ?? "readable");
+// the seasons the owner schedules (0014): anyone reads them, only an admin schedules one
+const seasonsAnon = await fetch(`${url}/rest/v1/rpc/live_seasons`, { method: "POST", headers: { apikey: key, "Content-Type": "application/json" }, body: "{}" });
+const seasonsList = await seasonsAnon.json().catch(() => null);
+check(seasonsAnon.status === 200 && Array.isArray(seasonsList), "the scheduled seasons answer with the public key alone", `${seasonsAnon.status} ${JSON.stringify(seasonsList)?.slice(0, 80)}`);
+const sneakySeason = await a.client.rpc("admin_schedule_season", { p_season: "summer", p_starts: new Date().toISOString(), p_days: 7 });
+check(sneakySeason.error?.code === "42501", "a player can't schedule a season", sneakySeason.error?.code ?? JSON.stringify(sneakySeason.data));
+const seasonsTable = await a.client.schema("ops").from("live_seasons").select("id");
+check(!!seasonsTable.error, "the seasons table isn't reachable from the API", seasonsTable.error?.code ?? "readable");
 
 // ── clean up: each test player deletes its own save (and so its card), then its account: no
 // test account stays on the project (they counted as players on the owner's dashboard) ──

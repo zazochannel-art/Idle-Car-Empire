@@ -106,6 +106,20 @@
     <div id="events"></div>
   </section>
 
+  <section data-panel="events" class="card" hidden>
+    <h2>Programează un anotimp</h2>
+    <p class="muted">Primăvara (21 martie – 10 aprilie) și vara (15 iulie – 10 august) vin oricum, din calendar. Aici le poți porni și altă dată, între 1 și 31 de zile: jucătorii au decorul din hale, +10% venit și festivalul (trei obiective cu ⭐ Stele și o vopsea de curse). Cât timp rulează, ține locul anotimpului din calendar. Unul singur odată.</p>
+    <div class="row">
+      <label>Anotimp <select id="seId"><option value="spring">🌸 Festivalul de primăvară</option><option value="summer">☀️ Road trip de vară</option></select></label>
+      <label>Începe <input id="seStart" type="datetime-local"></label>
+      <label>Zile <input id="seDays" type="number" min="1" max="31" step="1" value="7" style="width: 90px"></label>
+      <button id="seAdd">Programează</button>
+    </div>
+    <p id="seMsg" class="msg" role="status"></p>
+    <h2 style="margin-top: 18px">Programate</h2>
+    <div id="seasons"></div>
+  </section>
+
   <section data-panel="reports" class="card" hidden>
     <h2>Raportări deschise</h2>
     <p class="muted">Ce au raportat jucătorii. „Redenumește” dă jucătorului un nume neutru (își poate alege altul, verificat de filtru). Detalii: <code>docs/moderation.md</code>.</p>
@@ -210,7 +224,7 @@ async function show() {
   await loadAll();
 }
 async function loadAll() {
-  await Promise.all([loadOverview(), loadEvents(), loadReports(), loadErrors(), loadFunnel()].map((p) => p.catch((e) => console.warn(e))));
+  await Promise.all([loadOverview(), loadEvents(), loadSeasons(), loadReports(), loadErrors(), loadFunnel()].map((p) => p.catch((e) => console.warn(e))));
 }
 
 function table(head, rows) {
@@ -254,6 +268,35 @@ async function addEvent() {
   } catch (e) { $("evMsg").textContent = e.message; }
   $("evAdd").disabled = false;
   await loadEvents();
+}
+
+const SEASONS = { spring: "🌸 Festivalul de primăvară", summer: "☀️ Road trip de vară" };
+async function loadSeasons() {
+  const list = await rpc("admin_seasons");
+  const now = Date.now();
+  $("seasons").replaceChildren(table(["Anotimp", "Începe", "Se termină", "Stare", ""], list.map((e) => {
+    const start = Date.parse(e.starts_at), end = Date.parse(e.ends_at);
+    const state = e.cancelled_at ? ["anulat", "off"] : end <= now ? ["încheiat", ""] : start <= now ? ["rulează acum", "on"] : ["programat", "soon"];
+    const cancel = !e.cancelled_at && end > now ? el("button", { class: "ghost small", text: "Anulează", onclick: () => cancelSeason(e.id) }) : null;
+    return el("tr", {}, el("td", { text: SEASONS[e.season] || e.season }), el("td", { text: when(start) }), el("td", { text: when(end) }), el("td", {}, el("span", { class: `tag ${state[1]}`, text: state[0] })), el("td", {}, cancel));
+  })));
+}
+async function cancelSeason(id) {
+  if (!confirm("Anulezi anotimpul? Jucătorii revin la cel din calendar.")) return;
+  try { const r = await rpc("admin_cancel_season", { p_id: id }); $("seMsg").textContent = r === "ok" ? "Anulat." : "Nu mai e de anulat."; } catch (e) { $("seMsg").textContent = e.message; }
+  await loadSeasons();
+}
+async function addSeason() {
+  const start = $("seStart").value ? new Date($("seStart").value) : new Date();
+  const days = Number($("seDays").value);
+  if (!Number.isFinite(start.getTime()) || !(days >= 1 && days <= 31)) { $("seMsg").textContent = "Alege o zi de început și o durată între 1 și 31 de zile."; return; }
+  $("seAdd").disabled = true;
+  try {
+    const r = await rpc("admin_schedule_season", { p_season: $("seId").value, p_starts: start.toISOString(), p_days: days });
+    $("seMsg").textContent = { ok: "Programat. Jucătorii îl primesc în cel mult o jumătate de oră (sau când deschid jocul).", overlap: "Se suprapune cu alt anotimp programat: unul singur odată.", invalid: "Ziua sau durata nu e bună (cel mult 120 de zile înainte, 1–31 de zile).", limit: "Sunt deja 10 anotimpuri în așteptare.", unknown: "Anotimp necunoscut." }[r] || String(r);
+  } catch (e) { $("seMsg").textContent = e.message; }
+  $("seAdd").disabled = false;
+  await loadSeasons();
 }
 
 async function loadReports() {
@@ -314,6 +357,7 @@ for (const b of document.querySelectorAll("[data-out]")) b.addEventListener("cli
 });
 $("reload").addEventListener("click", () => loadAll());
 $("evAdd").addEventListener("click", addEvent);
+$("seAdd").addEventListener("click", addSeason);
 for (const b of document.querySelectorAll("[data-tab]")) b.addEventListener("click", () => {
   for (const x of document.querySelectorAll("[data-tab]")) x.setAttribute("aria-pressed", String(x === b));
   for (const p of document.querySelectorAll("[data-panel]")) p.hidden = p.dataset.panel !== b.dataset.tab;

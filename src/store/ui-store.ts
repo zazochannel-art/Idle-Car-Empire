@@ -32,6 +32,7 @@ export type View =
   | "leaderboard"
   | "alliance"
   | "winter"
+  | "festival"
   | "pass"
   | "build"
   | "upgrade"

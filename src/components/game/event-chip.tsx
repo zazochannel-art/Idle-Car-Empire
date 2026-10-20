@@ -2,7 +2,7 @@
 
 import { activeEvent, eventGoal, nextEvent } from "@/game/engine/events";
 import type { MessageKey } from "@/i18n";
-import { seasonAt } from "@/game/engine/season";
+import { SEASON_ICON, seasonAt } from "@/game/engine/season";
 import { formatDuration } from "@/game/format";
 import { useContent } from "@/i18n/content";
 import { useT } from "@/i18n/use-t";
@@ -22,13 +22,13 @@ export function EventChip() {
     if (!season) return null;
     const chip = (
       <>
-        {season === "halloween" ? "🎃" : "❄️"} {t(`season.${season}`)} · {t("season.bonus")}
+        {SEASON_ICON[season]} {t(`season.${season}`)} · {t("season.bonus")}
       </>
     );
     const style = "pointer-events-auto flex items-center gap-1.5 rounded-xl bg-orange-500/15 px-2 py-1 text-xs font-bold text-orange-200 ring-1 ring-orange-400/40 md:py-1.5";
-    // in winter the chip opens the festival
-    return season === "winter" ? (
-      <button onClick={() => useUi.getState().setView("winter")} className={style}>
+    // in winter, spring and summer the chip opens the festival
+    return season !== "halloween" ? (
+      <button onClick={() => useUi.getState().setView(season === "winter" ? "winter" : "festival")} className={style}>
         {chip}
       </button>
     ) : (

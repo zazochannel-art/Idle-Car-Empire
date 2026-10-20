@@ -71,6 +71,7 @@ import { SHOP_ITEM_BY_ID, type ShopItemId } from "@/game/config/shop";
 import * as Iap from "@/game/engine/iap";
 import { IAP_ICON, type IapProduct } from "@/game/config/iap";
 import * as Wt from "@/game/engine/winter";
+import * as Fe from "@/game/engine/festival";
 import * as Ps from "@/game/engine/pass";
 import { funnelDue, funnelMinutes } from "@/game/engine/funnel";
 import { browserOptOut, sendStep } from "@/game/save/funnel";
@@ -146,6 +147,8 @@ interface GameStore {
   /** Winter festival: opens an advent door (1–24) / takes a finished goal's reward. */
   openAdventDoor: (day: number) => boolean;
   claimWinterGoal: (goal: Wt.WinterGoal) => boolean;
+  /** Takes a finished spring or summer festival goal (engine/festival.ts). */
+  claimFestivalGoal: (goal: Fe.FestivalGoal) => boolean;
   /** Season pass: takes a reached tier / every reached tier / a finished weekly challenge. */
   claimPassTier: (tier: number) => boolean;
   claimPassAll: () => boolean;
@@ -429,6 +432,8 @@ export const useGame = create<GameStore>((set, get) => {
     if (pass.leftover) uiEvents.emit({ type: "toast", tone: "gold", icon: "🎟️", title: tr("pass.leftoverToast", { n: pass.leftover }) });
     if (pass.season && next.pass.season > 1 && next.lifetime.playTime > 600) uiEvents.emit({ type: "toast", tone: "gold", icon: "🎟️", title: tr("pass.newSeason", { n: next.pass.season }), action: { label: tr("pass.open"), view: "pass" } });
     if (Wt.winterTick(next, snap, now)) uiEvents.emit({ type: "toast", tone: "gold", icon: "🎄", title: tr("winter.startToast"), body: tr("winter.startToastBody"), action: { label: tr("winter.open"), view: "winter" } });
+    const fest = Fe.festivalTick(next, snap, now);
+    if (fest) uiEvents.emit({ type: "toast", tone: "gold", icon: fest === "spring" ? "🌸" : "☀️", title: tr(`festival.${fest}Start`), body: tr("festival.startBody"), action: { label: tr("winter.open"), view: "festival" } });
     const fo = Ex.fleetOrderTick(next, now);
     if (fo === "offer") uiEvents.emit({ type: "toast", tone: "info", icon: "🚌", title: tr("fleet.offerToast") });
     else if (fo === "failed") uiEvents.emit({ type: "toast", tone: "warn", icon: "⌛", title: tr("fleet.failed") });
@@ -663,6 +668,15 @@ export const useGame = create<GameStore>((set, get) => {
       if (ok) {
         persist(true);
         uiEvents.emit({ type: "toast", tone: "gold", icon: "⭐", title: tr("winter.goalToast"), body: tr("winter.doorStars", { money: formatMoney(money ?? 0), stars: Wt.WINTER.goalReward.stars ?? 0 }) });
+      }
+      return ok;
+    },
+    claimFestivalGoal: (goal) => {
+      let money: number | null = null;
+      const ok = act((s) => (money = Fe.claimFestivalGoal(s, goal, get().snap, Date.now())) !== null);
+      if (ok) {
+        persist(true);
+        uiEvents.emit({ type: "toast", tone: "gold", icon: "⭐", title: tr("winter.goalToast"), body: tr("winter.doorStars", { money: formatMoney(money ?? 0), stars: Fe.FESTIVAL.goalReward.stars ?? 0 }) });
       }
       return ok;
     },

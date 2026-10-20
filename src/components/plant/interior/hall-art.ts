@@ -1,6 +1,6 @@
 // Hand-drawn pieces of the hall that don't need a 3D model: brick and plank
 // textures laid onto the iso planes, and the seasonal decorations
-// (pumpkins, cobwebs, bats, a Christmas tree, strings of lights).
+// (pumpkins, cobwebs, bats, a Christmas tree, strings of lights, flowers, bunting, a parasol).
 import { sx, sy, type Painter } from "../../map/iso";
 
 /** A fixed pseudo-random number in [0, 1) for an index. */
@@ -294,6 +294,125 @@ export function garland(p: Painter, w: number, z: number) {
     c.beginPath();
     c.ellipse(qx - 2.5, qy, 2.5, 1.6, -0.4, 0, Math.PI * 2);
     c.ellipse(qx + 2.5, qy, 2.5, 1.6, 0.4, 0, Math.PI * 2);
+    c.fill();
+  }
+}
+
+// ───────────────────────── spring and summer ─────────────────────────
+
+/** A pot of flowers on the floor (spring: tulips; summer: sunflowers); they sway a little. */
+export function flowerPot(p: Painter, x: number, y: number, s: number, t: number, kind: "spring" | "summer") {
+  const c = p.ctx;
+  const [px, py] = [sx(x, y), sy(x, y)];
+  c.fillStyle = "rgba(15,23,42,0.25)";
+  c.beginPath();
+  c.ellipse(px, py + 1, 8 * s, 3 * s, 0, 0, Math.PI * 2);
+  c.fill();
+  // the pot: a terracotta cup with a rim
+  c.fillStyle = "#c2410c";
+  c.beginPath();
+  c.moveTo(px - 5 * s, py - 8 * s);
+  c.lineTo(px + 5 * s, py - 8 * s);
+  c.lineTo(px + 3.6 * s, py);
+  c.lineTo(px - 3.6 * s, py);
+  c.closePath();
+  c.fill();
+  c.fillStyle = "#ea580c";
+  c.fillRect(px - 5.6 * s, py - 9.6 * s, 11.2 * s, 2.2 * s);
+  const cols = kind === "spring" ? ["#f472b6", "#facc15", "#f8fafc", "#a855f7"] : ["#facc15", "#fbbf24", "#f59e0b"];
+  const stems = kind === "spring" ? 5 : 3;
+  for (let k = 0; k < stems; k++) {
+    const sway = Math.sin(t * 1.3 + k * 1.9 + x) * 1.2 * s;
+    const bx = px + (k - (stems - 1) / 2) * 2.6 * s;
+    const h = (kind === "spring" ? 13 : 19) * s + hash(k + x * 7) * 4 * s;
+    c.strokeStyle = "#15803d";
+    c.lineWidth = 1.2 * s;
+    c.beginPath();
+    c.moveTo(bx, py - 9 * s);
+    c.quadraticCurveTo(bx + sway * 0.5, py - 9 * s - h / 2, bx + sway, py - 9 * s - h);
+    c.stroke();
+    const [fx, fy] = [bx + sway, py - 9 * s - h];
+    c.fillStyle = cols[k % cols.length];
+    if (kind === "spring") {
+      // a tulip: a cup of three petals
+      c.beginPath();
+      c.ellipse(fx, fy, 2.2 * s, 3 * s, 0, 0, Math.PI * 2);
+      c.fill();
+      c.beginPath();
+      c.moveTo(fx - 2.2 * s, fy - 1 * s);
+      c.lineTo(fx - 1.1 * s, fy - 4.2 * s);
+      c.lineTo(fx, fy - 1.6 * s);
+      c.lineTo(fx + 1.1 * s, fy - 4.2 * s);
+      c.lineTo(fx + 2.2 * s, fy - 1 * s);
+      c.fill();
+    } else {
+      // a sunflower: yellow petals round a brown heart
+      for (let k2 = 0; k2 < 10; k2++) {
+        const a = (k2 * Math.PI) / 5;
+        c.beginPath();
+        c.ellipse(fx + Math.cos(a) * 3 * s, fy + Math.sin(a) * 3 * s, 1.9 * s, 1 * s, a, 0, Math.PI * 2);
+        c.fill();
+      }
+      c.fillStyle = "#78350f";
+      c.beginPath();
+      c.arc(fx, fy, 2.2 * s, 0, Math.PI * 2);
+      c.fill();
+    }
+  }
+}
+
+/** Bunting: little triangular flags hung along the back wall (in the still layer). */
+export function bunting(p: Painter, w: number, z: number, colors: string[]) {
+  const c = p.ctx;
+  c.strokeStyle = "rgba(30,41,59,0.7)";
+  c.lineWidth = 0.8;
+  c.beginPath();
+  const dip = (u: number) => Math.sin(((u % 3) / 3) * Math.PI) * 6;
+  for (let u = 0.3; u < w - 0.3; u += 0.1) {
+    const [qx, qy] = [sx(u, 0.1), sy(u, 0.1, z) + dip(u)];
+    if (u === 0.3) c.moveTo(qx, qy);
+    else c.lineTo(qx, qy);
+  }
+  c.stroke();
+  let k = 0;
+  for (let u = 0.55; u < w - 0.4; u += 0.5) {
+    const [qx, qy] = [sx(u, 0.1), sy(u, 0.1, z) + dip(u)];
+    c.fillStyle = colors[k++ % colors.length];
+    c.beginPath();
+    c.moveTo(qx - 3.2, qy - 1.6);
+    c.lineTo(qx + 3.2, qy + 1.6);
+    c.lineTo(qx - 0.4, qy + 7);
+    c.closePath();
+    c.fill();
+  }
+}
+
+/** A striped beach parasol over a cool box, for the crew's summer break. */
+export function parasol(p: Painter, x: number, y: number, t: number) {
+  const c = p.ctx;
+  const [px, py] = [sx(x, y), sy(x, y)];
+  c.fillStyle = "rgba(15,23,42,0.22)";
+  c.beginPath();
+  c.ellipse(px, py + 1, 20, 7, 0, 0, Math.PI * 2);
+  c.fill();
+  p.box(x + 0.25, y + 0.2, 0.5, 0.35, 0, 7, "#38bdf8", "#e0f2fe");
+  c.strokeStyle = "#e2e8f0";
+  c.lineWidth = 1.6;
+  c.beginPath();
+  c.moveTo(px, py);
+  c.lineTo(px, py - 44);
+  c.stroke();
+  const sway = Math.sin(t * 0.8 + x) * 0.04;
+  const cols = ["#ef4444", "#f8fafc"];
+  for (let k = 0; k < 8; k++) {
+    const a0 = Math.PI + (k / 8) * Math.PI + sway;
+    const a1 = Math.PI + ((k + 1) / 8) * Math.PI + sway;
+    c.fillStyle = cols[k % 2];
+    c.beginPath();
+    c.moveTo(px, py - 52);
+    c.lineTo(px + Math.cos(a0) * 24, py - 40 + Math.sin(a0) * -6);
+    c.lineTo(px + Math.cos(a1) * 24, py - 40 + Math.sin(a1) * -6);
+    c.closePath();
     c.fill();
   }
 }

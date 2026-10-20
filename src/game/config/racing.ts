@@ -401,6 +401,9 @@ export const SKINS: Record<string, { emoji: string; color: string; accent: strin
   // the winter festival (engine/winter.ts)
   frost: { emoji: "❄️", color: "#e0f2fe", accent: "#0284c7" },
   aurora: { emoji: "🌌", color: "#0f766e", accent: "#a7f3d0" },
+  // the spring and summer festivals (engine/festival.ts)
+  blossom: { emoji: "🌷", color: "#fdf2f8", accent: "#be185d" },
+  sunset: { emoji: "🌅", color: "#fb923c", accent: "#7c3aed" },
   // the season pass (config/pass.ts)
   pulse: { emoji: "💠", color: "#1d4ed8", accent: "#22d3ee" },
   legend: { emoji: "🏆", color: "#111827", accent: "#facc15" },
