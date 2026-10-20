@@ -86,6 +86,23 @@ export type JoinAllianceResult = "ok" | "member" | "full" | "unknown";
 export type ClaimTierResult = "ok" | "none" | "new" | "short" | "claimed" | "invalid";
 
 /** Why a player is reported (supabase/migrations/0008: report_player). */
+/** The player's invite code and friends (0012). */
+export interface MyInvite {
+  code: string;
+  /** Friends who used the code. */
+  friends: number;
+  /** Rewards waiting: friends who built their first car (within the limit). */
+  due: number;
+  /** Rewards taken so far, and the most there can be. */
+  rewarded: number;
+  max: number;
+  /** This account used a friend's code; it can still (a new account, none used yet). */
+  used: boolean;
+  canUse: boolean;
+}
+
+export type RedeemInviteResult = "ok" | "already" | "late" | "self" | "full" | "unknown";
+
 export type ReportReason = "name" | "company" | "cheating" | "other";
 export const REPORT_REASONS: ReportReason[] = ["name", "company", "cheating", "other"];
 export type ReportResult = "ok" | "limit" | "unknown";
@@ -230,5 +247,23 @@ export class Social {
 
   async giftsSentToday(): Promise<number> {
     return Math.max(0, Math.floor(num(await this.call("gifts_sent_today"))));
+  }
+
+  // ───────────────────────── invite codes (0012) ─────────────────────────
+
+  async myInvite(): Promise<MyInvite> {
+    const r = obj(await this.call("my_invite"));
+    return { code: str(r.code), friends: num(r.friends), due: num(r.due), rewarded: num(r.rewarded), max: num(r.max), used: r.used === true, canUse: r.canUse === true };
+  }
+
+  /** Uses a friend's code (once per account, in its first days). */
+  async redeemInvite(code: string): Promise<RedeemInviteResult> {
+    const r = str(await this.call("redeem_invite", { p_code: code }));
+    return r === "ok" || r === "already" || r === "late" || r === "self" || r === "full" ? r : "unknown";
+  }
+
+  /** Takes the rewards due for friends' first cars: how many (each counted once). */
+  async claimInviteRewards(): Promise<number> {
+    return Math.max(0, Math.floor(num(await this.call("claim_invite_rewards"))));
   }
 }

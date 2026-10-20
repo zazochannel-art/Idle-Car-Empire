@@ -195,6 +195,31 @@ a **gift** once a day.
   Rewards: 15 minutes of income, 45 minutes, and 2 hours plus ⭐ 1.
   Rewards don't count as money earned.
 
+## Invite codes
+
+Each player has a 6-character **invite code** (Profile → *Invite friends*),
+made the first time they open it, to share as text. A new player can enter
+one friend's code in their account's first 7 days:
+
+- **The new player** gets a welcome gift at once: $25K plus 10 minutes of
+  their income (`src/game/engine/invites.ts`).
+- **The friend** gets 2 ⭐ and 30 minutes of income once the new player has
+  built their first car, for up to 10 friends in all. The server reads that
+  from the new player's own cloud save (`lifetime.carsProduced ≥ 1`), so a
+  friend's reward can't be claimed by an account that never played. The game
+  collects due rewards on the same timer as gifts.
+- Both are rewards: they don't count as money earned (not for the board, not
+  for resets).
+- **Limits**: one code per account, ever; not one's own code, nor the code of
+  a friend who used one's own (no pairs inviting each other); a code takes at
+  most 50 players. A player sees how many friends used their code, never who.
+- The codes and the links (`ops.invite_codes`, `ops.invites`) are not
+  reachable from the API; players reach them only through `my_invite()`,
+  `redeem_invite(p_code)` (`ok`, `already`, `late`, `self`, `full`,
+  `unknown`) and `claim_invite_rewards()`. A deleted account takes its code
+  and its own link with it; a friend who used its code keeps only the fact
+  that they used one.
+
 ## Database
 
 Migrations in `supabase/migrations/`, in order:
@@ -217,6 +242,9 @@ Migrations in `supabase/migrations/`, in order:
 6. `0011_cloud_backups.sql` — cloud backups (see "Cloud backups"): the
    `ops.save_backups` table (not reachable from the API), the trigger on
    `game_saves` that keeps them, `list_my_backups()` and `take_my_backup()`.
+7. `0012_invites.sql` — invite codes (see "Invite codes"): the
+   `ops.invite_codes` and `ops.invites` tables (not reachable from the API),
+   `my_invite()`, `redeem_invite()` and `claim_invite_rewards()`.
 
 `profiles`: `id` (= the auth user, deleted with it), `username` (unique on
 `lower(username)`, 3–20 characters, no control characters), `avatar`,

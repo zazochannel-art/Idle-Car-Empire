@@ -2,7 +2,7 @@
 // only the public (publishable) key, exactly as the game's browser code
 // talks to it: two players A and B (anonymous accounts), saving, restoring,
 // revision conflicts, session restore, what each may (not) reach, the
-// leaderboard, visits and gifts, ghosts and alliances, and a third player C
+// leaderboard, visits and gifts, invite codes, ghosts and alliances, and a third player C
 // registering (email and password, as playing needs an account) and deleting
 // their account.
 //
@@ -124,6 +124,29 @@ const keptA = (await a.client.rpc("list_my_backups")).data ?? [];
 check(keptA[0]?.reason === "restore" && keptA[0].cash === 250, "the save it would replace is kept first", JSON.stringify(keptA[0]));
 check(one(await a.client.rpc("load_game"))?.data?.cash === 250, "taking a backup leaves the save as it is");
 
+// ── invite codes (0012): B uses A's code; A's reward waits for B's first car, and is taken once ──
+const inviteA = (await a.client.rpc("my_invite")).data;
+check(/^[A-HJ-NP-Z2-9]{6}$/.test(inviteA?.code ?? "") && inviteA.friends === 0 && inviteA.canUse === true, "A has an invite code (and, new, can still use one)", JSON.stringify(inviteA));
+check((await a.client.rpc("my_invite")).data?.code === inviteA?.code, "the code stays the same");
+const redeem = async (p, code) => (await p.client.rpc("redeem_invite", { p_code: code })).data;
+check((await redeem(a, inviteA?.code)) === "self", "nobody uses their own code");
+check((await redeem(b, "nope!")) === "unknown", "an unknown code is turned away");
+check((await redeem(b, ` ${inviteA?.code?.toLowerCase()} `)) === "ok", "B uses A's code (typed loosely)");
+check((await redeem(b, inviteA?.code)) === "already", "a code is used once per account");
+const inviteB = (await b.client.rpc("my_invite")).data;
+check(inviteB?.used === true && inviteB.canUse === false && inviteB.code !== inviteA?.code, "B is marked as invited", JSON.stringify(inviteB));
+check((await redeem(a, inviteB?.code)) === "self", "A can't use the code of a friend who used theirs");
+check((await a.client.rpc("my_invite")).data?.friends === 1 && (await a.client.rpc("claim_invite_rewards")).data === 0, "A sees one friend, no reward before B's first car");
+const sB2 = one(await b.client.rpc("save_game", { p_data: { cash: 7, lifetime: { carsProduced: 1 } }, p_save_version: 3, p_base_revision: Number(sB?.revision ?? 1), p_device: "e2e" }));
+check(sB2?.ok === true, "B builds their first car");
+check((await a.client.rpc("my_invite")).data?.due === 1, "A's reward is due");
+check((await b.client.rpc("claim_invite_rewards")).data === 0, "B can't take A's reward");
+check((await a.client.rpc("claim_invite_rewards")).data === 1, "A takes it");
+check((await a.client.rpc("claim_invite_rewards")).data === 0 && (await a.client.rpc("my_invite")).data?.rewarded === 1, "only once");
+const invitesTable = await b.client.schema("ops").from("invites").select("invitee");
+const codesTable = await b.client.schema("ops").from("invite_codes").select("code");
+check(!!invitesTable.error && !!codesTable.error, "the invite tables aren't reachable from the API", invitesTable.error?.code);
+
 // ── the leaderboard, visits and gifts (0004) ──
 // A saves a bigger game: the card on the board takes it, but a jump this big is held to what is plausible
 const revA = Number(one(await a.client.rpc("load_game"))?.revision);
@@ -208,6 +231,8 @@ const anonRead = await anon.client.from("game_saves").select("user_id");
 check(!!anonRead.error || (anonRead.data ?? []).length === 0, "signed out: the table shows nothing", anonRead.error?.code);
 const anonBackups = await anon.client.rpc("list_my_backups");
 check(!!anonBackups.error, "no backups without signing in", anonBackups.error?.code);
+const anonInvite = await anon.client.rpc("redeem_invite", { p_code: "ABCDEF" });
+check(!!anonInvite.error, "no invite codes without signing in", anonInvite.error?.code);
 const anonBoard = await anon.client.rpc("leaderboard", { p_kind: "all" });
 check(!!anonBoard.error, "signed out: no leaderboard", anonBoard.error?.code);
 

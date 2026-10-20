@@ -11,7 +11,8 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { plantsOf } from "@/game/engine/chain";
 import { isCleanName } from "@/game/engine/names";
 import { formatDuration, formatMoney, formatNumber } from "@/game/format";
-import { summarize, type AuthResult, type CloudBackup, type SaveSummary } from "@/game/save";
+import { summarize, type AuthResult, type CloudBackup, type MyInvite, type SaveSummary } from "@/game/save";
+import { INVITE } from "@/game/engine/invites";
 import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
@@ -388,6 +389,8 @@ export function ProfileView() {
         <Stat label={t("account.stat.cars")} value={formatNumber(state.lifetime.carsProduced)} />
       </div>
 
+      <InviteCard />
+
       {/* the save */}
       <div className="space-y-2 rounded-2xl bg-[#2b2b2e] p-3 ring-1 ring-white/10">
         <div className="flex items-center gap-2 text-sm font-bold">
@@ -570,6 +573,117 @@ function BackupsCard() {
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+/** The player's invite code to give friends, and a friend's code to use (a new account only). */
+function InviteCard() {
+  const saves = useGame((g) => g.saves);
+  const claim = useGame((g) => g.claimInviteRewards);
+  const redeem = useGame((g) => g.redeemInvite);
+  const mode = useCloud((c) => c.mode);
+  const { t } = useT();
+  const [info, setInfo] = useState<MyInvite | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [reads, setReads] = useState(0);
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null);
+  // rewards due are taken first, so the numbers shown come after them
+  useEffect(() => {
+    const social = saves?.social;
+    if (!social) return;
+    let live = true;
+    void claim()
+      .catch(() => 0)
+      .then(() => social.myInvite())
+      .then((i) => live && setInfo(i))
+      .catch(() => live && setFailed(true));
+    return () => {
+      live = false;
+    };
+  }, [saves, claim, reads]);
+  if (mode !== "cloud" || !saves?.social) return null;
+  const share = t("invite.shareText", { code: info?.code ?? "" });
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(share);
+      setMsg({ text: t("invite.copied") });
+    } catch {
+      setMsg({ text: share });
+    }
+  };
+  const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+  const use = async () => {
+    setBusy(true);
+    setMsg(null);
+    const res = await redeem(code.trim());
+    setBusy(false);
+    if (res === "ok") {
+      setCode("");
+      setReads((n) => n + 1);
+      return;
+    }
+    setMsg({ text: t(`invite.err.${res}` as MessageKey), bad: true });
+  };
+  return (
+    <div className="space-y-2 rounded-2xl bg-[#2b2b2e] p-3 ring-1 ring-white/10">
+      <div className="text-sm font-bold">🤝 {t("invite.title")}</div>
+      <p className="text-[11px] leading-snug text-white/55">{t("invite.hint", { stars: INVITE.perFriend.stars, minutes: INVITE.perFriend.incomeSeconds / 60, max: INVITE.maxFriends })}</p>
+      {failed ? (
+        <Button size="sm" variant="secondary" className="w-full" onClick={() => (setFailed(false), setReads((n) => n + 1))}>
+          <RefreshCw /> {t("account.cloudBackupsRetry")}
+        </Button>
+      ) : !info ? (
+        <p className="text-[11px] text-white/40">{t("account.cloudBackupsLoading")}</p>
+      ) : (
+        <>
+          <div className="flex items-center gap-2 rounded-xl bg-black/30 p-2.5 ring-1 ring-white/10">
+            <div className="min-w-0 flex-1">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-white/45">{t("invite.yourCode")}</div>
+              <div className="font-mono text-2xl font-black tracking-[0.25em] text-gold" aria-label={info.code.split("").join(" ")}>
+                {info.code}
+              </div>
+            </div>
+            <Button size="sm" variant="secondary" onClick={() => void copy()}>
+              {t("invite.copy")}
+            </Button>
+            {canShare && (
+              <Button size="sm" variant="gold" onClick={() => void navigator.share({ text: share }).catch(() => {})}>
+                {t("invite.share")}
+              </Button>
+            )}
+          </div>
+          <div className="flex justify-between text-[11px] text-white/60">
+            <span>{t("invite.friends", { n: formatNumber(info.friends) })}</span>
+            <span>{t("invite.rewardedCount", { n: formatNumber(info.rewarded), max: formatNumber(info.max) })}</span>
+          </div>
+          {info.canUse && (
+            <div className="space-y-1.5 border-t border-white/10 pt-2">
+              <div className="text-[12px] font-bold">{t("invite.haveCode")}</div>
+              <p className="text-[11px] leading-snug text-white/55">{t("invite.useHint", { days: INVITE.days })}</p>
+              <div className="flex gap-1.5">
+                <input
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6))}
+                  placeholder={t("invite.placeholder")}
+                  aria-label={t("invite.haveCode")}
+                  autoCapitalize="characters"
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="h-10 min-w-0 flex-1 rounded-xl bg-black/40 px-3 font-mono text-base tracking-[0.2em] text-white/90 ring-1 ring-white/10 outline-none focus:ring-electric/50"
+                />
+                <Button size="sm" variant="gold" className="h-10" disabled={busy || code.trim().length !== 6} onClick={() => void use()}>
+                  {t("invite.use")}
+                </Button>
+              </div>
+            </div>
+          )}
+          {info.used && <p className="text-[11px] text-emerald-300">✓ {t("invite.used")}</p>}
+          {msg && <p className={cn("break-words text-[11px]", msg.bad ? "text-rose-300" : "text-emerald-300")}>{msg.text}</p>}
+        </>
+      )}
     </div>
   );
 }

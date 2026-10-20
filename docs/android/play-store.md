@@ -170,7 +170,7 @@ rating authority decides.
 | Personal info → **Email address** | yes | required (an account is needed to play) | Account management |
 | Personal info → **Name** (player name) | yes | required (chosen when registering, can be changed) | App functionality |
 | Personal info → **User IDs** (account id) | yes | required | App functionality, Account management |
-| App activity → **Other actions** (game progress / save) | yes | required when online | App functionality |
+| App activity → **Other actions** (game progress / save; invite codes and which friend's code was used) | yes | required when online | App functionality |
 | App activity → **Other user-generated content** (company and alliance names; reports sent about other players) | yes | optional | App functionality; Fraud prevention, security, and compliance |
 | App activity → **App interactions** (anonymous beginner steps) | yes | optional (Settings → Anonymous statistics) | Analytics |
 | App info and performance → **Crash logs**, **Diagnostics** (the game's anonymous error reports: [errors.md](../errors.md)) | yes | optional (Settings → Anonymous statistics) | Analytics, App functionality |

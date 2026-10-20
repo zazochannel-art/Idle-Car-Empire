@@ -33,7 +33,7 @@ import { checkAchievements, claimDaily, claimMilestone, recordHistory, refreshDa
 import { cloneState, createInitialState } from "@/game/engine/state";
 import { tick as engineTick } from "@/game/engine/tick";
 import { formatDuration, formatMoney, formatNumber, formatPercent } from "@/game/format";
-import { decodeSave, encodeSave, SaveManager, type SaveWhere } from "@/game/save";
+import { decodeSave, encodeSave, SaveManager, type RedeemInviteResult, type SaveWhere } from "@/game/save";
 import { askStartChoice, askWelcome, useCloud } from "./cloud-store";
 import type { BuyAmount, CarId, CarRoute, DealerId, FacilityType, GameState, Lang, ManagerId, PlantType, QualityMode, Specialization, StructureType, ZoneId } from "@/game/types";
 import { applyLanguage, detectLanguage, loadLanguage, translate, type MessageKey, type Vars } from "@/i18n";
@@ -60,6 +60,7 @@ import { claimUnlock, openPlantTypes } from "@/game/engine/unlocks";
 import { hasPlant as hasPlantType } from "@/game/engine/chain";
 import * as Tu from "@/game/engine/tuning";
 import * as Gf from "@/game/engine/gifts";
+import * as Iv from "@/game/engine/invites";
 import * as Gh from "@/game/engine/ghost";
 import { allianceReward } from "@/game/engine/alliance";
 import { grantAd } from "@/game/engine/ads";
@@ -121,6 +122,10 @@ interface GameStore {
   saves: SaveManager | null;
   /** Collects the gifts other players sent (on the server) and pays them: how many there were. */
   claimGifts: () => Promise<number>;
+  /** Rewards for friends who built their first car with the player's invite code. */
+  claimInviteRewards: () => Promise<number>;
+  /** Uses a friend's invite code: the welcome gift on "ok". */
+  redeemInvite: (code: string) => Promise<RedeemInviteResult | "network">;
   /** Pays the thank-you for a gift the server accepted. */
   giftSent: () => void;
   /** Hides a player from the boards and visits on this account (their name is kept to list them in the Profile). */
@@ -536,6 +541,29 @@ export const useGame = create<GameStore>((set, get) => {
       uiEvents.emit({ type: "toast", tone: "gold", icon: "🎁", title: tr("gift.received", { n }), body: tr("gift.receivedBody", { money: formatMoney(money) }) });
       return n;
     },
+    claimInviteRewards: async () => {
+      const social = saves?.social;
+      // not while two saves wait for the player's choice: the one paid might be dropped
+      if (!social || !get().ready || saves?.sync?.state.status === "conflict") return 0;
+      const n = await social.claimInviteRewards().catch(() => 0);
+      if (!n) return 0;
+      let paid = { stars: 0, money: 0 };
+      act((s) => (paid = Iv.inviteRewards(s, n, get().snap)).stars > 0);
+      persist(true);
+      uiEvents.emit({ type: "toast", tone: "gold", icon: "🤝", title: tr("invite.rewarded", { n }), body: tr("invite.rewardedBody", { stars: paid.stars, money: formatMoney(paid.money) }) });
+      return n;
+    },
+    redeemInvite: async (code) => {
+      const social = saves?.social;
+      if (!social || !get().ready || saves?.sync?.state.status === "conflict") return "network";
+      const res = await social.redeemInvite(code).catch(() => "network" as const);
+      if (res !== "ok") return res;
+      let money = 0;
+      act((s) => (money = Iv.inviteWelcome(s, get().snap)) > 0);
+      persist(true);
+      uiEvents.emit({ type: "toast", tone: "gold", icon: "🎉", title: tr("invite.welcome"), body: tr("invite.welcomeBody", { money: formatMoney(money) }) });
+      return "ok";
+    },
     giftSent: () => {
       let money = 0;
       act((s) => (money = Gf.giftSent(s, get().snap)) > 0);
@@ -702,6 +730,7 @@ export const useGame = create<GameStore>((set, get) => {
       if (saves?.social) {
         const social = () => {
           void get().claimGifts();
+          void get().claimInviteRewards();
           void get().publishGhost();
         };
         setTimeout(social, SOCIAL_FIRST_MS);
