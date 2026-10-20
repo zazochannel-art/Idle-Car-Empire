@@ -399,13 +399,14 @@ Level Security. The game doesn't need it.
 - `scripts/cloud-e2e.mjs` — the same checks against the real project through
   its public API, exactly as the browser does (two anonymous test players;
   they appear on the board for a few seconds, under `e2e-…` names, until
-  they delete their saves; a third registers with an email and a password,
-  signs in with them, then deletes its account).
+  they delete their saves and then their accounts; a third registers with an
+  email and a password, signs in with them, then deletes its account).
   Runs in CI (`.github/workflows/cloud-e2e.yml`) on pull requests that touch
   the save code or the database, and on demand.
 
-The e2e test players stay as anonymous users named `e2e-…`. To remove them
-(SQL editor; deletes their profiles and saves too):
+Before October 2026 the two anonymous test players were kept, named
+`e2e-…`. To remove those left from then (SQL editor; deletes their profiles
+too, they never kept a save):
 
 ```sql
 delete from auth.users

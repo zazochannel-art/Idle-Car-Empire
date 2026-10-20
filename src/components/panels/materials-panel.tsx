@@ -78,9 +78,10 @@ export function MaterialsPanel({ id }: { id: string }) {
         <button
           role="switch"
           aria-checked={!!p.autoBuy && sp.autoBuy}
+          aria-label={t("mat.autoBuy")}
           disabled={!sp.autoBuy}
           onClick={() => g.setAutoBuy(id, !p.autoBuy)}
-          className={cn("relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-30", p.autoBuy && sp.autoBuy ? "bg-emerald-500" : "bg-white/15")}
+          className={cn("relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-30 before:absolute before:-inset-x-2 before:-inset-y-3 before:content-['']", p.autoBuy && sp.autoBuy ? "bg-emerald-500" : "bg-white/15")}
         >
           <span className={cn("absolute top-0.5 size-5 rounded-full bg-white shadow transition-all", p.autoBuy && sp.autoBuy ? "left-[1.4rem]" : "left-0.5")} />
         </button>
