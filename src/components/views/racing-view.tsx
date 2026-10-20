@@ -689,7 +689,7 @@ function Team() {
             <div className="text-sm font-black">🤖 {t("racing.auto")}</div>
             <div className="text-[11px] text-white/55">{lv.autoEvery ? t("racing.autoHint", { m: lv.autoEvery }) : t("racing.autoLocked")}</div>
           </div>
-          <Toggle on={R.auto.on} disabled={!lv.autoEvery || !car} onChange={(v) => setAutoRacing(v)} />
+          <Toggle on={R.auto.on} disabled={!lv.autoEvery || !car} onChange={(v) => setAutoRacing(v)} label={t("racing.auto")} />
         </div>
         {est && lv.autoEvery && (
           <div className="mt-2 grid grid-cols-3 gap-1.5 text-center text-[11px]">
@@ -700,7 +700,7 @@ function Team() {
         )}
         <div className="mt-2 flex items-center justify-between text-[11px]">
           <span className="text-white/60">🔧 {t("racing.autoRepair")}</span>
-          <Toggle on={R.auto.repair} onChange={setAutoRepair} />
+          <Toggle on={R.auto.repair} onChange={setAutoRepair} label={t("racing.autoRepair")} />
         </div>
       </div>
 
@@ -822,9 +822,9 @@ function Mini({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Toggle({ on, onChange, disabled }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+function Toggle({ on, onChange, disabled, label }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean; label: string }) {
   return (
-    <button role="switch" aria-checked={on} disabled={disabled} onClick={() => onChange(!on)} className={cn("relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-30", on ? "bg-emerald-500" : "bg-white/15")}>
+    <button role="switch" aria-checked={on} aria-label={label} disabled={disabled} onClick={() => onChange(!on)} className={cn("relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-30 before:absolute before:-inset-x-2 before:-inset-y-3 before:content-['']", on ? "bg-emerald-500" : "bg-white/15")}>
       <span className={cn("absolute top-0.5 size-5 rounded-full bg-white shadow transition-all", on ? "left-[1.4rem]" : "left-0.5")} />
     </button>
   );

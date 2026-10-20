@@ -13,7 +13,7 @@ your choices or manual approval: they can't be done from the repository.
 | App | Android 16 target (API 36), min Android 7.0; edge to edge; Back button (also with predictive back); large screens rotate; any native library checked for 16 KB memory pages in CI |
 | Release bundle | `app-release.aab`, signed when the upload key is in the repository's secrets (CI on `main`), checked with bundletool and Google Play's own rules (target SDK, not debuggable, 16 KB pages) |
 | Store listing | English, Romanian, Russian, Spanish, Brazilian Portuguese and German texts, release notes, icon, feature graphic, phone and tablet screenshots: `fastlane/metadata/android/` (below) |
-| Legal pages | [privacy policy](https://zazochannel-art.github.io/Idle-Car-Empire/privacy/), [terms of use](https://zazochannel-art.github.io/Idle-Car-Empire/terms/), [account deletion](https://zazochannel-art.github.io/Idle-Car-Empire/delete-account/) (en/ro/ru), also linked in the game (Settings, the account form) |
+| Legal pages | [privacy policy](https://zazochannel-art.github.io/Idle-Car-Empire/privacy/), [terms of use](https://zazochannel-art.github.io/Idle-Car-Empire/terms/), [account deletion](https://zazochannel-art.github.io/Idle-Car-Empire/delete-account/), each with a section in every game language (en/ro/ru/es/pt/de; the full text is the English one), also linked in the game (Settings, the account form), which opens them at the player's language |
 | Players' content (Google Play's [UGC policy](https://support.google.com/googleplay/android-developer/answer/9876937)) | terms accepted when creating an account, a name filter in the game and on the server, in-app reports of players and alliances, hiding players; [moderation.md](../moderation.md) |
 | Accounts | registration works for every address (no confirmation email needed); in-app account deletion; *Forgot password?* (by email once SMTP is set, else the contact address) |
 | Ads | rewarded ads only, Google AdMob with Google's consent form (UMP); test ads until you set your AdMob ids ([ads.md](ads.md)) |
@@ -170,7 +170,7 @@ rating authority decides.
 | Personal info → **Email address** | yes | required (an account is needed to play) | Account management |
 | Personal info → **Name** (player name) | yes | required (chosen when registering, can be changed) | App functionality |
 | Personal info → **User IDs** (account id) | yes | required | App functionality, Account management |
-| App activity → **Other actions** (game progress / save) | yes | required when online | App functionality |
+| App activity → **Other actions** (game progress / save; invite codes and which friend's code was used) | yes | required when online | App functionality |
 | App activity → **Other user-generated content** (company and alliance names; reports sent about other players) | yes | optional | App functionality; Fraud prevention, security, and compliance |
 | App activity → **App interactions** (anonymous beginner steps) | yes | optional (Settings → Anonymous statistics) | Analytics |
 | App info and performance → **Crash logs**, **Diagnostics** (the game's anonymous error reports: [errors.md](../errors.md)) | yes | optional (Settings → Anonymous statistics) | Analytics, App functionality |
@@ -219,7 +219,7 @@ Google's API only adds to an app that already has a bundle: the first upload
 
 1. Raise `versionCode` (by 1) and `versionName` in `android/version.properties`.
 2. Write the release notes: `fastlane/metadata/android/<lang>/changelogs/<versionCode>.txt`
-   for the three languages (the tests ask for them).
+   for every listing language (the tests ask for them).
 3. Merge to `main`; then either run *Publish to Google Play*, or download the
    signed `app-release.aab` from the Android run and upload it in Play Console.
 4. Roll it out (internal testing first is quickest to try).

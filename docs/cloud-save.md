@@ -95,6 +95,29 @@ During play, a refused save (another session saved meanwhile) opens the
 conflict dialog with both copies side by side (company, money, earnings,
 factories, cars, last played). The copy not chosen is kept as a backup.
 
+## Cloud backups
+
+Besides the backups on the device, the server keeps older copies of each
+account's save (`0011_cloud_backups.sql`), shown in the Profile under
+*Cloud backups*, on any device the player signs in on:
+
+- every time a save is written, the copy it replaces is kept when the
+  newest automatic backup is more than 3 hours old (so the first write after
+  a new account's first save makes one at once);
+- always when the new save has earned less than half of what the old one had
+  (a game that lost most of its progress: a bug, a wrong choice in the
+  conflict dialog, an old phone's save);
+- before a restore, the cloud save it is about to replace.
+
+Each player keeps the newest 12; they go with the account when it is deleted.
+A restore works like a device backup's: the server hands the backup to the
+game (`take_my_backup`, after keeping the current cloud save), the game it
+replaces is kept on the device too, and the game saves the restored one
+through `save_game()` as always, so a session that moved on meanwhile still
+gets the conflict dialog. A backup made by a newer version of the game than
+the one running isn't offered for restore ("update the app"). A backup that
+fails to be made never stops the save: the trigger logs it and goes on.
+
 ## Offline earnings and cheating
 
 - Time away is measured on the **server's clock**: `load_game()` returns the
@@ -172,6 +195,31 @@ a **gift** once a day.
   Rewards: 15 minutes of income, 45 minutes, and 2 hours plus ⭐ 1.
   Rewards don't count as money earned.
 
+## Invite codes
+
+Each player has a 6-character **invite code** (Profile → *Invite friends*),
+made the first time they open it, to share as text. A new player can enter
+one friend's code in their account's first 7 days:
+
+- **The new player** gets a welcome gift at once: $25K plus 10 minutes of
+  their income (`src/game/engine/invites.ts`).
+- **The friend** gets 2 ⭐ and 30 minutes of income once the new player has
+  built their first car, for up to 10 friends in all. The server reads that
+  from the new player's own cloud save (`lifetime.carsProduced ≥ 1`), so a
+  friend's reward can't be claimed by an account that never played. The game
+  collects due rewards on the same timer as gifts.
+- Both are rewards: they don't count as money earned (not for the board, not
+  for resets).
+- **Limits**: one code per account, ever; not one's own code, nor the code of
+  a friend who used one's own (no pairs inviting each other); a code takes at
+  most 50 players. A player sees how many friends used their code, never who.
+- The codes and the links (`ops.invite_codes`, `ops.invites`) are not
+  reachable from the API; players reach them only through `my_invite()`,
+  `redeem_invite(p_code)` (`ok`, `already`, `late`, `self`, `full`,
+  `unknown`) and `claim_invite_rewards()`. A deleted account takes its code
+  and its own link with it; a friend who used its code keeps only the fact
+  that they used one.
+
 ## Database
 
 Migrations in `supabase/migrations/`, in order:
@@ -191,6 +239,12 @@ Migrations in `supabase/migrations/`, in order:
    next save.
 5. `0005_ghosts_and_alliances.sql` — ghosts on the cards, and alliances (see
    "Ghost duels and alliances"). Safe to run again.
+6. `0011_cloud_backups.sql` — cloud backups (see "Cloud backups"): the
+   `ops.save_backups` table (not reachable from the API), the trigger on
+   `game_saves` that keeps them, `list_my_backups()` and `take_my_backup()`.
+7. `0012_invites.sql` — invite codes (see "Invite codes"): the
+   `ops.invite_codes` and `ops.invites` tables (not reachable from the API),
+   `my_invite()`, `redeem_invite()` and `claim_invite_rewards()`.
 
 `profiles`: `id` (= the auth user, deleted with it), `username` (unique on
 `lower(username)`, 3–20 characters, no control characters), `avatar`,
@@ -212,6 +266,13 @@ Functions (all for signed-in players only, `search_path` pinned):
   newer; otherwise returns `ok = false` and the current revision.
 - `load_game()` → `data, save_version, revision, updated_at, server_now`.
 - `ensure_profile()` → the caller's profile, created if missing.
+- `list_my_backups()` → the caller's cloud backups, newest first: `id,
+  made_at, reason` (`auto`, `drop`, `restore`), `device, save_version`, and
+  the summary the Profile shows (`company, cash, earned, cars, plants,
+  last_played`), read from the backup on the server.
+- `take_my_backup(p_id)` → `data, save_version` of one of the caller's own
+  backups (nothing for anyone else's), after keeping the caller's current
+  cloud save as a `restore` backup.
 - `leaderboard(p_kind)` (`'week'` or `'all'`) → the top 50 listed players
   plus the caller's own row: `rank, user_id, username, avatar, company,
   value, me`.
@@ -338,13 +399,14 @@ Level Security. The game doesn't need it.
 - `scripts/cloud-e2e.mjs` — the same checks against the real project through
   its public API, exactly as the browser does (two anonymous test players;
   they appear on the board for a few seconds, under `e2e-…` names, until
-  they delete their saves; a third registers with an email and a password,
-  signs in with them, then deletes its account).
+  they delete their saves and then their accounts; a third registers with an
+  email and a password, signs in with them, then deletes its account).
   Runs in CI (`.github/workflows/cloud-e2e.yml`) on pull requests that touch
   the save code or the database, and on demand.
 
-The e2e test players stay as anonymous users named `e2e-…`. To remove them
-(SQL editor; deletes their profiles and saves too):
+Before October 2026 the two anonymous test players were kept, named
+`e2e-…`. To remove those left from then (SQL editor; deletes their profiles
+too, they never kept a save):
 
 ```sql
 delete from auth.users

@@ -90,6 +90,51 @@
       privacy: "Политика конфиденциальности",
       terms: "Условия использования"
     },
+    es: {
+      title: "Elige una contraseña nueva",
+      intro: "La nueva contraseña de tu cuenta (al menos 6 caracteres).",
+      pw1: "Contraseña nueva",
+      pw2: "Repítela",
+      save: "Guardar la contraseña nueva",
+      done: "Tu contraseña se ha cambiado. Vuelve a la app e inicia sesión con tu correo y la contraseña nueva.",
+      expired: "Este enlace ha caducado o ya se ha usado. En la app, toca Iniciar sesión → ¿Has olvidado la contraseña? para recibir otro.",
+      none: "Abre esta página desde el enlace del correo que te envió el juego. Para recibir uno, toca Iniciar sesión → ¿Has olvidado la contraseña? en la app.",
+      short: "La contraseña necesita al menos 6 caracteres.",
+      mismatch: "Las dos contraseñas no coinciden.",
+      failed: "No se ha podido cambiar la contraseña:",
+      privacy: "Política de privacidad",
+      terms: "Términos de uso"
+    },
+    pt: {
+      title: "Escolha uma senha nova",
+      intro: "A nova senha da sua conta (pelo menos 6 caracteres).",
+      pw1: "Senha nova",
+      pw2: "Repita a senha",
+      save: "Salvar a senha nova",
+      done: "Sua senha foi alterada. Volte ao app e entre com seu e-mail e a senha nova.",
+      expired: "Este link expirou ou já foi usado. No app, toque em Entrar → Esqueceu a senha? para receber outro.",
+      none: "Abra esta página pelo link do e-mail que o jogo enviou. Para receber um, toque em Entrar → Esqueceu a senha? no app.",
+      short: "A senha precisa ter pelo menos 6 caracteres.",
+      mismatch: "As duas senhas não são iguais.",
+      failed: "Não foi possível alterar a senha:",
+      privacy: "Política de privacidade",
+      terms: "Termos de uso"
+    },
+    de: {
+      title: "Neues Passwort wählen",
+      intro: "Das neue Passwort deines Kontos (mindestens 6 Zeichen).",
+      pw1: "Neues Passwort",
+      pw2: "Wiederholen",
+      save: "Neues Passwort speichern",
+      done: "Dein Passwort wurde geändert. Geh zurück in die App und melde dich mit deiner E-Mail-Adresse und dem neuen Passwort an.",
+      expired: "Dieser Link ist abgelaufen oder wurde schon benutzt. Tippe in der App auf Anmelden → Passwort vergessen?, um einen neuen zu bekommen.",
+      none: "Öffne diese Seite über den Link in der E-Mail, die dir das Spiel geschickt hat. Um eine zu bekommen, tippe in der App auf Anmelden → Passwort vergessen?",
+      short: "Das Passwort braucht mindestens 6 Zeichen.",
+      mismatch: "Die beiden Passwörter sind nicht gleich.",
+      failed: "Das Passwort konnte nicht geändert werden:",
+      privacy: "Datenschutzerklärung",
+      terms: "Nutzungsbedingungen"
+    },
     en: { short: "The password needs at least 6 characters.", mismatch: "The two passwords are not the same.", failed: "The password couldn't be changed:" }
   };
   var t = T[lang] || T.en;
@@ -97,6 +142,8 @@
   if (T[lang] && lang !== "en") {
     document.documentElement.lang = lang;
     document.querySelectorAll("[data-t]").forEach(function (el) { var v = t[el.getAttribute("data-t")]; if (v) el.textContent = v; });
+    // the legal pages open at this language's section
+    document.querySelectorAll("a[data-t]").forEach(function (a) { a.setAttribute("href", a.getAttribute("href") + "#" + lang); });
   }
   var show = function (id) { document.getElementById(id).hidden = false; };
 

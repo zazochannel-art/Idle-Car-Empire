@@ -11,13 +11,13 @@ import { migrate } from "./serialize";
 import { SupabaseBackend } from "./supabase";
 import type { Social } from "./social";
 import { CloudSync, type SyncInfo } from "./sync";
-import type { Account, AuthResult, CloudBackend, CloudCopy, LocalCopy, Profile } from "./types";
+import type { Account, AuthResult, CloudBackend, CloudBackup, CloudCopy, LocalCopy, Profile } from "./types";
 
-export type { Account, AuthResult, CloudBackend, CloudCopy, LocalCopy, Profile, SaveAdapter, SavePayload } from "./types";
+export type { Account, AuthResult, CloudBackend, CloudBackup, CloudCopy, LocalCopy, Profile, SaveAdapter, SavePayload } from "./types";
 export type { SaveSummary } from "./policy";
 export { summarize } from "./policy";
 export type { SyncInfo, SyncStatus } from "./sync";
-export type { AllianceMember, AllianceSummary, BoardKind, BoardRow, ClaimTierResult, CreateAllianceResult, EmpireCard, GiftResult, JoinAllianceResult, MyAlliance, ReportReason, ReportResult } from "./social";
+export type { AllianceMember, AllianceSummary, BoardKind, BoardRow, ClaimTierResult, CreateAllianceResult, EmpireCard, GiftResult, JoinAllianceResult, MyAlliance, MyInvite, RedeemInviteResult, ReportReason, ReportResult } from "./social";
 export { GIFTS_PER_DAY, REPORT_REASONS } from "./social";
 export { encodeSave, decodeSave, migrate } from "./serialize";
 
@@ -257,6 +257,32 @@ export class SaveManager {
     if (!state) return null;
     this.local.backup({ state: current, savedAt: now }, "replaced");
     // the time since the backup was kept is not time away: no offline earnings for it
+    state.lastActiveAt = now;
+    return state;
+  }
+
+  /** The older copies of this account's save kept in the cloud (newest first); null without the cloud. */
+  async cloudBackups(): Promise<CloudBackup[] | null> {
+    if (!this.account || !this.backend?.backups) return null;
+    return this.backend.backups();
+  }
+
+  /**
+   * A cloud backup to play again, in place of `current`: the server keeps the cloud save it
+   * replaces as a backup, and `current` is kept on this device too. The caller saves the result,
+   * so it becomes the account's save (through the usual revision check). "newer" when the
+   * backup was made by a newer version of the game; null when it is gone or can't be read.
+   */
+  async restoreCloudBackup(id: number, current: GameState, now: number): Promise<GameState | "newer" | null> {
+    if (this.closed || !this.account || !this.backend?.takeBackup) return null;
+    const backup = (await this.cloudBackups())?.find((b) => b.id === id);
+    if (!backup) return null;
+    if (backup.version > SAVE_VERSION) return "newer";
+    const taken = await this.backend.takeBackup(id);
+    const state = taken && taken.version <= SAVE_VERSION ? this.read(taken.state, now) : null;
+    if (!state || this.closed) return null;
+    this.local.backup({ state: current, savedAt: now }, "replaced");
+    // the time since the backup was made is not time away: no offline earnings for it
     state.lastActiveAt = now;
     return state;
   }

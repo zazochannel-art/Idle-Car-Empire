@@ -424,8 +424,9 @@ function EmergencyParts({ id, parts }: { id: string; parts: ComponentId[] }) {
       <button
         role="switch"
         aria-checked={on}
+        aria-label={t("supplier.backup")}
         onClick={() => setBackup(id, !on)}
-        className={cn("relative h-6 w-11 shrink-0 rounded-full transition-colors", on ? "bg-amber-500" : "bg-white/15")}
+        className={cn("relative h-6 w-11 shrink-0 rounded-full transition-colors before:absolute before:-inset-x-2 before:-inset-y-3 before:content-['']", on ? "bg-amber-500" : "bg-white/15")}
       >
         <span className={cn("absolute top-0.5 size-5 rounded-full bg-white shadow transition-all", on ? "left-[1.4rem]" : "left-0.5")} />
       </button>
@@ -549,6 +550,8 @@ function CarThumbnail({ model, color }: { model: (typeof CARS)[number]["id"]; co
   }, [model, color, src]);
 
   return src ? (
+    // a picture drawn on the phone (a data: URL): nothing for next/image to optimize
+    // eslint-disable-next-line @next/next/no-img-element
     <img src={src} alt="" className="absolute inset-0 h-full w-full object-contain p-1" draggable={false} />
   ) : (
     <div className="absolute inset-4 animate-pulse rounded-lg bg-white/[0.06]" />

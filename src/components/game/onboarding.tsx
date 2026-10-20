@@ -210,7 +210,7 @@ export function Onboarding() {
 
   return (
     <div className="pointer-events-none fixed inset-0 z-[80] flex items-end justify-center p-3 pb-[calc(env(safe-area-inset-bottom)+5.5rem)] md:items-center md:pb-3">
-      <div className="pointer-events-auto w-full max-w-lg overflow-hidden rounded-3xl bg-[#141414]/95 shadow-[0_24px_80px_-20px_rgba(0,0,0,.9)] ring-1 ring-white/15 backdrop-blur-xl">
+      <div data-testid="tutorial" className="pointer-events-auto w-full max-w-lg overflow-hidden rounded-3xl bg-[#141414]/95 shadow-[0_24px_80px_-20px_rgba(0,0,0,.9)] ring-1 ring-white/15 backdrop-blur-xl">
         <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
           <div>
             <div className="text-[9px] font-black uppercase tracking-[0.2em] text-gold">{c.eyebrow}</div>
