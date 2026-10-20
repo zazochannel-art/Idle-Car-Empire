@@ -172,7 +172,7 @@ rating authority decides.
 | Personal info → **User IDs** (account id) | yes | required | App functionality, Account management |
 | App activity → **Other actions** (game progress / save; weekly cup times; invite codes and which friend's code was used) | yes | required when online | App functionality |
 | App activity → **Other user-generated content** (company and alliance names; reports sent about other players) | yes | optional | App functionality; Fraud prevention, security, and compliance |
-| App activity → **App interactions** (anonymous beginner steps) | yes | optional (Settings → Anonymous statistics) | Analytics |
+| App activity → **App interactions** (the days played: the dates the cloud save was updated, with the account; and the anonymous beginner steps) | yes | required when online (the days played; the beginner steps are optional: Settings → Anonymous statistics) | Analytics |
 | App info and performance → **Crash logs**, **Diagnostics** (the game's anonymous error reports: [errors.md](../errors.md)) | yes | optional (Settings → Anonymous statistics) | Analytics, App functionality |
 | *AdMob:* Device or other IDs → **Device or other IDs** (advertising ID) | yes, **shared** | required (the SDK collects it when an ad is requested) | Advertising or marketing, Analytics, Fraud prevention, security, and compliance |
 | *AdMob:* Location → **Approximate location** (from the IP address) | yes, **shared** | required | Advertising or marketing, Analytics, Fraud prevention, security, and compliance |
@@ -182,7 +182,8 @@ rating authority decides.
 The form takes each data type once: **Crash logs** and **Diagnostics** come
 from both the game (collected, not shared, optional) and AdMob (shared,
 required), so answer them collected **and** shared, **required** (AdMob's
-can't be switched off), with both rows' purposes.
+can't be switched off), with both rows' purposes. **App interactions** the
+same way: the game's (the days played, required) and AdMob's (shared).
 
 **Robot check** ([captcha.md](../captcha.md)), once a release has it: Cloudflare Turnstile reads
 device and browser signals when an account is made or signs in. Declare what Cloudflare's
