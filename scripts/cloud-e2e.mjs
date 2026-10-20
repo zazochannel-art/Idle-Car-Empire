@@ -2,7 +2,7 @@
 // only the public (publishable) key, exactly as the game's browser code
 // talks to it: two players A and B (anonymous accounts), saving, restoring,
 // revision conflicts, session restore, what each may (not) reach, the
-// leaderboard, visits and gifts, invite codes, ghosts and alliances, and a third player C
+// leaderboard, visits and gifts, invite codes, the weekly cup, ghosts and alliances, and a third player C
 // registering (email and password, as playing needs an account) and deleting
 // their account.
 //
@@ -147,6 +147,26 @@ const invitesTable = await b.client.schema("ops").from("invites").select("invite
 const codesTable = await b.client.schema("ops").from("invite_codes").select("code");
 check(!!invitesTable.error && !!codesTable.error, "the invite tables aren't reachable from the API", invitesTable.error?.code);
 
+// ── the weekly cup (0013): each player's best time of the week, on the server's week and track ──
+const serverNow = Date.parse(one(await a.client.rpc("load_game"))?.server_now ?? "") || Date.now();
+const cupWeek = Math.floor((Math.floor(serverNow / 86_400_000) + 3) / 7);
+// the game's TRACKS in turn (laps, reference lap): the server refuses anything faster than laps × lap × 0.49 s
+const [cupLaps, cupRef] = [[3, 62], [3, 70], [3, 84], [3, 78], [4, 90], [4, 74], [5, 96], [5, 102]][cupWeek % 8];
+const cupFloor = cupLaps * cupRef * 490;
+const cupSend = async (p, ms, week = cupWeek) => (await p.client.rpc("cup_submit", { p_week: week, p_ms: ms, p_car: "sports", p_color: "#ff0000" })).data;
+check((await cupSend(a, cupFloor - 1)) === "invalid", "an impossible cup time is refused");
+check((await cupSend(a, cupFloor + 20_000, cupWeek - 1)) === "closed", "last week's cup takes no more times");
+check((await cupSend(a, cupFloor + 20_000)) === "ok" && (await cupSend(a, cupFloor + 30_000)) === "ok", "A sends two cup times");
+check((await cupSend(b, cupFloor + 10_000)) === "ok", "B sends a faster one");
+const cupBoard = (await a.client.rpc("cup_board", { p_week: cupWeek })).data ?? [];
+const cupA = cupBoard.find((r) => r.me);
+const cupB = cupBoard.find((r) => r.user_id === idB);
+check(cupA?.best_ms === cupFloor + 20_000 && cupB?.best_ms === cupFloor + 10_000 && cupB.rank < cupA.rank, "the cup board keeps each player's best, fastest first", JSON.stringify(cupBoard.slice(0, 3)));
+check((await cupSend(a, cupFloor + 5_000)) === "limit", "three cup times a day");
+check(((await a.client.rpc("claim_cup_prizes")).data ?? []).length === 0, "no cup prize before the week is over");
+const cupTable = await b.client.schema("ops").from("cup_entries").select("week");
+check(!!cupTable.error, "the cup table isn't reachable from the API", cupTable.error?.code);
+
 // ── the leaderboard, visits and gifts (0004) ──
 // A saves a bigger game: the card on the board takes it, but a jump this big is held to what is plausible
 const revA = Number(one(await a.client.rpc("load_game"))?.revision);
@@ -233,6 +253,8 @@ const anonBackups = await anon.client.rpc("list_my_backups");
 check(!!anonBackups.error, "no backups without signing in", anonBackups.error?.code);
 const anonInvite = await anon.client.rpc("redeem_invite", { p_code: "ABCDEF" });
 check(!!anonInvite.error, "no invite codes without signing in", anonInvite.error?.code);
+const anonCup = await anon.client.rpc("cup_board", { p_week: 1 });
+check(!!anonCup.error, "no cup board without signing in", anonCup.error?.code);
 const anonBoard = await anon.client.rpc("leaderboard", { p_kind: "all" });
 check(!!anonBoard.error, "signed out: no leaderboard", anonBoard.error?.code);
 

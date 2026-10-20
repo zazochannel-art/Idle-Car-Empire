@@ -195,6 +195,41 @@ a **gift** once a day.
   Rewards: 15 minutes of income, 45 minutes, and 2 hours plus ⭐ 1.
   Rewards don't count as money earned.
 
+## Weekly cup
+
+Leaderboard → *Cup*: one track a week (Monday 00:00 UTC to the next), every
+track in turn, the same for every player whatever their reputation
+(`src/game/engine/cup.ts`).
+
+- **Timed runs**: three a UTC day, with the player's ghost car (their best
+  car at the track, unworn), against the clock: the track's reference lap
+  scaled by the car's rating, with a little form and noise. Each run is
+  decided once (seeded by week, day, run and car), so reloading doesn't race
+  it again. The week's best goes to the board.
+- **The board** (`cup_board(week)`): the best 50 times of listed players,
+  and the player's own; the entrants are counted. Players who left the
+  leaderboards don't show.
+- **Prizes**, paid once the week is over, by place (`claim_cup_prizes()`
+  hands each finished week out once; the game pays it, on the gifts timer):
+
+  | Place | Needs | Prize |
+  |---|---|---|
+  | 1st | 5+ players | 5 ⭐, 2 h of income, +60 reputation |
+  | top 3 | 5+ players | 3 ⭐, 90 min, +40 |
+  | top 25% | 4+ players | 2 ⭐, 1 h, +25 |
+  | top half | 2+ players | 1 ⭐, 45 min, +15 |
+  | everyone else who raced | | 30 min, +10 |
+
+  Rewards, like gifts: they don't count as money earned.
+- **On the server** (`ops.cup_entries`, not reachable from the API): one row
+  per player and week, the best time, its car and colour, the sends that day
+  (3 at most) and when the prize was taken. `cup_submit(week, ms, car,
+  color)` answers `ok`, `closed` (not this week), `invalid` (faster than the
+  best car could drive: laps × reference lap × 0.49 s, or not a car) or
+  `limit`. Times come from the player's game, as every score on the boards
+  does; the floor stops the impossible ones. The server's track list
+  (`ops.cup_track`) must match the game's `TRACKS`: a test compares them.
+
 ## Invite codes
 
 Each player has a 6-character **invite code** (Profile → *Invite friends*),
@@ -245,6 +280,9 @@ Migrations in `supabase/migrations/`, in order:
 7. `0012_invites.sql` — invite codes (see "Invite codes"): the
    `ops.invite_codes` and `ops.invites` tables (not reachable from the API),
    `my_invite()`, `redeem_invite()` and `claim_invite_rewards()`.
+8. `0013_weekly_cup.sql` — the weekly cup (see "Weekly cup"): the
+   `ops.cup_entries` table (not reachable from the API), `cup_submit()`,
+   `cup_board()` and `claim_cup_prizes()`.
 
 `profiles`: `id` (= the auth user, deleted with it), `username` (unique on
 `lower(username)`, 3–20 characters, no control characters), `avatar`,

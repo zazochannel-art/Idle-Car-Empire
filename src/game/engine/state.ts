@@ -88,6 +88,7 @@ export function createInitialState(now: number): GameState {
     tips: [],
     login: { day: "", streak: 0, claimed: true },
     duels: { day: "", raced: [] },
+    cup: { week: 0, day: 0, runs: 0, best: 0, laps: [], car: "", sent: 0, claimed: 0 },
     winter: { year: 0, doors: [], goals: [], base: null, target: null },
     rivalsBeaten: [],
     contracts: { offer: null, active: null, nextAt: 0, done: 0 },

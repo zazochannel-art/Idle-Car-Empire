@@ -103,6 +103,33 @@ export interface MyInvite {
 
 export type RedeemInviteResult = "ok" | "already" | "late" | "self" | "full" | "unknown";
 
+/** A row of a week's cup board (supabase/migrations/0013). */
+export interface CupRow {
+  rank: number;
+  userId: string;
+  username: string;
+  avatar: string;
+  car: string;
+  color: string;
+  /** The week's best time, in seconds. */
+  best: number;
+  me: boolean;
+  /** Players on the board that week. */
+  entrants: number;
+}
+
+/** "ok": the board has it; "closed": the week is over; "invalid": an impossible time; "limit": enough sent today. */
+export type CupSubmitResult = "ok" | "closed" | "invalid" | "limit";
+
+/** A finished week's place, handed out once. */
+export interface CupPlace {
+  week: number;
+  rank: number;
+  entrants: number;
+  /** Seconds. */
+  best: number;
+}
+
 export type ReportReason = "name" | "company" | "cheating" | "other";
 export const REPORT_REASONS: ReportReason[] = ["name", "company", "cheating", "other"];
 export type ReportResult = "ok" | "limit" | "unknown";
@@ -265,5 +292,33 @@ export class Social {
   /** Takes the rewards due for friends' first cars: how many (each counted once). */
   async claimInviteRewards(): Promise<number> {
     return Math.max(0, Math.floor(num(await this.call("claim_invite_rewards"))));
+  }
+
+  /** Sends the week's best timed run (milliseconds) to the cup board. */
+  async cupSubmit(week: number, ms: number, car: string, color: string): Promise<CupSubmitResult> {
+    const r = str(await this.call("cup_submit", { p_week: week, p_ms: ms, p_car: car, p_color: color }));
+    return r === "ok" || r === "closed" || r === "limit" ? r : "invalid";
+  }
+
+  /** A week's cup board: the best 50 (listed players) and the player's own row. */
+  async cupBoard(week: number): Promise<CupRow[]> {
+    const rows = (await this.call("cup_board", { p_week: week })) as unknown[] | null;
+    return (rows ?? []).map(obj).map((r) => ({
+      rank: num(r.rank),
+      userId: str(r.user_id),
+      username: str(r.username),
+      avatar: str(r.avatar),
+      car: str(r.car),
+      color: str(r.color),
+      best: num(r.best_ms) / 1000,
+      me: r.me === true,
+      entrants: num(r.entrants),
+    }));
+  }
+
+  /** The player's places in finished weeks not paid yet (the server hands each out once). */
+  async claimCupPrizes(): Promise<CupPlace[]> {
+    const rows = (await this.call("claim_cup_prizes")) as unknown[] | null;
+    return (rows ?? []).map(obj).map((r) => ({ week: num(r.week), rank: Math.max(1, num(r.rank)), entrants: Math.max(1, num(r.entrants)), best: num(r.best_ms) / 1000 }));
   }
 }

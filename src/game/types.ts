@@ -552,6 +552,12 @@ export interface GameState {
   login: { day: string; streak: number; claimed: boolean };
   /** Duels with other players' ghosts today (engine/ghost.ts): the rivals raced. */
   duels: { day: string; raced: string[] };
+  /**
+   * The weekly cup (engine/cup.ts): this week's runs today (UTC day number), the week's best
+   * time (seconds, 0: none) with its laps and car, the best the board has (ms), and the last
+   * finished week whose prize was paid.
+   */
+  cup: { week: number; day: number; runs: number; best: number; laps: number[]; car: string; sent: number; claimed: number };
   /** Winter festival (engine/winter.ts): its year, advent doors opened, goals taken, and where the goals started and how big they are. */
   winter: {
     year: number;
