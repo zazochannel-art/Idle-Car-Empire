@@ -2,14 +2,14 @@
 // only the public (publishable) key, exactly as the game's browser code
 // talks to it: two players A and B (anonymous accounts), saving, restoring,
 // revision conflicts, session restore, what each may (not) reach, the
-// leaderboard, visits and gifts, ghosts and alliances, and a third player C
+// leaderboard, visits and gifts, invite codes, ghosts and alliances, and a third player C
 // registering (email and password, as playing needs an account) and deleting
 // their account.
 //
 //   NEXT_PUBLIC_SUPABASE_URL=… NEXT_PUBLIC_SUPABASE_ANON_KEY=… node scripts/cloud-e2e.mjs
 //
-// It leaves no save behind (each test player deletes its own); the anonymous
-// accounts of A and B stay, named "e2e-…" (see docs/cloud-save.md to clear them).
+// It leaves nothing behind: each test player deletes its own save, then its
+// account.
 import { createClient } from "@supabase/supabase-js";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -108,6 +108,45 @@ const sB = one(await b.client.rpc("save_game", { p_data: { cash: 7 }, p_save_ver
 check(sB?.ok === true, "B saves their own game");
 check(one(await a.client.rpc("load_game"))?.data?.cash === 250, "A's save is untouched by B");
 
+// ── cloud backups (0011): older copies of a save, each player's own only ──
+const backupsA = await a.client.rpc("list_my_backups");
+const firstBackup = (backupsA.data ?? []).at(-1);
+check(!backupsA.error && firstBackup?.reason === "auto" && firstBackup.cash === 100, "the server kept A's first save as a backup", backupsA.error?.message ?? JSON.stringify(backupsA.data));
+const backupsB = await b.client.rpc("list_my_backups");
+check(!backupsB.error && !(backupsB.data ?? []).some((r) => Number(r.id) === Number(firstBackup?.id)), "B doesn't see A's backups", backupsB.error?.message);
+const takeB = await b.client.rpc("take_my_backup", { p_id: firstBackup?.id ?? 0 });
+check(!takeB.error && (takeB.data ?? []).length === 0, "B can't take A's backup", takeB.error?.message ?? JSON.stringify(takeB.data));
+const backupsTable = await b.client.schema("ops").from("save_backups").select("id");
+check(!!backupsTable.error, "the backups table isn't reachable from the API", backupsTable.error?.code);
+const takeA = one(await a.client.rpc("take_my_backup", { p_id: firstBackup?.id ?? 0 }));
+check(takeA?.data?.cash === 100, "A takes its backup to play again", JSON.stringify(takeA?.data));
+const keptA = (await a.client.rpc("list_my_backups")).data ?? [];
+check(keptA[0]?.reason === "restore" && keptA[0].cash === 250, "the save it would replace is kept first", JSON.stringify(keptA[0]));
+check(one(await a.client.rpc("load_game"))?.data?.cash === 250, "taking a backup leaves the save as it is");
+
+// ── invite codes (0012): B uses A's code; A's reward waits for B's first car, and is taken once ──
+const inviteA = (await a.client.rpc("my_invite")).data;
+check(/^[A-HJ-NP-Z2-9]{6}$/.test(inviteA?.code ?? "") && inviteA.friends === 0 && inviteA.canUse === true, "A has an invite code (and, new, can still use one)", JSON.stringify(inviteA));
+check((await a.client.rpc("my_invite")).data?.code === inviteA?.code, "the code stays the same");
+const redeem = async (p, code) => (await p.client.rpc("redeem_invite", { p_code: code })).data;
+check((await redeem(a, inviteA?.code)) === "self", "nobody uses their own code");
+check((await redeem(b, "nope!")) === "unknown", "an unknown code is turned away");
+check((await redeem(b, ` ${inviteA?.code?.toLowerCase()} `)) === "ok", "B uses A's code (typed loosely)");
+check((await redeem(b, inviteA?.code)) === "already", "a code is used once per account");
+const inviteB = (await b.client.rpc("my_invite")).data;
+check(inviteB?.used === true && inviteB.canUse === false && inviteB.code !== inviteA?.code, "B is marked as invited", JSON.stringify(inviteB));
+check((await redeem(a, inviteB?.code)) === "self", "A can't use the code of a friend who used theirs");
+check((await a.client.rpc("my_invite")).data?.friends === 1 && (await a.client.rpc("claim_invite_rewards")).data === 0, "A sees one friend, no reward before B's first car");
+const sB2 = one(await b.client.rpc("save_game", { p_data: { cash: 7, lifetime: { carsProduced: 1 } }, p_save_version: 3, p_base_revision: Number(sB?.revision ?? 1), p_device: "e2e" }));
+check(sB2?.ok === true, "B builds their first car");
+check((await a.client.rpc("my_invite")).data?.due === 1, "A's reward is due");
+check((await b.client.rpc("claim_invite_rewards")).data === 0, "B can't take A's reward");
+check((await a.client.rpc("claim_invite_rewards")).data === 1, "A takes it");
+check((await a.client.rpc("claim_invite_rewards")).data === 0 && (await a.client.rpc("my_invite")).data?.rewarded === 1, "only once");
+const invitesTable = await b.client.schema("ops").from("invites").select("invitee");
+const codesTable = await b.client.schema("ops").from("invite_codes").select("code");
+check(!!invitesTable.error && !!codesTable.error, "the invite tables aren't reachable from the API", invitesTable.error?.code);
+
 // ── the leaderboard, visits and gifts (0004) ──
 // A saves a bigger game: the card on the board takes it, but a jump this big is held to what is plausible
 const revA = Number(one(await a.client.rpc("load_game"))?.revision);
@@ -190,6 +229,10 @@ const anonLoad = await anon.client.rpc("load_game");
 check(!!anonLoad.error, "signed out: no access to saves", anonLoad.error?.code);
 const anonRead = await anon.client.from("game_saves").select("user_id");
 check(!!anonRead.error || (anonRead.data ?? []).length === 0, "signed out: the table shows nothing", anonRead.error?.code);
+const anonBackups = await anon.client.rpc("list_my_backups");
+check(!!anonBackups.error, "no backups without signing in", anonBackups.error?.code);
+const anonInvite = await anon.client.rpc("redeem_invite", { p_code: "ABCDEF" });
+check(!!anonInvite.error, "no invite codes without signing in", anonInvite.error?.code);
 const anonBoard = await anon.client.rpc("leaderboard", { p_kind: "all" });
 check(!!anonBoard.error, "signed out: no leaderboard", anonBoard.error?.code);
 
@@ -279,14 +322,17 @@ check(sneaky.error?.code === "42501", "a player can't schedule an event", sneaky
 const opsTable = await a.client.schema("ops").from("live_events").select("id");
 check(!!opsTable.error, "the events table isn't reachable from the API", opsTable.error?.code ?? "readable");
 
-// ── clean up: each test player deletes its own save (and so its card) ──
+// ── clean up: each test player deletes its own save (and so its card), then its account: no
+// test account stays on the project (they counted as players on the owner's dashboard) ──
 for (const p of [a, b]) {
   const del = await p.client.from("game_saves").delete().not("user_id", "is", null);
   if (del.error) console.log("cleanup:", del.error.message);
 }
 check(!((await a.client.rpc("leaderboard", { p_kind: "all" })).data ?? []).some((r) => r.me), "a deleted save takes its card off the board");
-await a.client.auth.signOut();
-await b.client.auth.signOut();
+for (const [name, p] of [["A", a], ["B", b]]) {
+  const gone = await p.client.rpc("delete_my_account");
+  check(gone.data === "ok", `test player ${name} deletes its account`, gone.error?.message ?? gone.data);
+}
 
 console.log(failed ? `\n${failed} check(s) failed` : "\nall cloud checks passed");
 process.exit(failed ? 1 : 0);

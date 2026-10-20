@@ -9,6 +9,8 @@ export const PRIVACY_URL = `${SITE_URL}privacy/`;
 export const TERMS_URL = `${SITE_URL}terms/`;
 /** Where a password reset email's link leads: the page that sets the new password (site/reset-password/). */
 export const RESET_PASSWORD_URL = `${SITE_URL}reset-password/`;
+/** A legal page opened at the player's language: each page has a section per game language (#ro, #de…). */
+export const legalUrl = (url: string, lang: string) => (lang === "en" ? url : `${url}#${lang}`);
 /** Players' help address (the store listing's and the legal pages'). */
 export const CONTACT_EMAIL = "idlecarempire@gmail.com";
 

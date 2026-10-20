@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { REPORT_REASONS, type ReportReason, type ReportResult } from "@/game/save";
 import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
-import { PRIVACY_URL, TERMS_URL } from "@/lib/platform";
+import { legalUrl, PRIVACY_URL, TERMS_URL } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import { uiEvents } from "@/store/events";
 import { useGame } from "@/store/game-store";
@@ -176,8 +176,8 @@ export function HiddenPlayersCard() {
 
 /** "By creating an account, you agree to the Terms of Use and the Privacy Policy", with the two links. */
 export function TermsConsent({ className }: { className?: string }) {
-  const { t } = useT();
-  const links: Record<string, [string, MessageKey]> = { "\u0001": [TERMS_URL, "account.termsLink"], "\u0002": [PRIVACY_URL, "account.privacyLink"] };
+  const { t, lang } = useT();
+  const links: Record<string, [string, MessageKey]> = { "\u0001": [legalUrl(TERMS_URL, lang), "account.termsLink"], "\u0002": [legalUrl(PRIVACY_URL, lang), "account.privacyLink"] };
   const parts = t("account.termsAgree", { terms: "\u0001", privacy: "\u0002" }).split(/(\u0001|\u0002)/);
   return (
     <p className={cn("text-center text-[10px] leading-snug text-white/50", className)}>

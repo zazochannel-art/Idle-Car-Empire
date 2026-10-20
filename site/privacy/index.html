@@ -27,7 +27,7 @@
   .langs a { padding: 3px 12px; border: 1px solid #23262e; border-radius: 999px; background: #12141a; color: #c9ccd4; font-size: .9rem; text-decoration: none; }
   footer { max-width: 760px; margin: 0 auto; padding: 20px 20px 48px; border-top: 1px solid #23262e; color: #8b8f99; font-size: .9rem; }
   footer a { margin-right: 1em; }
-  h1 { scroll-margin-top: 16px; }
+  h1 { scroll-margin-top: 16px; overflow-wrap: break-word; hyphens: auto; }
   /* phones: each row of the table is a card (three columns don't fit) */
   @media (max-width: 600px) {
     table, tbody, tr, td { display: block; }
@@ -42,9 +42,9 @@
 <body>
 <main>
 <a class="brand" href="../"><img src="../icon.png" alt="">Idle Car Empire</a>
-<nav class="langs"><a href="#en">English</a><a href="#ro">Română</a><a href="#ru">Русский</a></nav>
+<nav class="langs"><a href="#en">English</a><a href="#ro">Română</a><a href="#ru">Русский</a><a href="#es">Español</a><a href="#pt">Português</a><a href="#de">Deutsch</a></nav>
 <h1 id="en">Idle Car Empire – Privacy Policy</h1>
-<p class="muted">Applies to the Idle Car Empire apps for Android and iOS. Last updated: 19 October 2026. See also the <a href="../terms/">Terms of Use</a>.</p>
+<p class="muted">Applies to the Idle Car Empire apps for Android and iOS. Last updated: 20 October 2026. See also the <a href="../terms/">Terms of Use</a>.</p>
 
 <div class="box">
 <p><strong>In short:</strong> playing needs an account (a player name, an email address and a password). The game keeps your progress on your device and, so you can keep it across devices, in your account's cloud save. The app offers optional rewarded ads from Google AdMob (you choose to watch one for a bonus). The game has no analytics SDKs and doesn't sell your data. You can delete your account and everything stored with it from the game (Profile → Delete account).</p>
@@ -56,13 +56,14 @@
 <h2>What is stored, and why</h2>
 <table>
 <tr><th>Data</th><th>When</th><th>Why</th></tr>
-<tr><td><strong>Game progress</strong> (your company, factories, money, cars, research, settings, and the players you hid)</td><td>On your device, and in your account's cloud save.</td><td>To run the game and keep your progress.</td></tr>
+<tr><td><strong>Game progress</strong> (your company, factories, money, cars, research, settings, and the players you hid)</td><td>On your device, and in your account's cloud save, with up to 12 older copies of it (cloud backups: one every few hours of play, one before a save with much less progress, one before a restore).</td><td>To run the game, keep your progress, and let you go back to an older copy (Profile → <em>Cloud backups</em>).</td></tr>
 <tr><td><strong>An account id</strong> (a random identifier)</td><td>When you create your account, which is needed to play. (Players who played as a <em>guest</em> before accounts were required keep their account id when they register.)</td><td>To keep your cloud save yours and only yours.</td></tr>
 <tr><td><strong>Email address and password</strong></td><td>When you create your account. Passwords are stored hashed by our authentication provider; we never see them.</td><td>To sign in, also on other devices, and to confirm the address.</td></tr>
 <tr><td><strong>Player name and avatar</strong></td><td>The name you choose when you create your account (you can change it, and the avatar, in your Profile).</td><td>Shown on your profile, the leaderboards, alliances and gifts.</td></tr>
 <tr><td><strong>Public empire card</strong>: player name, avatar, company name, your plants and their levels, totals (money earned, cars built, stars, race results) and your best race car (for ghost races)</td><td>Published with your cloud save while you are listed on the leaderboards (on by default; switch it off in your Profile).</td><td>Leaderboards, visiting other players' empires, gifts and ghost races.</td></tr>
 <tr><td><strong>Alliance membership</strong>, and the alliance name/tag/emblem if you create one</td><td>Only if you join or create an alliance.</td><td>The alliance's shared weekly goal.</td></tr>
 <tr><td><strong>Gifts</strong> sent and received (who, when)</td><td>Only when you send or receive one.</td><td>The daily gift limits and rewards.</td></tr>
+<tr><td><strong>Invite codes</strong>: your code and, if you used a friend's code, whose code it was (account ids), when, and when your friend took their reward</td><td>Your code is made the first time you open <em>Invite friends</em> in your Profile; the link only if you use a friend's code (in your account's first 7 days).</td><td>To give the welcome gift once, and your friend's reward once, when you build your first car (read from your cloud save on the server). Players see how many friends used their code, never who.</td></tr>
 <tr><td><strong>Reports</strong>: who reported whom (account ids), the reason chosen, when, and the player, company or alliance name the reporter saw</td><td>Only when a player reports another player or an alliance.</td><td>So the developer can review the report and act on names and players that break the <a href="../terms/">Terms of Use</a>. Players never see who reported them.</td></tr>
 <tr><td><strong>Purchases</strong>, where the Android app offers in-app purchases: which products you own and a short code for each purchase (not the payment)</td><td>In your game progress, when you buy something.</td><td>To give each purchase once, keep it in your account, and give it back on a new phone.</td></tr>
 <tr><td><strong>Device type</strong> (e.g. “Android” or “iPhone”)</td><td>Stored with each cloud save.</td><td>To tell you which device saved last if two saves differ.</td></tr>
@@ -94,7 +95,7 @@
 
 <h2>Deleting your data</h2>
 <ul>
-<li><strong>In the game:</strong> Profile → <em>Delete account</em> → <em>Delete for good</em>. This deletes your account, cloud save, profile, public empire card, gifts, alliance seat and any reports about you at once; reports you made no longer name you.</li>
+<li><strong>In the game:</strong> Profile → <em>Delete account</em> → <em>Delete for good</em>. This deletes your account, cloud save and its backups, profile, public empire card, gifts, alliance seat and any reports about you at once; reports you made no longer name you.</li>
 <li><strong>Without the game:</strong> see <a href="../delete-account/">how to request deletion</a>.</li>
 <li><strong>On your device:</strong> uninstall the app, or clear its data in your phone's settings.</li>
 </ul>
@@ -110,42 +111,114 @@
 
 <hr>
 
+<section lang="ro">
 <h1 id="ro">Politica de confidențialitate (Română)</h1>
 <div class="box">
 <p><strong>Pe scurt:</strong> pentru a juca ai nevoie de un cont (nume de jucător, adresă de email și parolă). Jocul îți păstrează progresul pe dispozitiv și, ca să-l poți continua pe alte dispozitive, în salvarea din cloud a contului. Aplicația oferă reclame opționale cu recompensă de la Google AdMob (alegi tu să vezi una pentru un bonus). Jocul nu are SDK-uri de analiză și nu vinde datele tale. Îți poți șterge contul și tot ce e stocat cu el din joc (Profil → Șterge contul).</p>
 </div>
 <ul>
-<li><strong>Progresul jocului</strong>: pe dispozitiv și în salvarea din cloud a contului.</li>
+<li><strong>Progresul jocului</strong>: pe dispozitiv și în salvarea din cloud a contului, cu până la 12 copii mai vechi ale ei (copii de rezervă în cloud, ca să poți reveni la una: Profil → <em>Copii de rezervă în cloud</em>).</li>
 <li><strong>Un identificator de cont</strong> (aleator), <strong>emailul și parola</strong>, la crearea contului, necesar pentru a juca (parola e stocată criptat de furnizorul de autentificare).</li>
 <li><strong>Numele de jucător și avatarul</strong>, și o <strong>fișă publică a imperiului</strong> (nume, companie, fabrici, totaluri, cea mai bună mașină de curse) pentru clasamente, vizite, cadouri și curse cu fantome, cât timp ești listat (se poate opri din Profil).</li>
+<li><strong>Codurile de invitație</strong>: codul tău și, dacă ai folosit codul unui prieten, al cui era, când și când și-a luat prietenul recompensa (dată o singură dată, când îți construiești prima mașină, citită din salvarea din cloud). Jucătorii văd câți prieteni le-au folosit codul, niciodată cine.</li>
 <li><strong>Alianța</strong>, <strong>cadourile</strong> și <strong>tipul dispozitivului</strong> (ex. „Android” sau „iPhone”) cu fiecare salvare.</li>
-<li><strong>Raportările</strong>: când raportezi un jucător sau o alianță, păstrăm cine pe cine a raportat, motivul, data și numele văzute, ca dezvoltatorul să le verifice (vezi <a href="../terms/">Termenii de utilizare</a>). Jucătorii nu văd cine i-a raportat. Jucătorii pe care îi ascunzi rămân în salvarea ta.</li>
+<li><strong>Raportările</strong>: când raportezi un jucător sau o alianță, păstrăm cine pe cine a raportat, motivul, data și numele văzute, ca dezvoltatorul să le verifice (vezi <a href="../terms/#ro">Termenii de utilizare</a>). Jucătorii nu văd cine i-a raportat. Jucătorii pe care îi ascunzi rămân în salvarea ta.</li>
 <li><strong>Notificări</strong> (dacă le pornești din Setări): telefonul îți amintește de lucruri din joc cât e închis (o clădire terminată, limita offline atinsă). Sunt programate pe telefon; nu se trimite nimic nimănui.</li>
 <li><strong>Pași anonimi de progres</strong> (numele unei etape de început și minutele de joc), trimiși fără cont sau identificator; se pot opri din Setări.</li>
 <li><strong>Rapoarte anonime de erori</strong>: când jocul dă o eroare, mesajul erorii (fără nimic ce arată a email, adresă web sau număr lung), ecranul și locul din codul jocului, versiunea aplicației, „Android” sau „iOS” și versiunile Android/iOS și ale motorului web; trimise fără cont, fără progresul jocului și fără identificator de dispozitiv, ca să reparăm greșelile. Se șterg după 90 de zile și se opresc din Setări (<em>Statistici anonime</em>).</li>
 <li><strong>Cumpărături în aplicație</strong> (acolo unde aplicația Android le oferă): se plătesc prin Google Play; jocul nu vede niciodată datele cardului sau ale plății. Cu fiecare cumpărătură, jocul dă Google Play un cod anonim făcut din identificatorul contului (un hash într-un singur sens), ca cumpărătura să rămână a contului tău, și păstrează în salvare ce produse deții și un cod scurt al fiecărei cumpărături.</li>
 <li><strong>Reclame:</strong> reclame cu recompensă de la Google AdMob, doar când alegi să vezi una. Google colectează de pe dispozitiv ID-ul de publicitate (pe iPhone doar dacă permiți urmărirea), adresa IP (locație aproximativă), informații despre dispozitiv și aplicație, interacțiunile cu reclamele și diagnostice, pentru afișarea și măsurarea reclamelor și prevenirea fraudei (<a href="https://policies.google.com/technologies/partner-sites">cum folosește Google aceste date</a>). În SEE, Marea Britanie și Elveția aplicația cere mai întâi acordul; îl poți schimba din Setări → <em>Opțiuni de confidențialitate pentru reclame</em>. Datele jocului tău nu sunt date niciodată Google sau altor agenți de publicitate.</li>
 </ul>
-<p>Datele din cloud sunt găzduite de Supabase și păstrate până la ștergerea contului. Ștergere: în joc, Profil → <em>Șterge contul</em>, sau <a href="../delete-account/">cerere de ștergere</a>. Contact: <a href="mailto:idlecarempire@gmail.com">idlecarempire@gmail.com</a>.</p>
+<p>Datele din cloud sunt găzduite de Supabase și păstrate până la ștergerea contului. Ștergere: în joc, Profil → <em>Șterge contul</em>, sau <a href="../delete-account/#ro">cerere de ștergere</a>. Contact: <a href="mailto:idlecarempire@gmail.com">idlecarempire@gmail.com</a>.</p>
+</section>
 <hr>
 
+<section lang="ru">
 <h1 id="ru">Политика конфиденциальности (Русский)</h1>
 <div class="box">
 <p><strong>Коротко:</strong> для игры нужен аккаунт (имя игрока, адрес электронной почты и пароль). Игра хранит ваш прогресс на устройстве и, чтобы его можно было продолжить на других устройствах, в облачном сохранении аккаунта. В приложении есть необязательная реклама с наградой от Google AdMob (вы сами решаете, смотреть ли её ради бонуса). В игре нет SDK аналитики, и она не продаёт ваши данные. Аккаунт и всё, что с ним хранится, можно удалить в игре (Профиль → Удалить аккаунт).</p>
 </div>
 <ul>
-<li><strong>Прогресс игры</strong>: на устройстве и в облачном сохранении аккаунта.</li>
+<li><strong>Прогресс игры</strong>: на устройстве и в облачном сохранении аккаунта, вместе с не более чем 12 его старыми копиями (резервные копии в облаке, чтобы можно было вернуться к одной из них: Профиль → <em>Резервные копии в облаке</em>).</li>
 <li><strong>Идентификатор аккаунта</strong> (случайный), <strong>почта и пароль</strong> — при создании аккаунта, который нужен для игры (пароль хранится в зашифрованном виде у провайдера аутентификации).</li>
 <li><strong>Имя игрока и аватар</strong>, а также <strong>публичная карточка империи</strong> (имя, компания, заводы, итоги, лучшая гоночная машина) для рейтингов, визитов, подарков и гонок с призраками, пока вы в рейтинге (можно отключить в Профиле).</li>
+<li><strong>Коды приглашений</strong>: ваш код и, если вы использовали код друга, чей это был код, когда, и когда друг получил награду (один раз, когда вы построите первую машину; это видно из облачного сохранения). Игроки видят, сколько друзей использовали их код, но не кто.</li>
 <li><strong>Альянс</strong>, <strong>подарки</strong> и <strong>тип устройства</strong> (например, «Android» или «iPhone») с каждым сохранением.</li>
-<li><strong>Жалобы</strong>: когда вы жалуетесь на игрока или альянс, мы храним, кто на кого пожаловался, причину, дату и увиденные имена, чтобы разработчик мог их проверить (см. <a href="../terms/">Условия использования</a>). Игроки не видят, кто на них пожаловался. Скрытые вами игроки хранятся в вашем сохранении.</li>
+<li><strong>Жалобы</strong>: когда вы жалуетесь на игрока или альянс, мы храним, кто на кого пожаловался, причину, дату и увиденные имена, чтобы разработчик мог их проверить (см. <a href="../terms/#ru">Условия использования</a>). Игроки не видят, кто на них пожаловался. Скрытые вами игроки хранятся в вашем сохранении.</li>
 <li><strong>Уведомления</strong> (если включить в Настройках): телефон напоминает о событиях в игре, пока она закрыта. Они планируются на телефоне; никуда ничего не отправляется.</li>
 <li><strong>Анонимные шаги прогресса</strong> (название этапа начала игры и минуты игры) отправляются без аккаунта и идентификаторов; их можно отключить в Настройках.</li>
 <li><strong>Анонимные отчёты об ошибках</strong>: когда в игре происходит ошибка, её текст (без всего, что похоже на почту, веб-адрес или длинное число), экран и место в коде игры, версия приложения, «Android» или «iOS» и версии Android/iOS и веб-движка; отправляются без аккаунта, прогресса игры и идентификатора устройства, чтобы исправлять ошибки. Удаляются через 90 дней; отключаются в Настройках (<em>Анонимная статистика</em>).</li>
 <li><strong>Покупки в приложении</strong> (там, где Android-приложение их предлагает): оплачиваются через Google Play; игра никогда не видит данные карты или платежа. С каждой покупкой игра передаёт Google Play анонимный код, сделанный из идентификатора аккаунта (односторонний хеш), чтобы покупка принадлежала вашему аккаунту, и хранит в сохранении, какие товары у вас есть, и короткий код каждой покупки.</li>
 <li><strong>Реклама:</strong> реклама с наградой от Google AdMob, только когда вы сами решаете её посмотреть. Google собирает с устройства рекламный идентификатор (на iPhone — только с вашего разрешения), IP-адрес (примерное местоположение), сведения об устройстве и приложении, взаимодействие с рекламой и диагностику — для показа и измерения рекламы и защиты от мошенничества (<a href="https://policies.google.com/technologies/partner-sites">как Google использует эти данные</a>). В ЕЭЗ, Великобритании и Швейцарии приложение сначала спрашивает согласие; изменить выбор можно в Настройках → <em>Настройки конфиденциальности рекламы</em>. Данные вашей игры никогда не передаются Google или рекламодателям.</li>
 </ul>
-<p>Облачные данные хранятся в Supabase до удаления аккаунта. Удаление: в игре, Профиль → <em>Удалить аккаунт</em>, или <a href="../delete-account/">запрос на удаление</a>. Контакт: <a href="mailto:idlecarempire@gmail.com">idlecarempire@gmail.com</a>.</p>
+<p>Облачные данные хранятся в Supabase до удаления аккаунта. Удаление: в игре, Профиль → <em>Удалить аккаунт</em>, или <a href="../delete-account/#ru">запрос на удаление</a>. Контакт: <a href="mailto:idlecarempire@gmail.com">idlecarempire@gmail.com</a>.</p>
+</section>
+<hr>
+
+<section lang="es">
+<h1 id="es">Política de privacidad (Español)</h1>
+<div class="box">
+<p><strong>En resumen:</strong> para jugar necesitas una cuenta (un nombre de jugador, una dirección de correo electrónico y una contraseña). El juego guarda tu progreso en tu dispositivo y, para que puedas continuarlo en otros dispositivos, en la partida guardada en la nube de tu cuenta. La app ofrece anuncios con recompensa opcionales de Google AdMob (tú decides si ves uno a cambio de un bonus). El juego no tiene SDK de analítica y no vende tus datos. Puedes eliminar tu cuenta y todo lo que se guarda con ella desde el juego (Perfil → Eliminar cuenta).</p>
+</div>
+<ul>
+<li><strong>El progreso del juego</strong>: en tu dispositivo y en la partida guardada en la nube de tu cuenta, con hasta 12 copias anteriores de ella (copias de seguridad en la nube, para que puedas volver a una: Perfil → <em>Copias de seguridad en la nube</em>).</li>
+<li><strong>Un identificador de cuenta</strong> (aleatorio), <strong>tu correo y tu contraseña</strong>, al crear la cuenta, necesaria para jugar (la contraseña la guarda cifrada el proveedor de autenticación).</li>
+<li><strong>Tu nombre de jugador y tu avatar</strong>, y una <strong>ficha pública de tu imperio</strong> (nombre, empresa, fábricas, totales, tu mejor coche de carreras) para las clasificaciones, las visitas, los regalos y las carreras contra fantasmas, mientras apareces en ellas (se puede desactivar en el Perfil).</li>
+<li><strong>Los códigos de invitación</strong>: tu código y, si usaste el de un amigo, de quién era, cuándo y cuándo recibió tu amigo su recompensa (una sola vez, cuando construyes tu primer coche, según tu partida en la nube). Los jugadores ven cuántos amigos usaron su código, nunca quiénes.</li>
+<li><strong>Tu alianza</strong>, <strong>los regalos</strong> y <strong>el tipo de dispositivo</strong> (p. ej., «Android» o «iPhone») con cada guardado.</li>
+<li><strong>Las denuncias</strong>: cuando denuncias a un jugador o una alianza, guardamos quién denunció a quién, el motivo, la fecha y los nombres vistos, para que el desarrollador los revise (consulta los <a href="../terms/#es">Términos de uso</a>). Los jugadores no ven quién los ha denunciado. Los jugadores que ocultas se quedan en tu partida guardada.</li>
+<li><strong>Notificaciones</strong> (si las activas en Ajustes): el teléfono te recuerda cosas del juego mientras está cerrado (un edificio terminado, el límite sin conexión alcanzado). Se programan en el teléfono; no se envía nada a nadie.</li>
+<li><strong>Pasos anónimos de progreso</strong> (el nombre de una etapa del comienzo y los minutos de juego), enviados sin cuenta ni identificador; se pueden desactivar en Ajustes.</li>
+<li><strong>Informes anónimos de errores</strong>: cuando el juego falla, el mensaje del error (sin nada que parezca un correo, una dirección web o un número largo), la pantalla y el lugar del código del juego, la versión de la app, «Android» o «iOS» y las versiones de Android/iOS y del motor web; enviados sin cuenta, sin el progreso del juego y sin identificador del dispositivo, para corregir los fallos. Se borran a los 90 días y se desactivan en Ajustes (<em>Estadísticas anónimas</em>).</li>
+<li><strong>Compras en la app</strong> (donde la app de Android las ofrece): se pagan a través de Google Play; el juego nunca ve los datos de tu tarjeta ni del pago. Con cada compra, el juego da a Google Play un código anónimo hecho a partir del identificador de tu cuenta (un hash de un solo sentido), para que la compra pertenezca a tu cuenta, y guarda en tu partida qué productos tienes y un código corto de cada compra.</li>
+<li><strong>Anuncios:</strong> anuncios con recompensa de Google AdMob, solo cuando decides ver uno. Google recoge de tu dispositivo el ID de publicidad (en iPhone, solo si permites el seguimiento), la dirección IP (ubicación aproximada), información del dispositivo y de la app, las interacciones con los anuncios y diagnósticos, para mostrar y medir los anuncios y prevenir el fraude (<a href="https://policies.google.com/technologies/partner-sites">cómo usa Google estos datos</a>). En el EEE, el Reino Unido y Suiza, la app pide primero tu consentimiento; puedes cambiarlo en Ajustes → <em>Privacidad de los anuncios</em>. Los datos de tu partida nunca se dan a Google ni a anunciantes.</li>
+</ul>
+<p>Los datos en la nube los aloja Supabase y se guardan hasta que eliminas tu cuenta. Eliminación: en el juego, Perfil → <em>Eliminar cuenta</em>, o con una <a href="../delete-account/#es">solicitud de eliminación</a>. Contacto: <a href="mailto:idlecarempire@gmail.com">idlecarempire@gmail.com</a>. La versión en inglés es la completa; esta es un resumen.</p>
+</section>
+<hr>
+
+<section lang="pt">
+<h1 id="pt">Política de privacidade (Português)</h1>
+<div class="box">
+<p><strong>Em resumo:</strong> para jogar você precisa de uma conta (um nome de jogador, um endereço de e-mail e uma senha). O jogo guarda seu progresso no seu aparelho e, para você poder continuar em outros aparelhos, no save na nuvem da sua conta. O app oferece anúncios com recompensa opcionais do Google AdMob (você escolhe se quer ver um em troca de um bônus). O jogo não tem SDKs de análise e não vende seus dados. Você pode excluir sua conta e tudo o que é guardado com ela pelo jogo (Perfil → Excluir conta).</p>
+</div>
+<ul>
+<li><strong>O progresso do jogo</strong>: no seu aparelho e no save na nuvem da sua conta, com até 12 cópias anteriores dele (backups na nuvem, para você poder voltar a um: Perfil → <em>Backups na nuvem</em>).</li>
+<li><strong>Um identificador de conta</strong> (aleatório), <strong>seu e-mail e sua senha</strong>, ao criar a conta, necessária para jogar (a senha é guardada criptografada pelo provedor de autenticação).</li>
+<li><strong>Seu nome de jogador e seu avatar</strong>, e um <strong>cartão público do seu império</strong> (nome, empresa, fábricas, totais, seu melhor carro de corrida) para os rankings, as visitas, os presentes e as corridas contra fantasmas, enquanto você aparece neles (dá para desativar no Perfil).</li>
+<li><strong>Códigos de convite</strong>: seu código e, se você usou o de um amigo, de quem era, quando e quando seu amigo recebeu a recompensa (uma só vez, quando você constrói seu primeiro carro, conforme seu save na nuvem). Os jogadores veem quantos amigos usaram o código deles, nunca quem.</li>
+<li><strong>Sua aliança</strong>, <strong>os presentes</strong> e <strong>o tipo de aparelho</strong> (por exemplo, “Android” ou “iPhone”) a cada save.</li>
+<li><strong>As denúncias</strong>: quando você denuncia um jogador ou uma aliança, guardamos quem denunciou quem, o motivo, a data e os nomes vistos, para o desenvolvedor analisar (veja os <a href="../terms/#pt">Termos de uso</a>). Os jogadores não veem quem os denunciou. Os jogadores que você oculta ficam no seu save.</li>
+<li><strong>Notificações</strong> (se você ativá-las nas Configurações): o celular lembra você de coisas do jogo enquanto ele está fechado (um prédio pronto, o limite offline atingido). Elas são agendadas no celular; nada é enviado a ninguém.</li>
+<li><strong>Passos anônimos de progresso</strong> (o nome de uma etapa do começo e os minutos de jogo), enviados sem conta nem identificador; dá para desativar nas Configurações.</li>
+<li><strong>Relatórios anônimos de erros</strong>: quando o jogo dá erro, a mensagem do erro (sem nada que pareça um e-mail, um endereço da web ou um número longo), a tela e o lugar no código do jogo, a versão do app, “Android” ou “iOS” e as versões do Android/iOS e do motor web; enviados sem conta, sem o progresso do jogo e sem identificador do aparelho, para corrigir os erros. São apagados após 90 dias e se desativam nas Configurações (<em>Estatísticas anônimas</em>).</li>
+<li><strong>Compras no app</strong> (onde o app para Android as oferece): são pagas pelo Google Play; o jogo nunca vê os dados do seu cartão ou do pagamento. A cada compra, o jogo dá ao Google Play um código anônimo feito a partir do identificador da sua conta (um hash de mão única), para a compra pertencer à sua conta, e guarda no seu save quais produtos você tem e um código curto de cada compra.</li>
+<li><strong>Anúncios:</strong> anúncios com recompensa do Google AdMob, só quando você escolhe ver um. O Google coleta do seu aparelho o ID de publicidade (no iPhone, só se você permitir o rastreamento), o endereço IP (localização aproximada), informações do aparelho e do app, as interações com os anúncios e diagnósticos, para exibir e medir os anúncios e evitar fraudes (<a href="https://policies.google.com/technologies/partner-sites">como o Google usa esses dados</a>). No EEE, no Reino Unido e na Suíça, o app pede seu consentimento primeiro; você pode mudá-lo em Configurações → <em>Privacidade dos anúncios</em>. Os dados do seu jogo nunca são passados ao Google nem a anunciantes.</li>
+</ul>
+<p>Os dados na nuvem ficam hospedados na Supabase e são guardados até você excluir a conta. Exclusão: no jogo, Perfil → <em>Excluir conta</em>, ou com um <a href="../delete-account/#pt">pedido de exclusão</a>. Contato: <a href="mailto:idlecarempire@gmail.com">idlecarempire@gmail.com</a>. A versão em inglês é a completa; esta é um resumo.</p>
+</section>
+<hr>
+
+<section lang="de">
+<h1 id="de">Datenschutzerklärung (Deutsch)</h1>
+<div class="box">
+<p><strong>Kurz gesagt:</strong> Zum Spielen brauchst du ein Konto (einen Spielernamen, eine E-Mail-Adresse und ein Passwort). Das Spiel speichert deinen Fortschritt auf deinem Gerät und, damit du auf anderen Geräten weiterspielen kannst, im Cloud-Spielstand deines Kontos. Die App bietet optionale Werbung mit Belohnung von Google AdMob (du entscheidest selbst, ob du dir für einen Bonus eine ansiehst). Das Spiel enthält keine Analyse-SDKs und verkauft deine Daten nicht. Du kannst dein Konto und alles, was damit gespeichert ist, im Spiel löschen (Profil → Konto löschen).</p>
+</div>
+<ul>
+<li><strong>Dein Spielfortschritt</strong>: auf deinem Gerät und im Cloud-Spielstand deines Kontos, mit bis zu 12 älteren Kopien davon (Cloud-Sicherungen, damit du zu einer zurückkehren kannst: Profil → <em>Cloud-Sicherungen</em>).</li>
+<li><strong>Eine Konto-ID</strong> (zufällig), <strong>deine E-Mail-Adresse und dein Passwort</strong> beim Erstellen des Kontos, das zum Spielen nötig ist (das Passwort speichert der Anmeldedienst verschlüsselt).</li>
+<li><strong>Dein Spielername und dein Avatar</strong> sowie eine <strong>öffentliche Imperiumskarte</strong> (Name, Firma, Fabriken, Summen, dein bestes Rennauto) für Ranglisten, Besuche, Geschenke und Geisterrennen, solange du dort aufgeführt bist (im Profil abschaltbar).</li>
+<li><strong>Einladungscodes</strong>: dein Code und, wenn du den Code eines Freundes genutzt hast, wessen Code es war, wann und wann dein Freund seine Belohnung bekam (einmal, wenn du dein erstes Auto baust, laut deinem Cloud-Spielstand). Spieler sehen, wie viele Freunde ihren Code genutzt haben, nie wer.</li>
+<li><strong>Deine Allianz</strong>, <strong>Geschenke</strong> und die <strong>Geräteart</strong> (z. B. „Android“ oder „iPhone“) bei jedem Speichern.</li>
+<li><strong>Meldungen</strong>: Wenn du einen Spieler oder eine Allianz meldest, speichern wir, wer wen gemeldet hat, den Grund, das Datum und die gesehenen Namen, damit der Entwickler sie prüfen kann (siehe die <a href="../terms/#de">Nutzungsbedingungen</a>). Spieler sehen nicht, wer sie gemeldet hat. Spieler, die du ausblendest, bleiben in deinem Spielstand.</li>
+<li><strong>Benachrichtigungen</strong> (wenn du sie in den Einstellungen einschaltest): Das Handy erinnert dich an Dinge im Spiel, während es geschlossen ist (ein fertiges Gebäude, das erreichte Offline-Limit). Sie werden auf dem Handy geplant; es wird nichts an irgendjemanden gesendet.</li>
+<li><strong>Anonyme Fortschrittsschritte</strong> (der Name einer Etappe am Spielanfang und die Spielminuten), ohne Konto oder Kennung gesendet; in den Einstellungen abschaltbar.</li>
+<li><strong>Anonyme Fehlerberichte</strong>: Wenn im Spiel ein Fehler auftritt, die Fehlermeldung (ohne alles, was wie eine E-Mail-Adresse, eine Webadresse oder eine lange Zahl aussieht), der Bildschirm und die Stelle im Spielcode, die App-Version, „Android“ oder „iOS“ sowie die Versionen von Android/iOS und der Web-Engine; ohne Konto, ohne Spielfortschritt und ohne Gerätekennung gesendet, um Fehler zu beheben. Sie werden nach 90 Tagen gelöscht und lassen sich in den Einstellungen abschalten (<em>Anonyme Statistiken</em>).</li>
+<li><strong>In-App-Käufe</strong> (wo die Android-App sie anbietet): Sie werden über Google Play bezahlt; das Spiel sieht nie deine Karten- oder Zahlungsdaten. Bei jedem Kauf gibt das Spiel Google Play einen anonymen Code, der aus deiner Konto-ID gebildet wird (ein Einweg-Hash), damit der Kauf zu deinem Konto gehört, und speichert in deinem Spielstand, welche Produkte du besitzt, und einen kurzen Code jedes Kaufs.</li>
+<li><strong>Werbung:</strong> Werbung mit Belohnung von Google AdMob, nur wenn du dich entscheidest, eine anzusehen. Google erhebt von deinem Gerät die Werbe-ID (auf dem iPhone nur, wenn du Tracking erlaubst), die IP-Adresse (ungefährer Standort), Geräte- und App-Informationen, die Interaktionen mit der Werbung und Diagnosedaten, um Werbung auszuliefern und zu messen und Betrug zu verhindern (<a href="https://policies.google.com/technologies/partner-sites">wie Google diese Daten nutzt</a>). Im EWR, im Vereinigten Königreich und in der Schweiz fragt die App zuerst nach deiner Einwilligung; du kannst sie unter Einstellungen → <em>Datenschutz bei Werbung</em> ändern. Deine Spieldaten werden nie an Google oder Werbetreibende weitergegeben.</li>
+</ul>
+<p>Die Cloud-Daten liegen bei Supabase und werden gespeichert, bis du dein Konto löschst. Löschen: im Spiel unter Profil → <em>Konto löschen</em> oder per <a href="../delete-account/#de">Löschanfrage</a>. Kontakt: <a href="mailto:idlecarempire@gmail.com">idlecarempire@gmail.com</a>. Die englische Fassung ist die vollständige; dies ist eine Zusammenfassung.</p>
+</section>
 </main>
 <footer>
 <a href="../privacy/">Privacy policy</a><a href="../terms/">Terms of Use</a><a href="../delete-account/">Delete your account</a><a href="mailto:idlecarempire@gmail.com">idlecarempire@gmail.com</a>

@@ -51,29 +51,102 @@
 // account emails (their links lead here), and hands a save left in this browser,
 // or carried by an old transfer link, to the app as a code its Settings import.
 (function () {
-  var RO = /^ro\b/i.test(navigator.language || "");
-  var T = {
-    intro: "Idle Car Empire este acum un joc pentru telefon: instalează aplicația pentru Android sau iPhone. Nu mai rulează în browser.",
-    confirmed: "Adresa de email este confirmată. Întoarce-te în aplicație și conectează-te cu emailul și parola.",
-    authError: "Linkul nu a funcționat:",
-    rescueTitle: "Progresul tău din browser",
-    rescueHow: "Browserul acesta mai are un joc jucat aici. Ca să-l continui în aplicație: copiază codul, apoi în aplicație deschide Setările (⚙️), lipește codul în caseta pentru salvare și apasă „Importă salvarea”. Dacă ai jucat cu un cont, conectează-te pur și simplu în aplicație.",
-    moreTitle: "Altele",
-    privacy: "Politica de confidențialitate",
-    terms: "Termeni de utilizare",
-    deleteAccount: "Ștergerea contului și a datelor",
-    copy: "Copiază codul",
-    copied: "Cod copiat",
-    saved: "Salvat",
-    cash: "bani",
-    account: "salvarea unui cont",
-    link: "din linkul de transfer"
+  var L = {
+    ro: {
+      intro: "Idle Car Empire este acum un joc pentru telefon: instalează aplicația pentru Android sau iPhone. Nu mai rulează în browser.",
+      confirmed: "Adresa de email este confirmată. Întoarce-te în aplicație și conectează-te cu emailul și parola.",
+      authError: "Linkul nu a funcționat:",
+      rescueTitle: "Progresul tău din browser",
+      rescueHow: "Browserul acesta mai are un joc jucat aici. Ca să-l continui în aplicație: copiază codul, apoi în aplicație deschide Setările (⚙️), lipește codul în caseta pentru salvare și apasă „Importă salvarea”. Dacă ai jucat cu un cont, conectează-te pur și simplu în aplicație.",
+      moreTitle: "Altele",
+      privacy: "Politica de confidențialitate",
+      terms: "Termeni de utilizare",
+      deleteAccount: "Ștergerea contului și a datelor",
+      copy: "Copiază codul",
+      copied: "Cod copiat",
+      saved: "Salvat",
+      cash: "bani",
+      account: "salvarea unui cont",
+      link: "din linkul de transfer"
+    },
+    ru: {
+      intro: "Idle Car Empire теперь игра для телефона: установите приложение для Android или iPhone. В браузере она больше не работает.",
+      confirmed: "Адрес электронной почты подтверждён. Вернитесь в приложение и войдите с почтой и паролем.",
+      authError: "Ссылка не сработала:",
+      rescueTitle: "Ваш прогресс из браузера",
+      rescueHow: "В этом браузере осталась игра, в которую вы здесь играли. Чтобы продолжить её в приложении: скопируйте код, затем в приложении откройте Настройки (⚙️), вставьте код в поле сохранения и нажмите «Импорт сохранения». Если вы играли с аккаунтом, просто войдите в него в приложении.",
+      moreTitle: "Ещё",
+      privacy: "Политика конфиденциальности",
+      terms: "Условия использования",
+      deleteAccount: "Удаление аккаунта и данных",
+      copy: "Скопировать код",
+      copied: "Код скопирован",
+      saved: "Сохранено",
+      cash: "денег",
+      account: "сохранение аккаунта",
+      link: "из ссылки переноса"
+    },
+    es: {
+      intro: "Idle Car Empire ahora es un juego para el móvil: instala la app para Android o iPhone. Ya no funciona en el navegador.",
+      confirmed: "Tu dirección de correo está confirmada. Vuelve a la app e inicia sesión con tu correo y tu contraseña.",
+      authError: "Este enlace no ha funcionado:",
+      rescueTitle: "Tu progreso del navegador",
+      rescueHow: "Este navegador aún tiene una partida que jugaste aquí. Para continuarla en la app: copia su código y, en la app, abre Ajustes (⚙️), pega el código en la casilla de la partida guardada y toca «Importar partida». Si jugaste con una cuenta, simplemente inicia sesión en la app.",
+      moreTitle: "Más",
+      privacy: "Política de privacidad",
+      terms: "Términos de uso",
+      deleteAccount: "Eliminar tu cuenta y tus datos",
+      copy: "Copiar el código",
+      copied: "Código copiado",
+      saved: "Guardada",
+      cash: "de dinero",
+      account: "partida de una cuenta",
+      link: "del enlace de transferencia"
+    },
+    pt: {
+      intro: "Idle Car Empire agora é um jogo para celular: instale o app para Android ou iPhone. Ele não roda mais no navegador.",
+      confirmed: "Seu endereço de e-mail está confirmado. Volte ao app e entre com seu e-mail e sua senha.",
+      authError: "Este link não funcionou:",
+      rescueTitle: "Seu progresso do navegador",
+      rescueHow: "Este navegador ainda tem um jogo que você jogou aqui. Para continuar no app: copie o código e, no app, abra as Configurações (⚙️), cole o código na caixa do save e toque em “Importar save”. Se você jogou com uma conta, basta entrar nela no app.",
+      moreTitle: "Mais",
+      privacy: "Política de privacidade",
+      terms: "Termos de uso",
+      deleteAccount: "Excluir sua conta e seus dados",
+      copy: "Copiar o código",
+      copied: "Código copiado",
+      saved: "Salvo",
+      cash: "de dinheiro",
+      account: "save de uma conta",
+      link: "do link de transferência"
+    },
+    de: {
+      intro: "Idle Car Empire ist jetzt ein Handyspiel: Installiere die App für Android oder iPhone. Im Browser läuft es nicht mehr.",
+      confirmed: "Deine E-Mail-Adresse ist bestätigt. Geh zurück in die App und melde dich mit deiner E-Mail-Adresse und deinem Passwort an.",
+      authError: "Dieser Link hat nicht funktioniert:",
+      rescueTitle: "Dein Fortschritt aus dem Browser",
+      rescueHow: "In diesem Browser ist noch ein Spiel, das du hier gespielt hast. So spielst du es in der App weiter: Kopiere den Code, öffne in der App die Einstellungen (⚙️), füge den Code in das Spielstand-Feld ein und tippe auf „Spielstand importieren“. Wenn du mit einem Konto gespielt hast, melde dich einfach in der App an.",
+      moreTitle: "Mehr",
+      privacy: "Datenschutzerklärung",
+      terms: "Nutzungsbedingungen",
+      deleteAccount: "Konto und Daten löschen",
+      copy: "Code kopieren",
+      copied: "Code kopiert",
+      saved: "Gespeichert",
+      cash: "Geld",
+      account: "Spielstand eines Kontos",
+      link: "aus dem Übertragungslink"
+    }
   };
   var EN = { copy: "Copy the code", copied: "Code copied", saved: "Saved", cash: "cash", account: "an account's save", link: "from the transfer link" };
-  var t = function (k) { return RO ? T[k] : EN[k]; };
-  if (RO) {
-    document.documentElement.lang = "ro";
+  var lang = (navigator.language || "en").slice(0, 2).toLowerCase();
+  var T = L[lang];
+  var t = function (k) { return T ? T[k] : EN[k]; };
+  if (T) {
+    document.documentElement.lang = lang;
     document.querySelectorAll("[data-t]").forEach(function (el) { var v = T[el.getAttribute("data-t")]; if (v) el.textContent = v; });
+    // the legal pages open at this language's section
+    document.querySelectorAll("a[data-t]").forEach(function (a) { a.setAttribute("href", a.getAttribute("href") + "#" + lang); });
   }
 
   // the game's old offline cache would keep serving the old game: gone
