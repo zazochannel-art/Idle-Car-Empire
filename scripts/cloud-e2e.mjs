@@ -37,6 +37,12 @@ const one = (res) => (Array.isArray(res.data) ? res.data[0] : res.data);
 // ── player A ──
 const a = browser();
 const signA = await a.client.auth.signInAnonymously();
+// With CAPTCHA on in Supabase (docs/captcha.md) no account can be made or signed in without a token
+// from a real phone or browser, so this check can't make its test players: it says so and stops.
+if (signA.error?.code === "captcha_failed" || /captcha/i.test(signA.error?.message ?? "")) {
+  console.log("::warning title=cloud-e2e skipped::CAPTCHA is on in Supabase: test players can't sign in, so nothing was checked (docs/captcha.md).");
+  process.exit(0);
+}
 check(!signA.error && !!signA.data.user, "A signs in as a guest", signA.error?.message);
 const idA = signA.data.user?.id;
 
@@ -162,7 +168,8 @@ const cupBoard = (await a.client.rpc("cup_board", { p_week: cupWeek })).data ?? 
 const cupA = cupBoard.find((r) => r.me);
 const cupB = cupBoard.find((r) => r.user_id === idB);
 check(cupA?.best_ms === cupFloor + 20_000 && cupB?.best_ms === cupFloor + 10_000 && cupB.rank < cupA.rank, "the cup board keeps each player's best, fastest first", JSON.stringify(cupBoard.slice(0, 3)));
-check((await cupSend(a, cupFloor + 5_000)) === "limit", "three cup times a day");
+// A sent two already: a third is taken, a fourth isn't
+check((await cupSend(a, cupFloor + 5_000)) === "ok" && (await cupSend(a, cupFloor + 4_000)) === "limit", "three cup times a day");
 check(((await a.client.rpc("claim_cup_prizes")).data ?? []).length === 0, "no cup prize before the week is over");
 const cupTable = await b.client.schema("ops").from("cup_entries").select("week");
 check(!!cupTable.error, "the cup table isn't reachable from the API", cupTable.error?.code);
