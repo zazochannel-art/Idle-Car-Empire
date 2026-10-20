@@ -33,7 +33,7 @@ import { checkAchievements, claimDaily, claimMilestone, recordHistory, refreshDa
 import { cloneState, createInitialState } from "@/game/engine/state";
 import { tick as engineTick } from "@/game/engine/tick";
 import { formatDuration, formatMoney, formatNumber, formatPercent } from "@/game/format";
-import { decodeSave, encodeSave, SaveManager, type RedeemInviteResult, type SaveWhere } from "@/game/save";
+import { decodeSave, encodeSave, SaveManager, type CupPlace, type CupSubmitResult, type RedeemInviteResult, type SaveWhere } from "@/game/save";
 import { askStartChoice, askWelcome, useCloud } from "./cloud-store";
 import type { BuyAmount, CarId, CarRoute, DealerId, FacilityType, GameState, Lang, ManagerId, PlantType, QualityMode, Specialization, StructureType, ZoneId } from "@/game/types";
 import { applyLanguage, detectLanguage, loadLanguage, translate, type MessageKey, type Vars } from "@/i18n";
@@ -61,6 +61,7 @@ import { hasPlant as hasPlantType } from "@/game/engine/chain";
 import * as Tu from "@/game/engine/tuning";
 import * as Gf from "@/game/engine/gifts";
 import * as Iv from "@/game/engine/invites";
+import * as Cu from "@/game/engine/cup";
 import * as Gh from "@/game/engine/ghost";
 import { allianceReward } from "@/game/engine/alliance";
 import { grantAd } from "@/game/engine/ads";
@@ -126,6 +127,12 @@ interface GameStore {
   claimInviteRewards: () => Promise<number>;
   /** Uses a friend's invite code: the welcome gift on "ok". */
   redeemInvite: (code: string) => Promise<RedeemInviteResult | "network">;
+  /** Races a timed run of the weekly cup (engine/cup.ts); a new best goes to the board. Null: not allowed now. */
+  cupRun: () => Cu.CupRun | null;
+  /** Sends the week's best to the cup board if it isn't there yet: the server's answer (null: nothing to send). */
+  sendCup: () => Promise<CupSubmitResult | "network" | null>;
+  /** Pays the player's places in finished cup weeks: how many weeks were paid. */
+  claimCupPrizes: () => Promise<number>;
   /** Pays the thank-you for a gift the server accepted. */
   giftSent: () => void;
   /** Hides a player from the boards and visits on this account (their name is kept to list them in the Profile). */
@@ -564,6 +571,47 @@ export const useGame = create<GameStore>((set, get) => {
       uiEvents.emit({ type: "toast", tone: "gold", icon: "🎉", title: tr("invite.welcome"), body: tr("invite.welcomeBody", { money: formatMoney(money) }) });
       return "ok";
     },
+    cupRun: () => {
+      const result = act((s) => Cu.cupRun(s, Date.now()));
+      if (!result) return null;
+      persist(true);
+      if (result.best) void get().sendCup();
+      return result;
+    },
+    sendCup: async () => {
+      const social = saves?.social;
+      if (!social || !get().ready) return null;
+      const send = Cu.cupToSend(get().state, Date.now());
+      if (!send) return null;
+      const res = await social.cupSubmit(send.week, send.ms, send.car, send.color).catch(() => "network" as const);
+      // the board has it, or never will (the week is over, a time it refuses): not sent again; "limit" waits for tomorrow
+      if (res === "ok" || res === "closed" || res === "invalid") {
+        act((s) => s.cup.week === send.week && (Cu.cupSent(s, send.ms), true));
+        persist(true);
+      }
+      return res;
+    },
+    claimCupPrizes: async () => {
+      const social = saves?.social;
+      // not while two saves wait for the player's choice: the one paid might be dropped
+      if (!social || !get().ready || saves?.sync?.state.status === "conflict") return 0;
+      const places = await social.claimCupPrizes().catch(() => [] as CupPlace[]);
+      let paid = 0;
+      for (const p of [...places].sort((a, b) => a.week - b.week)) {
+        const got = act((s) => Cu.payCupPrize(s, p.week, p.rank, p.entrants, get().snap));
+        if (!got) continue;
+        paid++;
+        uiEvents.emit({
+          type: "toast",
+          tone: "gold",
+          icon: Cu.CUP_ICON[got.prize.tier],
+          title: tr("cup.prize", { rank: p.rank, n: p.entrants }),
+          body: tr(got.prize.stars ? "cup.prizeBody" : "cup.prizeBodyNoStars", { stars: got.prize.stars, money: formatMoney(got.money), rep: got.prize.rep }),
+        });
+      }
+      if (paid) persist(true);
+      return paid;
+    },
     giftSent: () => {
       let money = 0;
       act((s) => (money = Gf.giftSent(s, get().snap)) > 0);
@@ -731,6 +779,8 @@ export const useGame = create<GameStore>((set, get) => {
         const social = () => {
           void get().claimGifts();
           void get().claimInviteRewards();
+          void get().claimCupPrizes();
+          void get().sendCup();
           void get().publishGhost();
         };
         setTimeout(social, SOCIAL_FIRST_MS);

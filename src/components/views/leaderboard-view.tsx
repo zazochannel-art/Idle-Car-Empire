@@ -18,11 +18,12 @@ import { useCloud } from "@/store/cloud-store";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { PlayerActions } from "../game/player-safety";
+import { CupPanel } from "./cup-panel";
 import { ViewHeader } from "./section-title";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
-/** The global leaderboard (this week, all time); a tap on a player visits their empire. */
+/** The global leaderboard (this week, all time) and the weekly cup; a tap on a player visits their empire. */
 export function LeaderboardView() {
   const saves = useGame((g) => g.saves);
   const hidden = useGame((g) => g.view.state.settings.hidden);
@@ -30,7 +31,8 @@ export function LeaderboardView() {
   const setView = useUi((u) => u.setView);
   const { t } = useT();
   const social = saves?.social ?? null;
-  const [kind, setKind] = useState<BoardKind>("week");
+  const [tab, setTab] = useState<BoardKind | "cup">("week");
+  const kind: BoardKind = tab === "cup" ? "week" : tab;
   const [attempt, setAttempt] = useState(0);
   // the last answer, for the board it was asked for (another board shows as loading)
   const [answer, setAnswer] = useState<{ key: string; rows: BoardRow[] | null }>({ key: "", rows: null });
@@ -39,7 +41,8 @@ export function LeaderboardView() {
   const key = `${kind}:${attempt}`;
 
   useEffect(() => {
-    if (!social) return;
+    // (the cup reads its own board)
+    if (!social || tab === "cup") return;
     let live = true;
     social.leaderboard(kind).then(
       (rows) => live && setAnswer({ key, rows }),
@@ -48,7 +51,7 @@ export function LeaderboardView() {
     return () => {
       live = false;
     };
-  }, [social, kind, key]);
+  }, [social, kind, key, tab]);
   const rows = answer.key === key ? answer.rows : null;
   const failed = answer.key === key && !answer.rows;
   const load = () => setAttempt((n) => n + 1);
@@ -86,46 +89,52 @@ export function LeaderboardView() {
     <div className="space-y-4">
       {header}
 
-      <div className="grid grid-cols-2 gap-1 rounded-2xl bg-[#2b2b2e] p-1 ring-1 ring-white/10">
-        {(["week", "all"] as const).map((k) => (
-          <button key={k} aria-pressed={kind === k} onClick={() => setKind(k)} className={cn("rounded-xl py-2 text-sm font-black transition", kind === k ? "bg-gold text-[#1d1d20]" : "text-white/60 hover:bg-white/[0.06]")}>
-            {t(k === "week" ? "board.week" : "board.all")}
+      <div className="grid grid-cols-3 gap-1 rounded-2xl bg-[#2b2b2e] p-1 ring-1 ring-white/10">
+        {(["week", "all", "cup"] as const).map((k) => (
+          <button key={k} aria-pressed={tab === k} onClick={() => setTab(k)} className={cn("rounded-xl py-2 text-sm font-black transition", tab === k ? "bg-gold text-[#1d1d20]" : "text-white/60 hover:bg-white/[0.06]")}>
+            {t(k === "week" ? "board.week" : k === "all" ? "board.all" : "board.cup")}
           </button>
         ))}
       </div>
-      <p className="px-1 text-[11px] leading-snug text-white/50">
-        {t(kind === "week" ? "board.weekHint" : "board.allHint")} {t("board.tapToVisit")}
-      </p>
-      {!listed && <p className="rounded-xl bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200 ring-1 ring-amber-400/20">{t("board.hidden")}</p>}
-
-      {failed ? (
-        <div className="space-y-3 rounded-2xl bg-[#2b2b2e] p-4 text-center ring-1 ring-white/10">
-          <p className="text-sm text-rose-300">{t("board.error")}</p>
-          <Button variant="secondary" size="sm" onClick={load}>
-            <RefreshCw /> {t("board.retry")}
-          </Button>
-        </div>
-      ) : !rows ? (
-        <div className="space-y-1.5">
-          {Array.from({ length: 6 }, (_, i) => (
-            <div key={i} className="h-14 animate-pulse rounded-2xl bg-white/[0.04]" />
-          ))}
-        </div>
+      {tab === "cup" ? (
+        <CupPanel onVisit={setVisiting} />
       ) : (
-        <div className="space-y-1.5">
-          {!top.length && <p className="rounded-2xl bg-[#2b2b2e] p-4 text-center text-sm text-white/60 ring-1 ring-white/10">{t("board.empty")}</p>}
-          {top.map((r) => (
-            <Row key={r.userId} r={r} onVisit={() => setVisiting(r.userId)} />
-          ))}
-          {meBelow && (
-            <>
-              <div className="text-center text-white/30">⋯</div>
-              <Row r={meBelow} onVisit={() => setVisiting(meBelow.userId)} />
-            </>
+        <>
+          <p className="px-1 text-[11px] leading-snug text-white/50">
+            {t(kind === "week" ? "board.weekHint" : "board.allHint")} {t("board.tapToVisit")}
+          </p>
+          {!listed && <p className="rounded-xl bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200 ring-1 ring-amber-400/20">{t("board.hidden")}</p>}
+
+          {failed ? (
+            <div className="space-y-3 rounded-2xl bg-[#2b2b2e] p-4 text-center ring-1 ring-white/10">
+              <p className="text-sm text-rose-300">{t("board.error")}</p>
+              <Button variant="secondary" size="sm" onClick={load}>
+                <RefreshCw /> {t("board.retry")}
+              </Button>
+            </div>
+          ) : !rows ? (
+            <div className="space-y-1.5">
+              {Array.from({ length: 6 }, (_, i) => (
+                <div key={i} className="h-14 animate-pulse rounded-2xl bg-white/[0.04]" />
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              {!top.length && <p className="rounded-2xl bg-[#2b2b2e] p-4 text-center text-sm text-white/60 ring-1 ring-white/10">{t("board.empty")}</p>}
+              {top.map((r) => (
+                <Row key={r.userId} r={r} onVisit={() => setVisiting(r.userId)} />
+              ))}
+              {meBelow && (
+                <>
+                  <div className="text-center text-white/30">⋯</div>
+                  <Row r={meBelow} onVisit={() => setVisiting(meBelow.userId)} />
+                </>
+              )}
+              {!me && <p className="px-1 pt-1 text-center text-[11px] text-white/50">{t("board.notYet")}</p>}
+              {hiddenHere > 0 && <p className="px-1 pt-1 text-center text-[11px] text-white/40">🙈 {t("board.hiddenCount", { n: hiddenHere })}</p>}
+            </div>
           )}
-          {!me && <p className="px-1 pt-1 text-center text-[11px] text-white/50">{t("board.notYet")}</p>}
-          {hiddenHere > 0 && <p className="px-1 pt-1 text-center text-[11px] text-white/40">🙈 {t("board.hiddenCount", { n: hiddenHere })}</p>}
-        </div>
+        </>
       )}
 
       {sent !== null && (
