@@ -122,7 +122,8 @@ const say = (line) => {
   console.log(line);
 };
 let shots = 0;
-const shot = (name) => page.screenshot({ path: join(RESULTS, `${String(++shots).padStart(2, "0")}-${name}.png`) }).catch(() => {});
+// file names that every file system (and CI's artifact upload) takes: letters, digits and dashes
+const shot = (name) => page.screenshot({ path: join(RESULTS, `${String(++shots).padStart(2, "0")}-${name.replace(/[^a-z0-9]+/gi, "-").replace(/-+$/, "")}.png`) }).catch(() => {});
 const failed = [];
 /** The tutorial's card (its buttons share names with the screens they open). */
 const tutorial = page.getByTestId("tutorial");
@@ -197,14 +198,14 @@ try {
   });
 
   await step("the game saves to the cloud", async () => {
+    // the game groups its saves: the one with the first body may come a little after the funnel's report
+    const bodies = (save) => save?.p_data?.lifetime?.parts?.body ?? 0;
     const until = Date.now() + 90_000;
-    while (!server_.saves.length) {
-      if (Date.now() > until) throw new Error("no cloud save in 90 s");
+    while (!server_.saves.some((x) => bodies(x) >= 1)) {
+      if (Date.now() > until) throw new Error(`no cloud save with the first body in 90 s (${server_.saves.length} saves, bodies ${server_.saves.map(bodies).join(", ")})`);
       await page.waitForTimeout(2_000);
     }
-    const last = server_.saves.at(-1);
-    if (typeof last?.p_data !== "object" || !last.p_data?.city) throw new Error("the save has no game in it");
-    if (!(last.p_data.lifetime?.parts?.body >= 1)) throw new Error(`the saved game has made ${last.p_data.lifetime?.parts?.body ?? 0} bodies`);
+    for (const x of server_.saves) if (typeof x?.p_data !== "object" || !x.p_data?.city) throw new Error("a save had no game in it");
   });
 
   await step("the funnel saw a new player", async () => {
