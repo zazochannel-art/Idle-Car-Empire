@@ -83,4 +83,27 @@ export interface CloudBackend {
   load(): Promise<CloudCopy>;
   /** Saves if the cloud is still at baseRevision; otherwise ok is false and nothing changed. */
   save(state: GameState, version: number, baseRevision: number, device: string): Promise<{ ok: boolean; revision: number; updatedAt: number }>;
+  /** The older copies of this account's save the server keeps (newest first). */
+  backups?(): Promise<CloudBackup[]>;
+  /** One of them to play again (the server first keeps the cloud save it will replace); null if it's gone. */
+  takeBackup?(id: number): Promise<{ state: unknown; version: number } | null>;
+}
+
+/**
+ * An older copy of the account's save, kept by the server (supabase/migrations/0011): every few
+ * hours of play ("auto"), before a save with much less progress ("drop"), before a restore.
+ */
+export interface CloudBackup {
+  id: number;
+  at: number;
+  reason: "auto" | "drop" | "restore";
+  device: string;
+  /** The save format: a newer one than this game reads can't be restored here. */
+  version: number;
+  company: string;
+  cash: number;
+  earned: number;
+  cars: number;
+  plants: number;
+  lastPlayed: number;
 }

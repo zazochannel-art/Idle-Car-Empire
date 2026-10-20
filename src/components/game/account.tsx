@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { plantsOf } from "@/game/engine/chain";
 import { isCleanName } from "@/game/engine/names";
 import { formatDuration, formatMoney, formatNumber } from "@/game/format";
-import { summarize, type AuthResult, type SaveSummary } from "@/game/save";
+import { summarize, type AuthResult, type CloudBackup, type SaveSummary } from "@/game/save";
 import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
@@ -409,6 +409,8 @@ export function ProfileView() {
         )}
       </div>
 
+      <CloudBackupsCard />
+
       <BackupsCard />
 
       <HiddenPlayersCard />
@@ -568,6 +570,103 @@ function BackupsCard() {
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+/** The older copies of the account's save the server keeps: any of them can be played again. */
+function CloudBackupsCard() {
+  const saves = useGame((g) => g.saves);
+  const restore = useGame((g) => g.restoreCloudBackup);
+  const mode = useCloud((c) => c.mode);
+  const { t } = useT();
+  const [list, setList] = useState<CloudBackup[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [asking, setAsking] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  // read when the Profile opens, and again after a restore or a retry
+  const [reads, setReads] = useState(0);
+  useEffect(() => {
+    let live = true;
+    saves
+      ?.cloudBackups()
+      .then((l) => live && setList(l ?? []))
+      .catch(() => live && setFailed(true));
+    return () => {
+      live = false;
+    };
+  }, [saves, reads]);
+  const load = () => {
+    setFailed(false);
+    setReads((n) => n + 1);
+  };
+  if (mode !== "cloud") return null;
+  const from = (r: CloudBackup["reason"]) => t(r === "drop" ? "account.cloudBackup.drop" : r === "restore" ? "account.cloudBackup.restore" : "account.cloudBackup.auto");
+  return (
+    <div className="space-y-2 rounded-2xl bg-[#2b2b2e] p-3 ring-1 ring-white/10">
+      <div className="flex items-center gap-2 text-sm font-bold">
+        <Cloud className="size-4 text-sky-300" /> {t("account.cloudBackups")}
+      </div>
+      <p className="text-[11px] text-white/55">{t("account.cloudBackupsHint")}</p>
+      {failed ? (
+        <Button size="sm" variant="secondary" className="w-full" onClick={load}>
+          <RefreshCw /> {t("account.cloudBackupsRetry")}
+        </Button>
+      ) : !list ? (
+        <p className="text-[11px] text-white/40">{t("account.cloudBackupsLoading")}</p>
+      ) : !list.length ? (
+        <p className="text-[11px] text-white/40">{t("account.cloudBackupsNone")}</p>
+      ) : (
+        list.map((b) => (
+          <div key={b.id} className="space-y-2 rounded-xl bg-white/[0.04] p-2.5 ring-1 ring-white/10">
+            <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-black">{b.company || t("account.noCompany")}</div>
+                <div className="text-[11px] text-white/55">
+                  {from(b.reason)} · {ago(t, b.at)}
+                  {b.device ? ` · ${b.device}` : ""}
+                </div>
+              </div>
+              <div className="text-right text-[11px] text-white/70">
+                <div>💰 {formatMoney(b.cash)}</div>
+                <div>
+                  🏭 {formatNumber(b.plants)} · 🚗 {formatNumber(b.cars)}
+                </div>
+              </div>
+            </div>
+            {asking === b.id ? (
+              <>
+                <p className="text-[11px] text-amber-300">{t("account.cloudRestoreConfirm")}</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <Button size="sm" variant="secondary" disabled={busy} onClick={() => setAsking(null)}>
+                    {t("common.cancel")}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="gold"
+                    disabled={busy}
+                    onClick={async () => {
+                      setBusy(true);
+                      const res = await restore(b.id);
+                      setBusy(false);
+                      setAsking(null);
+                      load();
+                      const ok = res === "ok";
+                      uiEvents.emit({ type: "toast", tone: ok ? "success" : "warn", icon: ok ? "♻️" : "⚠️", title: t(ok ? "account.restored" : res === "newer" ? "account.cloudBackupNewer" : "account.err.unknown") });
+                    }}
+                  >
+                    {t("account.restoreYes")}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <Button size="sm" variant="secondary" className="w-full" onClick={() => setAsking(b.id)}>
+                <History /> {t("account.restore")}
+              </Button>
+            )}
+          </div>
+        ))
+      )}
     </div>
   );
 }

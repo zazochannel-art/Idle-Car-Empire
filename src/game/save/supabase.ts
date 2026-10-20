@@ -6,7 +6,7 @@
 import type { AuthError as SbAuthError, SupabaseClient, User } from "@supabase/supabase-js";
 import type { GameState } from "../types";
 import { Social } from "./social";
-import type { Account, AuthError, AuthResult, CloudBackend, CloudCopy, Profile } from "./types";
+import type { Account, AuthError, AuthResult, CloudBackend, CloudBackup, CloudCopy, Profile } from "./types";
 
 function account(u: User | null | undefined): Account | null {
   if (!u) return null;
@@ -196,6 +196,34 @@ export class SupabaseBackend implements CloudBackend {
       updatedAt: ms(row?.updated_at),
       serverNow: ms(row?.server_now),
     };
+  }
+
+  async backups(): Promise<CloudBackup[]> {
+    const c = await this.client;
+    const { data, error } = await c.rpc("list_my_backups");
+    if (error) throw error;
+    type Row = { id: number | string; made_at: string; reason: CloudBackup["reason"]; device: string | null; save_version: number; company: string; cash: number; earned: number; cars: number; plants: number; last_played: number };
+    return ((data as Row[] | null) ?? []).map((r) => ({
+      id: Number(r.id),
+      at: ms(r.made_at),
+      reason: r.reason,
+      device: r.device ?? "",
+      version: Number(r.save_version) || 0,
+      company: r.company ?? "",
+      cash: Number(r.cash) || 0,
+      earned: Number(r.earned) || 0,
+      cars: Number(r.cars) || 0,
+      plants: Number(r.plants) || 0,
+      lastPlayed: Number(r.last_played) || 0,
+    }));
+  }
+
+  async takeBackup(id: number): Promise<{ state: unknown; version: number } | null> {
+    const c = await this.client;
+    const { data, error } = await c.rpc("take_my_backup", { p_id: id });
+    if (error) throw error;
+    const row = (data as { data: unknown; save_version: number }[] | null)?.[0];
+    return row ? { state: row.data, version: row.save_version } : null;
   }
 
   async save(state: GameState, version: number, baseRevision: number, device: string) {

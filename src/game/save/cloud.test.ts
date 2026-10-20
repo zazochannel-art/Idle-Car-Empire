@@ -9,7 +9,7 @@ import { LocalStore, LOCAL_SAVE_KEY, memoryStorage, type KeyValue } from "./loca
 import { decideStart, summarize, trustedLastActive } from "./policy";
 import { CloudSync, type SyncInfo } from "./sync";
 import { storedAccount } from "./supabase";
-import type { Account, AuthResult, CloudBackend, CloudCopy, LocalCopy, Profile } from "./types";
+import type { Account, AuthResult, CloudBackend, CloudBackup, CloudCopy, LocalCopy, Profile } from "./types";
 
 const T0 = Date.UTC(2026, 0, 1);
 
@@ -26,6 +26,8 @@ class Server {
   rows = new Map<string, { data: unknown; version: number; revision: number; updatedAt: number }>();
   users = new Map<string, { email: string | null; password: string | null; pending?: string }>();
   profiles = new Map<string, Profile>();
+  /** Older copies of each save, as migration 0011 keeps them (newest last). */
+  backups: { id: number; user: string; data: unknown; version: number; reason: CloudBackup["reason"]; at: number }[] = [];
   clock = T0 + 1_000_000;
   next = 1;
   requests = 0;
@@ -128,8 +130,40 @@ class FakeCloud implements CloudBackend {
     const ok = base === 0 ? !row : !!row && row.revision === base && row.version <= version;
     if (!ok) return { ok: false, revision: row?.revision ?? 0, updatedAt: row?.updatedAt ?? 0 };
     const next = { data: JSON.parse(JSON.stringify(state)), version, revision: (row?.revision ?? 0) + 1, updatedAt: this.server.clock };
+    if (row) this.keepOnWrite(row, next.data as GameState);
     this.server.rows.set(this.user, next);
     return { ok: true, revision: next.revision, updatedAt: next.updatedAt };
+  }
+  // the database's backup rules (0011): every 3 hours, before a save with less than half the progress
+  private keepOnWrite(old: { data: unknown; version: number }, next: GameState) {
+    const autos = this.server.backups.filter((b) => b.user === this.user && b.reason === "auto");
+    const earned = (old.data as GameState).lifetime?.moneyEarned ?? 0;
+    const reason = !autos.length || this.server.clock - autos.at(-1)!.at > 3 * 3_600_000 ? "auto" : earned > 0 && next.lifetime.moneyEarned < earned / 2 ? "drop" : null;
+    if (reason) this.keep(old, reason);
+  }
+  private keep(old: { data: unknown; version: number }, reason: CloudBackup["reason"], spare?: number) {
+    this.server.backups.push({ id: this.server.next++, user: this.user!, data: JSON.parse(JSON.stringify(old.data)), version: old.version, reason, at: this.server.clock });
+    const mine = this.server.backups.filter((b) => b.user === this.user && b.id !== spare);
+    const drop = new Set(mine.slice(0, Math.max(0, mine.length - 12)).map((b) => b.id));
+    this.server.backups = this.server.backups.filter((b) => !drop.has(b.id));
+  }
+  async backups(): Promise<CloudBackup[]> {
+    if (this.offline) throw new Error("network");
+    return this.server.backups
+      .filter((b) => b.user === this.user)
+      .reverse()
+      .map((b) => {
+        const s = summarize(b.data);
+        return { id: b.id, at: b.at, reason: b.reason, device: "test", version: b.version, company: s.company, cash: s.cash, earned: s.earned, cars: s.cars, plants: s.plants, lastPlayed: s.lastPlayed };
+      });
+  }
+  async takeBackup(id: number) {
+    if (this.offline) throw new Error("network");
+    const b = this.server.backups.find((x) => x.id === id && x.user === this.user);
+    if (!b) return null;
+    const row = this.server.rows.get(this.user!);
+    if (row) this.keep(row, "restore", id);
+    return { state: JSON.parse(JSON.stringify(b.data)), version: b.version };
   }
 }
 
@@ -573,6 +607,75 @@ describe("players and devices", () => {
     await vi.advanceTimersByTimeAsync(2_100);
     expect((server.rows.get(first.cloud.user!)!.data as GameState).cash).toBe(33);
     expect(second.saves.restoreBackup("idle-car-empire:backup:0:gone", restored, now)).toBeNull();
+  });
+
+  it("the server keeps older copies of a player's save; a backup plays again, and what it replaces is kept", async () => {
+    const server = new Server();
+    const pc = device(server);
+    await pc.saves.start(T0, registers(pc));
+    const early = game(1_000);
+    early.lifetime.moneyEarned = 5_000;
+    pc.saves.save(early, true);
+    await vi.advanceTimersByTimeAsync(2_100);
+    const later = game(80_000);
+    later.lifetime.moneyEarned = 90_000;
+    pc.saves.save(later, true);
+    await vi.advanceTimersByTimeAsync(2_100);
+    // the first write's copy became the first backup
+    const list = (await pc.saves.cloudBackups())!;
+    expect(list.map((b) => [b.reason, b.cash, b.earned])).toEqual([["auto", 1_000, 5_000]]);
+
+    // played again: the cloud save it replaces is kept there, the game here kept on this device
+    const now = T0 + 500_000;
+    const restored = await pc.saves.restoreCloudBackup(list[0].id, later, now);
+    if (!restored || restored === "newer") throw new Error("not restored");
+    expect(restored.cash).toBe(1_000);
+    expect(restored.lastActiveAt).toBe(now); // no offline earnings for the time it spent as a backup
+    expect(pc.saves.backups().map((b) => [b.reason, b.summary.cash])).toEqual([["replaced", 80_000]]);
+    expect((await pc.saves.cloudBackups())!.map((b) => [b.reason, b.cash])).toEqual([
+      ["restore", 80_000],
+      ["auto", 1_000],
+    ]);
+    pc.saves.save(restored, true);
+    await vi.advanceTimersByTimeAsync(2_100);
+    expect((server.rows.get(pc.cloud.user!)!.data as GameState).cash).toBe(1_000);
+    // a save that lost most of the progress keeps the one it replaced too
+    const lost = game(10);
+    pc.saves.save(lost, true);
+    await vi.advanceTimersByTimeAsync(2_100);
+    expect((await pc.saves.cloudBackups())![0]).toMatchObject({ reason: "drop", cash: 1_000 });
+  });
+
+  it("a player sees and restores only their own cloud backups", async () => {
+    const server = new Server();
+    const a = device(server);
+    await a.saves.start(T0, registers(a));
+    a.saves.save(game(1_000), true);
+    await vi.advanceTimersByTimeAsync(2_100);
+    a.saves.save(game(2_000), true);
+    await vi.advanceTimersByTimeAsync(2_100);
+    const [mine] = (await a.saves.cloudBackups())!;
+
+    const b = device(server);
+    await b.saves.start(T0, registers(b));
+    b.saves.save(game(5), true);
+    await vi.advanceTimersByTimeAsync(2_100);
+    expect(await b.saves.cloudBackups()).toEqual([]);
+    expect(await b.saves.restoreCloudBackup(mine.id, game(5), T0)).toBeNull();
+    expect(await b.cloud.takeBackup(mine.id)).toBeNull();
+    expect((server.rows.get(a.cloud.user!)!.data as GameState).cash).toBe(2_000);
+  });
+
+  it("a cloud backup from a newer version of the game is not played here", async () => {
+    const server = new Server();
+    const pc = device(server);
+    await pc.saves.start(T0, registers(pc));
+    pc.saves.save(game(1_000), true);
+    await vi.advanceTimersByTimeAsync(2_100);
+    server.backups.push({ id: 999, user: pc.cloud.user!, data: game(7), version: SAVE_VERSION + 1, reason: "auto", at: server.clock });
+    expect(await pc.saves.restoreCloudBackup(999, game(1_000), T0)).toBe("newer");
+    expect(server.backups.filter((x) => x.reason === "restore")).toEqual([]);
+    expect(await pc.saves.restoreCloudBackup(12345, game(1_000), T0)).toBeNull();
   });
 
   it("after a logout the next start waits for a sign-in, and this device forgets the account's copy", async () => {

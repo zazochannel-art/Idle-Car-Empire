@@ -95,6 +95,29 @@ During play, a refused save (another session saved meanwhile) opens the
 conflict dialog with both copies side by side (company, money, earnings,
 factories, cars, last played). The copy not chosen is kept as a backup.
 
+## Cloud backups
+
+Besides the backups on the device, the server keeps older copies of each
+account's save (`0011_cloud_backups.sql`), shown in the Profile under
+*Cloud backups*, on any device the player signs in on:
+
+- every time a save is written, the copy it replaces is kept when the
+  newest automatic backup is more than 3 hours old (so the first write after
+  a new account's first save makes one at once);
+- always when the new save has earned less than half of what the old one had
+  (a game that lost most of its progress: a bug, a wrong choice in the
+  conflict dialog, an old phone's save);
+- before a restore, the cloud save it is about to replace.
+
+Each player keeps the newest 12; they go with the account when it is deleted.
+A restore works like a device backup's: the server hands the backup to the
+game (`take_my_backup`, after keeping the current cloud save), the game it
+replaces is kept on the device too, and the game saves the restored one
+through `save_game()` as always, so a session that moved on meanwhile still
+gets the conflict dialog. A backup made by a newer version of the game than
+the one running isn't offered for restore ("update the app"). A backup that
+fails to be made never stops the save: the trigger logs it and goes on.
+
 ## Offline earnings and cheating
 
 - Time away is measured on the **server's clock**: `load_game()` returns the
@@ -191,6 +214,9 @@ Migrations in `supabase/migrations/`, in order:
    next save.
 5. `0005_ghosts_and_alliances.sql` — ghosts on the cards, and alliances (see
    "Ghost duels and alliances"). Safe to run again.
+6. `0011_cloud_backups.sql` — cloud backups (see "Cloud backups"): the
+   `ops.save_backups` table (not reachable from the API), the trigger on
+   `game_saves` that keeps them, `list_my_backups()` and `take_my_backup()`.
 
 `profiles`: `id` (= the auth user, deleted with it), `username` (unique on
 `lower(username)`, 3–20 characters, no control characters), `avatar`,
@@ -212,6 +238,13 @@ Functions (all for signed-in players only, `search_path` pinned):
   newer; otherwise returns `ok = false` and the current revision.
 - `load_game()` → `data, save_version, revision, updated_at, server_now`.
 - `ensure_profile()` → the caller's profile, created if missing.
+- `list_my_backups()` → the caller's cloud backups, newest first: `id,
+  made_at, reason` (`auto`, `drop`, `restore`), `device, save_version`, and
+  the summary the Profile shows (`company, cash, earned, cars, plants,
+  last_played`), read from the backup on the server.
+- `take_my_backup(p_id)` → `data, save_version` of one of the caller's own
+  backups (nothing for anyone else's), after keeping the caller's current
+  cloud save as a `restore` backup.
 - `leaderboard(p_kind)` (`'week'` or `'all'`) → the top 50 listed players
   plus the caller's own row: `rank, user_id, username, avatar, company,
   value, me`.

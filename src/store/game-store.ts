@@ -115,6 +115,8 @@ interface GameStore {
   resolveConflict: (keep: "local" | "cloud") => Promise<void>;
   /** Plays a backup kept on this device instead of the current game (which becomes a backup). */
   restoreBackup: (key: string) => boolean;
+  /** Plays a cloud backup in place of the current game (Profile → Cloud backups). */
+  restoreCloudBackup: (id: number) => Promise<"ok" | "newer" | "failed">;
   /** The save manager (account actions for the profile screen). */
   saves: SaveManager | null;
   /** Collects the gifts other players sent (on the server) and pays them: how many there were. */
@@ -506,6 +508,20 @@ export const useGame = create<GameStore>((set, get) => {
       commit(state);
       persist(true);
       return true;
+    },
+    restoreCloudBackup: async (id) => {
+      // not while two saves wait for the player's choice (nor if one came up meanwhile): that choice comes first
+      const choosing = () => saves?.sync?.state.status === "conflict";
+      if (!saves || choosing()) return "failed";
+      const now = Date.now();
+      const state = await saves.restoreCloudBackup(id, get().state, now).catch(() => null);
+      if (state === "newer") return "newer";
+      if (!state || choosing()) return "failed";
+      refreshDaily(state, now);
+      lastTick = Date.now();
+      commit(state);
+      persist(true);
+      return "ok";
     },
     act,
     claimGifts: async () => {
