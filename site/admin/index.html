@@ -85,6 +85,7 @@
     <button data-tab="reports" aria-pressed="false">Raportări</button>
     <button data-tab="errors" aria-pressed="false">Erori</button>
     <button data-tab="funnel" aria-pressed="false">Jucători noi</button>
+    <button data-tab="retention" aria-pressed="false">Revin</button>
   </nav>
 
   <section data-panel="overview" class="card">
@@ -117,6 +118,14 @@
     <h2>Erori din joc (ultimele 30 de zile)</h2>
     <p class="muted">Cele mai dese întâi. Locul se citește cu hărțile build-ului (<code>docs/errors.md</code>).</p>
     <div id="errors"></div>
+  </section>
+
+  <section data-panel="retention" class="card" hidden>
+    <h2>Câți jucători revin</h2>
+    <p class="muted">Din zilele (UTC) în care jocul fiecărui cont a salvat în cloud. <b>Jucători noi</b>: conturile făcute în ziua aceea care au jucat. <b>A doua zi</b> și <b>ziua 7</b>: câți dintre ei au jucat exact atunci; <b>în prima săptămână</b>: în oricare din cele 7 zile de după. Procentele de sus adună toate zilele care au apucat să afle.</p>
+    <div id="retTiles" class="tiles"></div>
+    <p id="retSince" class="muted" style="margin-top: 10px"></p>
+    <div id="retention"></div>
   </section>
 
   <section data-panel="funnel" class="card" hidden>
@@ -210,7 +219,7 @@ async function show() {
   await loadAll();
 }
 async function loadAll() {
-  await Promise.all([loadOverview(), loadEvents(), loadReports(), loadErrors(), loadFunnel()].map((p) => p.catch((e) => console.warn(e))));
+  await Promise.all([loadOverview(), loadEvents(), loadReports(), loadErrors(), loadFunnel(), loadRetention()].map((p) => p.catch((e) => console.warn(e))));
 }
 
 function table(head, rows) {
@@ -293,6 +302,28 @@ async function loadFunnel() {
     el("tr", {}, el("td", { text: STEPS[s.step] || s.step }), el("td", { class: "num", text: num(s.players) }),
       el("td", { style: "width: 30%; min-width: 90px" }, el("div", { class: "bar", style: `width: ${Math.round((100 * (Number(s.players) || 0)) / top)}%` })),
       el("td", { class: "num", text: s.pct_of_start == null ? "" : `${s.pct_of_start}%` }), el("td", { class: "num", text: s.median_minutes == null ? "" : num(Math.round(s.median_minutes)) })))));
+}
+
+async function loadRetention() {
+  const r = await rpc("admin_retention");
+  const pct = (x) => (x && x.of > 0 ? `${Math.round((100 * x.back) / x.of)}%` : "–");
+  const tiles = [
+    [num(r.dau), "au jucat azi"], [num(r.wau), "au jucat în 7 zile"], [num(r.mau), "au jucat în 30 de zile"],
+    [pct(r.d1), `revin a doua zi (${num(r.d1?.back ?? 0)} din ${num(r.d1?.of ?? 0)})`],
+    [pct(r.d7), `revin în ziua 7 (${num(r.d7?.back ?? 0)} din ${num(r.d7?.of ?? 0)})`],
+    [pct(r.week), `revin în prima săptămână (${num(r.week?.back ?? 0)} din ${num(r.week?.of ?? 0)})`],
+  ];
+  $("retTiles").replaceChildren(...tiles.map(([v, label]) => el("div", { class: "tile" }, el("b", { text: v }), el("span", { text: label }))));
+  $("retSince").textContent = r.since ? `Zilele se numără de pe ${new Date(r.since).toLocaleDateString("ro-RO")}; înainte de 20 octombrie 2026 sunt doar cele aflate din salvări.` : "";
+  const top = Math.max(1, ...r.days.map((d) => Number(d.active) || 0));
+  const share = (n, of, ready) => (!ready ? "" : of > 0 ? `${num(n)} (${Math.round((100 * n) / of)}%)` : "–");
+  const today = Date.parse(r.today);
+  $("retention").replaceChildren(table(["Ziua", "Au jucat", "", "Noi", "A doua zi", "Ziua 7", "În prima săptămână"], r.days.map((d) => {
+    const age = Math.round((today - Date.parse(d.day)) / 86400000);
+    return el("tr", {}, el("td", { text: new Date(d.day).toLocaleDateString("ro-RO", { day: "numeric", month: "short" }) }), el("td", { class: "num", text: num(d.active) }),
+      el("td", { style: "width: 22%; min-width: 70px" }, el("div", { class: "bar", style: `width: ${Math.round((100 * (Number(d.active) || 0)) / top)}%` })),
+      el("td", { class: "num", text: num(d.new) }), el("td", { class: "num", text: share(d.d1, d.new, age >= 1) }), el("td", { class: "num", text: share(d.d7, d.new, age >= 7) }), el("td", { class: "num", text: share(d.week, d.new, age >= 7) }));
+  })));
 }
 
 // ── wiring ──

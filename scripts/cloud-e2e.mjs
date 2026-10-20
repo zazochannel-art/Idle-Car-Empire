@@ -344,6 +344,12 @@ check(sneaky.error?.code === "42501", "a player can't schedule an event", sneaky
 const opsTable = await a.client.schema("ops").from("live_events").select("id");
 check(!!opsTable.error, "the events table isn't reachable from the API", opsTable.error?.code ?? "readable");
 
+// ── retention (0015): the days played are the dashboard's, in totals; no player reads them ──
+const retention = await a.client.rpc("admin_retention");
+check(retention.error?.code === "42501", "the retention figures are refused to a player", retention.error?.code ?? "answered");
+const playDays = await a.client.schema("analytics").from("play_days").select("day");
+check(!!playDays.error, "the days played aren't reachable from the API", playDays.error?.code ?? "readable");
+
 // ── clean up: each test player deletes its own save (and so its card), then its account: no
 // test account stays on the project (they counted as players on the owner's dashboard) ──
 for (const p of [a, b]) {
