@@ -18,4 +18,6 @@ ext {
     userMessagingPlatformVersion = '4.0.0'
     // the store's rating card (@capacitor-community/in-app-review, lib/review.ts): exact, as above
     googleAndroidPlayReviewVersion = '2.0.2'
+    // notifications from the server (@capacitor/push-notifications, lib/push.ts): exact, as above
+    firebaseMessagingVersion = '25.0.1'
 }

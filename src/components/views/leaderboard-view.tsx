@@ -31,7 +31,11 @@ export function LeaderboardView() {
   const setView = useUi((u) => u.setView);
   const { t } = useT();
   const social = saves?.social ?? null;
-  const [tab, setTab] = useState<BoardKind | "cup">("week");
+  // a notification about the cup opens on the cup's tab
+  const [tab, setTab] = useState<BoardKind | "cup">(() => useUi.getState().boardTab ?? "week");
+  useEffect(() => {
+    if (useUi.getState().boardTab) useUi.setState({ boardTab: null });
+  }, []);
   const kind: BoardKind = tab === "cup" ? "week" : tab;
   const [attempt, setAttempt] = useState(0);
   // the last answer, for the board it was asked for (another board shows as loading)

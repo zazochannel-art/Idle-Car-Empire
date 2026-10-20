@@ -40,6 +40,8 @@ import { applyLanguage, detectLanguage, loadLanguage, translate, type MessageKey
 import { contentFor } from "@/i18n/content";
 import { uiEvents } from "./events";
 import type { AwayNote } from "@/lib/notify";
+import { pushSupported, pushToken, startPush } from "@/lib/push";
+import { useUi } from "./ui-store";
 import * as Mk from "@/game/engine/market";
 import * as Lv from "@/game/engine/live";
 import * as Cl from "@/game/engine/classics";
@@ -133,6 +135,8 @@ interface GameStore {
   sendCup: () => Promise<CupSubmitResult | "network" | null>;
   /** Pays the player's places in finished cup weeks: how many weeks were paid. */
   claimCupPrizes: () => Promise<number>;
+  /** Forgets this phone's notification token on the server (before signing out; lib/push.ts). */
+  forgetPush: () => Promise<void>;
   /** Pays the thank-you for a gift the server accepted. */
   giftSent: () => void;
   /** Hides a player from the boards and visits on this account (their name is kept to list them in the Profile). */
@@ -487,6 +491,32 @@ export const useGame = create<GameStore>((set, get) => {
     return result;
   };
 
+  /** Notifications from the server (lib/push.ts): this phone's token for the player while notifications are on. */
+  const syncPush = () => {
+    const social = saves?.social;
+    if (!social || !pushSupported() || !get().state.settings.notify) return;
+    void startPush({
+      token: (t) => void social.registerPush(t, "android", get().state.settings.lang, -new Date().getTimezoneOffset()).catch(() => false),
+      open: (kind) => {
+        // what the note was about, and its screen
+        if (kind === "gift") void get().claimGifts();
+        if (kind === "invite") {
+          void get().claimInviteRewards();
+          useUi.getState().setView("profile");
+        }
+        if (kind === "cup") {
+          void get().claimCupPrizes();
+          useUi.getState().openBoard("cup");
+        }
+      },
+      shown: (title, body) => uiEvents.emit({ type: "toast", tone: "info", icon: "🔔", title, body }),
+    });
+  };
+  const forgetPush = async () => {
+    const t = pushToken();
+    if (t) await saves?.social?.forgetPush(t).catch(() => {});
+  };
+
   return {
     ready: false,
     state: initial,
@@ -611,6 +641,9 @@ export const useGame = create<GameStore>((set, get) => {
       }
       if (paid) persist(true);
       return paid;
+    },
+    forgetPush: async () => {
+      await Promise.race([forgetPush(), new Promise((r) => setTimeout(r, 4_000))]);
     },
     giftSent: () => {
       let money = 0;
@@ -785,6 +818,7 @@ export const useGame = create<GameStore>((set, get) => {
         };
         setTimeout(social, SOCIAL_FIRST_MS);
         setInterval(social, SOCIAL_EVERY_MS);
+        syncPush();
       }
     },
 
@@ -1147,6 +1181,10 @@ export const useGame = create<GameStore>((set, get) => {
         return true;
       });
       persist(true);
+      if (key === "notify") {
+        if (on) syncPush();
+        else void forgetPush();
+      }
     },
     setSaver: (saver) => {
       act((s) => {
@@ -1172,6 +1210,9 @@ export const useGame = create<GameStore>((set, get) => {
             return true;
           });
           persist(true);
+          // the server's notes in the new language
+          const t = pushToken();
+          if (t && get().state.settings.notify) void saves?.social?.registerPush(t, "android", lang, -new Date().getTimezoneOffset()).catch(() => false);
         });
     },
     exportSave: () => encodeSave(get().state),

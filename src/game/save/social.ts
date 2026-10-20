@@ -294,6 +294,16 @@ export class Social {
     return Math.max(0, Math.floor(num(await this.call("claim_invite_rewards"))));
   }
 
+  /** This phone's notification token for the player, with the game's language and the phone's offset from UTC (minutes). */
+  async registerPush(token: string, platform: "android" | "ios", lang: string, tz: number): Promise<boolean> {
+    return str(await this.call("register_push_token", { p_token: token, p_platform: platform, p_lang: lang, p_tz: Math.round(tz) })) === "ok";
+  }
+
+  /** Forgets this phone's token (notifications off, signing out). */
+  async forgetPush(token: string): Promise<void> {
+    await this.call("forget_push_token", { p_token: token });
+  }
+
   /** Sends the week's best timed run (milliseconds) to the cup board. */
   async cupSubmit(week: number, ms: number, car: string, color: string): Promise<CupSubmitResult> {
     const r = str(await this.call("cup_submit", { p_week: week, p_ms: ms, p_car: car, p_color: color }));

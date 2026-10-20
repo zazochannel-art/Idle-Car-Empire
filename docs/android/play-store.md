@@ -184,6 +184,11 @@ from both the game (collected, not shared, optional) and AdMob (shared,
 required), so answer them collected **and** shared, **required** (AdMob's
 can't be switched off), with both rows' purposes.
 
+**Notifications from the server** ([push.md](../push.md)), once a release has them: add
+**Device or other IDs** (the notification token from Firebase Cloud Messaging): collected, not
+shared, optional (the player turns notifications on), App functionality. Until then the app
+doesn't collect it.
+
 Not collected: precise location, contacts, photos/files, messages, financial
 info, health, web history, audio, calendar. The "Android" device label stored
 with saves is a type, not an identifier.

@@ -1983,6 +1983,7 @@ export const pt: Record<MessageKey, string> = {
   "city.billboard": "Novo: {car}",
   "notify.label": "Notificações quando você estiver fora",
   "notify.hint": "Um prédio concluído, o limite offline atingido: uma notificação com o jogo fechado.",
+  "notify.hintPush": "Um prédio concluído, o limite offline, um presente, seus amigos, a copa da semana, um evento: uma notificação com o jogo fechado.",
   "notify.unsupported": "As notificações funcionam no app do seu celular.",
   "notify.blocked": "As notificações do Idle Car Empire estão desativadas: permita-as nas configurações do celular.",
   "notify.offlineFullBody": "O limite offline foi atingido: abra o jogo para coletar e manter a produção.",
