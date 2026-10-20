@@ -168,7 +168,8 @@ const cupBoard = (await a.client.rpc("cup_board", { p_week: cupWeek })).data ?? 
 const cupA = cupBoard.find((r) => r.me);
 const cupB = cupBoard.find((r) => r.user_id === idB);
 check(cupA?.best_ms === cupFloor + 20_000 && cupB?.best_ms === cupFloor + 10_000 && cupB.rank < cupA.rank, "the cup board keeps each player's best, fastest first", JSON.stringify(cupBoard.slice(0, 3)));
-check((await cupSend(a, cupFloor + 5_000)) === "limit", "three cup times a day");
+// A sent two already: a third is taken, a fourth isn't
+check((await cupSend(a, cupFloor + 5_000)) === "ok" && (await cupSend(a, cupFloor + 4_000)) === "limit", "three cup times a day");
 check(((await a.client.rpc("claim_cup_prizes")).data ?? []).length === 0, "no cup prize before the week is over");
 const cupTable = await b.client.schema("ops").from("cup_entries").select("week");
 check(!!cupTable.error, "the cup table isn't reachable from the API", cupTable.error?.code);
