@@ -34,11 +34,11 @@
 <h1 data-t="title">Choose a new password</h1>
 
 <form id="form" hidden>
-  <p data-t="intro">Your account's new password (at least 6 characters).</p>
+  <p data-t="intro">Your account's new password (at least 8 characters, with a letter and a digit).</p>
   <label for="pw1" data-t="pw1">New password</label>
-  <input id="pw1" type="password" autocomplete="new-password" minlength="6" required>
+  <input id="pw1" type="password" autocomplete="new-password" minlength="8" required>
   <label for="pw2" data-t="pw2">Repeat it</label>
-  <input id="pw2" type="password" autocomplete="new-password" minlength="6" required>
+  <input id="pw2" type="password" autocomplete="new-password" minlength="8" required>
   <button id="save" type="submit" data-t="save">Save the new password</button>
   <div id="formError" class="box bad" hidden><p id="formErrorText"></p></div>
 </form>
@@ -62,14 +62,15 @@
   var T = {
     ro: {
       title: "Alege o parolă nouă",
-      intro: "Noua parolă a contului (cel puțin 6 caractere).",
+      intro: "Noua parolă a contului (cel puțin 8 caractere, cu o literă și o cifră).",
       pw1: "Parola nouă",
       pw2: "Repet-o",
       save: "Salvează parola nouă",
       done: "Parola a fost schimbată. Întoarce-te în aplicație și conectează-te cu emailul și parola nouă.",
       expired: "Linkul a expirat sau a fost deja folosit. În aplicație, apasă Conectare → Ai uitat parola? ca să primești altul.",
       none: "Deschide pagina din linkul din emailul trimis de joc. Ca să primești unul, apasă Conectare → Ai uitat parola? în aplicație.",
-      short: "Parola trebuie să aibă cel puțin 6 caractere.",
+      short: "Parola trebuie să aibă cel puțin 8 caractere.",
+      simple: "Parola trebuie să aibă o literă și o cifră.",
       mismatch: "Cele două parole nu sunt la fel.",
       failed: "Parola nu s-a putut schimba:",
       privacy: "Politica de confidențialitate",
@@ -77,14 +78,15 @@
     },
     ru: {
       title: "Новый пароль",
-      intro: "Новый пароль аккаунта (не меньше 6 символов).",
+      intro: "Новый пароль аккаунта (не меньше 8 символов, с буквой и цифрой).",
       pw1: "Новый пароль",
       pw2: "Повторите его",
       save: "Сохранить новый пароль",
       done: "Пароль изменён. Вернитесь в приложение и войдите с почтой и новым паролем.",
       expired: "Ссылка устарела или уже использована. В приложении нажмите Вход → Забыли пароль?, чтобы получить новую.",
       none: "Откройте эту страницу по ссылке из письма, которое прислала игра. Чтобы получить его, нажмите в приложении Вход → Забыли пароль?",
-      short: "Пароль должен быть не короче 6 символов.",
+      short: "Пароль должен быть не короче 8 символов.",
+      simple: "В пароле нужны буква и цифра.",
       mismatch: "Пароли не совпадают.",
       failed: "Не удалось изменить пароль:",
       privacy: "Политика конфиденциальности",
@@ -92,14 +94,15 @@
     },
     es: {
       title: "Elige una contraseña nueva",
-      intro: "La nueva contraseña de tu cuenta (al menos 6 caracteres).",
+      intro: "La nueva contraseña de tu cuenta (al menos 8 caracteres, con una letra y un número).",
       pw1: "Contraseña nueva",
       pw2: "Repítela",
       save: "Guardar la contraseña nueva",
       done: "Tu contraseña se ha cambiado. Vuelve a la app e inicia sesión con tu correo y la contraseña nueva.",
       expired: "Este enlace ha caducado o ya se ha usado. En la app, toca Iniciar sesión → ¿Has olvidado la contraseña? para recibir otro.",
       none: "Abre esta página desde el enlace del correo que te envió el juego. Para recibir uno, toca Iniciar sesión → ¿Has olvidado la contraseña? en la app.",
-      short: "La contraseña necesita al menos 6 caracteres.",
+      short: "La contraseña necesita al menos 8 caracteres.",
+      simple: "La contraseña necesita una letra y un número.",
       mismatch: "Las dos contraseñas no coinciden.",
       failed: "No se ha podido cambiar la contraseña:",
       privacy: "Política de privacidad",
@@ -107,14 +110,15 @@
     },
     pt: {
       title: "Escolha uma senha nova",
-      intro: "A nova senha da sua conta (pelo menos 6 caracteres).",
+      intro: "A nova senha da sua conta (pelo menos 8 caracteres, com uma letra e um número).",
       pw1: "Senha nova",
       pw2: "Repita a senha",
       save: "Salvar a senha nova",
       done: "Sua senha foi alterada. Volte ao app e entre com seu e-mail e a senha nova.",
       expired: "Este link expirou ou já foi usado. No app, toque em Entrar → Esqueceu a senha? para receber outro.",
       none: "Abra esta página pelo link do e-mail que o jogo enviou. Para receber um, toque em Entrar → Esqueceu a senha? no app.",
-      short: "A senha precisa ter pelo menos 6 caracteres.",
+      short: "A senha precisa ter pelo menos 8 caracteres.",
+      simple: "A senha precisa de uma letra e um número.",
       mismatch: "As duas senhas não são iguais.",
       failed: "Não foi possível alterar a senha:",
       privacy: "Política de privacidade",
@@ -122,20 +126,21 @@
     },
     de: {
       title: "Neues Passwort wählen",
-      intro: "Das neue Passwort deines Kontos (mindestens 6 Zeichen).",
+      intro: "Das neue Passwort deines Kontos (mindestens 8 Zeichen, mit einem Buchstaben und einer Ziffer).",
       pw1: "Neues Passwort",
       pw2: "Wiederholen",
       save: "Neues Passwort speichern",
       done: "Dein Passwort wurde geändert. Geh zurück in die App und melde dich mit deiner E-Mail-Adresse und dem neuen Passwort an.",
       expired: "Dieser Link ist abgelaufen oder wurde schon benutzt. Tippe in der App auf Anmelden → Passwort vergessen?, um einen neuen zu bekommen.",
       none: "Öffne diese Seite über den Link in der E-Mail, die dir das Spiel geschickt hat. Um eine zu bekommen, tippe in der App auf Anmelden → Passwort vergessen?",
-      short: "Das Passwort braucht mindestens 6 Zeichen.",
+      short: "Das Passwort braucht mindestens 8 Zeichen.",
+      simple: "Das Passwort braucht einen Buchstaben und eine Ziffer.",
       mismatch: "Die beiden Passwörter sind nicht gleich.",
       failed: "Das Passwort konnte nicht geändert werden:",
       privacy: "Datenschutzerklärung",
       terms: "Nutzungsbedingungen"
     },
-    en: { short: "The password needs at least 6 characters.", mismatch: "The two passwords are not the same.", failed: "The password couldn't be changed:" }
+    en: { short: "The password needs at least 8 characters.", simple: "The password needs a letter and a digit.", mismatch: "The two passwords are not the same.", failed: "The password couldn't be changed:" }
   };
   var t = T[lang] || T.en;
   var say = function (k) { return t[k] || T.en[k]; };
@@ -165,7 +170,9 @@
     e.preventDefault();
     document.getElementById("formError").hidden = true;
     var pw = document.getElementById("pw1").value;
-    if (pw.length < 6) return fail(say("short"));
+    // the game's rule for a new password (src/lib/password.ts)
+    if (Array.from(pw).length < 8) return fail(say("short"));
+    if (!/\p{L}/u.test(pw) || !/\p{Nd}/u.test(pw)) return fail(say("simple"));
     if (pw !== document.getElementById("pw2").value) return fail(say("mismatch"));
     var button = document.getElementById("save");
     button.disabled = true;

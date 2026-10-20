@@ -37,6 +37,12 @@ const one = (res) => (Array.isArray(res.data) ? res.data[0] : res.data);
 // ── player A ──
 const a = browser();
 const signA = await a.client.auth.signInAnonymously();
+// With CAPTCHA on in Supabase (docs/captcha.md) no account can be made or signed in without a token
+// from a real phone or browser, so this check can't make its test players: it says so and stops.
+if (signA.error?.code === "captcha_failed" || /captcha/i.test(signA.error?.message ?? "")) {
+  console.log("::warning title=cloud-e2e skipped::CAPTCHA is on in Supabase: test players can't sign in, so nothing was checked (docs/captcha.md).");
+  process.exit(0);
+}
 check(!signA.error && !!signA.data.user, "A signs in as a guest", signA.error?.message);
 const idA = signA.data.user?.id;
 

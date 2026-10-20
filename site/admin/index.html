@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self'; connect-src https://orffhhsogoymalyogfzl.supabase.co; base-uri 'none'; form-action 'none'">
+<!-- the robot check's public site key, written by pages.yml from the TURNSTILE_SITE_KEY variable (docs/captcha.md); empty: none -->
+<meta name="turnstile-sitekey" content="">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; style-src 'unsafe-inline'; img-src 'self'; connect-src https://orffhhsogoymalyogfzl.supabase.co https://challenges.cloudflare.com; base-uri 'none'; form-action 'none'">
 <title>Idle Car Empire – Panou</title>
 <style>
   :root { color-scheme: dark; }
@@ -64,6 +66,7 @@
     <label>Parolă <input id="password" type="password" autocomplete="current-password" required></label>
     <button id="go">Intră</button>
   </div>
+  <div id="captcha" hidden></div>
   <p id="signinMsg" class="msg" role="status"></p>
 </section>
 
@@ -181,6 +184,29 @@ async function auth(grant, body) {
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error_description || j.msg || j.message || `HTTP ${r.status}`);
   return j;
+}
+// the robot check (Cloudflare Turnstile), once CAPTCHA is on in Supabase (docs/captcha.md)
+const SITEKEY = document.querySelector('meta[name="turnstile-sitekey"]')?.content || "";
+let turnstile = null;
+function captcha() {
+  if (!SITEKEY) return Promise.resolve(null);
+  turnstile ??= new Promise((res, rej) => {
+    const s = document.createElement("script");
+    s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+    s.onload = () => res(window.turnstile);
+    s.onerror = () => { turnstile = null; rej(new Error("Verificarea anti-robot nu s-a încărcat.")); };
+    document.head.appendChild(s);
+  });
+  return turnstile.then((ts) => new Promise((res, rej) => {
+    const box = $("captcha");
+    box.hidden = false;
+    const done = () => { ts.remove(id); box.hidden = true; };
+    const id = ts.render(box, {
+      sitekey: SITEKEY, action: "admin", language: "ro", theme: "dark",
+      callback: (t) => { done(); res(t); },
+      "error-callback": () => { done(); rej(new Error("Verificarea anti-robot n-a trecut. Încearcă din nou.")); },
+    });
+  }));
 }
 async function token() {
   if (!session) throw new Error("signed out");
@@ -300,7 +326,10 @@ for (const [id, name] of Object.entries(EVENTS)) $("evId").append(el("option", {
 $("go").addEventListener("click", async () => {
   $("signinMsg").textContent = "";
   try {
-    keep(await auth("password", { email: $("email").value.trim(), password: $("password").value }));
+    const body = { email: $("email").value.trim(), password: $("password").value };
+    const captchaToken = await captcha();
+    if (captchaToken) body.gotrue_meta_security = { captcha_token: captchaToken };
+    keep(await auth("password", body));
     $("password").value = "";
     await show();
   } catch (e) { $("signinMsg").textContent = /invalid/i.test(e.message) ? "Email sau parolă greșită." : e.message; }

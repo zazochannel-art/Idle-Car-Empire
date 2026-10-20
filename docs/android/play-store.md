@@ -184,6 +184,11 @@ from both the game (collected, not shared, optional) and AdMob (shared,
 required), so answer them collected **and** shared, **required** (AdMob's
 can't be switched off), with both rows' purposes.
 
+**Robot check** ([captcha.md](../captcha.md)), once a release has it: Cloudflare Turnstile reads
+device and browser signals when an account is made or signs in. Declare what Cloudflare's
+Turnstile privacy addendum lists, for Fraud prevention, security, and compliance, processed
+ephemerally. Until then the app doesn't load it.
+
 Not collected: precise location, contacts, photos/files, messages, financial
 info, health, web history, audio, calendar. The "Android" device label stored
 with saves is a type, not an identifier.
