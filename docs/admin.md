@@ -34,6 +34,12 @@ To remove an admin: `delete from ops.admins where user_id = (select id from auth
   - **Dismiss** closes it when nothing is wrong.
 - **Errors (Erori):** the last 30 days' errors in the game, most frequent first ([errors.md](errors.md) explains how to find the line in the code).
 - **New players (Jucători noi):** the anonymous funnel, how far new players get and after how many minutes ([funnel.md](funnel.md)).
+- **Coming back (Revin):** how many players play and how many come back.
+  - Players who played today, in 7 days and in 30 days.
+  - Of the new players, how many played again the next day (D1), on the 7th day (D7) and on any day of their first week.
+  - The last 30 days one by one, with the same numbers per day of sign-up.
+  - A player's day counts when their game saves to the cloud that day (UTC), so a player who only plays offline counts on the day the save gets through. The days before this tab came (20 October 2026) were filled in from each player's last save, their cloud backups and the day they signed up, so the first weeks show fewer days than were played.
+  - Only totals: the page never lists a player.
 
 The page is in Romanian. You stay signed in until you close the tab or press **Ieși** (sign out).
 
@@ -78,6 +84,7 @@ The rules live on the server (`supabase/migrations/0014_seasons.sql`) and in the
 ## Safety
 
 - **Not reachable from the API:** the tables (`ops.admins`, `ops.live_events`, `ops.live_seasons`) are in the `ops` schema, which the API does not expose. Nobody but the database owner can read or change them directly (`supabase/migrations/0010_live_events_and_dashboard.sql`).
+- **The days played:** `analytics.play_days` keeps one row per player and day (UTC date only), marked by the server when a cloud save is written, and goes with the account. It is in the `analytics` schema, out of the API's reach; only `admin_retention()` reads it, for an admin, and returns totals (`supabase/migrations/0015_retention.sql`).
 - **What players can call:** only `live_events()` and `live_seasons()`, which return the events running or coming in the next two weeks and the seasons in the next 60 days. All the `admin_*` functions refuse anyone who isn't in `ops.admins` (error `42501`). Guests and players without an account can't call them at all.
 - **The live check:** `scripts/cloud-e2e.mjs` checks on every database change that a player can read the schedule but not the dashboard's data, can't schedule an event or a season, and can't reach the tables.
 - **On the page:**

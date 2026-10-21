@@ -2,6 +2,7 @@
 // cloud is set up, the player's account and its cloud copy. SaveManager
 // decides at the start which copy to play (see policy.ts), asks the player
 // when both moved on, then keeps the cloud up to date (see sync.ts).
+import { captchaFailed, captchaOn } from "../../lib/captcha";
 import { isCleanName } from "../engine/names";
 import { SAVE_VERSION } from "../engine/state";
 import type { GameState } from "../types";
@@ -316,9 +317,10 @@ export class SaveManager {
     if (!isCleanName(username)) return { ok: false, error: "blocked", field: "name" };
     if (!this.backend) return { ok: false, error: "network" };
     try {
-      if (!(await this.currentAccount())) await timeout(this.backend.signInGuest(), 10_000);
-    } catch {
-      return { ok: false, error: "network" };
+      // the robot check may wait for the player's tap (lib/captcha.ts)
+      if (!(await this.currentAccount())) await timeout(this.backend.signInGuest(), captchaOn() ? 120_000 : 10_000);
+    } catch (e) {
+      return { ok: false, error: captchaFailed(e) ? "captcha" : "network" };
     }
     const named = await this.backend.updateProfile({ username });
     if (!named.ok) return { ...named, field: "name" };

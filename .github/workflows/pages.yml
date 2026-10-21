@@ -25,6 +25,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      - name: The robot check's public site key, once the owner set it up (docs/captcha.md)
+        env:
+          TURNSTILE_SITE_KEY: ${{ vars.TURNSTILE_SITE_KEY }}
+        run: |
+          if [ -n "$TURNSTILE_SITE_KEY" ]; then
+            sed -i "s|<meta name=\"turnstile-sitekey\" content=\"\">|<meta name=\"turnstile-sitekey\" content=\"$TURNSTILE_SITE_KEY\">|" site/admin/index.html
+            grep -q "content=\"$TURNSTILE_SITE_KEY\"" site/admin/index.html
+          fi
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site

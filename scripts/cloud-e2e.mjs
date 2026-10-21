@@ -37,6 +37,12 @@ const one = (res) => (Array.isArray(res.data) ? res.data[0] : res.data);
 // ── player A ──
 const a = browser();
 const signA = await a.client.auth.signInAnonymously();
+// With CAPTCHA on in Supabase (docs/captcha.md) no account can be made or signed in without a token
+// from a real phone or browser, so this check can't make its test players: it says so and stops.
+if (signA.error?.code === "captcha_failed" || /captcha/i.test(signA.error?.message ?? "")) {
+  console.log("::warning title=cloud-e2e skipped::CAPTCHA is on in Supabase: test players can't sign in, so nothing was checked (docs/captcha.md).");
+  process.exit(0);
+}
 check(!signA.error && !!signA.data.user, "A signs in as a guest", signA.error?.message);
 const idA = signA.data.user?.id;
 
@@ -352,6 +358,12 @@ const sneakySeason = await a.client.rpc("admin_schedule_season", { p_season: "su
 check(sneakySeason.error?.code === "42501", "a player can't schedule a season", sneakySeason.error?.code ?? JSON.stringify(sneakySeason.data));
 const seasonsTable = await a.client.schema("ops").from("live_seasons").select("id");
 check(!!seasonsTable.error, "the seasons table isn't reachable from the API", seasonsTable.error?.code ?? "readable");
+
+// ── retention (0015): the days played are the dashboard's, in totals; no player reads them ──
+const retention = await a.client.rpc("admin_retention");
+check(retention.error?.code === "42501", "the retention figures are refused to a player", retention.error?.code ?? "answered");
+const playDays = await a.client.schema("analytics").from("play_days").select("day");
+check(!!playDays.error, "the days played aren't reachable from the API", playDays.error?.code ?? "readable");
 
 // ── clean up: each test player deletes its own save (and so its card), then its account: no
 // test account stays on the project (they counted as players on the owner's dashboard) ──

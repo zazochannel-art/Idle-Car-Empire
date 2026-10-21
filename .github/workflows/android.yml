@@ -56,6 +56,9 @@ jobs:
           # "on" once Supabase sends email to every address (custom SMTP): the game then emails password
           # reset links; unset, it shows the contact address instead (docs/cloud-save.md)
           NEXT_PUBLIC_PASSWORD_RESET: ${{ vars.PASSWORD_RESET }}
+          # the robot check's public site key (Cloudflare Turnstile), a repository variable once CAPTCHA
+          # is on in Supabase (docs/captcha.md); unset: no check
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.TURNSTILE_SITE_KEY }}
           # this build's source maps, kept as an artifact (not in the app) to read players' error reports
           SOURCE_MAPS: "1"
       # The upload key signs the release bundle on main and on manual runs, never on pull
