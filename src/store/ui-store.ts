@@ -78,6 +78,9 @@ interface UiStore {
   setTimeMode: (m: TimeMode) => void;
   setPreview: (p: { plot: string; type: StructureType } | null) => void;
   setView: (v: View | null) => void;
+  /** The leaderboard's tab to open on (a notification about the cup); the leaderboard clears it. */
+  boardTab: "cup" | null;
+  openBoard: (tab: "cup") => void;
   /** Every screen opened, newest last (the pillars reopen on the last one of theirs). */
   seen: View[];
   selectPlot: (id: string | null, focus?: boolean) => void;
@@ -122,6 +125,11 @@ export const useUi = create<UiStore>((set) => ({
   setPreview: (preview) => set({ preview }),
   seen: [],
   setView: (view) => set((u) => ({ view, plot: null, zone: null, preview: null, showcase: null, seen: view ? [...u.seen.filter((x) => x !== view), view] : u.seen })),
+  boardTab: null,
+  openBoard: (boardTab) => {
+    useUi.getState().setView("leaderboard");
+    set({ boardTab });
+  },
   selectPlot: (plot, focus = true) =>
     set(() => ({ plot, zone: null, view: null, preview: null, showcase: null, ...(plot && focus ? { command: { kind: "plot" as const, id: plot, n: ++n } } : {}) })),
   selectZone: (zone, focus = true) =>

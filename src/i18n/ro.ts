@@ -2001,6 +2001,7 @@ export const ro: Record<MessageKey, string> = {
   "city.billboard": "Nou: {car}",
   "notify.label": "Notificări când nu ești în joc",
   "notify.hint": "O clădire terminată, limita offline atinsă: primești o notificare când jocul e închis.",
+  "notify.hintPush": "O clădire terminată, limita offline, un cadou, prietenii tăi, cupa săptămânii, un eveniment: primești o notificare când jocul e închis.",
   "notify.unsupported": "Notificările funcționează în aplicația de pe telefon.",
   "notify.blocked": "Notificările sunt oprite pentru Idle Car Empire: permite-le din setările telefonului.",
   "notify.offlineFullBody": "Limita offline e atinsă: deschide jocul ca să încasezi și producția să continue.",

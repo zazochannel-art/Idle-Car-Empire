@@ -4,6 +4,7 @@ import { Bell, ChevronRight, Cloud } from "lucide-react";
 import { useState } from "react";
 import { useT } from "@/i18n/use-t";
 import { askNotify, notifySupported } from "@/lib/notify";
+import { pushSupported } from "@/lib/push";
 import { cn } from "@/lib/utils";
 import { useCloud } from "@/store/cloud-store";
 import { useGame } from "@/store/game-store";
@@ -61,7 +62,7 @@ export function NotifyToggle() {
         <Bell className="size-4 shrink-0 text-white/60" />
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold">{t("notify.label")}</span>
-          <span className="block text-[11px] text-white/45">{t("notify.hint")}</span>
+          <span className="block text-[11px] text-white/45">{t(pushSupported() ? "notify.hintPush" : "notify.hint")}</span>
         </span>
         <span className={cn("relative h-6 w-10 shrink-0 rounded-full transition", on ? "bg-emerald-500" : "bg-white/15")}>
           <span className={cn("absolute top-0.5 size-5 rounded-full bg-white shadow transition-all", on ? "left-[1.125rem]" : "left-0.5")} />

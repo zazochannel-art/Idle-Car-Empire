@@ -2001,6 +2001,7 @@ export const de: Record<MessageKey, string> = {
   "city.billboard": "Neu: {car}",
   "notify.label": "Benachrichtigungen, während du weg bist",
   "notify.hint": "Ein Gebäude fertig, das Offline-Limit erreicht: eine Benachrichtigung, während das Spiel geschlossen ist.",
+  "notify.hintPush": "Ein Gebäude fertig, das Offline-Limit, ein Geschenk, deine Freunde, der Wochenpokal, ein Event: eine Benachrichtigung, während das Spiel geschlossen ist.",
   "notify.unsupported": "Benachrichtigungen funktionieren in der App auf deinem Handy.",
   "notify.blocked": "Benachrichtigungen für Idle Car Empire sind aus: Erlaube sie in den Einstellungen deines Handys.",
   "notify.offlineFullBody": "Das Offline-Limit ist erreicht: Öffne das Spiel, um abzuholen und die Produktion am Laufen zu halten.",

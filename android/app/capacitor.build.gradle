@@ -13,6 +13,7 @@ dependencies {
     implementation project(':capacitor-community-in-app-review')
     implementation project(':capacitor-app')
     implementation project(':capacitor-local-notifications')
+    implementation project(':capacitor-push-notifications')
     implementation project(':capawesome-capacitor-app-update')
     implementation project(':capgo-native-purchases')
 

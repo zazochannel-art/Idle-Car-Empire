@@ -190,6 +190,11 @@ device and browser signals when an account is made or signs in. Declare what Clo
 Turnstile privacy addendum lists, for Fraud prevention, security, and compliance, processed
 ephemerally. Until then the app doesn't load it.
 
+**Notifications from the server** ([push.md](../push.md)), once a release has them: add
+**Device or other IDs** (the notification token from Firebase Cloud Messaging): collected, not
+shared, optional (the player turns notifications on), App functionality. Until then the app
+doesn't collect it.
+
 Not collected: precise location, contacts, photos/files, messages, financial
 info, health, web history, audio, calendar. The "Android" device label stored
 with saves is a type, not an identifier.

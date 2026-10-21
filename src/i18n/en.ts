@@ -2002,6 +2002,7 @@ export const en = {
   "city.billboard": "New: {car}",
   "notify.label": "Notifications while away",
   "notify.hint": "A building finished, the offline limit reached: a notification while the game is closed.",
+  "notify.hintPush": "A building finished, the offline limit, a gift, your friends, the weekly cup, an event: a notification while the game is closed.",
   "notify.unsupported": "Notifications work in the app on your phone.",
   "notify.blocked": "Notifications are off for Idle Car Empire: allow them in your phone's settings.",
   "notify.offlineFullBody": "The offline limit is reached: open the game to collect and keep production going.",

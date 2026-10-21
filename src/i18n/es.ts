@@ -2001,6 +2001,7 @@ export const es: Record<MessageKey, string> = {
   "city.billboard": "Nuevo: {car}",
   "notify.label": "Notificaciones mientras no estás",
   "notify.hint": "Un edificio terminado, el límite sin conexión alcanzado: una notificación mientras el juego está cerrado.",
+  "notify.hintPush": "Un edificio terminado, el límite sin conexión, un regalo, tus amigos, la copa semanal, un evento: una notificación mientras el juego está cerrado.",
   "notify.unsupported": "Las notificaciones funcionan en la app de tu teléfono.",
   "notify.blocked": "Las notificaciones de Idle Car Empire están desactivadas: permítelas en los ajustes del teléfono.",
   "notify.offlineFullBody": "Se ha alcanzado el límite sin conexión: abre el juego para recoger y que la producción siga.",

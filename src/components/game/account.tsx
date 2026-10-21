@@ -457,6 +457,8 @@ export function ProfileView() {
                       size="sm"
                       className="bg-none bg-rose-600 shadow-none"
                       onClick={async () => {
+                        // this phone's notifications go with the account it signs out of
+                        await useGame.getState().forgetPush();
                         await saves?.logout();
                         window.location.reload();
                       }}

@@ -30,6 +30,15 @@
 
         </activity>
 
+        <!-- notifications from the server (Firebase Cloud Messaging, docs/push.md): the game's
+             small icon and its channel when the app is closed -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_notify" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="game" />
+
         <!-- AdMob app id (rewarded ads): set by the build, see android/app/build.gradle -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"

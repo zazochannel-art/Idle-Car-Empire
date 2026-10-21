@@ -365,6 +365,28 @@ check(retention.error?.code === "42501", "the retention figures are refused to a
 const playDays = await a.client.schema("analytics").from("play_days").select("day");
 check(!!playDays.error, "the days played aren't reachable from the API", playDays.error?.code ?? "readable");
 
+// ── notifications from the server (0016): a player registers and forgets only their own phone;
+// the sender's functions and the tables are out of reach ──
+const phone = `e2e-${crypto.randomUUID()}`;
+const reg = await a.client.rpc("register_push_token", { p_token: phone, p_platform: "android", p_lang: "ro", p_tz: 180 });
+check(reg.data === "ok", "a player registers their phone for notifications", reg.error?.message ?? reg.data);
+check((await a.client.rpc("register_push_token", { p_token: "not a token", p_platform: "android", p_lang: "ro", p_tz: 0 })).data === "invalid", "a token that isn't one is refused");
+check((await b.client.rpc("forget_push_token", { p_token: phone })).data === false, "another player can't forget someone's phone");
+const take = await a.client.rpc("push_take", { p_limit: 10 });
+check(take.error?.code === "42501", "a player can't take the notes to send", take.error?.code ?? "answered");
+const tokensTable = await a.client.schema("ops").from("push_tokens").select("token");
+check(!!tokensTable.error, "the phones' tokens aren't reachable from the API", tokensTable.error?.code ?? "readable");
+check((await a.client.rpc("forget_push_token", { p_token: phone })).data === true, "a player forgets their own phone");
+// the sender (supabase/functions/push): no call without a key; with one it runs, and until the
+// owner sets Firebase up it sends nothing (docs/push.md)
+const sender = `${url}/functions/v1/push`;
+const noKey = await fetch(sender, { method: "POST" });
+check(noKey.status === 401, "the push sender refuses a call without a key", noKey.status);
+const session = (await a.client.auth.getSession()).data.session;
+const run = await fetch(sender, { method: "POST", headers: { apikey: key, Authorization: `Bearer ${session?.access_token}` } });
+const sent = await run.json().catch(() => null);
+check(run.ok && typeof sent?.configured === "boolean" && sent?.sent >= 0, "the push sender runs", `${run.status} ${JSON.stringify(sent)}`);
+
 // ── clean up: each test player deletes its own save (and so its card), then its account: no
 // test account stays on the project (they counted as players on the owner's dashboard) ──
 for (const p of [a, b]) {
