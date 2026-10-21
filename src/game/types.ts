@@ -566,6 +566,14 @@ export interface GameState {
     base: { cars: number; earned: number; wins: number } | null;
     target: { cars: number; earned: number; wins: number } | null;
   };
+  /** The spring or summer festival (engine/festival.ts): which run of the season it is, the goals taken, where they started and how big they are. */
+  festival: {
+    key: string;
+    season: string;
+    goals: import("./engine/festival").FestivalGoal[];
+    base: { cars: number; earned: number; wins: number } | null;
+    target: { cars: number; earned: number; wins: number } | null;
+  };
   /** Rival companies the player has overtaken. */
   rivalsBeaten: string[];
   /** Tutorial tips the player has dismissed. */

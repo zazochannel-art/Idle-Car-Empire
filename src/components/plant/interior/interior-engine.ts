@@ -17,7 +17,8 @@ import { skyAt, worldClock, type TimeMode } from "../../map/lighting";
 import { drawModel, drawTruck, type CarModel } from "../../map/vehicles";
 import { sprites3d, tierFor, type SpriteSize } from "../../three/sprites";
 import type { WorkerRole } from "../../three/interior-models";
-import { bat, brick, christmasTree, cobweb, garland, planks, pumpkin, stringLights, tiles } from "./hall-art";
+import { bat, brick, bunting, christmasTree, cobweb, flowerPot, garland, parasol, planks, pumpkin, stringLights, tiles } from "./hall-art";
+import type { Season } from "@/game/engine/season";
 import { hallLook, type HallLook } from "./theme";
 import { interiorLayout, lineStops, recipeFor, type Interior, type InteriorSpec, type Line, type PartKind, type PlacedStation, type PropKind, type StationDef, type StationId, type StationUpgrade } from "./layout";
 
@@ -64,7 +65,7 @@ export interface InteriorScene {
   /** The plant's name, on the sign over the halls. */
   title?: string;
   /** Halloween or winter decorations, and the time of day the map is showing. */
-  season?: "halloween" | "winter" | null;
+  season?: Season | null;
   timeMode?: TimeMode;
 }
 
@@ -144,7 +145,7 @@ export class InteriorEngine {
   private look: HallLook = hallLook("bodyWorks", 5);
   /** 0 noon … 0.5 golden hour … 1 night (the map's own clock). */
   private skyDark = 0;
-  private season: "halloween" | "winter" | null = null;
+  private season: Season | null = null;
   /** Finished units rising over each line's store ("+5 ⚙️"), and when the last ones went up. */
   private pops: { line: number; n: number; t0: number; bump: number }[] = [];
   private popAt = -99;
@@ -588,7 +589,9 @@ export class InteriorEngine {
     const k = tierCap(this.cam.zoom * this.dpr);
     const kinds = this.look.decor;
     [6.1, 12.9, 19.7].forEach((x, i) => this.stack(kinds[i % kinds.length], x, 0.85, k));
-    if (this.season === "halloween") for (const x of [4.55, 11.65, 18.75]) pumpkin(this.p, x, L.lines[0] ? L.lines[0].y0 + 0.45 : 1.85, 0.9, this.t);
+    const front = L.lines[0] ? L.lines[0].y0 + 0.45 : 1.85;
+    if (this.season === "halloween") for (const x of [4.55, 11.65, 18.75]) pumpkin(this.p, x, front, 0.9, this.t);
+    else if (this.season === "spring" || this.season === "summer") for (const x of [4.55, 11.65, 18.75]) flowerPot(this.p, x, front, 0.9, this.t, this.season);
   }
 
   /** The season up under the roof: strings of lights along the walls, bats. */
@@ -605,7 +608,9 @@ export class InteriorEngine {
         const y = 2 + i * 4.5 + Math.sin(this.t * 0.7 + i) * 1.2;
         bat(c, sx(x, y), sy(x, y, 74 + Math.sin(this.t * 2 + i) * 6), this.t + i, 0.9);
       }
-    } else stringLights(this.p, L.w, L.d, 82, this.t, ["#ef4444", "#facc15", "#22c55e", "#3b82f6", "#f472b6"]);
+    } else if (this.season === "spring") stringLights(this.p, L.w, L.d, 82, this.t, ["#f9a8d4", "#fde68a", "#bbf7d0", "#c4b5fd"]);
+    else if (this.season === "summer") stringLights(this.p, L.w, L.d, 82, this.t, ["#fbbf24", "#fb923c", "#f472b6", "#38bdf8"]);
+    else stringLights(this.p, L.w, L.d, 82, this.t, ["#ef4444", "#facc15", "#22c55e", "#3b82f6", "#f472b6"]);
   }
 
   /** A pallet of the plant's own stock (coils, tyres, drums, reels…) stacked two high. */
@@ -1032,6 +1037,8 @@ export class InteriorEngine {
       cobweb(c, w, 0, WH - 1, 30, true);
       for (const [x0] of this.windowSpans(w).filter((_, i) => i % 3 === 1)) cobweb(c, x0, 0, 78, 14);
     } else if (this.season === "winter") garland(p, w, WH - 18);
+    else if (this.season === "spring") bunting(p, w, WH - 16, ["#f9a8d4", "#fde68a", "#86efac", "#c4b5fd", "#f8fafc"]);
+    else if (this.season === "summer") bunting(p, w, WH - 16, ["#ef4444", "#facc15", "#3b82f6", "#22c55e", "#fb923c"]);
   }
 
   /** Where the windows of the back wall are (x from, x to). */
@@ -1708,6 +1715,11 @@ export class InteriorEngine {
     // the season
     if (this.season === "winter") christmasTree(p, 18.3, fy + 0.1, this.t);
     else if (this.season === "halloween") for (const [x, dy] of [[7.3, 0.3], [12.9, 0.35], [17.4, 0.2], [18.1, 0.45]]) pumpkin(p, x, fy + dy, 1, this.t);
+    else if (this.season === "spring") for (const [x, dy] of [[7.3, 0.3], [12.9, 0.35], [17.6, 0.25]]) flowerPot(p, x, fy + dy, 1, this.t, "spring");
+    else if (this.season === "summer") {
+      parasol(p, 17.9, fy + 0.2, this.t);
+      flowerPot(p, 7.3, fy + 0.3, 1, this.t, "summer");
+    }
   }
 
   /** Big plants: an overhead crane over the stores, travelling across the halls. */

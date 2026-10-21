@@ -29,6 +29,7 @@ import { BuildPanel, GaragesView, MechanicsSummary, MenuPanel, PlotPanel, Upgrad
 import { Sheet } from "../panels/sheet";
 import { passWaiting } from "@/game/engine/pass";
 import { winterWaiting } from "@/game/engine/winter";
+import { festivalWaiting } from "@/game/engine/festival";
 import { ConflictDialog, ProfileView, StartGate } from "./account";
 import { StartScreen } from "./start-screen";
 import { useCloud } from "@/store/cloud-store";
@@ -69,6 +70,7 @@ const SCREENS = {
   leaderboard: () => import("../views/leaderboard-view"),
   alliance: () => import("../views/alliance-view"),
   winter: () => import("../views/winter-view"),
+  festival: () => import("../views/festival-view"),
   pass: () => import("../views/pass-view"),
   shop: () => import("../views/shop-view"),
   research: () => import("../views/research-view"),
@@ -92,6 +94,7 @@ const ImperiumView = lazy(() => retry(SCREENS.imperium).then((m) => ({ default: 
 const LeaderboardView = lazy(() => retry(SCREENS.leaderboard).then((m) => ({ default: m.LeaderboardView })));
 const AllianceView = lazy(() => retry(SCREENS.alliance).then((m) => ({ default: m.AllianceView })));
 const WinterView = lazy(() => retry(SCREENS.winter).then((m) => ({ default: m.WinterView })));
+const FestivalView = lazy(() => retry(SCREENS.festival).then((m) => ({ default: m.FestivalView })));
 const PassView = lazy(() => retry(SCREENS.pass).then((m) => ({ default: m.PassView })));
 const ShopView = lazy(() => retry(SCREENS.shop).then((m) => ({ default: m.ShopView })));
 const ResearchView = lazy(() => retry(SCREENS.research).then((m) => ({ default: m.ResearchView })));
@@ -172,7 +175,7 @@ function badgeCounts(state: ReturnType<typeof useGame.getState>["state"], snap: 
     managers: MANAGERS.filter((m) => !state.managers[m.id].hired && isManagerUnlocked(state, m.id) && state.cash >= m.cost).length + (idle > 0 ? 1 : 0),
     missions: claimableCount(state, snap),
     // the crown menu: an expansion ready, a decision on the desk or a chapter to close
-    imperium: (canImperium(state) ? 1 : 0) + (storyWaiting(state, snap) ? 1 : 0) + (winterWaiting(state, state.lastActiveAt) ? 1 : 0) + (passWaiting(state) > 0 ? 1 : 0),
+    imperium: (canImperium(state) ? 1 : 0) + (storyWaiting(state, snap) ? 1 : 0) + (winterWaiting(state, state.lastActiveAt) ? 1 : 0) + (festivalWaiting(state, state.lastActiveAt) ? 1 : 0) + (passWaiting(state) > 0 ? 1 : 0),
     upgrade: upgrades,
   };
 }
@@ -433,6 +436,8 @@ const ViewSwitch = memo(function ViewSwitch({ view, onSettings }: { view: View; 
       return <AllianceView />;
     case "winter":
       return <WinterView />;
+    case "festival":
+      return <FestivalView />;
     case "pass":
       return <PassView />;
     case "shop":
@@ -450,7 +455,7 @@ export const PILLARS: { id: PillarId; icon: Icon; views: View[] }[] = [
   { id: "empire", icon: Factory, views: ["empire", "garages", "logistics", "research", "managers", "imperium"] },
   { id: "cars", icon: Car, views: ["cars"] },
   { id: "racing", icon: Flag, views: ["racing"] },
-  { id: "business", icon: Briefcase, views: ["dealers", "economy", "missions", "stats", "achievements", "story", "leaderboard", "alliance", "winter", "pass"] },
+  { id: "business", icon: Briefcase, views: ["dealers", "economy", "missions", "stats", "achievements", "story", "leaderboard", "alliance", "winter", "festival", "pass"] },
 ];
 export const pillarOf = (v: View | null) => (v ? (PILLARS.find((p) => p.views.includes(v))?.id ?? null) : null);
 

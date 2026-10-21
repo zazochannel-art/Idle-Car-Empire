@@ -27,7 +27,7 @@ To remove an admin: `delete from ops.admins where user_id = (select id from auth
   - New games started in 7 days.
   - Alliances and open reports.
   - Errors today, and different errors in 7 days.
-- **Events (Evenimente):** schedule an event, see the scheduled ones, cancel one.
+- **Events (Evenimente):** schedule an event or a season, see the scheduled ones, cancel one.
 - **Reports (Raportări):** players' open reports, with three actions (see [moderation.md](moderation.md)):
   - **Rename** gives the player a neutral name and closes the report.
   - **Done** closes it after you have acted.
@@ -56,12 +56,37 @@ The game runs a market event every few hours on its own (Factory Week, Car Show,
 - **Offline players:** they don't get it; the regular schedule goes on for them.
 - **Cancelling:** players stop seeing the event (within half an hour, as above). The dashboard keeps it, marked "anulat" (cancelled).
 
+## Seasons
+
+Spring and summer come with the calendar, like Halloween and winter:
+
+- **Spring festival:** 21 March to 10 April.
+- **Summer road trip:** 15 July to 10 August.
+
+While one runs, every player gets:
+- flowers or bunting in the factory halls;
+- +10% income;
+- the festival: three goals sized to their empire, each paying 1 ⭐ and an hour of income;
+- a race livery for all three goals (*Blossom* in spring, *Sunset* in summer).
+
+From the dashboard you can also put spring or summer on at another time (**Programează un anotimp**, on the Events tab):
+
+- **When:** from now up to 120 days ahead.
+- **How long:** 1 to 31 days.
+- **Which:** spring or summer only. Winter's advent calendar is tied to December, so it stays on the calendar.
+- **One at a time:** a season that would overlap another scheduled one is refused.
+- **While it runs:** it takes the place of the calendar's season. Each run is a new festival with new goals, even if the player already had one that year.
+- **Reaching players:** as for events, within half an hour.
+- **Cancelling:** players go back to the calendar's season. The dashboard keeps the row, marked "anulat" (cancelled).
+
+The rules live on the server (`supabase/migrations/0014_seasons.sql`) and in the game (`src/game/engine/season.ts`, `festival.ts`).
+
 ## Safety
 
-- **Not reachable from the API:** the tables (`ops.admins`, `ops.live_events`) are in the `ops` schema, which the API does not expose. Nobody but the database owner can read or change them directly (`supabase/migrations/0010_live_events_and_dashboard.sql`).
+- **Not reachable from the API:** the tables (`ops.admins`, `ops.live_events`, `ops.live_seasons`) are in the `ops` schema, which the API does not expose. Nobody but the database owner can read or change them directly (`supabase/migrations/0010_live_events_and_dashboard.sql`).
 - **The days played:** `analytics.play_days` keeps one row per player and day (UTC date only), marked by the server when a cloud save is written, and goes with the account. It is in the `analytics` schema, out of the API's reach; only `admin_retention()` reads it, for an admin, and returns totals (`supabase/migrations/0015_retention.sql`).
-- **What players can call:** only `live_events()`, which returns the events running or coming in the next two weeks. All the `admin_*` functions refuse anyone who isn't in `ops.admins` (error `42501`). Guests and players without an account can't call them at all.
-- **The live check:** `scripts/cloud-e2e.mjs` checks on every database change that a player can read the schedule but not the dashboard's data, can't schedule an event, and can't reach the tables.
+- **What players can call:** only `live_events()` and `live_seasons()`, which return the events running or coming in the next two weeks and the seasons in the next 60 days. All the `admin_*` functions refuse anyone who isn't in `ops.admins` (error `42501`). Guests and players without an account can't call them at all.
+- **The live check:** `scripts/cloud-e2e.mjs` checks on every database change that a player can read the schedule but not the dashboard's data, can't schedule an event or a season, and can't reach the tables.
 - **On the page:**
   - Players' words (names in reports, error messages) are always shown as text, never run as code.
   - The page may only talk to the game's Supabase project (its Content Security Policy).
