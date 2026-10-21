@@ -194,10 +194,52 @@ Not collected: precise location, contacts, photos/files, messages, financial
 info, health, web history, audio, calendar. The "Android" device label stored
 with saves is a type, not an identifier.
 
-**Other declarations**: news app no; COVID-19 no; government no; financial
-features none; health no. Data used for ads: yes, by the Google Mobile Ads SDK
-only. The game's own data (saves, accounts, profiles, reports) is never used
-for ads.
+**Other declarations.** Answer each one as below. Google Play publishes apps that
+declare financial, health, government or VPN features only from an **organization**
+account, and rejects them from a personal one (see *If Play rejects the app* below).
+- **Financial features**: *My app doesn't provide any financial features.* In-app
+  purchases, a payments profile and ads are not financial features: those are
+  banking, loans, stock trading, investment, crypto wallets and exchanges.
+- **Health apps**: *My app does not have any health features.*
+- **Government apps**: *No.*
+- **News app**: *No.* **COVID-19 contact tracing and status**: not one.
+- **Data used for ads**: yes, by the Google Mobile Ads SDK only. The game's own
+  data (saves, accounts, profiles, reports) is never used for ads.
+
+## If Play rejects the app
+
+Play Console → **Policy and programs → Policy status** lists each issue. *View
+details* gives the policy and, for some, what was found. Google also emails it to
+the account's address.
+
+**"Play Console requirements: … only from an organization account"** (*Некоторые
+типы приложений могут распространяться только организациями*). Google lets only
+organization accounts publish four kinds of app ([Play Console
+Requirements](https://support.google.com/googleplay/android-developer/answer/10788890)):
+- financial products and services;
+- health apps (medical, human subjects research);
+- apps that use the `VpnService` class;
+- government apps.
+
+The game is none of these. Its manifest has no VPN service and no health
+permissions, and no plugin adds one. So the rejection comes from an answer in
+Play Console, not from the app:
+1. Policy → **App content**: open *Financial features*, *Health apps* and
+   *Government apps*, and set them as in *Other declarations* above. A financial
+   feature ticked for the in-app purchases is the usual cause.
+2. **Store settings → App category**: *Game*, category *Simulation* (not Finance,
+   Medical or Health & Fitness).
+3. **Publishing overview** → *Send changes for review*. Usually no new upload is needed:
+   the same bundle is reviewed again with the corrected answers.
+4. If Play still refuses with every answer as above, use **Appeal** on the Policy
+   status issue. Say that it is a single-player idle game with ads and in-app
+   purchases, with no financial, health, government or VPN features.
+
+An organization account (it needs a D-U-N-S number) is not needed for this game.
+
+**"Developer Program Policies"** with no detail on the Policy status page is the
+heading over the issues listed under it. Fix those. If it stands alone, *View
+details* or the email names the policy.
 
 ## Uploading from GitHub (optional)
 
