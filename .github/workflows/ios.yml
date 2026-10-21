@@ -40,6 +40,8 @@ jobs:
           NEXT_PUBLIC_ADMOB_REWARDED_ID_IOS: ${{ vars.ADMOB_REWARDED_ID_IOS }}
           # "on" once Supabase sends email to every address: password reset links (docs/cloud-save.md)
           NEXT_PUBLIC_PASSWORD_RESET: ${{ vars.PASSWORD_RESET }}
+          # the robot check's public site key (docs/captcha.md); unset: no check
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.TURNSTILE_SITE_KEY }}
       - name: Xcode
         run: xcodebuild -version
       - name: Build for the simulator

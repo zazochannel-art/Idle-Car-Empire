@@ -15,6 +15,7 @@ import { summarize, type AuthResult, type CloudBackup, type MyInvite, type SaveS
 import { INVITE } from "@/game/engine/invites";
 import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
+import { passwordIssue } from "@/lib/password";
 import { cn } from "@/lib/utils";
 import { answerStartChoice, enterGame, useCloud } from "@/store/cloud-store";
 import { trackGate } from "@/game/save/funnel";
@@ -37,6 +38,13 @@ const ago = (t: T, ms: number | null) => (ms ? t("account.ago", { time: formatDu
 
 function errorText(t: T, r: AuthResult): string {
   return r.ok ? "" : t(`account.err.${r.error}` as MessageKey);
+}
+
+/** Under a new password: its rule, or what is wrong with it as the player types (lib/password.ts). */
+function PasswordHint({ pw, email, name }: { pw: string; email?: string; name?: string }) {
+  const { t } = useT();
+  const issue = pw ? passwordIssue(pw, { email, name }) : null;
+  return <p className={cn("px-1 text-[11px] leading-snug", issue ? "text-amber-300" : pw ? "text-emerald-300" : "text-white/45")}>{issue ? t(`password.${issue}`) : pw ? `✓ ${t("password.ok")}` : t("password.rule")}</p>;
 }
 
 // ───────────────────────── status ─────────────────────────
@@ -194,7 +202,8 @@ export function AccountForms({ initial, guest, onDone }: { initial: "login" | "r
     }
   };
 
-  const canSubmit = validEmail(email) && password.length >= 6 && !busy;
+  // a new password follows the rules; signing in takes any (older accounts keep theirs)
+  const canSubmit = validEmail(email) && (tab === "register" ? !passwordIssue(password, { email }) : password.length >= 6) && !busy;
   return (
     <div className="space-y-2.5">
       {guest && (
@@ -211,6 +220,7 @@ export function AccountForms({ initial, guest, onDone }: { initial: "login" | "r
       {tab === "login" && guest && <p className="text-[11px] leading-snug text-amber-300/90">{t("account.loginGuestWarn")}</p>}
       <Field label={t("account.email")} type="email" inputMode="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
       <Field label={t("account.password")} type="password" autoComplete={tab === "register" ? "new-password" : "current-password"} value={password} onChange={(e) => setPassword(e.target.value)} />
+      {tab === "register" && <PasswordHint pw={password} email={email} />}
       {tab === "register" ? (
         <Button
           variant="gold"
@@ -329,6 +339,8 @@ function ProfileEditor() {
 
 function PasswordForm() {
   const saves = useGame((g) => g.saves);
+  const email = useCloud((c) => c.account?.email ?? null);
+  const name = useCloud((c) => c.profile?.username);
   const { t } = useT();
   const [pw, setPw] = useState("");
   const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null);
@@ -336,11 +348,12 @@ function PasswordForm() {
   return (
     <div className="space-y-2">
       <Field label={t("account.newPassword")} type="password" autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} />
+      <PasswordHint pw={pw} email={email ?? undefined} name={name} />
       <Button
         size="sm"
         variant="secondary"
         className="w-full"
-        disabled={pw.length < 6}
+        disabled={!!passwordIssue(pw, { email: email ?? undefined, name })}
         onClick={async () => {
           const r = await saves.setPassword(pw).catch(() => ({ ok: false as const, error: "network" as const }));
           setMsg(r.ok ? { text: t("account.passwordSaved") } : { text: errorText(t, r), bad: true });
@@ -869,7 +882,7 @@ function WelcomeGate({ mode }: { mode: "new" | "returning" | "guest" }) {
   if (!saves) return null;
 
   const nameOk = name.trim().length >= 3 && name.trim().length <= 20;
-  const canSubmit = !busy && validEmail(email) && password.length >= 6 && (tab === "login" || nameOk);
+  const canSubmit = !busy && validEmail(email) && (tab === "login" ? password.length >= 6 : nameOk && !passwordIssue(password, { email, name }));
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -956,6 +969,7 @@ function WelcomeGate({ mode }: { mode: "new" | "returning" | "guest" }) {
         {tab === "register" && <Field label={t("account.username")} autoComplete="nickname" maxLength={20} value={name} onChange={(e) => setName(e.target.value)} />}
         <Field label={t("account.email")} type="email" inputMode="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         <Field label={t("account.password")} type="password" autoComplete={tab === "register" ? "new-password" : "current-password"} value={password} onChange={(e) => setPassword(e.target.value)} />
+        {tab === "register" && <PasswordHint pw={password} email={email} name={name} />}
         <Button type="submit" variant="gold" size="lg" className="w-full" disabled={!canSubmit}>
           {tab === "register" ? (
             <>

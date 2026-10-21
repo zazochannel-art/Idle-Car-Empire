@@ -4,6 +4,7 @@
 // Row Level Security keeps every row to its owner; this file holds only the
 // project's public (publishable) key.
 import type { AuthError as SbAuthError, SupabaseClient, User } from "@supabase/supabase-js";
+import { captchaOn, captchaToken } from "../../lib/captcha";
 import type { GameState } from "../types";
 import { Social } from "./social";
 import type { Account, AuthError, AuthResult, CloudBackend, CloudBackup, CloudCopy, Profile } from "./types";
@@ -17,6 +18,7 @@ function account(u: User | null | undefined): Account | null {
 export function authError(e: Pick<SbAuthError, "message"> & { code?: string; status?: number; name?: string }): AuthError {
   const code = e.code ?? "";
   const msg = e.message?.toLowerCase() ?? "";
+  if (code === "captcha_failed" || msg.includes("captcha")) return "captcha";
   if (code === "email_exists" || code === "user_already_exists" || msg.includes("already")) return "taken";
   if (code === "weak_password" || msg.includes("password should")) return "weak";
   if (code === "invalid_credentials" || msg.includes("invalid login")) return "credentials";
@@ -89,9 +91,15 @@ export class SupabaseBackend implements CloudBackend {
     }
   }
 
+  /** Supabase's options for a call it guards with CAPTCHA once the owner turns it on (lib/captcha.ts). */
+  private async captcha(action: string): Promise<{ captchaToken?: string }> {
+    if (!captchaOn()) return {};
+    return { captchaToken: await captchaToken(action, document.documentElement.lang || "auto") };
+  }
+
   async signInGuest(): Promise<Account> {
     const c = await this.client;
-    const { data, error } = await c.auth.signInAnonymously();
+    const { data, error } = await c.auth.signInAnonymously({ options: await this.captcha("signup") });
     if (error || !data.user) throw error ?? new Error("no guest account");
     return account(data.user)!;
   }
@@ -109,7 +117,13 @@ export class SupabaseBackend implements CloudBackend {
 
   async login(email: string, password: string): Promise<AuthResult> {
     const c = await this.client;
-    const { error } = await c.auth.signInWithPassword({ email, password });
+    let options: { captchaToken?: string };
+    try {
+      options = await this.captcha("login");
+    } catch {
+      return { ok: false, error: "captcha" };
+    }
+    const { error } = await c.auth.signInWithPassword({ email, password, options });
     return error ? fail(error) : { ok: true };
   }
 
@@ -122,7 +136,13 @@ export class SupabaseBackend implements CloudBackend {
   async resetPassword(email: string, redirectTo: string): Promise<AuthResult> {
     const c = await this.client;
     // the email's link carries a short session for that account to the site's reset page (implicit flow)
-    const { error } = await c.auth.resetPasswordForEmail(email, { redirectTo });
+    let options: { captchaToken?: string };
+    try {
+      options = await this.captcha("reset");
+    } catch {
+      return { ok: false, error: "captcha" };
+    }
+    const { error } = await c.auth.resetPasswordForEmail(email, { redirectTo, ...options });
     return error ? fail(error) : { ok: true };
   }
 
