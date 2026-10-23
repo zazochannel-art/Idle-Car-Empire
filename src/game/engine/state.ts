@@ -1,0 +1,156 @@
+import { createBrand } from "./brand";
+import { CARS } from "../config/cars";
+import { COMPONENTS } from "../config/chain";
+import { DEALER_IDS } from "../config/dealerships";
+import { MANAGER_IDS } from "../config/managers";
+import { START_CASH } from "../config/economy";
+import { createChain } from "./chain";
+import { createCity } from "./city";
+import { createLogistics } from "./logistics";
+import { createRacing } from "./racing";
+import { createSeason, createShow, createVip } from "./live";
+import { createClassics } from "./classics";
+import { createEngineers, createExport, createFleet, createProto } from "./expansion";
+import { createStory } from "./story";
+import { createEditions } from "./collection";
+import { createPass } from "./pass";
+import { createAds } from "./ads";
+import { createIap } from "./iap";
+import { createShop } from "./shop";
+import type { CarDesign, CarId, ComponentId, DealerId, DealerState, GameState, ManagerId, ManagerState, Stats } from "../types";
+
+/** v3: the supply-chain economy (older saves start a new company). */
+export const SAVE_VERSION = 3;
+/**
+ * The world map the plot ids refer to: 3 is the island map (lots along its
+ * roads). Saves from an older map start a new company (their lots are gone).
+ */
+export const MAP_VERSION = 3;
+
+export function createDealers(): Record<DealerId, DealerState> {
+  return Object.fromEntries(DEALER_IDS.map((d) => [d, { owned: false, level: 1 }])) as Record<DealerId, DealerState>;
+}
+
+export function createManagers(): Record<ManagerId, ManagerState> {
+  return Object.fromEntries(
+    MANAGER_IDS.map((m) => [m, { hired: false, level: 1, assignedTo: null }]),
+  ) as Record<ManagerId, ManagerState>;
+}
+
+export function emptyCarCounts(): Record<CarId, number> {
+  return Object.fromEntries(CARS.map((c) => [c.id, 0])) as Record<CarId, number>;
+}
+
+export function emptyParts(): Record<ComponentId, number> {
+  return Object.fromEntries(COMPONENTS.map((c) => [c.id, 0])) as Record<ComponentId, number>;
+}
+
+/** Every platform starts with its default model name and no options. */
+export function createDesigns(): Record<CarId, CarDesign> {
+  return Object.fromEntries(CARS.map((c) => [c.id, { name: c.modelName, engine: 0, interior: 0, rims: 0, paint: 0, color: "" }])) as Record<CarId, CarDesign>;
+}
+
+export function createStats(): Stats {
+  return {
+    carsProduced: 0,
+    moneyEarned: 0,
+    levelsBought: 0,
+    upgradesBought: 0,
+    researchDone: 0,
+    managersHired: 0,
+    offlineEarned: 0,
+    playTime: 0,
+    highestIncome: 0,
+    carsByType: emptyCarCounts(),
+    parts: emptyParts(),
+    deliveries: 0,
+    carsSold: 0,
+    carRevenue: 0,
+  };
+}
+
+export function createInitialState(now: number): GameState {
+  return {
+    version: SAVE_VERSION,
+    // starting capital: materials, the first upgrades, saving for the next plant
+    cash: START_CASH,
+    rp: 0,
+    dealers: createDealers(),
+    managers: createManagers(),
+    carModels: emptyCarCounts(),
+    designs: createDesigns(),
+    boost: 0,
+    stars: 0,
+    starUpgrades: {},
+    imperiumCount: 0,
+    epBase: 0,
+    history: [],
+    tips: [],
+    login: { day: "", streak: 0, claimed: true },
+    duels: { day: "", raced: [] },
+    cup: { week: 0, day: 0, runs: 0, best: 0, laps: [], car: "", sent: 0, claimed: 0 },
+    winter: { year: 0, doors: [], goals: [], base: null, target: null },
+    festival: { key: "", season: "", goals: [], base: null, target: null },
+    rivalsBeaten: [],
+    contracts: { offer: null, active: null, nextAt: 0, done: 0 },
+    logistics: createLogistics(),
+    market: { t: 0, bought: 0 },
+    mapVersion: MAP_VERSION,
+    eventGoal: { start: 0, base: 0, claimed: false },
+    brand: createBrand(),
+    showroom: { campaignUntil: 0, campaigns: 0, sold: 0, revenue: 0 },
+    ev: { chargers: {} },
+    story: createStory(),
+    editions: createEditions(),
+    pass: createPass(),
+    ads: createAds(),
+    shop: createShop(),
+    iap: createIap(),
+    research: [],
+    achievements: [],
+    missions: { dailyDate: "", daily: [], milestonesClaimed: [] },
+    run: createStats(),
+    lifetime: createStats(),
+    city: createCity(),
+    chain: createChain(),
+    racing: createRacing(),
+    pendingOffline: null,
+    unlocks: [],
+    classics: createClassics(),
+    proto: createProto(),
+    export: createExport(),
+    fleet: createFleet(),
+    engineers: createEngineers(),
+    vip: createVip(),
+    season: createSeason(),
+    show: createShow(),
+    quality: { rep: 50, defects: 0, recall: null, scandalUntil: 0, recalls: 0 },
+    settings: { buyAmount: 1, lang: "en", lowGraphics: false, sound: true, music: true, haptics: true, notify: false, saver: "auto", stats: true, hidden: [] },
+    funnel: [],
+    createdAt: now,
+    runStartedAt: now,
+    lastActiveAt: now,
+  };
+}
+
+/**
+ * A deep copy of plain data (objects, arrays, numbers, strings, booleans, null,
+ * undefined): what the game state is made of, since it is saved as JSON. About
+ * three times faster than structuredClone, which matters at ten ticks a second.
+ */
+function copy<T>(v: T): T {
+  if (v === null || typeof v !== "object") return v;
+  if (Array.isArray(v)) {
+    const n = v.length;
+    const out = new Array(n);
+    for (let i = 0; i < n; i++) out[i] = copy(v[i]);
+    return out as T;
+  }
+  const out: Record<string, unknown> = {};
+  for (const k in v) out[k] = copy((v as Record<string, unknown>)[k]);
+  return out as T;
+}
+
+export function cloneState(s: GameState): GameState {
+  return copy(s);
+}

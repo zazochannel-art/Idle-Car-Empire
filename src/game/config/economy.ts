@@ -1,0 +1,251 @@
+// The real economy of the empire, in one place: raw materials and their
+// market, what every component is made of, what it costs to run a plant
+// (labour, energy, maintenance), logistics, dealer fees and taxes, and the
+// margins cars and parts sell at. Money only comes from selling what the
+// plants made out of materials the player bought; every value that shapes
+// that loop lives here so balancing never touches the engine or the UI.
+import type { CarClass } from "./cars";
+import type { ComponentId, PlantType } from "../types";
+
+// ───────────────────────────── materials ─────────────────────────────
+
+export type MaterialId = "steel" | "aluminum" | "plastic" | "rubber" | "glass" | "copper" | "electronics" | "fabric" | "leather" | "paint" | "battery" | "fluids";
+
+export interface MaterialConfig {
+  id: MaterialId;
+  emoji: string;
+  /** Base market price per unit (before supplier, bulk discount and drift). */
+  price: number;
+  color: string;
+}
+
+export const MATERIALS: MaterialConfig[] = [
+  { id: "steel", emoji: "🔩", price: 25, color: "#94a3b8" },
+  { id: "aluminum", emoji: "🔧", price: 40, color: "#cbd5e1" },
+  { id: "plastic", emoji: "🧴", price: 10, color: "#f59e0b" },
+  { id: "rubber", emoji: "⚫", price: 18, color: "#334155" },
+  { id: "glass", emoji: "🪟", price: 15, color: "#7dd3fc" },
+  { id: "copper", emoji: "🟠", price: 55, color: "#c2410c" },
+  { id: "electronics", emoji: "💾", price: 120, color: "#22c55e" },
+  { id: "fabric", emoji: "🧵", price: 12, color: "#a16207" },
+  { id: "leather", emoji: "👜", price: 80, color: "#7c2d12" },
+  { id: "paint", emoji: "🎨", price: 30, color: "#ec4899" },
+  { id: "battery", emoji: "🔋", price: 300, color: "#84cc16" },
+  { id: "fluids", emoji: "🛢️", price: 8, color: "#0f766e" },
+];
+export const MATERIAL_BY_ID = Object.fromEntries(MATERIALS.map((m) => [m.id, m])) as Record<MaterialId, MaterialConfig>;
+export const MATERIAL_IDS = MATERIALS.map((m) => m.id);
+
+/** Materials in one unit of each component at grade 1 (better grades use more and finer material). */
+export const COMPONENT_RECIPE: Record<ComponentId, Partial<Record<MaterialId, number>>> = {
+  body: { steel: 60, plastic: 6 },
+  engine: { aluminum: 25, steel: 10, copper: 4, fluids: 5 },
+  tires: { rubber: 16, steel: 2 },
+  interior: { fabric: 15, plastic: 20, leather: 2 },
+  suspension: { steel: 12, aluminum: 6, fluids: 2 },
+  glass: { glass: 15, plastic: 1 },
+  paint: { paint: 5, fluids: 2 },
+  electronics: { electronics: 10, copper: 4, plastic: 3 },
+  battery: { battery: 20, copper: 6, aluminum: 5 },
+  // servers, sensors and test rigs the driving stack is trained and validated on
+  software: { electronics: 14, copper: 2 },
+  transmission: { steel: 14, aluminum: 8, fluids: 3 },
+  wheels: { aluminum: 16, steel: 3 },
+  brakes: { steel: 10, copper: 2, plastic: 2 },
+};
+
+/** Material per unit grows with the component grade (Standard … Carbon). */
+export const GRADE_MATERIAL = [1, 1.8, 3.2, 5.5, 9];
+
+/** Seconds to make one unit at Level 1, manual, grade 1. */
+export const COMPONENT_TIME: Record<ComponentId, number> = {
+  body: 45,
+  engine: 60,
+  tires: 30,
+  interior: 40,
+  suspension: 35,
+  glass: 25,
+  paint: 25,
+  electronics: 35,
+  battery: 60,
+  software: 55,
+  transmission: 45,
+  wheels: 30,
+  brakes: 30,
+};
+
+/** Prices drift a little, slowly and predictably (no wild swings): ±amp over a period of minutes. */
+export const PRICE_DRIFT = { amp: 0.06, minPeriod: 18 * 60, maxPeriod: 40 * 60 };
+
+// ───────────────────────────── suppliers ─────────────────────────────
+
+export type SupplierId = "local" | "wholesale" | "international" | "contract";
+
+export interface SupplierConfig {
+  id: SupplierId;
+  emoji: string;
+  /** Discount on every order. */
+  discount: number;
+  /** Largest single order (units of one material). */
+  maxOrder: number;
+  /** Lifetime material units bought to unlock it. */
+  unlockBought: number;
+  /** Plants may restock automatically from this supplier on. */
+  autoBuy: boolean;
+}
+
+export const SUPPLIERS: SupplierConfig[] = [
+  { id: "local", emoji: "🏪", discount: 0, maxOrder: 1_000, unlockBought: 0, autoBuy: false },
+  { id: "wholesale", emoji: "🏭", discount: 0.03, maxOrder: 10_000, unlockBought: 5_000, autoBuy: true },
+  { id: "international", emoji: "🚢", discount: 0.06, maxOrder: 50_000, unlockBought: 60_000, autoBuy: true },
+  { id: "contract", emoji: "📜", discount: 0.1, maxOrder: 250_000, unlockBought: 600_000, autoBuy: true },
+];
+export const SUPPLIER_BY_ID = Object.fromEntries(SUPPLIERS.map((s) => [s.id, s])) as Record<SupplierId, SupplierConfig>;
+
+/** Volume discounts on one order: the biggest tier reached applies. */
+export const BULK_DISCOUNT: [number, number][] = [
+  [10_000, 0.15],
+  [1_000, 0.1],
+  [100, 0.05],
+];
+
+/** The one-tap "buy materials" order (goal card, plant panel) is for this many units, or as many as fit. */
+export const RESTOCK_UNITS = 10;
+
+/** Goals suggest buying material once a plant has this many units' worth left (and nothing on the way). */
+export const LOW_STOCK_UNITS = 4;
+
+/** Goals only suggest spending on upgrades while this many units of materials per plant stay affordable. */
+export const RESERVE_UNITS = 5;
+
+/**
+ * Suggested and automatic material orders leave this many seconds of what
+ * the plants cost to run (wages, energy, maintenance) in the cash, so those
+ * are paid from it instead of going on the company's account. A plant with
+ * nothing left to work with still gets its next units from the whole cash.
+ */
+export const WAGE_RESERVE_SECONDS = 120;
+
+/**
+ * Auto-restock keeps a few minutes of production in stock — not a full
+ * warehouse, so the cash stays free for building: it orders when a material
+ * drops below `belowMin` minutes of work and fills up to `upToMin` minutes
+ * (at least `minUnits` units), within the warehouse.
+ */
+export const AUTO_BUY = { belowMin: 2, upToMin: 5, minUnits: 3 };
+
+/** Goals suggest a bigger warehouse once it holds less than this many minutes of a plant's work. */
+export const WAREHOUSE_MINUTES = 3;
+
+// ───────────────────────────── warehouse ─────────────────────────────
+
+/** Material units a plant's warehouse holds, by warehouse level. */
+export const WAREHOUSE_CAP = [500, 1_000, 2_500, 5_000, 10_000, 20_000, 40_000, 80_000, 160_000, 320_000];
+/** Warehouse upgrade price: plant cost × base × growth^(level-1). */
+export const WAREHOUSE_COST = { base: 0.2, growth: 1.7 };
+/**
+ * A material delivery takes the depot truck's drive and costs this per unit
+ * delivered. The fee is part of that unit's cost: each material on a truck
+ * carries its own units' fee into its cost basis (nothing is shared out).
+ */
+export const DELIVERY_FEE = 0.5;
+
+// ───────────────────────────── running a plant ─────────────────────────────
+
+/** Wage per worker per second. */
+export const WAGE = 0.8;
+/** Workers per production line by automation tier (Manual … AI Factory): robots take over. */
+export const WORKERS_PER_LINE = [4, 3, 2, 1, 0.5];
+/** Robots per line by automation tier. */
+export const ROBOTS_PER_LINE = [0, 1, 2, 3, 4];
+
+/** Power: the building, each line and each robot draw kW; energy is priced per kW per minute. */
+export const POWER = { plant: 150, line: 50, robot: 20, paintBooth: 35, pricePerKwMin: 0.08 };
+/** ⚡ Power System upgrades: each cuts the energy bill by this share (up to `max` levels). */
+export const POWER_SYSTEM = { cut: 0.08, max: 6, costBase: 0.25, growth: 1.9 };
+
+/** Maintenance per plant per second at Level 1; grows with the plant. */
+export const MAINTENANCE = { base: 0.5, perLevel: 0.18 };
+
+/** Crew of each plant type, per line (the assembly line needs the most hands). */
+export const CREW: Partial<Record<PlantType, number>> = { assemblyPlant: 1.5, paintFactory: 0.75, glassFactory: 0.75 };
+
+// ───────────────────────────── logistics, fees, tax ─────────────────────────────
+
+/** Every truck trip costs fuel and a driver. */
+export const TRIP_FEE: Record<"van" | "truck" | "semi" | "trailer" | "carrier", number> = { van: 25, truck: 45, semi: 90, trailer: 180, carrier: 120 };
+/** The dealer keeps this share of every sale; the state takes this share as operating tax. */
+export const DEALER_FEE = 0.06;
+export const SALES_TAX = 0.08;
+
+// ───────────────────────────── margins & demand ─────────────────────────────
+
+/**
+ * What a car sells for: its standard production cost × (1 + margin),
+ * grossed up for the dealer fee and tax. Premium cars earn more per car
+ * but sell slowly (demand).
+ */
+export const CLASS_MARGIN: Record<CarClass, number> = { economy: 0.24, sport: 0.3, premium: 0.36, luxury: 0.44, supercar: 0.54, hypercar: 0.62 };
+/** How quickly each class finds a buyer (× the dealer's customer rate). */
+export const CLASS_DEMAND: Record<CarClass, number> = { economy: 1.3, sport: 1, premium: 0.8, luxury: 0.6, supercar: 0.35, hypercar: 0.25 };
+
+/** Surplus parts sold to the Parts Market: a thin margin over their standard cost. */
+export const PARTS_MARGIN = 0.1;
+
+/** Final assembly plus quality control, per car at Level 1 (seconds): × the car's own factor. */
+export const ASSEMBLY_TIME = { assembly: 50, qc: 10 };
+
+/** Finished cars a plant's car storage holds at Level 1 (grows with the level's storage). */
+export const CAR_STORAGE = 6;
+
+// ───────────────────────────── upgrades ─────────────────────────────
+
+/**
+ * Upgrade prices scale from the plant's build cost:
+ *   level n → cost × level.base × level.growth^(n-2)
+ * A level adds a whole production line, so it is priced to be a decision
+ * (Level 2 of the Body Works ≈ 10 minutes of its profit), not a reflex —
+ * see docs/ECONOMY_BALANCE.md for the model and the old values.
+ */
+export const UPGRADE_SCALING = {
+  level: { base: 0.3, growth: 1.8 },
+  speed: { base: 0.08, growth: 1.5 },
+  /** Automation tiers, × plant cost. */
+  automation: [0, 1.5, 5, 15, 45],
+  /** Component grades, × plant cost. */
+  grade: [0, 2, 8, 30, 120],
+};
+
+/**
+ * The company's account with its suppliers. Wages, energy, maintenance and
+ * truck trips the cash can't cover yet go on it (and, for bought-in tyres and
+ * drivetrain parts, the next batch; and the emergency supplier) — never
+ * materials: those are paid when ordered. It is paid back from every sale
+ * (`share` of what the sale brings in, after fees and tax) and out of profit
+ * (`repay` of the chain's average net income, every second), from the cash;
+ * cash that covers it twice over settles it. Its limit is `seconds` of what
+ * the plants cost to run, at least `min`: over it, nothing more is bought on
+ * credit, but plants with material keep working (what they make is what pays
+ * the account back). Only at `halt` × the limit is every plant SUSPENDED,
+ * until it is paid down to `resume` of that line (cash that covers it
+ * settles it at once).
+ */
+export const DEBT = { min: 10_000, seconds: 300, resume: 0.5, repay: 0.5, share: 0.3, halt: 2 };
+
+
+/**
+ * The emergency supplier: a company that is completely stuck (can't afford
+ * one unit of material anywhere, nothing made, nothing on the road or at a
+ * dealer) gets material for `units` units at `markup` × the market price, on
+ * its account (up to twice its limit) — never cash, nothing written off, at
+ * most once per cooldown.
+ * Bad planning costs money; it never leaves a company stuck for good: the
+ * last resort, when the stuck company's emergency line is full too, is a
+ * restructuring — the creditors cut the account back to its limit, and the
+ * company pays with `restructure.rep` points of reputation (lower car prices
+ * until it recovers), at most once per `restructure.cooldown` seconds.
+ */
+export const RESCUE = { units: 2, cooldown: 15 * 60, markup: 1.5, restructure: { cooldown: 60 * 60, rep: 25 } };
+
+/** Money every new company starts with. */
+export const START_CASH = 10_000;

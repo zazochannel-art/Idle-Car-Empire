@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Idle Car Empire</title>
+<meta name="description" content="Idle Car Empire is a phone game for Android and iOS.">
+<link rel="icon" type="image/png" href="icon.png">
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: radial-gradient(900px 420px at 50% -160px, #15284f 0%, rgba(6, 7, 10, 0) 70%) no-repeat, #06070a; color: #e7e9ee; font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 40px 20px 64px; }
+  .logo { width: 96px; height: 96px; border-radius: 22px; display: block; margin: 0 0 16px; }
+  h1 { font-size: 1.9rem; line-height: 1.2; margin: 0 0 8px; }
+  h2 { font-size: 1.15rem; margin: 2em 0 .4em; color: #fcd34d; }
+  p, li { color: #c9ccd4; }
+  a { color: #7dd3fc; }
+  .box { background: #12141a; border: 1px solid #23262e; border-radius: 12px; padding: 12px 16px; margin: 12px 0; }
+  .ok { border-color: #166534; }
+  .bad { border-color: #9f1239; }
+  button { font: inherit; font-weight: 700; color: #06070a; background: #fcd34d; border: 0; border-radius: 10px; padding: 9px 14px; cursor: pointer; }
+  textarea { width: 100%; box-sizing: border-box; height: 90px; margin-top: 8px; background: #000; color: #9aa3b2; border: 1px solid #23262e; border-radius: 8px; font: 12px/1.4 ui-monospace, monospace; }
+  .muted { color: #8b8f99; font-size: .9rem; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+<img class="logo" src="icon.png" alt="Idle Car Empire logo">
+<h1>Idle Car Empire</h1>
+<p data-t="intro">Idle Car Empire is now a phone game: get the app for Android or iPhone. It no longer runs in the browser.</p>
+
+<div id="confirmed" class="box ok" hidden><p data-t="confirmed">Your email address is confirmed. Go back to the app and sign in with your email and password.</p></div>
+<div id="authError" class="box bad" hidden><p><span data-t="authError">This link didn't work:</span> <span id="authErrorText"></span></p></div>
+
+<section id="rescue" hidden>
+  <h2 data-t="rescueTitle">Your progress from the browser</h2>
+  <p data-t="rescueHow">This browser still has a game you played here. To continue it in the app: copy its code, then in the app open Settings (⚙️), paste the code in the save box and tap “Import save”. If you played with an account, just sign in to it in the app.</p>
+  <div id="saves"></div>
+</section>
+
+<h2 data-t="moreTitle">More</h2>
+<ul>
+  <li><a href="privacy/" data-t="privacy">Privacy policy</a></li>
+  <li><a href="terms/" data-t="terms">Terms of use</a></li>
+  <li><a href="delete-account/" data-t="deleteAccount">Delete your account and data</a></li>
+</ul>
+</main>
+<script>
+// The game used to be played on this site. The page that replaced it: it confirms
+// account emails (their links lead here), and hands a save left in this browser,
+// or carried by an old transfer link, to the app as a code its Settings import.
+(function () {
+  var L = {
+    ro: {
+      intro: "Idle Car Empire este acum un joc pentru telefon: instalează aplicația pentru Android sau iPhone. Nu mai rulează în browser.",
+      confirmed: "Adresa de email este confirmată. Întoarce-te în aplicație și conectează-te cu emailul și parola.",
+      authError: "Linkul nu a funcționat:",
+      rescueTitle: "Progresul tău din browser",
+      rescueHow: "Browserul acesta mai are un joc jucat aici. Ca să-l continui în aplicație: copiază codul, apoi în aplicație deschide Setările (⚙️), lipește codul în caseta pentru salvare și apasă „Importă salvarea”. Dacă ai jucat cu un cont, conectează-te pur și simplu în aplicație.",
+      moreTitle: "Altele",
+      privacy: "Politica de confidențialitate",
+      terms: "Termeni de utilizare",
+      deleteAccount: "Ștergerea contului și a datelor",
+      copy: "Copiază codul",
+      copied: "Cod copiat",
+      saved: "Salvat",
+      cash: "bani",
+      account: "salvarea unui cont",
+      link: "din linkul de transfer"
+    },
+    ru: {
+      intro: "Idle Car Empire теперь игра для телефона: установите приложение для Android или iPhone. В браузере она больше не работает.",
+      confirmed: "Адрес электронной почты подтверждён. Вернитесь в приложение и войдите с почтой и паролем.",
+      authError: "Ссылка не сработала:",
+      rescueTitle: "Ваш прогресс из браузера",
+      rescueHow: "В этом браузере осталась игра, в которую вы здесь играли. Чтобы продолжить её в приложении: скопируйте код, затем в приложении откройте Настройки (⚙️), вставьте код в поле сохранения и нажмите «Импорт сохранения». Если вы играли с аккаунтом, просто войдите в него в приложении.",
+      moreTitle: "Ещё",
+      privacy: "Политика конфиденциальности",
+      terms: "Условия использования",
+      deleteAccount: "Удаление аккаунта и данных",
+      copy: "Скопировать код",
+      copied: "Код скопирован",
+      saved: "Сохранено",
+      cash: "денег",
+      account: "сохранение аккаунта",
+      link: "из ссылки переноса"
+    },
+    es: {
+      intro: "Idle Car Empire ahora es un juego para el móvil: instala la app para Android o iPhone. Ya no funciona en el navegador.",
+      confirmed: "Tu dirección de correo está confirmada. Vuelve a la app e inicia sesión con tu correo y tu contraseña.",
+      authError: "Este enlace no ha funcionado:",
+      rescueTitle: "Tu progreso del navegador",
+      rescueHow: "Este navegador aún tiene una partida que jugaste aquí. Para continuarla en la app: copia su código y, en la app, abre Ajustes (⚙️), pega el código en la casilla de la partida guardada y toca «Importar partida». Si jugaste con una cuenta, simplemente inicia sesión en la app.",
+      moreTitle: "Más",
+      privacy: "Política de privacidad",
+      terms: "Términos de uso",
+      deleteAccount: "Eliminar tu cuenta y tus datos",
+      copy: "Copiar el código",
+      copied: "Código copiado",
+      saved: "Guardada",
+      cash: "de dinero",
+      account: "partida de una cuenta",
+      link: "del enlace de transferencia"
+    },
+    pt: {
+      intro: "Idle Car Empire agora é um jogo para celular: instale o app para Android ou iPhone. Ele não roda mais no navegador.",
+      confirmed: "Seu endereço de e-mail está confirmado. Volte ao app e entre com seu e-mail e sua senha.",
+      authError: "Este link não funcionou:",
+      rescueTitle: "Seu progresso do navegador",
+      rescueHow: "Este navegador ainda tem um jogo que você jogou aqui. Para continuar no app: copie o código e, no app, abra as Configurações (⚙️), cole o código na caixa do save e toque em “Importar save”. Se você jogou com uma conta, basta entrar nela no app.",
+      moreTitle: "Mais",
+      privacy: "Política de privacidade",
+      terms: "Termos de uso",
+      deleteAccount: "Excluir sua conta e seus dados",
+      copy: "Copiar o código",
+      copied: "Código copiado",
+      saved: "Salvo",
+      cash: "de dinheiro",
+      account: "save de uma conta",
+      link: "do link de transferência"
+    },
+    de: {
+      intro: "Idle Car Empire ist jetzt ein Handyspiel: Installiere die App für Android oder iPhone. Im Browser läuft es nicht mehr.",
+      confirmed: "Deine E-Mail-Adresse ist bestätigt. Geh zurück in die App und melde dich mit deiner E-Mail-Adresse und deinem Passwort an.",
+      authError: "Dieser Link hat nicht funktioniert:",
+      rescueTitle: "Dein Fortschritt aus dem Browser",
+      rescueHow: "In diesem Browser ist noch ein Spiel, das du hier gespielt hast. So spielst du es in der App weiter: Kopiere den Code, öffne in der App die Einstellungen (⚙️), füge den Code in das Spielstand-Feld ein und tippe auf „Spielstand importieren“. Wenn du mit einem Konto gespielt hast, melde dich einfach in der App an.",
+      moreTitle: "Mehr",
+      privacy: "Datenschutzerklärung",
+      terms: "Nutzungsbedingungen",
+      deleteAccount: "Konto und Daten löschen",
+      copy: "Code kopieren",
+      copied: "Code kopiert",
+      saved: "Gespeichert",
+      cash: "Geld",
+      account: "Spielstand eines Kontos",
+      link: "aus dem Übertragungslink"
+    }
+  };
+  var EN = { copy: "Copy the code", copied: "Code copied", saved: "Saved", cash: "cash", account: "an account's save", link: "from the transfer link" };
+  var lang = (navigator.language || "en").slice(0, 2).toLowerCase();
+  var T = L[lang];
+  var t = function (k) { return T ? T[k] : EN[k]; };
+  if (T) {
+    document.documentElement.lang = lang;
+    document.querySelectorAll("[data-t]").forEach(function (el) { var v = T[el.getAttribute("data-t")]; if (v) el.textContent = v; });
+    // the legal pages open at this language's section
+    document.querySelectorAll("a[data-t]").forEach(function (a) { a.setAttribute("href", a.getAttribute("href") + "#" + lang); });
+  }
+
+  // the game's old offline cache would keep serving the old game: gone
+  if ("serviceWorker" in navigator) navigator.serviceWorker.getRegistrations().then(function (r) { r.forEach(function (x) { x.unregister(); }); }).catch(function () {});
+  if (window.caches) caches.keys().then(function (k) { k.forEach(function (n) { caches.delete(n); }); }).catch(function () {});
+
+  // the save code the app's Settings import (the same as its "Export save")
+  var code = function (json) { return btoa(unescape(encodeURIComponent(json))); };
+  var money = function (n) { return "$" + Math.round(n || 0).toLocaleString(); };
+  var list = document.getElementById("saves");
+  var shown = 0;
+  function offer(title, json) {
+    var box = document.createElement("div");
+    box.className = "box";
+    var p = document.createElement("p");
+    p.textContent = title;
+    var b = document.createElement("button");
+    b.textContent = t("copy");
+    var area = document.createElement("textarea");
+    area.readOnly = true;
+    area.value = code(json);
+    b.onclick = function () {
+      area.select();
+      (navigator.clipboard ? navigator.clipboard.writeText(area.value) : Promise.reject()).catch(function () { document.execCommand("copy"); }).then(function () { b.textContent = t("copied"); });
+    };
+    box.append(p, b, area);
+    list.append(box);
+    document.getElementById("rescue").hidden = false;
+    shown++;
+  }
+
+  var hash = new URLSearchParams(location.hash.replace(/^#/, ""));
+  // a password reset link that landed here (Supabase sends players to this page when the reset page's
+  // address isn't on its list): the page that sets the new password takes it
+  if (hash.get("type") === "recovery" && hash.get("access_token")) {
+    location.replace("reset-password/" + location.hash);
+    return;
+  }
+  // an account email's link (sign-up or a new address): Supabase confirms it, then sends the player here
+  if (hash.get("error_description")) {
+    document.getElementById("authErrorText").textContent = hash.get("error_description");
+    document.getElementById("authError").hidden = false;
+  } else if (hash.get("access_token") || /signup|email_change/.test(hash.get("type") || "")) {
+    document.getElementById("confirmed").hidden = false;
+  }
+  // an old transfer link (#save=z1.…): its save, compressed
+  var transfer = hash.get("save");
+  if (transfer && transfer.indexOf("z1.") === 0 && window.DecompressionStream) {
+    try {
+      var b64 = transfer.slice(3).replace(/-/g, "+").replace(/_/g, "/");
+      var bin = atob(b64), bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text().then(function (json) {
+        var s = JSON.parse(json);
+        offer(t("link") + " · " + money(s.cash) + " " + t("cash"), json);
+      }).catch(function () {});
+    } catch (e) {}
+  }
+  if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+
+  // saves this browser kept: the game without an account, each account's copy, the backups
+  try {
+    for (var k = 0; k < localStorage.length; k++) {
+      var key = localStorage.key(k);
+      if (!/^idle-car-empire:(save:|backup:)/.test(key)) continue;
+      var copy = JSON.parse(localStorage.getItem(key));
+      var state = copy && (copy.state || (copy.payload && copy.payload.state));
+      if (!state || typeof state !== "object") continue;
+      var when = copy.savedAt || (copy.payload && copy.payload.savedAt) || copy.at;
+      var title = (when ? t("saved") + " " + new Date(when).toLocaleString() + " · " : "") + money(state.cash) + " " + t("cash") + (/^idle-car-empire:save:u:/.test(key) ? " · " + t("account") : "");
+      offer(title, JSON.stringify(state));
+    }
+  } catch (e) {}
+})();
+</script>
+</body>
+</html>

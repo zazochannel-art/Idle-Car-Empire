@@ -1,0 +1,226 @@
+"use client";
+
+import { ProfileButton } from "./account";
+import { Car, Factory, Moon, Settings, Star, Store, Sun, Sunset, SunMoon, TrendingDown, TrendingUp } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { TIME_MODES } from "@/components/map/lighting";
+import { formatMoney, formatNumber } from "@/game/format";
+import { LANGS } from "@/i18n";
+import { useT } from "@/i18n/use-t";
+import { plantsOf } from "@/game/engine/chain";
+import { crateWait } from "@/game/engine/shop";
+import { useGame } from "@/store/game-store";
+import { EventChip } from "./event-chip";
+import { AdBoostChip } from "./ad-buttons";
+import { useUi } from "@/store/ui-store";
+import { AnimatedNumber } from "./animated-number";
+
+const money = (n: number) => formatMoney(n);
+
+/** Top bar floating over the map: the shop, cash, profit/s, production rate, factories, ⭐ Stars. */
+export function Hud({ onSettings }: { onSettings: () => void }) {
+  // each number has its own small component, so a tick re-renders only the figures that changed
+  // (the bar, its buttons and icons stay as they are)
+  const setView = useUi((u) => u.setView);
+  const { t } = useT();
+
+  return (
+    <header className="pointer-events-none absolute inset-x-0 top-0 z-30 pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
+      <div className="flex items-start gap-2 p-2 sm:p-3">
+        <ShopButton />
+        <div className="pointer-events-auto flex min-w-0 flex-1 flex-wrap items-center gap-1.5 rounded-2xl bg-[rgba(36,104,214,0.82)] p-1.5 shadow-[0_3px_0_0_rgba(10,40,110,0.35)] md:flex-nowrap md:gap-2 md:bg-[rgba(36,104,214,0.62)] md:p-2 md:hud-bar">
+          {/* the cash never gives way to the other figures */}
+          <div className="relative flex shrink-0 items-center gap-2 pl-1 pr-2">
+            <CashCounter label={t("hud.cash")} />
+          </div>
+          <IncomePill />
+          <RatePill />
+          <AdBoostChip />
+          <div className="hidden md:block">
+            <FactoriesPill />
+          </div>
+          {/* on tablet widths there's no room for it next to the figures (the Missions screen shows it too) */}
+          <div className="hidden lg:block"><EventChip /></div>
+          <div className="hidden md:block">
+            <button onClick={() => setView("imperium")} className="text-left">
+              <StarsPill />
+            </button>
+          </div>
+        </div>
+        <div className="pointer-events-auto flex shrink-0 flex-col gap-1.5 md:flex-row">
+          <ProfileButton />
+          <TimeButton />
+          <div className="hidden md:block"><LanguageSwitch /></div>
+          <button
+            onClick={onSettings}
+            className="flex size-10 items-center justify-center rounded-full bg-[#5b5b60]/85 text-white shadow-[0_3px_0_0_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:brightness-110"
+            aria-label={t("settings.title")}
+          >
+            <Settings className="size-5" />
+          </button>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+/** The shop, top left: a red dot when the free crate is ready. */
+function ShopButton() {
+  const crate = useGame((g) => crateWait(g.state, g.state.lastActiveAt) === 0);
+  const setView = useUi((u) => u.setView);
+  const { t } = useT();
+  return (
+    <button
+      onClick={() => setView("shop")}
+      className="pointer-events-auto relative flex size-10 shrink-0 items-center justify-center rounded-full bg-gold text-[#2a1d00] shadow-[0_3px_0_0_#c48300] transition hover:brightness-105 active:translate-y-px md:size-12"
+      aria-label={t("nav.shop")}
+    >
+      <Store className="size-5 stroke-[2.5] md:size-6" />
+      {crate && <span className="absolute -right-0.5 -top-0.5 size-3 rounded-full bg-red-500 ring-2 ring-white" />}
+    </button>
+  );
+}
+
+function IncomePill() {
+  const steady = useGame((g) => g.snap.steadyIncomePerSec);
+  const [displayIncome, setDisplayIncome] = useState(steady);
+  useEffect(() => {
+    setDisplayIncome(useGame.getState().snap.steadyIncomePerSec);
+    const interval = setInterval(() => {
+      setDisplayIncome(useGame.getState().snap.steadyIncomePerSec);
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
+  const income = formatMoney(displayIncome);
+  const { t } = useT();
+  const icon = <TrendingUp className="size-4 stroke-[3] text-lime" />;
+  return <Pill icon={icon} label={t("hud.profit")} value={`${income}${t("unit.perSec")}`} />;
+}
+
+/** Production rate: cars per minute once an assembly plant runs, parts before. */
+function RatePill() {
+  const carsRate = useGame((g) => (g.snap.carsPerSec > 0 ? formatNumber(g.snap.carsPerSec * 60) : ""));
+  const partsRate = useGame((g) => (g.snap.carsPerSec > 0 ? "" : formatNumber(Object.values(g.snap.chain.plants).reduce((a, p) => (p.type === "assemblyPlant" ? a : a + p.unitsPerSec), 0) * 60)));
+  const { t } = useT();
+  return <Pill icon={<Car className="size-4 stroke-[2.5] text-white" />} label={carsRate ? t("hud.carsRate") : t("hud.partsRate")} value={`${carsRate || partsRate}${t("unit.perMin")}`} />;
+}
+
+function FactoriesPill() {
+  const owned = useGame((g) => plantsOf(g.state).length);
+  const trucks = useGame((g) => g.state.chain.shipments.length);
+  const { t } = useT();
+  return <Pill icon={<Factory className="size-3.5 text-cyan-300" />} label={t("hud.factories")} value={`${owned} · 🚚${trucks}`} />;
+}
+
+function StarsPill() {
+  const stars = useGame((g) => g.state.stars);
+  const { t } = useT();
+  return <Pill icon={<Star className="size-3.5 fill-gold text-gold" />} label={t("imperium.stars")} value={formatNumber(stars)} gold />;
+}
+
+function Pill({ icon, label, value, gold }: { icon: React.ReactNode; label: string; value: React.ReactNode; gold?: boolean }) {
+  return (
+    <div className="flex items-center gap-1.5 rounded-lg bg-black/20 px-2 py-1 md:px-2.5 md:py-1.5">
+      {icon}
+      <div className="leading-tight">
+        <div className="hidden text-[9px] font-bold uppercase tracking-wider text-white/65 xl:block">{label}</div>
+        <div className={`race-type whitespace-nowrap text-[15px] not-italic tabular-nums md:text-base ${gold ? "text-gold" : "text-white"}`}>{value}</div>
+      </div>
+    </div>
+  );
+}
+
+function LanguageSwitch() {
+  const lang = useGame((g) => g.state.settings.lang);
+  const setLang = useGame((g) => g.setLang);
+  const [open, setOpen] = useState(false);
+  const current = LANGS.find((l) => l.id === lang) ?? LANGS[0];
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex h-10 items-center gap-1.5 rounded-full bg-[#5b5b60]/85 px-3 text-xs font-bold text-white shadow-[0_3px_0_0_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:brightness-110"
+        aria-label="Language"
+        aria-expanded={open}
+      >
+        <span className="text-base leading-none">{current.flag}</span>
+        {current.short}
+      </button>
+      {open && (
+        <div className="glass-strong absolute right-0 top-12 z-50 w-40 overflow-hidden rounded-xl p-1">
+          {LANGS.map((l) => (
+            <button
+              key={l.id}
+              onClick={() => {
+                setLang(l.id);
+                setOpen(false);
+              }}
+              className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition ${l.id === lang ? "bg-electric/20 text-white" : "text-white/70 hover:bg-white/5"}`}
+            >
+              <span className="text-base">{l.flag}</span>
+              {l.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The green banknote in front of the cash, as on the racing game's top bar. */
+/** The cash counter: the one part of the bar that follows every tick. */
+function CashCounter({ label }: { label: string }) {
+  const cash = useGame((g) => g.state.cash);
+  return (
+    <>
+      <CashFlash cash={cash} />
+      {CASH_BILL}
+      <div className="min-w-0">
+        <div className="hidden text-[9px] font-bold uppercase tracking-[0.14em] text-white/70 md:block">{label}</div>
+        <AnimatedNumber value={cash} format={money} className="race-type block truncate text-[22px] tabular-nums leading-tight text-white not-italic [text-shadow:0_2px_0_rgba(0,0,0,0.25)] md:text-[26px]" />
+      </div>
+    </>
+  );
+}
+
+const CASH_BILL = (
+  <span className="relative flex h-5 w-8 shrink-0 items-center justify-center rounded-[4px] bg-[#3fcf5a] shadow-[0_2px_0_0_#1d8a34] ring-2 ring-[#1d8a34] md:h-6 md:w-9" aria-hidden>
+    <span className="size-2.5 rounded-full bg-[#1d8a34] md:size-3" />
+  </span>
+);
+
+/** A soft golden glow behind the cash counter whenever money comes in. */
+function CashFlash({ cash }: { cash: number }) {
+  const last = useRef(cash);
+  const lastPulse = useRef(0);
+  const [pulse, setPulse] = useState(0);
+  useEffect(() => {
+    // at most one glow every 1.5 s, so steady income doesn't flicker
+    const now = performance.now();
+    if (cash > last.current + 0.5 && now - lastPulse.current > 1500) {
+      lastPulse.current = now;
+      setPulse((n) => n + 1);
+    }
+    last.current = cash;
+  }, [cash]);
+  return <span key={pulse} className="cash-flash pointer-events-none absolute inset-0 rounded-xl" aria-hidden />;
+}
+
+const TIME_ICONS = { auto: SunMoon, day: Sun, evening: Sunset, night: Moon } as const;
+
+function TimeButton() {
+  const mode = useUi((u) => u.timeMode);
+  const setTimeMode = useUi((u) => u.setTimeMode);
+  const { t } = useT();
+  const Icon = TIME_ICONS[mode];
+  return (
+    <button
+      onClick={() => setTimeMode(TIME_MODES[(TIME_MODES.indexOf(mode) + 1) % TIME_MODES.length])}
+      className="flex size-10 items-center justify-center rounded-full bg-[#5b5b60]/85 text-gold shadow-[0_3px_0_0_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:brightness-110"
+      aria-label={t(`time.${mode}`)}
+      title={t(`time.${mode}`)}
+    >
+      <Icon className="size-5" />
+    </button>
+  );
+}

@@ -1,0 +1,329 @@
+"use client";
+
+// MY CARS: every car the company kept, each with its own identity — its DNA
+// (the parts actually fitted), its record and its Test Track report.
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { CARS, CAR_BY_ID } from "@/game/config/cars";
+import { carDNA, testCar, testFee, type TestReport } from "@/game/engine/car-dna";
+import { DEALER_BY_ID } from "@/game/config/dealerships";
+import { RESEARCH_BY_ID } from "@/game/config/research";
+import { carEta, carTrip, showroomFor } from "@/game/engine/chain";
+import { campaignOn } from "@/game/engine/market";
+import { campaignCost, expectedSale, fairPrice } from "@/game/engine/showroom";
+import { MY_CARS_LOT, atTrack, condition, fleetCap, orderableCars, racingFleet } from "@/game/engine/racing";
+import { formatMoney, formatNumber, formatPercent } from "@/game/format";
+import type { RaceCarState } from "@/game/types";
+import { useContent } from "@/i18n/content";
+import { useT } from "@/i18n/use-t";
+import { cn } from "@/lib/utils";
+import { useGame } from "@/store/game-store";
+import { useUi } from "@/store/ui-store";
+
+const lapTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;
+const serial = (id: number) => `#${String(id).padStart(3, "0")}`;
+
+/** The cars the company owns, and how to keep a new one off the line. */
+export function MyCars() {
+  const state = useGame((g) => g.view.state);
+  const [open, setOpen] = useState<number | null>(null);
+  const { t } = useT();
+  const R = state.racing;
+  const cars = R.cars;
+  return (
+    <div className="space-y-3">
+      <KeepCar />
+      <Campaign />
+      {cars.length === 0 && <p className="rounded-2xl bg-white/[0.03] p-4 text-center text-sm text-white/50 ring-1 ring-white/[0.06]">{t("mycars.empty")}</p>}
+      {cars.map((rc) => (
+        <CarCard key={rc.id} rc={rc} open={open === rc.id} onToggle={() => setOpen(open === rc.id ? null : rc.id)} />
+      ))}
+    </div>
+  );
+}
+
+/** Keep the next car of a model that comes off an assembly line. */
+function KeepCar() {
+  const state = useGame((g) => g.view.state);
+  const order = useGame((g) => g.orderRaceCar);
+  const { t, lang } = useT();
+  const n = useContent(lang);
+  const models = orderableCars(state);
+  const full = racingFleet(state) >= fleetCap(state);
+  return (
+    <div className="rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.07]">
+      <div className="mb-1 flex items-center justify-between">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-white/55">🔑 {t("mycars.keep")}</span>
+        <span className="text-[10px] tabular-nums text-white/45">
+          {racingFleet(state)}/{fleetCap(state)}
+        </span>
+      </div>
+      <p className="mb-2 text-[11px] text-white/50">{state.racing.unlocked ? t("mycars.keepDesc") : t("mycars.keepLot", { n: MY_CARS_LOT })}</p>
+      {models.length === 0 ? (
+        <p className="text-[11px] text-white/40">{t("mycars.noModels")}</p>
+      ) : (
+        <div className="flex flex-wrap gap-1.5">
+          {CARS.filter((c) => models.includes(c.id)).map((c) => (
+            <button key={c.id} disabled={full} onClick={() => order(c.id)} className="rounded-lg bg-white/[0.05] px-2 py-1 text-xs ring-1 ring-white/10 hover:bg-white/[0.1] disabled:opacity-40">
+              {c.emoji} {state.designs[c.id].name} <span className="text-white/40">· {n.car(c)}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {state.racing.orders.length > 0 && (
+        <p className="mt-2 text-[11px] text-amber-200/80">
+          ⏳ {t("mycars.ordered", { list: state.racing.orders.map((c) => state.designs[c].name).join(", ") })}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function CarCard({ rc, open, onToggle }: { rc: RaceCarState; open: boolean; onToggle: () => void }) {
+  const state = useGame((g) => g.view.state);
+  const { runTest, selectRaceCar, sendCar } = useGame.getState();
+  const setView = useUi((u) => u.setView);
+  const { t, lang } = useT();
+  const n = useContent(lang);
+  const cfg = CAR_BY_ID[rc.car];
+  const dna = carDNA(state, rc);
+  const losses = rc.races - rc.wins;
+  const fee = testFee(rc);
+  const where =
+    state.racing.live?.car === rc.id
+      ? t("mycars.loc.racing")
+      : rc.location === "factory"
+        ? t("mycars.loc.factory")
+        : rc.location === "transit"
+          ? t("mycars.loc.transit")
+          : rc.location === "showroom"
+            ? t("mycars.loc.showroom")
+            : t("mycars.loc.paddock");
+  const eta = rc.location === "transit" ? carEta(state, rc.id) : null;
+  const toPaddock = carTrip(state, rc, "racing");
+  const toLot = carTrip(state, rc, "factory");
+  return (
+    <div className="glass overflow-hidden rounded-2xl ring-1 ring-white/[0.07]">
+      <button onClick={onToggle} className="flex w-full items-center gap-3 p-3 text-left">
+        <span className="flex size-12 shrink-0 items-center justify-center rounded-xl text-2xl" style={{ background: `${state.designs[rc.car].color || cfg.color}33` }}>
+          {cfg.emoji}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline gap-1.5">
+            <span className="font-mono text-[11px] text-white/45">{serial(rc.id)}</span>
+            <span className="truncate font-bold">{state.designs[rc.car].name}</span>
+          </div>
+          <div className="text-[11px] text-white/55">
+            {dna.engine} · {formatNumber(dna.hp)} {t("dna.hp")} · {formatNumber(dna.weight)} kg
+          </div>
+          <div className="text-[10px] text-white/40">
+            📍 {where} · 🛣️ {formatNumber(Math.round(rc.mileage ?? 0))} km · ❤️ {Math.round(condition(rc) * 100)}%
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-sm font-black tabular-nums text-gold">{formatMoney(dna.value)}</div>
+          <div className="text-[10px] text-white/45">
+            🏁 {rc.races} · 🏆 {rc.wins}
+          </div>
+        </div>
+      </button>
+      {open && (
+        <div className="space-y-3 border-t border-white/[0.06] p-3">
+          {/* the record */}
+          <div className="grid grid-cols-4 gap-1.5 text-center text-[10px]">
+            <Stat label={t("mycars.races")} value={String(rc.races)} />
+            <Stat label={t("mycars.wins")} value={String(rc.wins)} />
+            <Stat label={t("mycars.losses")} value={String(losses)} />
+            <Stat label={t("mycars.bestLap")} value={rc.bestLap ? lapTime(rc.bestLap) : "—"} />
+          </div>
+          {/* the DNA */}
+          <div>
+            <div className="mb-1 text-[11px] font-bold uppercase tracking-wider text-white/55">🧬 {t("dna.title")}</div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+              <Row k={t("dna.engine")} v={dna.engine} />
+              <Row k={t("dna.power")} v={`${formatNumber(dna.hp)} ${t("dna.hp")} · ${formatNumber(dna.torque)} Nm`} />
+              <Row k={t("dna.weight")} v={`${formatNumber(dna.weight)} kg`} />
+              <Row k={t("dna.gearbox")} v={dna.gearbox} />
+              <Row k={t("dna.chassis")} v={dna.chassis} />
+              <Row k={t("dna.suspension")} v={dna.suspension} />
+              <Row k={t("dna.brakes")} v={dna.brakes} />
+              <Row k={t("dna.tires")} v={dna.tires} />
+              <Row k={t("dna.wheels")} v={dna.wheels} />
+              <Row k={t("dna.aero")} v={`${dna.aero}/100`} />
+              <Row k={t("dna.interior")} v={dna.interior} />
+              <Row k={t("dna.glass")} v={dna.glass} />
+              <Row k={t("dna.lights")} v={dna.lights} />
+              <Row k={t("dna.paint")} v={dna.paint} />
+              <Row k={t("dna.quality")} v={`${dna.quality}/100`} />
+              <Row k={t("dna.reliability")} v={`${dna.reliability}/100`} />
+              <Row k={t("dna.cost")} v={formatMoney(dna.cost)} />
+              <Row k={t("dna.performance")} v={formatNumber(dna.performance)} />
+            </div>
+            <div className="mt-1 flex justify-between gap-2 text-[11px]">
+              <span className="text-white/45">🔬 {t("dna.tech")}</span>
+              <span className="text-right font-semibold">{dna.tech.length ? dna.tech.map((x) => n.research(RESEARCH_BY_ID[x])).join(" · ") : t("dna.noTech")}</span>
+            </div>
+            <p className="mt-1 text-[10px] text-white/40">
+              {n.car(cfg)} · {t("dna.from")}
+            </p>
+          </div>
+          {/* the Test Track */}
+          <div className="rounded-xl bg-gradient-to-br from-sky-500/10 to-transparent p-2.5 ring-1 ring-sky-400/25">
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-sky-200">⏱️ {t("test.title")}</span>
+              <Button size="sm" variant="gold" disabled={state.cash < fee || state.racing.live?.car === rc.id || rc.location === "transit"} onClick={() => runTest(rc.id)}>
+                {t("test.run", { fee: formatMoney(fee) })}
+              </Button>
+            </div>
+            {rc.test ? <Report r={rc.test} now={testCar(rc)} /> : <p className="text-[11px] text-white/45">{t("test.none")}</p>}
+          </div>
+          {/* on the road: the car travels on its own transporter, visible on the map */}
+          {eta && (
+            <p className="rounded-lg bg-amber-400/10 px-2 py-1.5 text-[11px] text-amber-200 ring-1 ring-amber-300/20">
+              {t("mycars.eta", { to: t(eta.to === "racing" ? "mycars.loc.paddock" : eta.to === "showroom" ? "mycars.loc.showroom" : "mycars.loc.factory"), time: `${Math.ceil(eta.left)}s` })}
+            </p>
+          )}
+          {state.racing.unlocked && rc.location === "factory" && <p className="text-[11px] text-white/45">{t("mycars.awayHint")}</p>}
+          <div className="flex gap-2">
+            {toPaddock && (
+              <Button size="sm" variant="gold" className="flex-1" disabled={state.cash < toPaddock.fee} onClick={() => sendCar(rc.id, "racing")}>
+                {t("mycars.send.racing", { fee: formatMoney(toPaddock.fee) })}
+              </Button>
+            )}
+            {toLot && (
+              <Button size="sm" variant="secondary" className="flex-1" disabled={state.cash < toLot.fee} onClick={() => sendCar(rc.id, "factory")}>
+                {t("mycars.send.factory", { fee: formatMoney(toLot.fee) })}
+              </Button>
+            )}
+          </div>
+          <Showroom rc={rc} />
+          {state.racing.unlocked && atTrack(rc) && (
+            <Button
+              size="sm"
+              variant="secondary"
+              className="w-full"
+              onClick={() => {
+                selectRaceCar(rc.id);
+                setView("racing");
+              }}
+            >
+              🏁 {t("mycars.toRacing")}
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const clock = (sec: number) => (sec >= 3600 ? `${Math.floor(sec / 3600)}h ${Math.round((sec % 3600) / 60)}m` : `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}`);
+
+/** SHOWROOM: the player's price against what the car is worth; a transporter takes it to the dealer. */
+function Showroom({ rc }: { rc: RaceCarState }) {
+  const state = useGame((g) => g.view.state);
+  const { sendCar, setShowroomPrice } = useGame.getState();
+  const [pct, setPct] = useState(1.1);
+  const { t, lang } = useT();
+  const n = useContent(lang);
+  const fair = fairPrice(state, rc);
+  const dealer = rc.listing?.dealer ?? showroomFor(state, rc);
+  const trip = carTrip(state, rc, "showroom");
+  const price = rc.listing?.price ?? fair * pct;
+  if (!dealer) return <p className="text-[11px] text-white/40">🏬 {t("showroom.noDealer")}</p>;
+  return (
+    <div className="rounded-xl bg-gradient-to-br from-emerald-500/10 to-transparent p-2.5 ring-1 ring-emerald-400/25">
+      <div className="mb-1 flex items-center justify-between text-[11px]">
+        <span className="font-bold uppercase tracking-wider text-emerald-200">🏬 {t("showroom.title")}</span>
+        <span className="text-white/55">{t("showroom.fair", { money: formatMoney(fair) })}</span>
+      </div>
+      {rc.listing && <div className="text-[11px] text-white/60">{t("showroom.listed", { dealer: n.dealer(DEALER_BY_ID[dealer]) })}</div>}
+      <div className="mt-1 text-xs font-bold">{t("showroom.price", { money: formatMoney(price), pct: formatPercent(price / fair) })}</div>
+      <div className="text-[11px] text-white/50">{t("showroom.eta", { time: clock(expectedSale(state, rc, price)) })}</div>
+      <div className="mt-2 flex gap-1.5">
+        {[0.8, 0.95, 1.1, 1.3, 1.6].map((k) => (
+          <button
+            key={k}
+            onClick={() => (rc.listing ? setShowroomPrice(rc.id, fair * k) : setPct(k))}
+            className={cn("flex-1 rounded-lg px-1 py-1 text-[11px] font-bold ring-1", Math.abs(price / fair - k) < 0.01 ? "bg-emerald-400/25 ring-emerald-300/50" : "bg-white/[0.05] ring-white/10")}
+          >
+            {formatPercent(k)}
+          </button>
+        ))}
+      </div>
+      {!rc.listing && trip && (
+        <Button size="sm" variant="gold" className="mt-2 w-full" disabled={state.cash < trip.fee} onClick={() => sendCar(rc.id, "showroom", fair * pct)}>
+          {t("mycars.send.showroom", { fee: formatMoney(trip.fee) })}
+        </Button>
+      )}
+      <p className="mt-1 text-[10px] text-white/40">{t("showroom.hint")}</p>
+    </div>
+  );
+}
+
+/** A marketing campaign: every dealer gets customers faster, the showroom more buyers. */
+function Campaign() {
+  const state = useGame((g) => g.view.state);
+  const start = useGame((g) => g.startCampaign);
+  const { t } = useT();
+  if (!state.chain.firstCar) return null;
+  const on = campaignOn(state);
+  const cost = campaignCost(state);
+  return (
+    <div className="flex items-center gap-3 rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.07]">
+      <div className="min-w-0 flex-1">
+        <div className="text-[11px] font-bold uppercase tracking-wider text-white/55">📣 {t("campaign.title")}</div>
+        <div className="text-[11px] text-white/50">{t("campaign.desc")}</div>
+        {state.showroom.sold > 0 && <div className="text-[10px] text-white/40">{t("showroom.stats", { n: state.showroom.sold, money: formatMoney(state.showroom.revenue) })}</div>}
+      </div>
+      {on ? (
+        <span className="shrink-0 text-[11px] font-bold text-emerald-300">{t("campaign.on", { time: clock(state.showroom.campaignUntil - state.market.t) })}</span>
+      ) : (
+        <Button size="sm" variant="gold" disabled={state.cash < cost} onClick={() => start()}>
+          {t("campaign.run", { money: formatMoney(cost) })}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+const Stat = ({ label, value }: { label: string; value: string }) => (
+  <div className="rounded-lg bg-white/[0.04] p-1.5">
+    <div className="text-white/45">{label}</div>
+    <div className="text-xs font-bold tabular-nums">{value}</div>
+  </div>
+);
+const Row = ({ k, v }: { k: string; v: string }) => (
+  <div className="flex justify-between gap-2 border-b border-white/[0.04] py-0.5">
+    <span className="text-white/45">{k}</span>
+    <span className="truncate text-right font-semibold">{v}</span>
+  </div>
+);
+
+/** CAR TEST REPORT: what was measured, and how the car compares now (wear, upgrades since). */
+function Report({ r, now }: { r: TestReport; now: TestReport }) {
+  const { t } = useT();
+  const rows: [string, string, number, number, boolean][] = [
+    [t("test.zero100"), `${r.zeroTo100.toFixed(1)} s`, r.zeroTo100, now.zeroTo100, false],
+    [t("test.zero200"), r.zeroTo200 === null ? "—" : `${r.zeroTo200.toFixed(1)} s`, r.zeroTo200 ?? 0, now.zeroTo200 ?? 0, false],
+    [t("test.top"), `${r.topSpeed} km/h`, r.topSpeed, now.topSpeed, true],
+    [t("test.braking"), `${r.braking.toFixed(1)} m`, r.braking, now.braking, false],
+    [t("test.cornering"), `${r.cornering.toFixed(2)} g`, r.cornering, now.cornering, true],
+    [t("test.handling"), String(r.handling), r.handling, now.handling, true],
+    [t("test.reliability"), String(r.reliability), r.reliability, now.reliability, true],
+    [t("test.lap"), lapTime(r.lap), r.lap, now.lap, false],
+  ];
+  return (
+    <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+      {rows.map(([k, v, then, cur, up]) => {
+        const better = up ? cur > then + 1e-6 : cur < then - 1e-6;
+        const worse = up ? cur < then - 1e-6 : cur > then + 1e-6;
+        return (
+          <div key={k} className="flex justify-between gap-2 border-b border-white/[0.04] py-0.5">
+            <span className="text-white/45">{k}</span>
+            <span className={cn("font-bold tabular-nums", better ? "text-emerald-300" : worse ? "text-rose-300" : "")}>{v}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}

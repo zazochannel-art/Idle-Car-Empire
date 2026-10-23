@@ -1,0 +1,463 @@
+"use client";
+
+import { CloudSection, NotifyToggle } from "./cloud-section";
+import { AnimatePresence, motion } from "framer-motion";
+import { Clock, Download, RotateCcw, Upload } from "lucide-react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { formatDuration, formatHours, formatMoney, formatNumber } from "@/game/format";
+import { STRUCTURE_BY_ID } from "@/game/config/city";
+import { LANGS } from "@/i18n";
+import { useT } from "@/i18n/use-t";
+import { cn } from "@/lib/utils";
+import { batteryState, isSaving, powerVersion, watchPower, type SaverSetting } from "@/lib/power";
+import { legalUrl, PRIVACY_URL, TERMS_URL } from "@/lib/platform";
+import { uiEvents, type UiEvent, type UiToastAction } from "@/store/events";
+import { useGame } from "@/store/game-store";
+import { useUi } from "@/store/ui-store";
+import { LedgerTable } from "../views/ledger-table";
+import { AdPrivacyButton, OfflineAdButton } from "./ad-buttons";
+
+/** "Welcome Back!" — shown while an offline report is waiting to be collected. */
+export function OfflineDialog() {
+  // only whether a report waits: the report itself (and the plants it names) is read while it is open
+  const waiting = useGame((g) => !!g.state.pendingOffline);
+  return waiting ? <OfflineReport /> : null;
+}
+
+function OfflineReport() {
+  const report = useGame((g) => g.state.pendingOffline);
+  const buildings = useGame((g) => g.state.city.buildings);
+  const collect = useGame((g) => g.collectOffline);
+  const { t } = useT();
+  const offlineCap = useGame((g) => g.snap.gm.offlineCapHours);
+  if (!report) return null;
+  const capped = report.seconds > report.cappedSeconds + 1;
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && collect()}>
+      <DialogContent hideClose className="text-center">
+        <motion.div initial={{ scale: 0.6, rotate: -8 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: "spring", stiffness: 260, damping: 14 }} className="mx-auto mb-2 text-6xl">
+          🏭
+        </motion.div>
+        <DialogTitle className="text-2xl">{t("offline.title")}</DialogTitle>
+        <DialogDescription className="mt-1">{t("offline.subtitle")}</DialogDescription>
+
+        <div className="mt-5 grid grid-cols-2 gap-2 text-left">
+          <div className="rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.07]">
+            <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-white/45">
+              <Clock className="size-3" /> {t("offline.time")}
+            </div>
+            <div className="mt-1 text-lg font-bold tabular-nums">{formatDuration(report.seconds)}</div>
+          </div>
+          <div className="rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.07]">
+            <div className="text-[11px] uppercase tracking-wider text-white/45">{t("offline.cars")}</div>
+            <div className="mt-1 text-lg font-bold tabular-nums">{formatNumber(report.cars)}</div>
+            {(report.serviced ?? 0) > 0 && (
+              <div className="text-[11px] text-sky-300">
+                +{formatNumber(report.serviced ?? 0)} {t("offline.serviced").toLowerCase()}
+              </div>
+            )}
+          </div>
+          <div className="rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.07]">
+            <div className="text-[11px] uppercase tracking-wider text-white/45">{t("offline.components")}</div>
+            <div className="mt-1 text-lg font-bold tabular-nums">{formatNumber(report.components ?? 0)}</div>
+          </div>
+          <div className="rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.07]">
+            <div className="text-[11px] uppercase tracking-wider text-white/45">{t("offline.deliveries")}</div>
+            <div className="mt-1 text-lg font-bold tabular-nums">{formatNumber(report.deliveries ?? 0)}</div>
+          </div>
+        </div>
+        {!!report.built?.length && (
+          <div className="mt-2 rounded-2xl bg-gold/[0.07] p-3 text-left text-xs ring-1 ring-gold/30">
+            <div className="mb-1 text-[11px] font-bold uppercase tracking-wider text-gold/80">🏗️ {t("offline.built")}</div>
+            {report.built.map((id) => {
+              const b = buildings[id];
+              return b ? (
+                <div key={id} className="font-semibold">
+                  {STRUCTURE_BY_ID[b.type].emoji} {t(`structure.${b.type}`)} — {t("land.status.operational")}
+                </div>
+              ) : null;
+            })}
+          </div>
+        )}
+        {report.ledger && (
+          <div className="mt-2 text-left">
+            <div className="mb-1 flex justify-between text-[11px] uppercase tracking-wider text-white/45">
+              <span>{t("offline.breakdown")}</span>
+              <span>{t("offline.sold", { n: formatNumber(report.carsSold ?? 0) })}</span>
+            </div>
+            <LedgerTable values={report.ledger} compact />
+            {Math.abs(report.owed ?? 0) >= 0.5 && (
+              <div className={(report.owed ?? 0) > 0 ? "mt-1 text-[11px] text-rose-300" : "mt-1 text-[11px] text-emerald-300"}>
+                🧾 {(report.owed ?? 0) > 0 ? t("offline.owedUp", { money: formatMoney(report.owed!) }) : t("offline.owedDown", { money: formatMoney(-report.owed!) })}
+              </div>
+            )}
+          </div>
+        )}
+        {report.racing && (
+          <div className="mt-2 rounded-2xl bg-white/[0.04] p-3 text-left text-xs ring-1 ring-white/[0.07]">
+            <div className="mb-1 text-[11px] font-bold uppercase tracking-wider text-white/45">🏁 {t("offline.racing")}</div>
+            <div className="grid grid-cols-3 gap-1 text-center">
+              <div>
+                <div className="text-[10px] text-white/45">{t("racing.st.races")}</div>
+                <b>{formatNumber(report.racing.races)}</b>
+              </div>
+              <div>
+                <div className="text-[10px] text-white/45">{t("racing.st.wins")}</div>
+                <b>{formatNumber(report.racing.wins)}</b>
+              </div>
+              <div>
+                <div className="text-[10px] text-white/45">{t("racing.st.podiums")}</div>
+                <b>{formatNumber(report.racing.podiums)}</b>
+              </div>
+            </div>
+            <div className="mt-1.5 space-y-0.5">
+              <div className="flex justify-between">
+                <span className="text-white/55">{t("racing.prize")}</span>
+                <b className="text-emerald-300">+{formatMoney(report.racing.prize)}</b>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-white/55">{t("racing.repLabel")}</span>
+                <b className="text-sky-300">+{formatNumber(Math.round(report.racing.rep))}</b>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-white/55">{t("racing.costs")}</span>
+                <b className="text-rose-300">−{formatMoney(report.racing.repairs + (report.racing.fees ?? 0))}</b>
+              </div>
+              <div className="flex justify-between border-t border-white/10 pt-0.5">
+                <span className="font-bold">{t("racing.net")}</span>
+                <b>{formatMoney(report.racing.prize - report.racing.repairs - (report.racing.fees ?? 0))}</b>
+              </div>
+            </div>
+          </div>
+        )}
+        <div className="mt-2 rounded-2xl bg-gradient-to-br from-gold/15 to-transparent p-4 ring-1 ring-gold/30">
+          <div className="text-[11px] uppercase tracking-wider text-gold/70">{t("offline.money")}</div>
+          <div className="text-3xl font-black tabular-nums text-gradient-gold">{formatMoney(report.money)}</div>
+          {report.rp > 0 && <div className="text-xs text-violet-300">{t("offline.rp", { n: formatNumber(report.rp) })}</div>}
+        </div>
+        {capped && <p className="mt-2 text-[11px] text-white/40">{t("offline.capped", { hours: formatHours(offlineCap) })}</p>}
+
+        <Button variant="gold" size="lg" className="mt-5 w-full text-base" onClick={collect}>
+          {t("offline.collect", { amount: formatMoney(report.money) })}
+        </Button>
+        <OfflineAdButton amount={report.money} />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface Toast {
+  id: number;
+  tone: "success" | "gold" | "info" | "warn";
+  title: string;
+  body?: string;
+  icon?: string;
+  action?: UiToastAction;
+}
+let toastId = 0;
+
+export function Toasts() {
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  // the first-car title takes this spot on phones while it plays
+  const celebrating = useUi((u) => !!u.celebrate);
+  useEffect(
+    () =>
+      uiEvents.on((e: UiEvent) => {
+        if (e.type !== "toast") return;
+        const t = { id: ++toastId, tone: e.tone, title: e.title, body: e.body, icon: e.icon, action: e.action };
+        setToasts((list) => [...list.slice(-3), t]);
+        setTimeout(() => setToasts((list) => list.filter((x) => x.id !== t.id)), e.action ? 7000 : 3800);
+      }),
+    [],
+  );
+
+  return (
+    <div className="pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top)+8.75rem)] z-[45] flex flex-col items-center gap-1.5 px-5 md:top-20 md:items-end md:pr-6">
+      <AnimatePresence initial={false}>
+        {(celebrating ? [] : toasts).map((t) => (
+          <motion.div
+            key={t.id}
+            layout
+            initial={{ opacity: 0, y: -12, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, x: 40, transition: { duration: 0.18 } }}
+            className={cn(
+              "glass-strong pointer-events-auto flex w-full max-w-[320px] items-center gap-2.5 rounded-xl p-2.5 md:max-w-sm md:gap-3 md:rounded-2xl md:p-3",
+              t.tone === "gold" && "ring-1 ring-gold/40",
+              t.tone === "success" && "ring-1 ring-emerald-400/30",
+              t.tone === "info" && "ring-1 ring-electric/30",
+              t.tone === "warn" && "ring-1 ring-amber-400/50",
+            )}
+          >
+            {t.icon && <span className="shrink-0 text-xl md:text-2xl">{t.icon}</span>}
+            <div className="min-w-0 flex-1">
+              <div className={cn("text-[13px] leading-tight font-semibold md:text-sm", t.tone === "gold" && "text-gold")}>{t.title}</div>
+              {t.body && <div className="truncate text-[11px] leading-tight text-white/55 md:text-xs">{t.body}</div>}
+            </div>
+            {t.action && (
+              <button
+                type="button"
+                className="shrink-0 rounded-xl bg-gold/90 px-3 py-1.5 text-xs font-bold text-black hover:bg-gold"
+                onClick={() => {
+                  const a = t.action!;
+                  if (a.view) useUi.getState().setView(a.view);
+                  else if (a.plot) useUi.getState().selectPlot(a.plot);
+                  setToasts((list) => list.filter((x) => x.id !== t.id));
+                }}
+              >
+                {t.action.label}
+              </button>
+            )}
+          </motion.div>
+        ))}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/** Full-screen celebration after a Reset Imperium. */
+export function ImperiumOverlay() {
+  const { t } = useT();
+  const [points, setPoints] = useState<number | null>(null);
+  useEffect(
+    () =>
+      uiEvents.on((e) => {
+        if (e.type !== "imperium") return;
+        setPoints(e.stars);
+        setTimeout(() => setPoints(null), 2600);
+      }),
+    [],
+  );
+
+  return (
+    <AnimatePresence>
+      {points !== null && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setPoints(null)}
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-md"
+        >
+          <motion.div
+            initial={{ scale: 0.3, opacity: 0 }}
+            animate={{ scale: [0.3, 1.15, 1], opacity: 1 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            className="text-center"
+          >
+            <motion.div animate={{ rotate: 360 }} transition={{ duration: 6, repeat: Infinity, ease: "linear" }} className="mx-auto text-8xl">
+              👑
+            </motion.div>
+            <div className="mt-4 text-xs font-semibold uppercase tracking-[0.3em] text-gold/80">{t("imperium.title")}</div>
+            <div className="mt-1 text-5xl font-black text-gradient-gold">
+              +{formatNumber(points)} ⭐
+            </div>
+            <div className="mt-1 text-sm text-white/60">{t("imperium.restart")}</div>
+          </motion.div>
+          {Array.from({ length: 18 }).map((_, i) => (
+            <motion.span
+              key={i}
+              className="absolute text-2xl"
+              initial={{ x: 0, y: 0, opacity: 1 }}
+              animate={{ x: Math.cos((i / 18) * Math.PI * 2) * 260, y: Math.sin((i / 18) * Math.PI * 2) * 260, opacity: 0 }}
+              transition={{ duration: 1.4, ease: "easeOut" }}
+            >
+              ⭐
+            </motion.span>
+          ))}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+  const { exportSave, importSave, resetGame, backend, setLang } = useGame.getState();
+  const lang = useGame((g) => g.state.settings.lang);
+  const { t } = useT();
+  const [text, setText] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+  const [confirmReset, setConfirmReset] = useState(false);
+
+  // Android's hardware Back button sends this event before the generic Escape fallback.
+  // Explicitly close controlled Settings so the dialog cannot trap the app in the emulator.
+  useEffect(() => {
+    if (!open) return;
+    const onNativeBack = () => onOpenChange(false);
+    window.addEventListener("idle-car-empire:native-back", onNativeBack);
+    return () => window.removeEventListener("idle-car-empire:native-back", onNativeBack);
+  }, [open, onOpenChange]);
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        onOpenChange(o);
+        if (!o) {
+          setMsg(null);
+          setConfirmReset(false);
+        }
+      }}
+    >
+      <DialogContent>
+        <DialogTitle>{t("settings.title")}</DialogTitle>
+        <DialogDescription className="mt-1">{t("settings.autosave", { backend: t(`settings.saveWhere.${backend}`) })}</DialogDescription>
+
+        <div className="mt-4">
+          <div className="mb-1.5 text-xs font-semibold text-white/60">{t("settings.language")}</div>
+          <div className="grid grid-cols-3 gap-1.5">
+            {LANGS.map((l) => (
+              <Button key={l.id} size="sm" variant={l.id === lang ? "default" : "secondary"} onClick={() => setLang(l.id)}>
+                <span>{l.flag}</span> {l.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        <SaverPicker />
+
+        <div className="mt-4 space-y-1.5">
+          <Toggle label={t("settings.lowGraphics")} hint={t("settings.lowGraphicsHint")} k="lowGraphics" />
+          <Toggle label={t("settings.sound")} k="sound" />
+          <Toggle label={t("settings.music")} hint={t("settings.musicHint")} k="music" />
+          <Toggle label={t("settings.haptics")} k="haptics" />
+          <NotifyToggle />
+          <Toggle label={t("settings.stats")} hint={t("settings.statsHint")} k="stats" />
+        </div>
+
+        <div className="mt-4">
+          <CloudSection onOpen={() => onOpenChange(false)} />
+        </div>
+
+        <div className="mt-4 space-y-2">
+          <Button
+            variant="secondary"
+            className="w-full"
+            onClick={async () => {
+              const code = exportSave();
+              setText(code);
+              try {
+                await navigator.clipboard.writeText(code);
+                setMsg(t("settings.copied"));
+              } catch {
+                setMsg(t("settings.copyBelow"));
+              }
+            }}
+          >
+            <Download /> {t("settings.export")}
+          </Button>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder={t("settings.pastePlaceholder")}
+            className="h-24 w-full resize-none rounded-xl bg-black/40 p-3 font-mono text-base text-white/80 ring-1 ring-white/10 outline-none focus:ring-electric/50"
+          />
+          <Button
+            variant="secondary"
+            className="w-full"
+            disabled={!text.trim()}
+            onClick={() => setMsg(importSave(text) ? t("settings.imported") : t("settings.invalid"))}
+          >
+            <Upload /> {t("settings.import")}
+          </Button>
+          {msg && <p className="text-center text-xs text-sky-300">{msg}</p>}
+        </div>
+
+        <div className="mt-5 border-t border-white/10 pt-4">
+          {confirmReset ? (
+            <div className="flex gap-2">
+              <Button variant="secondary" className="flex-1" onClick={() => setConfirmReset(false)}>
+                {t("common.cancel")}
+              </Button>
+              <Button
+                className="flex-1 bg-none bg-rose-600 shadow-none"
+                onClick={async () => {
+                  await resetGame();
+                  setConfirmReset(false);
+                  onOpenChange(false);
+                }}
+              >
+                {t("settings.erase")}
+              </Button>
+            </div>
+          ) : (
+            <Button variant="ghost" className="w-full text-rose-300" onClick={() => setConfirmReset(true)}>
+              <RotateCcw /> {t("settings.reset")}
+            </Button>
+          )}
+        </div>
+        <div className="mt-3 border-t border-white/10 pt-3 text-[11px] leading-snug text-white/45">
+          <div className="mb-0.5 font-bold uppercase tracking-wider text-white/60">{t("settings.credits")}</div>
+          <p>
+            {t("settings.creditsModel")}{" "}
+            <a className="underline" href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">
+              CC BY 4.0
+            </a>
+          </p>
+          <p className="mt-1.5">
+            <a className="underline" href={legalUrl(PRIVACY_URL, lang)} target="_blank" rel="noreferrer">
+              {t("settings.privacy")}
+            </a>
+            {" · "}
+            <a className="underline" href={legalUrl(TERMS_URL, lang)} target="_blank" rel="noreferrer">
+              {t("settings.terms")}
+            </a>
+          </p>
+          <AdPrivacyButton />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const SAVER_OPTIONS: SaverSetting[] = ["auto", "on", "off"];
+
+/** The battery saver: auto (on when the battery is low), on or off, and what it does now. */
+function SaverPicker() {
+  const { t } = useT();
+  const saver = useGame((g) => g.state.settings.saver);
+  const setSaver = useGame((g) => g.setSaver);
+  useSyncExternalStore(watchPower, powerVersion, powerVersion);
+  const battery = batteryState();
+  const active = isSaving();
+  const level = battery ? Math.round(battery.level * 100) : null;
+  const status = level === null ? t(active ? "saver.statusOn" : "saver.statusOff") : t(active ? "saver.statusOnBattery" : "saver.statusOffBattery", { n: level, charging: battery?.charging ? t("saver.charging") : "" });
+  return (
+    <div className="mt-4">
+      <div className="mb-1.5 text-xs font-semibold text-white/60">{t("saver.title")}</div>
+      <div role="radiogroup" aria-label={t("saver.title")} className="grid grid-cols-3 gap-1.5">
+        {SAVER_OPTIONS.map((id) => (
+          <Button key={id} role="radio" aria-checked={id === saver} size="sm" variant={id === saver ? "default" : "secondary"} onClick={() => setSaver(id)}>
+            {t(`saver.${id}`)}
+          </Button>
+        ))}
+      </div>
+      <div className="mt-1.5 text-[11px] text-white/45">{t(`saver.hint.${saver}`)}</div>
+      <div className={cn("mt-1 text-[11px] font-semibold", active ? "text-emerald-300" : "text-white/55")}>{status}</div>
+    </div>
+  );
+}
+
+function Toggle({ label, hint, k }: { label: string; hint?: string; k: "lowGraphics" | "sound" | "music" | "haptics" | "stats" }) {
+  const on = useGame((g) => g.state.settings[k]);
+  const setPref = useGame((g) => g.setPref);
+  return (
+    <button
+      role="switch"
+      aria-checked={on}
+      onClick={() => setPref(k, !on)}
+      className="flex w-full items-center gap-3 rounded-xl bg-white/[0.04] px-3 py-2.5 text-left ring-1 ring-white/10"
+    >
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold">{label}</span>
+        {hint && <span className="block text-[11px] text-white/45">{hint}</span>}
+      </span>
+      <span className={cn("relative h-6 w-10 shrink-0 rounded-full transition", on ? "bg-emerald-500" : "bg-white/15")}>
+        <span className={cn("absolute top-0.5 size-5 rounded-full bg-white shadow transition-all", on ? "left-[1.125rem]" : "left-0.5")} />
+      </span>
+    </button>
+  );
+}

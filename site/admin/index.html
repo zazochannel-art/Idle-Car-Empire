@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<!-- the robot check's public site key, written by pages.yml from the TURNSTILE_SITE_KEY variable (docs/captcha.md); empty: none -->
+<meta name="turnstile-sitekey" content="">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; style-src 'unsafe-inline'; img-src 'self'; connect-src https://orffhhsogoymalyogfzl.supabase.co https://challenges.cloudflare.com; base-uri 'none'; form-action 'none'">
+<title>Idle Car Empire – Panou</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: radial-gradient(900px 420px at 50% -160px, #15284f 0%, rgba(6, 7, 10, 0) 70%) no-repeat, #06070a; color: #e7e9ee; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 960px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  h2 { font-size: 1.1rem; margin: 0 0 10px; color: #fcd34d; }
+  a { color: #7dd3fc; }
+  .muted { color: #8b8f99; font-size: .9rem; }
+  .brand { display: inline-flex; align-items: center; gap: 10px; margin: 0 0 16px; color: #e7e9ee; font-weight: 800; text-decoration: none; }
+  .brand img { width: 36px; height: 36px; border-radius: 10px; }
+  .card { background: #0f1117; border: 1px solid #23262e; border-radius: 14px; padding: 16px; margin: 0 0 16px; }
+  /* only a table scrolls sideways on a phone, never the card around it */
+  .scroll { overflow-x: auto; margin: 0 -4px; padding: 0 4px; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+  label { display: grid; gap: 4px; font-size: .85rem; color: #c9ccd4; }
+  input, select, button { font: inherit; border-radius: 10px; border: 1px solid #2c303a; background: #161922; color: #e7e9ee; padding: 9px 12px; }
+  input:focus, select:focus { outline: 2px solid #3b82f6; outline-offset: 1px; }
+  button { cursor: pointer; background: #1d4ed8; border-color: #1d4ed8; font-weight: 700; }
+  button.ghost { background: #161922; border-color: #2c303a; font-weight: 600; }
+  button.small { padding: 4px 10px; font-size: .85rem; }
+  button:disabled { opacity: .5; cursor: default; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+  .tile { background: #161922; border: 1px solid #23262e; border-radius: 12px; padding: 10px 12px; }
+  .tile b { display: block; font-size: 1.4rem; font-variant-numeric: tabular-nums; }
+  .tile span { color: #8b8f99; font-size: .8rem; }
+  table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid #1d2028; vertical-align: top; }
+  th { color: #8b8f99; font-weight: 600; white-space: nowrap; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.wrap { word-break: break-word; min-width: 220px; }
+  code { font-size: .8rem; color: #c4b5fd; word-break: break-all; }
+  .tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: .78rem; background: #23262e; color: #c9ccd4; white-space: nowrap; }
+  .tag.on { background: #14532d; color: #bbf7d0; }
+  .tag.soon { background: #1e3a8a; color: #bfdbfe; }
+  .tag.off { background: #3f1d1d; color: #fecaca; }
+  .msg { margin: 8px 0 0; min-height: 1.2em; color: #fcd34d; }
+  .bar { height: 8px; border-radius: 999px; background: #3b82f6; min-width: 2px; }
+  nav.tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px; }
+  nav.tabs button { background: #161922; border-color: #2c303a; font-weight: 600; }
+  nav.tabs button[aria-pressed="true"] { background: #1d4ed8; border-color: #1d4ed8; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+<a class="brand" href="../"><img src="../icon.png" alt="">Idle Car Empire</a>
+<h1>Panoul jocului</h1>
+<p class="muted">Pentru proprietarul jocului. Te conectezi cu contul tău din joc; serverul arată datele doar unui cont de administrator (vezi <code>docs/admin.md</code>).</p>
+
+<section id="signin" class="card" hidden>
+  <h2>Conectare</h2>
+  <div class="row">
+    <label>Email <input id="email" type="email" autocomplete="username" required></label>
+    <label>Parolă <input id="password" type="password" autocomplete="current-password" required></label>
+    <button id="go">Intră</button>
+  </div>
+  <div id="captcha" hidden></div>
+  <p id="signinMsg" class="msg" role="status"></p>
+</section>
+
+<section id="notAdmin" class="card" hidden>
+  <h2>Acest cont nu e administrator</h2>
+  <p>Ca să-l faci administrator, în Supabase → <strong>SQL Editor</strong> rulează o singură dată (cu emailul contului tău din joc):</p>
+  <p><code>insert into ops.admins (user_id) select id from auth.users where email = 'EMAILUL-TĂU';</code></p>
+  <button class="ghost" data-out>Ieși</button>
+</section>
+
+<div id="app" hidden>
+  <div class="row" style="justify-content: space-between; margin: 0 0 12px">
+    <span class="muted" id="who"></span>
+    <span class="row"><button class="ghost small" id="reload">Reîncarcă</button><button class="ghost small" data-out>Ieși</button></span>
+  </div>
+  <nav class="tabs" aria-label="Secțiuni">
+    <button data-tab="overview" aria-pressed="true">Pe scurt</button>
+    <button data-tab="events" aria-pressed="false">Evenimente</button>
+    <button data-tab="reports" aria-pressed="false">Raportări</button>
+    <button data-tab="errors" aria-pressed="false">Erori</button>
+    <button data-tab="funnel" aria-pressed="false">Jucători noi</button>
+    <button data-tab="retention" aria-pressed="false">Revin</button>
+  </nav>
+
+  <section data-panel="overview" class="card">
+    <h2>Pe scurt</h2>
+    <div id="tiles" class="tiles"></div>
+  </section>
+
+  <section data-panel="events" class="card" hidden>
+    <h2>Programează un eveniment</h2>
+    <p class="muted">Pornește unul din evenimentele jocului pentru toți jucătorii, la ora aleasă (ora telefonului/calculatorului tău), între 15 minute și 72 de ore. Cât timp rulează, ține locul evenimentelor obișnuite. Unul singur odată.</p>
+    <div class="row">
+      <label>Eveniment <select id="evId"></select></label>
+      <label>Începe <input id="evStart" type="datetime-local"></label>
+      <label>Ore <input id="evHours" type="number" min="0.25" max="72" step="0.25" value="24" style="width: 90px"></label>
+      <button id="evAdd">Programează</button>
+    </div>
+    <p id="evMsg" class="msg" role="status"></p>
+    <h2 style="margin-top: 18px">Programate</h2>
+    <div id="events"></div>
+  </section>
+
+  <section data-panel="events" class="card" hidden>
+    <h2>Programează un anotimp</h2>
+    <p class="muted">Primăvara (21 martie – 10 aprilie) și vara (15 iulie – 10 august) vin oricum, din calendar. Aici le poți porni și altă dată, între 1 și 31 de zile: jucătorii au decorul din hale, +10% venit și festivalul (trei obiective cu ⭐ Stele și o vopsea de curse). Cât timp rulează, ține locul anotimpului din calendar. Unul singur odată.</p>
+    <div class="row">
+      <label>Anotimp <select id="seId"><option value="spring">🌸 Festivalul de primăvară</option><option value="summer">☀️ Road trip de vară</option></select></label>
+      <label>Începe <input id="seStart" type="datetime-local"></label>
+      <label>Zile <input id="seDays" type="number" min="1" max="31" step="1" value="7" style="width: 90px"></label>
+      <button id="seAdd">Programează</button>
+    </div>
+    <p id="seMsg" class="msg" role="status"></p>
+    <h2 style="margin-top: 18px">Programate</h2>
+    <div id="seasons"></div>
+  </section>
+
+  <section data-panel="reports" class="card" hidden>
+    <h2>Raportări deschise</h2>
+    <p class="muted">Ce au raportat jucătorii. „Redenumește” dă jucătorului un nume neutru (își poate alege altul, verificat de filtru). Detalii: <code>docs/moderation.md</code>.</p>
+    <p id="repMsg" class="msg" role="status"></p>
+    <div id="reports"></div>
+  </section>
+
+  <section data-panel="errors" class="card" hidden>
+    <h2>Erori din joc (ultimele 30 de zile)</h2>
+    <p class="muted">Cele mai dese întâi. Locul se citește cu hărțile build-ului (<code>docs/errors.md</code>).</p>
+    <div id="errors"></div>
+  </section>
+
+  <section data-panel="retention" class="card" hidden>
+    <h2>Câți jucători revin</h2>
+    <p class="muted">Din zilele (UTC) în care jocul fiecărui cont a salvat în cloud. <b>Jucători noi</b>: conturile făcute în ziua aceea care au jucat. <b>A doua zi</b> și <b>ziua 7</b>: câți dintre ei au jucat exact atunci; <b>în prima săptămână</b>: în oricare din cele 7 zile de după. Procentele de sus adună toate zilele care au apucat să afle.</p>
+    <div id="retTiles" class="tiles"></div>
+    <p id="retSince" class="muted" style="margin-top: 10px"></p>
+    <div id="retention"></div>
+  </section>
+
+  <section data-panel="funnel" class="card" hidden>
+    <h2>Jucători noi: până unde ajung</h2>
+    <p class="muted">Anonim: câți jucători noi au atins fiecare pas și după câte minute de joc (mediana).</p>
+    <div id="funnel"></div>
+  </section>
+</div>
+</main>
+
+<script>
+"use strict";
+// The owner's dashboard. It signs in through Supabase Auth's public API with the owner's game
+// account and calls the admin_* functions (migration 0010), which check on the server that the
+// account is an admin. The session lives in this tab only (sessionStorage). Everything the
+// server returns is shown as text, never as HTML: reports and errors carry players' words.
+const URL_ = "https://orffhhsogoymalyogfzl.supabase.co";
+const KEY = "sb_publishable_hqGfNt6uaNbq0AgGyp0I8g_QLjjFaJ-";
+const STORE = "ice-admin-session";
+
+const EVENTS = {
+  rushOrders: "⚡ Săptămâna fabricii",
+  carShow: "🎪 Salonul auto internațional",
+  steelSale: "🏷️ Prăbușirea prețului oțelului",
+  luxuryBoom: "💎 Boom-ul luxului",
+  researchFair: "🔬 Târgul de inginerie",
+  exportDeal: "🚢 Contract de export",
+  raceWeekend: "🏁 Weekend de curse",
+  electricWeek: "🔋 Săptămâna electrică",
+};
+const REASONS = { name: "nume de jucător", company: "nume de companie", alliance: "alianță", cheating: "trișat", other: "altceva" };
+const STEPS = {
+  gate: "pagina de cont", start: "a pornit jocul", firstBody: "prima caroserie", engineFactory: "fabrica de motoare", assemblyPlant: "fabrica de asamblare",
+  firstCar: "prima mașină", firstSale: "prima vânzare", min30: "30 min de joc", zone2: "al doilea district", research: "prima cercetare",
+  hour3: "3 ore de joc", racing: "curse", day1: "a revenit a doua zi", day7: "după 7 zile", imperium: "primul Imperium",
+};
+
+const $ = (id) => document.getElementById(id);
+/** An element with text (never HTML) and attributes. */
+function el(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k === "text") e.textContent = v;
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else if (v !== false && v != null) e.setAttribute(k, v === true ? "" : String(v));
+  }
+  for (const k of kids) if (k != null) e.append(k);
+  return e;
+}
+const when = (t) => (t ? new Date(t).toLocaleString("ro-RO", { dateStyle: "short", timeStyle: "short" }) : "");
+const num = (n) => Number(n || 0).toLocaleString("ro-RO");
+
+// ── session ──
+let session = null;
+try { session = JSON.parse(sessionStorage.getItem(STORE) || "null"); } catch { session = null; }
+function keep(s) {
+  session = s ? { access: s.access_token, refresh: s.refresh_token, until: Date.now() + (s.expires_in || 3600) * 1000 - 60_000, email: s.user?.email ?? session?.email ?? "" } : null;
+  try { session ? sessionStorage.setItem(STORE, JSON.stringify(session)) : sessionStorage.removeItem(STORE); } catch {}
+}
+async function auth(grant, body) {
+  const r = await fetch(`${URL_}/auth/v1/token?grant_type=${grant}`, { method: "POST", headers: { apikey: KEY, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error_description || j.msg || j.message || `HTTP ${r.status}`);
+  return j;
+}
+// the robot check (Cloudflare Turnstile), once CAPTCHA is on in Supabase (docs/captcha.md)
+const SITEKEY = document.querySelector('meta[name="turnstile-sitekey"]')?.content || "";
+let turnstile = null;
+function captcha() {
+  if (!SITEKEY) return Promise.resolve(null);
+  turnstile ??= new Promise((res, rej) => {
+    const s = document.createElement("script");
+    s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+    s.onload = () => res(window.turnstile);
+    s.onerror = () => { turnstile = null; rej(new Error("Verificarea anti-robot nu s-a încărcat.")); };
+    document.head.appendChild(s);
+  });
+  return turnstile.then((ts) => new Promise((res, rej) => {
+    const box = $("captcha");
+    box.hidden = false;
+    const done = () => { ts.remove(id); box.hidden = true; };
+    const id = ts.render(box, {
+      sitekey: SITEKEY, action: "admin", language: "ro", theme: "dark",
+      callback: (t) => { done(); res(t); },
+      "error-callback": () => { done(); rej(new Error("Verificarea anti-robot n-a trecut. Încearcă din nou.")); },
+    });
+  }));
+}
+async function token() {
+  if (!session) throw new Error("signed out");
+  if (Date.now() > session.until) keep(await auth("refresh_token", { refresh_token: session.refresh }));
+  return session.access;
+}
+/** Calls one of the server's functions as the signed-in account. */
+async function rpc(name, args) {
+  const r = await fetch(`${URL_}/rest/v1/rpc/${name}`, { method: "POST", headers: { apikey: KEY, Authorization: `Bearer ${await token()}`, "Content-Type": "application/json" }, body: JSON.stringify(args || {}) });
+  const j = await r.json().catch(() => null);
+  if (r.status === 401) { keep(null); show(); throw new Error("Sesiunea a expirat: intră din nou."); }
+  if (!r.ok) throw new Error((j && (j.message || j.hint)) || `HTTP ${r.status}`);
+  return j;
+}
+
+// ── screens ──
+async function show() {
+  $("signin").hidden = !!session;
+  $("notAdmin").hidden = true;
+  $("app").hidden = true;
+  if (!session) return;
+  let admin = false;
+  try { admin = await rpc("admin_check"); } catch (e) { $("signin").hidden = false; $("signinMsg").textContent = e.message; return; }
+  if (!admin) { $("notAdmin").hidden = false; return; }
+  $("app").hidden = false;
+  $("who").textContent = session.email ? `Conectat: ${session.email}` : "Conectat";
+  await loadAll();
+}
+async function loadAll() {
+  await Promise.all([loadOverview(), loadEvents(), loadSeasons(), loadReports(), loadErrors(), loadFunnel(), loadRetention()].map((p) => p.catch((e) => console.warn(e))));
+}
+
+function table(head, rows) {
+  if (!rows.length) return el("p", { class: "muted", text: "Nimic deocamdată." });
+  return el("div", { class: "scroll" }, el("table", {}, el("thead", {}, el("tr", {}, ...head.map((h) => el("th", { text: h })))), el("tbody", {}, ...rows)));
+}
+
+async function loadOverview() {
+  const o = await rpc("admin_overview");
+  const tiles = [
+    ["accounts", "conturi"], ["guests", "conturi de oaspete"], ["new7d", "conturi noi (7 zile)"], ["active1d", "au jucat azi"],
+    ["active7d", "au jucat în 7 zile"], ["starts7d", "jocuri noi pornite (7 zile)"], ["alliances", "alianțe"], ["openReports", "raportări deschise"],
+    ["errors1d", "erori azi"], ["errorKinds7d", "erori diferite (7 zile)"],
+  ];
+  $("tiles").replaceChildren(...tiles.map(([k, label]) => el("div", { class: "tile" }, el("b", { text: num(o[k]) }), el("span", { text: label }))));
+}
+
+async function loadEvents() {
+  const list = await rpc("admin_events");
+  const now = Date.now();
+  $("events").replaceChildren(table(["Eveniment", "Începe", "Se termină", "Stare", ""], list.map((e) => {
+    const start = Date.parse(e.starts_at), end = Date.parse(e.ends_at);
+    const state = e.cancelled_at ? ["anulat", "off"] : end <= now ? ["încheiat", ""] : start <= now ? ["rulează acum", "on"] : ["programat", "soon"];
+    const cancel = !e.cancelled_at && end > now ? el("button", { class: "ghost small", text: "Anulează", onclick: () => cancelEvent(e.id) }) : null;
+    return el("tr", {}, el("td", { text: EVENTS[e.event] || e.event }), el("td", { text: when(start) }), el("td", { text: when(end) }), el("td", {}, el("span", { class: `tag ${state[1]}`, text: state[0] })), el("td", {}, cancel));
+  })));
+}
+async function cancelEvent(id) {
+  if (!confirm("Anulezi evenimentul? Jucătorii nu-l mai văd.")) return;
+  try { const r = await rpc("admin_cancel_event", { p_id: id }); $("evMsg").textContent = r === "ok" ? "Anulat." : "Nu mai e de anulat."; } catch (e) { $("evMsg").textContent = e.message; }
+  await loadEvents();
+}
+async function addEvent() {
+  const start = $("evStart").value ? new Date($("evStart").value) : new Date();
+  const hours = Number($("evHours").value);
+  if (!Number.isFinite(start.getTime()) || !(hours >= 0.25 && hours <= 72)) { $("evMsg").textContent = "Alege o oră de început și o durată între 0,25 și 72 de ore."; return; }
+  $("evAdd").disabled = true;
+  try {
+    const r = await rpc("admin_schedule_event", { p_event: $("evId").value, p_starts: start.toISOString(), p_hours: hours });
+    $("evMsg").textContent = { ok: "Programat. Jucătorii îl primesc în cel mult o jumătate de oră (sau când deschid jocul).", overlap: "Se suprapune cu alt eveniment programat: unul singur odată.", invalid: "Ora sau durata nu e bună (cel mult 60 de zile înainte, 0,25–72 de ore).", limit: "Sunt deja 20 de evenimente în așteptare.", unknown: "Eveniment necunoscut." }[r] || String(r);
+  } catch (e) { $("evMsg").textContent = e.message; }
+  $("evAdd").disabled = false;
+  await loadEvents();
+}
+
+const SEASONS = { spring: "🌸 Festivalul de primăvară", summer: "☀️ Road trip de vară" };
+async function loadSeasons() {
+  const list = await rpc("admin_seasons");
+  const now = Date.now();
+  $("seasons").replaceChildren(table(["Anotimp", "Începe", "Se termină", "Stare", ""], list.map((e) => {
+    const start = Date.parse(e.starts_at), end = Date.parse(e.ends_at);
+    const state = e.cancelled_at ? ["anulat", "off"] : end <= now ? ["încheiat", ""] : start <= now ? ["rulează acum", "on"] : ["programat", "soon"];
+    const cancel = !e.cancelled_at && end > now ? el("button", { class: "ghost small", text: "Anulează", onclick: () => cancelSeason(e.id) }) : null;
+    return el("tr", {}, el("td", { text: SEASONS[e.season] || e.season }), el("td", { text: when(start) }), el("td", { text: when(end) }), el("td", {}, el("span", { class: `tag ${state[1]}`, text: state[0] })), el("td", {}, cancel));
+  })));
+}
+async function cancelSeason(id) {
+  if (!confirm("Anulezi anotimpul? Jucătorii revin la cel din calendar.")) return;
+  try { const r = await rpc("admin_cancel_season", { p_id: id }); $("seMsg").textContent = r === "ok" ? "Anulat." : "Nu mai e de anulat."; } catch (e) { $("seMsg").textContent = e.message; }
+  await loadSeasons();
+}
+async function addSeason() {
+  const start = $("seStart").value ? new Date($("seStart").value) : new Date();
+  const days = Number($("seDays").value);
+  if (!Number.isFinite(start.getTime()) || !(days >= 1 && days <= 31)) { $("seMsg").textContent = "Alege o zi de început și o durată între 1 și 31 de zile."; return; }
+  $("seAdd").disabled = true;
+  try {
+    const r = await rpc("admin_schedule_season", { p_season: $("seId").value, p_starts: start.toISOString(), p_days: days });
+    $("seMsg").textContent = { ok: "Programat. Jucătorii îl primesc în cel mult o jumătate de oră (sau când deschid jocul).", overlap: "Se suprapune cu alt anotimp programat: unul singur odată.", invalid: "Ziua sau durata nu e bună (cel mult 120 de zile înainte, 1–31 de zile).", limit: "Sunt deja 10 anotimpuri în așteptare.", unknown: "Anotimp necunoscut." }[r] || String(r);
+  } catch (e) { $("seMsg").textContent = e.message; }
+  $("seAdd").disabled = false;
+  await loadSeasons();
+}
+
+async function loadReports() {
+  const list = await rpc("admin_reports");
+  $("reports").replaceChildren(table(["Când", "Motiv", "Ce a văzut", "Numele acum", "Raportări", ""], list.map((r) => {
+    const seen = [r.seen_name, r.seen_company, r.seen_alliance].filter(Boolean).join(" · ");
+    const act = (label, fn, ghost = true) => el("button", { class: `${ghost ? "ghost " : ""}small`, text: label, onclick: fn });
+    return el("tr", {},
+      el("td", { text: when(r.created_at) }), el("td", { text: REASONS[r.reason] || r.reason }), el("td", { class: "wrap", text: seen }),
+      el("td", { class: "wrap", text: r.name_now ?? "—" }), el("td", { class: "num", text: num(r.reports_about_them) }),
+      el("td", {}, el("div", { class: "row" },
+        r.target ? act("Redenumește", () => rename(r.target, r.id)) : null,
+        act("Rezolvat", () => mark(r.id, "done")), act("Respinge", () => mark(r.id, "dismissed")))));
+  })));
+}
+async function mark(id, status) {
+  try { await rpc("admin_report_status", { p_id: id, p_status: status }); $("repMsg").textContent = status === "done" ? "Marcat rezolvat." : "Respins."; } catch (e) { $("repMsg").textContent = e.message; }
+  await Promise.all([loadReports(), loadOverview()]);
+}
+async function rename(user, reportId) {
+  if (!confirm("Dai jucătorului un nume neutru (Player-…)?")) return;
+  try { const n = await rpc("admin_rename_player", { p_user: user }); $("repMsg").textContent = n === "unknown" ? "Jucătorul nu mai există." : `Redenumit: ${n}`; if (n !== "unknown") await rpc("admin_report_status", { p_id: reportId, p_status: "done" }); } catch (e) { $("repMsg").textContent = e.message; }
+  await Promise.all([loadReports(), loadOverview()]);
+}
+
+async function loadErrors() {
+  const list = await rpc("admin_errors");
+  $("errors").replaceChildren(table(["De câte ori", "Zile", "Eroare", "Loc", "Versiuni", "Sisteme", "Ultima dată"], list.map((e) =>
+    el("tr", {}, el("td", { class: "num", text: num(e.times) }), el("td", { class: "num", text: num(e.days) }), el("td", { class: "wrap", text: `${e.kind}: ${e.message}` }),
+      el("td", { class: "wrap" }, el("code", { text: e.place || "" })), el("td", { text: e.versions || "" }), el("td", { class: "wrap", text: e.engines || e.platforms || "" }), el("td", { text: when(e.last_seen) })))));
+}
+
+async function loadFunnel() {
+  const list = await rpc("admin_funnel");
+  const top = Math.max(1, ...list.map((s) => Number(s.players) || 0));
+  $("funnel").replaceChildren(table(["Pas", "Jucători", "", "% din start", "Minute (mediană)"], list.map((s) =>
+    el("tr", {}, el("td", { text: STEPS[s.step] || s.step }), el("td", { class: "num", text: num(s.players) }),
+      el("td", { style: "width: 30%; min-width: 90px" }, el("div", { class: "bar", style: `width: ${Math.round((100 * (Number(s.players) || 0)) / top)}%` })),
+      el("td", { class: "num", text: s.pct_of_start == null ? "" : `${s.pct_of_start}%` }), el("td", { class: "num", text: s.median_minutes == null ? "" : num(Math.round(s.median_minutes)) })))));
+}
+
+async function loadRetention() {
+  const r = await rpc("admin_retention");
+  const pct = (x) => (x && x.of > 0 ? `${Math.round((100 * x.back) / x.of)}%` : "–");
+  const tiles = [
+    [num(r.dau), "au jucat azi"], [num(r.wau), "au jucat în 7 zile"], [num(r.mau), "au jucat în 30 de zile"],
+    [pct(r.d1), `revin a doua zi (${num(r.d1?.back ?? 0)} din ${num(r.d1?.of ?? 0)})`],
+    [pct(r.d7), `revin în ziua 7 (${num(r.d7?.back ?? 0)} din ${num(r.d7?.of ?? 0)})`],
+    [pct(r.week), `revin în prima săptămână (${num(r.week?.back ?? 0)} din ${num(r.week?.of ?? 0)})`],
+  ];
+  $("retTiles").replaceChildren(...tiles.map(([v, label]) => el("div", { class: "tile" }, el("b", { text: v }), el("span", { text: label }))));
+  $("retSince").textContent = r.since ? `Zilele se numără de pe ${new Date(r.since).toLocaleDateString("ro-RO")}; înainte de 20 octombrie 2026 sunt doar cele aflate din salvări.` : "";
+  const top = Math.max(1, ...r.days.map((d) => Number(d.active) || 0));
+  const share = (n, of, ready) => (!ready ? "" : of > 0 ? `${num(n)} (${Math.round((100 * n) / of)}%)` : "–");
+  const today = Date.parse(r.today);
+  $("retention").replaceChildren(table(["Ziua", "Au jucat", "", "Noi", "A doua zi", "Ziua 7", "În prima săptămână"], r.days.map((d) => {
+    const age = Math.round((today - Date.parse(d.day)) / 86400000);
+    return el("tr", {}, el("td", { text: new Date(d.day).toLocaleDateString("ro-RO", { day: "numeric", month: "short" }) }), el("td", { class: "num", text: num(d.active) }),
+      el("td", { style: "width: 22%; min-width: 70px" }, el("div", { class: "bar", style: `width: ${Math.round((100 * (Number(d.active) || 0)) / top)}%` })),
+      el("td", { class: "num", text: num(d.new) }), el("td", { class: "num", text: share(d.d1, d.new, age >= 1) }), el("td", { class: "num", text: share(d.d7, d.new, age >= 7) }), el("td", { class: "num", text: share(d.week, d.new, age >= 7) }));
+  })));
+}
+
+// ── wiring ──
+for (const [id, name] of Object.entries(EVENTS)) $("evId").append(el("option", { value: id, text: name }));
+$("go").addEventListener("click", async () => {
+  $("signinMsg").textContent = "";
+  try {
+    const body = { email: $("email").value.trim(), password: $("password").value };
+    const captchaToken = await captcha();
+    if (captchaToken) body.gotrue_meta_security = { captcha_token: captchaToken };
+    keep(await auth("password", body));
+    $("password").value = "";
+    await show();
+  } catch (e) { $("signinMsg").textContent = /invalid/i.test(e.message) ? "Email sau parolă greșită." : e.message; }
+});
+$("password").addEventListener("keydown", (e) => { if (e.key === "Enter") $("go").click(); });
+for (const b of document.querySelectorAll("[data-out]")) b.addEventListener("click", async () => {
+  const t = session?.access;
+  keep(null);
+  if (t) fetch(`${URL_}/auth/v1/logout?scope=local`, { method: "POST", headers: { apikey: KEY, Authorization: `Bearer ${t}` } }).catch(() => {});
+  await show();
+});
+$("reload").addEventListener("click", () => loadAll());
+$("evAdd").addEventListener("click", addEvent);
+$("seAdd").addEventListener("click", addSeason);
+for (const b of document.querySelectorAll("[data-tab]")) b.addEventListener("click", () => {
+  for (const x of document.querySelectorAll("[data-tab]")) x.setAttribute("aria-pressed", String(x === b));
+  for (const p of document.querySelectorAll("[data-panel]")) p.hidden = p.dataset.panel !== b.dataset.tab;
+});
+show();
+</script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+3D models used in Idle Car Empire
+=================================
+
+car-pack.glb — every car in the game: the City Car, Sedan, SUV, Luxury, Supercar,
+  Sports Car, MC GT, Hypercar and Electric platforms, and the street traffic
+  (compact, minivan, off-roader, pickup, wagon)
+  Original: "Generic passenger car pack" by Comrade1280
+  https://sketchfab.com/comrade1280
+  https://sketchfab.com/3d-models/generic-passenger-car-pack-20f9af9b8a404d5cb022ac6fe87f21f5
+  Licence: CC BY 4.0 — https://creativecommons.org/licenses/by/4.0/
+
+  Changes: meshopt-compressed, textures resized to 512 px WebP (gltf-transform
+  optimize); two textures of the Wagon body, missing from the received file,
+  replaced with plain grey. In the game each car is taken out of the pack,
+  straightened and scaled, and its paint texture is turned grey so the body
+  can be painted in the game's colours. The car in the game's logo (the app
+  icons, the launch screens, assets/logo.webp) is a render of the Hypercar.
+
+The cars are generic, unbranded designs (no real make or model). Every model
+here allows commercial use (CC BY 4.0). Models under a
+non-commercial licence (CC BY-NC) are not used: the Android app shows ads.

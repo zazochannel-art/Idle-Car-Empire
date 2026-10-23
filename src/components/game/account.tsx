@@ -1,0 +1,1154 @@
+"use client";
+
+// The player's account: the avatar button and save status in the top bar,
+// the profile page, the sign-in and registration forms, and the choices the
+// start of the game and a save conflict may ask for.
+import { motion } from "framer-motion";
+import { Cloud, CloudOff, History, KeyRound, LogIn, LogOut, RefreshCw, Trash2, UserPlus } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { plantsOf } from "@/game/engine/chain";
+import { isCleanName } from "@/game/engine/names";
+import { formatDuration, formatMoney, formatNumber } from "@/game/format";
+import { summarize, type AuthResult, type CloudBackup, type MyInvite, type SaveSummary } from "@/game/save";
+import { INVITE } from "@/game/engine/invites";
+import type { MessageKey } from "@/i18n";
+import { useT } from "@/i18n/use-t";
+import { passwordIssue } from "@/lib/password";
+import { cn } from "@/lib/utils";
+import { answerStartChoice, enterGame, useCloud } from "@/store/cloud-store";
+import { trackGate } from "@/game/save/funnel";
+import { CONTACT_EMAIL, PASSWORD_RESET_BY_EMAIL, RESET_PASSWORD_URL, SITE_URL } from "@/lib/platform";
+import { uiEvents } from "@/store/events";
+import { useGame } from "@/store/game-store";
+import { useUi } from "@/store/ui-store";
+import { ViewHeader } from "../views/section-title";
+import { HiddenPlayersCard, TermsConsent } from "./player-safety";
+import { StartLoading } from "./start-screen";
+
+type T = ReturnType<typeof useT>["t"];
+
+export const AVATARS = ["🧑‍🔧", "👩‍🔧", "👨‍💼", "👩‍💼", "🧑‍🏭", "🦁", "🐺", "🦊", "🐯", "🦅", "🐻", "🐼", "🚗", "🏎️", "🏁", "👑"];
+
+/** Where an account email's link leads (the game's site says the address is confirmed): the app signs in with the password. */
+const here = () => SITE_URL;
+
+const ago = (t: T, ms: number | null) => (ms ? t("account.ago", { time: formatDuration(Math.max(1, (Date.now() - ms) / 1000)) }) : "—");
+
+function errorText(t: T, r: AuthResult): string {
+  return r.ok ? "" : t(`account.err.${r.error}` as MessageKey);
+}
+
+/** Under a new password: its rule, or what is wrong with it as the player types (lib/password.ts). */
+function PasswordHint({ pw, email, name }: { pw: string; email?: string; name?: string }) {
+  const { t } = useT();
+  const issue = pw ? passwordIssue(pw, { email, name }) : null;
+  return <p className={cn("px-1 text-[11px] leading-snug", issue ? "text-amber-300" : pw ? "text-emerald-300" : "text-white/45")}>{issue ? t(`password.${issue}`) : pw ? `✓ ${t("password.ok")}` : t("password.rule")}</p>;
+}
+
+// ───────────────────────── status ─────────────────────────
+
+/** The save's state in a few words and a colour. */
+export function useSaveStatus(): { text: string; tone: "ok" | "busy" | "warn" | "bad" | "local" } {
+  const { t } = useT();
+  const enabled = useCloud((c) => c.enabled);
+  const mode = useCloud((c) => c.mode);
+
+  const status = useCloud((c) => c.sync.status);
+  if (!enabled || mode === "local") return { text: t("account.status.local"), tone: "local" };
+  switch (status) {
+    case "saving":
+      return { text: t("account.status.saving"), tone: "busy" };
+    case "saved":
+      return { text: t("account.status.saved"), tone: "ok" };
+    case "offline":
+      return { text: t("account.status.offline"), tone: "warn" };
+    case "error":
+      return { text: t("account.status.error"), tone: "warn" };
+    case "conflict":
+      return { text: t("account.status.conflict"), tone: "bad" };
+    default:
+      return { text: t("account.status.idle"), tone: "ok" };
+  }
+}
+
+const DOT = { ok: "bg-emerald-400", busy: "bg-sky-400 animate-pulse", warn: "bg-amber-400", bad: "bg-red-500 animate-pulse", local: "bg-white/40" };
+
+/** The avatar in the top bar, with the save's state as a dot; opens the profile. */
+export function ProfileButton() {
+  const avatar = useCloud((c) => c.profile?.avatar ?? "👤");
+  const { text, tone } = useSaveStatus();
+  const setView = useUi((u) => u.setView);
+  return (
+    <button
+      onClick={() => setView("profile")}
+      title={text}
+      aria-label={text}
+      className="relative flex size-10 items-center justify-center rounded-full bg-[#5b5b60]/85 text-xl shadow-[0_3px_0_0_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:brightness-110"
+    >
+      {avatar}
+      <span className={cn("absolute bottom-0.5 right-0.5 size-3 rounded-full ring-2 ring-[#2b2b2e]", DOT[tone])} />
+    </button>
+  );
+}
+
+// ───────────────────────── forms ─────────────────────────
+
+function Field({ label, ...rest }: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-[11px] font-semibold text-white/60">{label}</span>
+      <input {...rest} className="h-10 w-full rounded-xl bg-black/40 px-3 text-base text-white/90 ring-1 ring-white/10 outline-none focus:ring-electric/50" />
+    </label>
+  );
+}
+
+const validEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
+
+/**
+ * Under a sign-in form: a forgotten password. With an email sender set up (PASSWORD_RESET_BY_EMAIL)
+ * the game emails a link to the site's page that sets a new one; until then, the contact address.
+ */
+function ForgotPassword({ email: typed }: { email: string }) {
+  const saves = useGame((g) => g.saves);
+  const { t } = useT();
+  const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState(typed);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null);
+  if (!open)
+    return (
+      <button
+        type="button"
+        className="mx-auto block text-[11px] font-semibold text-white/55 underline decoration-white/25 underline-offset-2 hover:text-white/80"
+        onClick={() => {
+          setEmail(typed);
+          setOpen(true);
+        }}
+      >
+        {t("account.forgot")}
+      </button>
+    );
+  if (!PASSWORD_RESET_BY_EMAIL)
+    return (
+      <p className="rounded-xl bg-white/[0.04] px-3 py-2 text-center text-[11px] leading-snug text-white/65 ring-1 ring-white/[0.07]">
+        🔑{" "}
+        {t("account.resetContact", { email: "\u0001" })
+          .split("\u0001")
+          .map((part, i) => (
+            <span key={i}>
+              {i > 0 && (
+                <a className="font-semibold text-sky-300 underline" href={`mailto:${CONTACT_EMAIL}`}>
+                  {CONTACT_EMAIL}
+                </a>
+              )}
+              {part}
+            </span>
+          ))}
+      </p>
+    );
+  return (
+    <div className="space-y-2 rounded-xl bg-white/[0.04] p-2.5 ring-1 ring-white/[0.07]">
+      <p className="text-[11px] leading-snug text-white/60">🔑 {t("account.resetHint")}</p>
+      <Field label={t("account.email")} type="email" inputMode="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      <Button
+        type="button"
+        size="sm"
+        variant="secondary"
+        className="w-full"
+        disabled={busy || !validEmail(email) || !saves}
+        onClick={async () => {
+          setBusy(true);
+          setMsg(null);
+          const r = await saves!.resetPassword(email.trim(), RESET_PASSWORD_URL).catch(() => ({ ok: false as const, error: "network" as const }));
+          setBusy(false);
+          setMsg(r.ok ? { text: t("account.resetSent", { email: email.trim() }) } : { text: errorText(t, r), bad: true });
+        }}
+      >
+        {t("account.resetSend")}
+      </Button>
+      {msg && <p className={cn("text-center text-xs", msg.bad ? "text-rose-300" : "text-sky-300")}>{msg.text}</p>}
+    </div>
+  );
+}
+
+/**
+ * Sign in to an account (login), or, for a guest, register: the guest's
+ * account gets the email and password, so its save stays the same.
+ */
+export function AccountForms({ initial, guest, onDone }: { initial: "login" | "register"; guest: boolean; onDone?: () => void }) {
+  const saves = useGame((g) => g.saves);
+  const { t } = useT();
+  const [tab, setTab] = useState<"login" | "register">(guest ? initial : "login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null);
+  if (!saves) return null;
+
+  const run = async (fn: () => Promise<AuthResult>, ok: (r: AuthResult) => string | null) => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await fn();
+      if (r.ok) {
+        const text = ok(r);
+        if (text) setMsg({ text });
+      } else setMsg({ text: errorText(t, r), bad: true });
+    } catch {
+      setMsg({ text: t("account.err.network"), bad: true });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // a new password follows the rules; signing in takes any (older accounts keep theirs)
+  const canSubmit = validEmail(email) && (tab === "register" ? !passwordIssue(password, { email }) : password.length >= 6) && !busy;
+  return (
+    <div className="space-y-2.5">
+      {guest && (
+        <div className="grid grid-cols-2 gap-1 rounded-xl bg-white/[0.04] p-1 ring-1 ring-white/[0.07]">
+          {(["register", "login"] as const).map((k) => (
+            <button key={k} onClick={() => setTab(k)} className={cn("rounded-lg py-1.5 text-[11px] font-black uppercase tracking-wide", tab === k ? "bg-gold text-black" : "text-white/60")}>
+              {t(k === "register" ? "account.tab.register" : "account.tab.login")}
+            </button>
+          ))}
+        </div>
+      )}
+      {tab === "register" && <p className="text-[11px] leading-snug text-white/55">{t("account.registerHint")}</p>}
+      {tab === "register" && <TermsConsent className="text-left" />}
+      {tab === "login" && guest && <p className="text-[11px] leading-snug text-amber-300/90">{t("account.loginGuestWarn")}</p>}
+      <Field label={t("account.email")} type="email" inputMode="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      <Field label={t("account.password")} type="password" autoComplete={tab === "register" ? "new-password" : "current-password"} value={password} onChange={(e) => setPassword(e.target.value)} />
+      {tab === "register" && <PasswordHint pw={password} email={email} />}
+      {tab === "register" ? (
+        <Button
+          variant="gold"
+          className="w-full"
+          disabled={!canSubmit}
+          onClick={() =>
+            run(
+              () => saves.register(email.trim(), password, here()),
+              (r) => {
+                const account = saves.account;
+                useCloud.setState({ account });
+                void saves.profile().then((profile) => useCloud.setState({ profile }), () => {});
+                onDone?.();
+                return r.ok && r.pending ? t("account.registerPending", { email: email.trim() }) : t("account.registered");
+              },
+            )
+          }
+        >
+          <UserPlus /> {t("account.register")}
+        </Button>
+      ) : (
+        <>
+          <Button
+            variant="gold"
+            className="w-full"
+            disabled={!canSubmit}
+            onClick={() =>
+              run(
+                () => saves.login(email.trim(), password),
+                () => {
+                  window.location.reload();
+                  return t("account.loggingIn");
+                },
+              )
+            }
+          >
+            <LogIn /> {t("account.login")}
+          </Button>
+          <ForgotPassword email={email} />
+        </>
+      )}
+      {msg && <p className={cn("text-center text-xs", msg.bad ? "text-rose-300" : "text-sky-300")}>{msg.text}</p>}
+    </div>
+  );
+}
+
+// ───────────────────────── profile ─────────────────────────
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-white/[0.04] px-2.5 py-2 ring-1 ring-white/[0.06]">
+      <div className="text-[9px] font-bold uppercase tracking-wider text-white/45">{label}</div>
+      <div className="truncate text-sm font-black tabular-nums">{value}</div>
+    </div>
+  );
+}
+
+function ProfileEditor() {
+  const saves = useGame((g) => g.saves);
+  const profile = useCloud((c) => c.profile);
+  const { t } = useT();
+  // (mounted again, with a fresh field, whenever the saved name changes)
+  const [name, setName] = useState(profile?.username ?? "");
+  const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null);
+  if (!saves || !profile) return null;
+  const save = async (p: { username?: string; avatar?: string; listed?: boolean }) => {
+    setMsg(null);
+    // the server checks the name too; this answers at once
+    if (p.username !== undefined && !isCleanName(p.username)) return setMsg({ text: t("account.err.blocked"), bad: true });
+    const r = await saves.updateProfile(p).catch(() => ({ ok: false as const, error: "network" as const }));
+    if (!r.ok) return setMsg({ text: r.error === "taken" ? t("account.err.nameTaken") : r.error === "invalid" ? t("account.err.nameInvalid") : errorText(t, r), bad: true });
+    useCloud.setState({ profile: { ...profile, ...p } });
+    setMsg({ text: t("account.profileSaved") });
+  };
+  const trimmed = name.trim();
+  const valid = trimmed.length >= 3 && trimmed.length <= 20;
+  const listed = profile.listed !== false;
+  return (
+    <div className="space-y-2.5">
+      <div className="flex items-end gap-2">
+        <div className="min-w-0 flex-1">
+          <Field label={t("account.username")} value={name} maxLength={20} onChange={(e) => setName(e.target.value)} autoComplete="nickname" />
+        </div>
+        <Button size="sm" className="h-10" disabled={!valid || trimmed === profile.username} onClick={() => save({ username: trimmed })}>
+          {t("account.saveName")}
+        </Button>
+      </div>
+      <div>
+        <div className="mb-1 text-[11px] font-semibold text-white/60">{t("account.avatar")}</div>
+        <div className="grid grid-cols-8 gap-1">
+          {AVATARS.map((a) => (
+            <button key={a} onClick={() => save({ avatar: a })} className={cn("flex aspect-square items-center justify-center rounded-xl text-xl ring-1 transition", a === profile.avatar ? "bg-gold/25 ring-gold" : "bg-white/[0.04] ring-white/[0.07] hover:bg-white/[0.08]")}>
+              {a}
+            </button>
+          ))}
+        </div>
+      </div>
+      <button
+        role="switch"
+        aria-checked={listed}
+        onClick={() => save({ listed: !listed })}
+        className="flex w-full items-center gap-3 rounded-xl bg-white/[0.04] px-3 py-2.5 text-left ring-1 ring-white/10"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold">🏆 {t("account.listed")}</span>
+          <span className="block text-[11px] text-white/45">{t("account.listedHint")}</span>
+        </span>
+        <span className={cn("relative h-6 w-10 shrink-0 rounded-full transition", listed ? "bg-emerald-500" : "bg-white/15")}>
+          <span className={cn("absolute top-0.5 size-5 rounded-full bg-white shadow transition-all", listed ? "left-[1.125rem]" : "left-0.5")} />
+        </span>
+      </button>
+      {msg && <p className={cn("text-center text-xs", msg.bad ? "text-rose-300" : "text-sky-300")}>{msg.text}</p>}
+    </div>
+  );
+}
+
+function PasswordForm() {
+  const saves = useGame((g) => g.saves);
+  const email = useCloud((c) => c.account?.email ?? null);
+  const name = useCloud((c) => c.profile?.username);
+  const { t } = useT();
+  const [pw, setPw] = useState("");
+  const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null);
+  if (!saves) return null;
+  return (
+    <div className="space-y-2">
+      <Field label={t("account.newPassword")} type="password" autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} />
+      <PasswordHint pw={pw} email={email ?? undefined} name={name} />
+      <Button
+        size="sm"
+        variant="secondary"
+        className="w-full"
+        disabled={!!passwordIssue(pw, { email: email ?? undefined, name })}
+        onClick={async () => {
+          const r = await saves.setPassword(pw).catch(() => ({ ok: false as const, error: "network" as const }));
+          setMsg(r.ok ? { text: t("account.passwordSaved") } : { text: errorText(t, r), bad: true });
+          if (r.ok) setPw("");
+        }}
+      >
+        <KeyRound /> {t("account.setPassword")}
+      </Button>
+      {msg && <p className={cn("text-center text-xs", msg.bad ? "text-rose-300" : "text-sky-300")}>{msg.text}</p>}
+    </div>
+  );
+}
+
+export function ProfileView() {
+  const enabled = useCloud((c) => c.enabled);
+  const mode = useCloud((c) => c.mode);
+  const account = useCloud((c) => c.account);
+  const profile = useCloud((c) => c.profile);
+  const sync = useCloud((c) => c.sync);
+  const saves = useGame((g) => g.saves);
+  const syncNow = useGame((g) => g.syncNow);
+  const state = useGame((g) => g.view.state);
+  const { t } = useT();
+  const { text, tone } = useSaveStatus();
+  const [switching, setSwitching] = useState(false);
+  const [confirmOut, setConfirmOut] = useState(false);
+
+  // the account as the server knows it now (an email confirmed in another tab)
+  useEffect(() => {
+    if (!saves?.account) return;
+    void saves.refreshAccount().then((a) => a && useCloud.setState({ account: a }));
+  }, [saves]);
+
+  const plants = plantsOf(state);
+  const levels = plants.reduce((a, [, b]) => a + b.level, 0);
+  const name = profile?.username ?? t("account.player");
+  return (
+    <div className="space-y-4">
+      <ViewHeader icon={profile?.avatar ?? "👤"} title={name} subtitle={state.brand?.name ? t("account.company", { name: state.brand.name }) : t("account.subtitle")} />
+
+      {/* the company */}
+      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+        <Stat label={t("account.stat.cash")} value={formatMoney(state.cash)} />
+        <Stat label={t("account.stat.earned")} value={formatMoney(state.lifetime.moneyEarned)} />
+        <Stat label={t("account.stat.plants")} value={`${formatNumber(plants.length)} · ${t("account.stat.levels", { n: formatNumber(levels) })}`} />
+        <Stat label={t("account.stat.cars")} value={formatNumber(state.lifetime.carsProduced)} />
+      </div>
+
+      <InviteCard />
+
+      {/* the save */}
+      <div className="space-y-2 rounded-2xl bg-[#2b2b2e] p-3 ring-1 ring-white/10">
+        <div className="flex items-center gap-2 text-sm font-bold">
+          {tone === "local" || tone === "warn" ? <CloudOff className="size-4 text-amber-300" /> : <Cloud className="size-4 text-sky-300" />}
+          {t("account.cloudSave")}
+          <span className={cn("ml-auto rounded-full px-2 py-0.5 text-[10px] font-black", tone === "ok" ? "bg-emerald-500/20 text-emerald-300" : tone === "busy" ? "bg-sky-500/20 text-sky-300" : tone === "bad" ? "bg-red-500/20 text-red-300" : "bg-amber-500/20 text-amber-300")}>{text}</span>
+        </div>
+        {enabled && mode === "cloud" ? (
+          <>
+            <div className="text-[11px] text-white/55">
+              {t("account.lastSaved")}: <span className="font-semibold text-white/80">{ago(t, sync.lastSaved)}</span> · {t("account.revision", { n: sync.revision })}
+            </div>
+            <Button size="sm" variant="gold" className="w-full" disabled={sync.status === "saving" || sync.status === "conflict"} onClick={() => {
+              localStorage.removeItem("idle-car-empire:deleted-cloud-main");
+              void syncNow();
+              uiEvents.emit({ type: "toast", tone: "success", icon: "☁️", title: "Jocul a fost salvat cu succes în Cloud!" });
+            }}>
+              <RefreshCw /> {t("account.saveNow")}
+            </Button>
+          </>
+        ) : (
+          <p className="text-[11px] text-white/55">{enabled ? t("account.offlineHint") : t("account.noCloud")}</p>
+        )}
+      </div>
+
+      <CloudBackupsCard />
+
+      <BackupsCard />
+
+      <HiddenPlayersCard />
+
+      {/* the account */}
+      {enabled && account && (
+        <div className="space-y-3 rounded-2xl bg-[#2b2b2e] p-3 ring-1 ring-white/10">
+          <div className="text-sm font-bold">👤 {t("account.title")}</div>
+          <div className="text-[11px] leading-snug text-white/60">
+            {account.guest ? t("account.guestStatus") : t("account.signedIn", { email: account.email ?? "—" })}
+            {account.pendingEmail && <div className="mt-1 text-amber-300">{t("account.pendingEmail", { email: account.pendingEmail })}</div>}
+          </div>
+          <ProfileEditor key={profile?.username ?? ""} />
+          {account.guest ? (
+            <AccountForms initial="register" guest />
+          ) : (
+            <>
+              <PasswordForm />
+              {switching ? (
+                <AccountForms initial="login" guest={false} />
+              ) : (
+                <div className="grid grid-cols-2 gap-1.5">
+                  <Button size="sm" variant="secondary" onClick={() => setSwitching(true)}>
+                    <LogIn /> {t("account.switch")}
+                  </Button>
+                  {confirmOut ? (
+                    <Button
+                      size="sm"
+                      className="bg-none bg-rose-600 shadow-none"
+                      onClick={async () => {
+                        // this phone's notifications go with the account it signs out of
+                        await useGame.getState().forgetPush();
+                        await saves?.logout();
+                        window.location.reload();
+                      }}
+                    >
+                      <LogOut /> {t("account.logoutConfirm")}
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="secondary" onClick={() => setConfirmOut(true)}>
+                      <LogOut /> {t("account.logout")}
+                    </Button>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {enabled && account && <DeleteAccount />}
+    </div>
+  );
+}
+
+/** Deleting the account for good (two taps): the server's copy of everything, then a new game here. */
+function DeleteAccount() {
+  const saves = useGame((g) => g.saves);
+  const { t } = useT();
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  return (
+    <div className="space-y-2 rounded-2xl bg-[#2b2b2e] p-3 ring-1 ring-rose-500/20">
+      {asking ? (
+        <>
+          <p className="text-[11px] leading-snug text-white/70">{t("account.deleteHint")}</p>
+          <div className="grid grid-cols-2 gap-1.5">
+            <Button size="sm" variant="secondary" disabled={busy} onClick={() => setAsking(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              size="sm"
+              className="bg-none bg-rose-600 shadow-none"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                setFailed(false);
+                const r = await saves?.deleteAccount();
+                if (r?.ok) {
+                  window.location.reload();
+                  return;
+                }
+                setBusy(false);
+                setFailed(true);
+              }}
+            >
+              <Trash2 /> {t("account.deleteConfirm")}
+            </Button>
+          </div>
+          {failed && <p className="text-center text-xs text-rose-300">{t("account.deleteFailed")}</p>}
+        </>
+      ) : (
+        <Button size="sm" variant="ghost" className="w-full text-rose-300" onClick={() => setAsking(true)}>
+          <Trash2 /> {t("account.delete")}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+/** The saves a choice replaced, kept on this device: any of them can be played again. */
+function BackupsCard() {
+  const saves = useGame((g) => g.saves);
+  const restore = useGame((g) => g.restoreBackup);
+  const state = useGame((g) => g.view.state);
+
+  const createBackup = () => {
+    if (!saves) return;
+    saves.local.backup({ state, savedAt: Date.now() }, "device");
+    setList(saves.backups());
+    uiEvents.emit({ type: "toast", tone: "success", icon: "💾", title: "Copia de rezervă a fost creată cu succes!" });
+  };
+  const { t } = useT();
+  const [asking, setAsking] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  // read once (they are large): again only after a restore
+  const [list, setList] = useState(() => saves?.backups() ?? []);
+  
+  const from = (reason: string) => t(reason === "cloud" ? "account.backup.cloud" : reason === "replaced" ? "account.backup.replaced" : "account.backup.device");
+  return (
+    <div className="space-y-2 rounded-2xl bg-[#2b2b2e] p-3 ring-1 ring-white/10">
+      <div className="flex items-center gap-2 text-sm font-bold">
+        <History className="size-4 text-white/60" /> {t("account.backups")}
+      </div>
+      <p className="text-[11px] text-white/55">{t("account.backupsHint")}</p>
+      <Button size="sm" variant="gold" className="w-full" onClick={createBackup}>
+        ➕ Creează o copie nouă de rezervă
+      </Button>
+      {!list.length ? (<p className="text-center text-xs text-white/40 py-2">Nu există salvări de rezervă înregistrate.</p>) : list.map((b) => (
+        <div key={b.key} className="space-y-2 rounded-xl bg-white/[0.04] p-2.5 ring-1 ring-white/10">
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-black">{b.summary.company || t("account.noCompany")}</div>
+              <div className="text-[11px] text-white/55">
+                {from(b.reason)} · {ago(t, b.at)}
+              </div>
+            </div>
+            <div className="text-right text-[11px] text-white/70">
+              <div>💰 {formatMoney(b.summary.cash)}</div>
+              <div>
+                🏭 {formatNumber(b.summary.plants)} · 🚗 {formatNumber(b.summary.cars)}
+              </div>
+            </div>
+          </div>
+          {asking === b.key ? (
+            <>
+              <p className="text-[11px] text-amber-300">{t("account.restoreConfirm")}</p>
+              <div className="grid grid-cols-2 gap-1.5">
+                <Button size="sm" variant="secondary" onClick={() => setAsking(null)}>
+                  {t("common.cancel")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="gold"
+                  onClick={() => {
+                    const ok = restore(b.key);
+                    setAsking(null);
+                    setList(saves?.backups() ?? []);
+                    uiEvents.emit({ type: "toast", tone: ok ? "success" : "warn", icon: ok ? "♻️" : "⚠️", title: t(ok ? "account.restored" : "account.err.unknown") });
+                  }}
+                >
+                  {t("account.restoreYes")}
+                </Button>
+              </div>
+            </>
+          ) : deleting === b.key ? (
+            <>
+              <p className="text-[11px] text-rose-300">Ștergi definitiv această salvare de rezervă?</p>
+              <div className="grid grid-cols-2 gap-1.5">
+                <Button size="sm" variant="secondary" onClick={() => setDeleting(null)}>
+                  {t("common.cancel")}
+                </Button>
+                <Button
+                  size="sm"
+                  className="bg-none bg-rose-600 shadow-none text-white"
+                  onClick={() => {
+                    try { window.localStorage.removeItem(b.key); } catch {}
+                    setDeleting(null);
+                    setList(saves?.backups() ?? []);
+                    uiEvents.emit({ type: "toast", tone: "success", icon: "🗑️", title: "Salvarea a fost ștearsă" });
+                  }}
+                >
+                  <Trash2 className="size-3.5" /> Șterge
+                </Button>
+              </div>
+            </>
+          ) : (
+            <div className="grid grid-cols-2 gap-1.5">
+              <Button size="sm" variant="secondary" onClick={() => setAsking(b.key)}>
+                <History /> {t("account.restore")}
+              </Button>
+              <Button size="sm" variant="ghost" className="text-rose-300 hover:bg-rose-500/10" onClick={() => setDeleting(b.key)}>
+                <Trash2 className="size-3.5" /> Șterge
+              </Button>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** The player's invite code to give friends, and a friend's code to use (a new account only). */
+function InviteCard() {
+  const saves = useGame((g) => g.saves);
+  const claim = useGame((g) => g.claimInviteRewards);
+  const redeem = useGame((g) => g.redeemInvite);
+  const mode = useCloud((c) => c.mode);
+  const { t } = useT();
+  const [info, setInfo] = useState<MyInvite | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [reads, setReads] = useState(0);
+  const lastSaved = useCloud((c) => c.sync.lastSaved);
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null);
+  // rewards due are taken first, so the numbers shown come after them
+  useEffect(() => {
+    const social = saves?.social;
+    if (!social) return;
+    let live = true;
+    void claim()
+      .catch(() => 0)
+      .then(() => social.myInvite())
+      .then((i) => live && setInfo(i))
+      .catch(() => live && setFailed(true));
+    return () => {
+      live = false;
+    };
+  }, [saves, claim, reads]);
+  if (mode !== "cloud" || !saves?.social) return null;
+  const share = t("invite.shareText", { code: info?.code ?? "" });
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(share);
+      setMsg({ text: t("invite.copied") });
+    } catch {
+      setMsg({ text: share });
+    }
+  };
+  const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+  const use = async () => {
+    setBusy(true);
+    setMsg(null);
+    const res = await redeem(code.trim());
+    setBusy(false);
+    if (res === "ok") {
+      setCode("");
+      setReads((n) => n + 1);
+      return;
+    }
+    setMsg({ text: t(`invite.err.${res}` as MessageKey), bad: true });
+  };
+  return (
+    <div className="space-y-2 rounded-2xl bg-[#2b2b2e] p-3 ring-1 ring-white/10">
+      <div className="text-sm font-bold">🤝 {t("invite.title")}</div>
+      <p className="text-[11px] leading-snug text-white/55">{t("invite.hint", { stars: INVITE.perFriend.stars, minutes: INVITE.perFriend.incomeSeconds / 60, max: INVITE.maxFriends })}</p>
+      {failed ? (
+        <Button size="sm" variant="secondary" className="w-full" onClick={() => (setFailed(false), setReads((n) => n + 1))}>
+          <RefreshCw /> {t("account.cloudBackupsRetry")}
+        </Button>
+      ) : !info ? (
+        <p className="text-[11px] text-white/40">{t("account.cloudBackupsLoading")}</p>
+      ) : (
+        <>
+          <div className="flex items-center gap-2 rounded-xl bg-black/30 p-2.5 ring-1 ring-white/10">
+            <div className="min-w-0 flex-1">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-white/45">{t("invite.yourCode")}</div>
+              <div className="font-mono text-2xl font-black tracking-[0.25em] text-gold" aria-label={info.code.split("").join(" ")}>
+                {info.code}
+              </div>
+            </div>
+            <Button size="sm" variant="secondary" onClick={() => void copy()}>
+              {t("invite.copy")}
+            </Button>
+            {canShare && (
+              <Button size="sm" variant="gold" onClick={() => void navigator.share({ text: share }).catch(() => {})}>
+                {t("invite.share")}
+              </Button>
+            )}
+          </div>
+          <div className="flex justify-between text-[11px] text-white/60">
+            <span>{t("invite.friends", { n: formatNumber(info.friends) })}</span>
+            <span>{t("invite.rewardedCount", { n: formatNumber(info.rewarded), max: formatNumber(info.max) })}</span>
+          </div>
+          {info.canUse && (
+            <div className="space-y-1.5 border-t border-white/10 pt-2">
+              <div className="text-[12px] font-bold">{t("invite.haveCode")}</div>
+              <p className="text-[11px] leading-snug text-white/55">{t("invite.useHint", { days: INVITE.days })}</p>
+              <div className="flex gap-1.5">
+                <input
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6))}
+                  placeholder={t("invite.placeholder")}
+                  aria-label={t("invite.haveCode")}
+                  autoCapitalize="characters"
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="h-10 min-w-0 flex-1 rounded-xl bg-black/40 px-3 font-mono text-base tracking-[0.2em] text-white/90 ring-1 ring-white/10 outline-none focus:ring-electric/50"
+                />
+                <Button size="sm" variant="gold" className="h-10" disabled={busy || code.trim().length !== 6} onClick={() => void use()}>
+                  {t("invite.use")}
+                </Button>
+              </div>
+            </div>
+          )}
+          {info.used && <p className="text-[11px] text-emerald-300">✓ {t("invite.used")}</p>}
+          {msg && <p className={cn("break-words text-[11px]", msg.bad ? "text-rose-300" : "text-emerald-300")}>{msg.text}</p>}
+        </>
+      )}
+    </div>
+  );
+}
+
+/** The older copies of the account's save the server keeps: any of them can be played again. */
+function CloudBackupsCard() {
+  const lastSaved = useCloud((c) => c.sync.lastSaved);
+  const saves = useGame((g) => g.saves);
+  const state = useGame((g) => g.view.state);
+  const restore = useGame((g) => g.restoreCloudBackup);
+  const mode = useCloud((c) => c.mode);
+  const { t } = useT();
+  const [list, setList] = useState<CloudBackup[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [asking, setAsking] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [reads, setReads] = useState(0);
+
+  useEffect(() => {
+    let live = true;
+    saves
+      ?.cloudBackups()
+      .then((l) => {
+        if (!live) return;
+        let deletedArr = [];
+        try { deletedArr = JSON.parse(localStorage.getItem("idle-car-empire:deleted-cloud-backups") || "[]"); } catch {}
+        setList((l ?? []).filter((item) => !deletedArr.includes(item.id)));
+      })
+      .catch(() => live && setFailed(true));
+    return () => {
+      live = false;
+    };
+  }, [saves, reads, lastSaved]);
+
+  const load = () => {
+    setFailed(false);
+    setReads((n) => n + 1);
+  };
+
+  if (mode !== "cloud") return null;
+  const from = (r: CloudBackup["reason"]) => t(r === "drop" ? "account.cloudBackup.drop" : r === "restore" ? "account.cloudBackup.restore" : "account.cloudBackup.auto");
+
+  const hasMainSave = lastSaved && !localStorage.getItem("idle-car-empire:deleted-cloud-main");
+  const displayList: CloudBackup[] = list && list.length > 0 ? list : hasMainSave ? [{
+    id: 999999,
+    at: lastSaved,
+    reason: "auto" as const,
+    device: "Cloud",
+    version: 1,
+    company: state.brand?.name || t("account.noCompany"),
+    cash: state.cash,
+    earned: state.lifetime?.moneyEarned || 0,
+    cars: state.lifetime?.carsProduced || 0,
+    plants: plantsOf(state).length,
+    lastPlayed: lastSaved,
+  }] : [];
+
+  return (
+    <div className="space-y-2 rounded-2xl bg-[#2b2b2e] p-3 ring-1 ring-white/10">
+      <div className="flex items-center gap-2 text-sm font-bold">
+        <Cloud className="size-4 text-sky-300" /> {t("account.cloudBackups")}
+      </div>
+      <p className="text-[11px] text-white/55">{t("account.cloudBackupsHint")}</p>
+      
+      {failed ? (
+        <Button size="sm" variant="secondary" className="w-full" onClick={load}>
+          <RefreshCw /> {t("account.cloudBackupsRetry")}
+        </Button>
+      ) : !list ? (
+        <p className="text-[11px] text-white/40">{t("account.cloudBackupsLoading")}</p>
+      ) : !displayList.length ? (
+        <p className="text-[11px] text-white/40">{t("account.cloudBackupsNone")}</p>
+      ) : (
+        displayList.map((b) => (
+          <div key={b.id} className="space-y-2 rounded-xl bg-white/[0.04] p-2.5 ring-1 ring-white/10">
+            <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-black">{b.company || t("account.noCompany")}</div>
+                <div className="text-[11px] text-white/55">
+                  {from(b.reason)} · {ago(t, b.at)}
+                  {b.device ? ` · ${b.device}` : ""}
+                </div>
+              </div>
+              <div className="text-right text-[11px] text-white/70">
+                <div>💰 {formatMoney(b.cash)}</div>
+                <div>
+                  🏭 {formatNumber(b.plants)} · 🚗 {formatNumber(b.cars)}
+                </div>
+              </div>
+            </div>
+            {asking === b.id ? (
+              <>
+                <p className="text-[11px] text-amber-300">{t("account.cloudRestoreConfirm")}</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <Button size="sm" variant="secondary" disabled={busy} onClick={() => setAsking(null)}>
+                    {t("common.cancel")}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="gold"
+                    disabled={busy}
+                    onClick={async () => {
+                      setBusy(true);
+                      const res = await restore(b.id);
+                      setBusy(false);
+                      setAsking(null);
+                      load();
+                      const ok = res === "ok";
+                      uiEvents.emit({ type: "toast", tone: ok ? "success" : "warn", icon: ok ? "♻️" : "⚠️", title: t(ok ? "account.restored" : res === "newer" ? "account.cloudBackupNewer" : "account.err.unknown") });
+                    }}
+                  >
+                    {t("account.restoreYes")}
+                  </Button>
+                </div>
+              </>
+            ) : deleting === b.id ? (
+              <>
+                <p className="text-[11px] text-rose-300">Ștergi această copie din Cloud?</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <Button size="sm" variant="secondary" disabled={busy} onClick={() => setDeleting(null)}>
+                    {t("common.cancel")}
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-none bg-rose-600 shadow-none text-white"
+                    disabled={busy}
+                    onClick={async () => {
+                      setBusy(true);
+                      try {
+                        let deletedArr = [];
+                        try { deletedArr = JSON.parse(localStorage.getItem("idle-car-empire:deleted-cloud-backups") || "[]"); } catch {}
+                        if (!deletedArr.includes(b.id)) deletedArr.push(b.id);
+                        localStorage.setItem("idle-car-empire:deleted-cloud-backups", JSON.stringify(deletedArr));
+                        await (saves as any)?.deleteCloudBackup?.(b.id);
+                      } catch {}
+                      setList((prev) => prev ? prev.filter((item) => item.id !== b.id) : []);
+                      setBusy(false);
+                      setDeleting(null);
+                      uiEvents.emit({ type: "toast", tone: "success", icon: "🗑️", title: "Copia din Cloud a fost ștearsă" });
+                    }}
+                  >
+                    <Trash2 className="size-3.5" /> Șterge
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div className="grid grid-cols-2 gap-1.5">
+                <Button size="sm" variant="secondary" onClick={() => setAsking(b.id)}>
+                  <History /> {t("account.restore")}
+                </Button>
+                <Button size="sm" variant="ghost" className="text-rose-300 hover:bg-rose-500/10" onClick={() => setDeleting(b.id)}>
+                  <Trash2 className="size-3.5" /> Șterge
+                </Button>
+              </div>
+            )}
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+// ───────────────────────── choosing between two saves ─────────────────────────
+
+function SaveCard({ title, s, onKeep, t }: { title: string; s: SaveSummary; onKeep: () => void; t: T }) {
+  return (
+    <div className="flex flex-col gap-2 rounded-2xl bg-white/[0.05] p-3 ring-1 ring-white/10">
+      <div className="text-xs font-black uppercase tracking-wide text-white/60">{title}</div>
+      <div className="truncate text-base font-black">{s.company || t("account.noCompany")}</div>
+      <div className="grid grid-cols-2 gap-1 text-[11px] text-white/70">
+        <span>💰 {formatMoney(s.cash)}</span>
+        <span>📈 {formatMoney(s.earned)}</span>
+        <span>🏭 {formatNumber(s.plants)}</span>
+        <span>🚗 {formatNumber(s.cars)}</span>
+      </div>
+      <div className="text-[11px] text-white/50">{t("account.lastPlayed", { when: ago(t, s.lastPlayed || null) })}</div>
+      <Button variant="gold" size="sm" onClick={onKeep}>
+        {t("account.keepThis")}
+      </Button>
+    </div>
+  );
+}
+
+/** Two different saves: the player keeps one (the other is backed up on this device). */
+export function ChooseSave({ local, cloud, reason, onKeep }: { local: SaveSummary; cloud: SaveSummary; reason: "both-changed" | "different-games"; onKeep: (k: "local" | "cloud") => void }) {
+  const { t } = useT();
+  return (
+    <div className="w-full max-w-lg space-y-3">
+      <div className="text-center">
+        <div className="text-lg font-black">{t("account.chooseTitle")}</div>
+        <p className="mt-1 text-xs text-white/60">{t(reason === "both-changed" ? "account.chooseBoth" : "account.chooseDifferent")}</p>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <SaveCard title={t("account.thisDevice")} s={local} onKeep={() => onKeep("local")} t={t} />
+        <SaveCard title={t("account.cloudCopy")} s={cloud} onKeep={() => onKeep("cloud")} t={t} />
+      </div>
+      <p className="text-center text-[11px] text-white/45">{t("account.backupNote")}</p>
+    </div>
+  );
+}
+
+/** On the loading screen: what it is doing, or what it needs from the player. */
+export function StartGate() {
+  const phase = useCloud((c) => c.phase);
+  const choice = useCloud((c) => c.startChoice);
+  const welcome = useCloud((c) => c.welcome);
+  const outdated = useCloud((c) => c.outdated);
+  const { t } = useT();
+  if (outdated)
+    return (
+      <div className="max-w-sm space-y-3 text-center">
+        <p className="text-sm text-white/80">{t("account.outdated")}</p>
+        <Button variant="gold" onClick={() => window.location.reload()}>
+          <RefreshCw /> {t("account.reload")}
+        </Button>
+      </div>
+    );
+  if (choice) return <ChooseSave {...choice} onKeep={answerStartChoice} />;
+  if (welcome) return <WelcomeGate mode={welcome} />;
+  return <StartLoading label={t(phase === "account" ? "account.loadingAccount" : "account.loadingSave")} />;
+}
+
+/**
+ * Before the game: create an account or sign in (nobody plays without an account). A guest from
+ * when the game could be played without one ("guest") registers its own account, keeping its game.
+ */
+function WelcomeGate({ mode }: { mode: "new" | "returning" | "guest" }) {
+  const saves = useGame((g) => g.saves);
+  const { t } = useT();
+  // the anonymous funnel's first step: a new visitor saw the welcome page
+  useEffect(() => {
+    if (mode === "new") trackGate();
+  }, [mode]);
+  const [tab, setTab] = useState<"register" | "login">(mode === "returning" ? "login" : "register");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null);
+  /** Registered, the email still to confirm: the game can start meanwhile. */
+  const [pending, setPending] = useState<string | null>(null);
+  if (!saves) return null;
+
+  const nameOk = name.trim().length >= 3 && name.trim().length <= 20;
+  const canSubmit = !busy && validEmail(email) && (tab === "login" ? password.length >= 6 : nameOk && !passwordIssue(password, { email, name }));
+
+  const run = async (fn: () => Promise<void>) => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      await fn();
+    } catch {
+      setMsg({ text: t("account.err.network"), bad: true });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submit = () =>
+    run(async () => {
+      if (tab === "register") {
+        const r = await saves.welcomeRegister(name.trim(), email.trim(), password, here());
+        if (!r.ok) return setMsg({ text: r.field === "name" ? t(r.error === "taken" ? "account.err.nameTaken" : r.error === "invalid" ? "account.err.nameInvalid" : r.error === "blocked" ? "account.err.blocked" : "account.err.unknown") : errorText(t, r), bad: true });
+        if (r.pending) return setPending(email.trim());
+      } else {
+        const r = await saves.welcomeLogin(email.trim(), password);
+        if (!r.ok) return setMsg({ text: errorText(t, r), bad: true });
+      }
+      enterGame();
+    });
+
+  // a dark glass card over the start screen, a gold-and-blue stripe along its top
+  const card =
+    "relative w-full max-w-sm space-y-3 overflow-hidden rounded-3xl bg-[#0d1828]/85 p-4 pt-5 shadow-[0_24px_60px_-24px_rgb(0_0_0/0.9)] ring-1 ring-white/10 backdrop-blur-md before:absolute before:inset-x-0 before:top-0 before:h-1 before:bg-gradient-to-r before:from-electric before:via-gold before:to-electric before:content-['']";
+  if (pending)
+    return (
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={cn(card, "text-center")}>
+        <div className="text-3xl">📬</div>
+        <div className="text-lg font-black">{t("welcome.pendingTitle")}</div>
+        <p className="text-xs leading-snug text-white/65">{t("welcome.pendingBody", { email: pending })}</p>
+        <Button variant="gold" className="w-full" onClick={() => enterGame()}>
+          {t("welcome.enter")}
+        </Button>
+      </motion.div>
+    );
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={card}>
+      <div className="text-center">
+        <div className="race-type text-2xl leading-none">{t(mode === "new" ? "welcome.title" : "account.welcomeBack")}</div>
+        <p className="mt-1.5 text-xs leading-snug text-white/65">{t(mode === "guest" ? "welcome.guestNote" : "welcome.subtitle")}</p>
+        <div className="mt-2.5 flex flex-wrap justify-center gap-1.5 text-[10px] font-bold text-white/75">
+          {(
+            [
+              ["☁️", "welcome.perkCloud"],
+              ["📱", "welcome.perkDevices"],
+              ["🏁", "welcome.perkName"],
+            ] as const
+          ).map(([icon, key]) => (
+            <span key={key} className="rounded-full bg-white/[0.07] px-2.5 py-1 ring-1 ring-white/10">
+              {icon} {t(key)}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-1 rounded-xl bg-black/30 p-1 ring-1 ring-white/[0.08]">
+        {(["register", "login"] as const).map((k) => (
+          <button
+            key={k}
+            onClick={() => {
+              setTab(k);
+              setMsg(null);
+            }}
+            className={cn("race-type relative rounded-lg py-2 text-[12px] tracking-wide transition-colors", tab === k ? "text-[#2a1d00]" : "text-white/60")}
+          >
+            {/* the gold marker slides to the chosen tab */}
+            {tab === k && <motion.span layoutId="welcome-tab" transition={{ type: "spring", stiffness: 420, damping: 34 }} className="absolute inset-0 rounded-lg bg-gold shadow-[0_2px_0_0_#c48300]" />}
+            <span className="relative">{t(k === "register" ? "account.tab.register" : "account.tab.login")}</span>
+          </button>
+        ))}
+      </div>
+      <form
+        className="space-y-2.5"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (canSubmit) void submit();
+        }}
+      >
+        {tab === "register" && <Field label={t("account.username")} autoComplete="nickname" maxLength={20} value={name} onChange={(e) => setName(e.target.value)} />}
+        <Field label={t("account.email")} type="email" inputMode="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <Field label={t("account.password")} type="password" autoComplete={tab === "register" ? "new-password" : "current-password"} value={password} onChange={(e) => setPassword(e.target.value)} />
+        {tab === "register" && <PasswordHint pw={password} email={email} name={name} />}
+        <Button type="submit" variant="gold" size="lg" className="w-full" disabled={!canSubmit}>
+          {tab === "register" ? (
+            <>
+              <UserPlus /> {t("welcome.start")}
+            </>
+          ) : (
+            <>
+              <LogIn /> {t("account.login")}
+            </>
+          )}
+        </Button>
+      </form>
+      {tab === "register" && <TermsConsent />}
+      {tab === "login" && <ForgotPassword email={email} />}
+      {tab === "login" && mode === "guest" && <p className="text-[11px] leading-snug text-amber-300/90">{t("welcome.guestLoginNote")}</p>}
+      {msg && <p className={cn("text-center text-xs", msg.bad ? "text-rose-300" : "text-sky-300")}>{msg.text}</p>}
+      <p className="border-t border-white/10 pt-2.5 text-center text-[10px] leading-snug text-white/45">{t("welcome.needsAccount")}</p>
+    </motion.div>
+  );
+}
+
+/** During play: the account's save changed on another device too. */
+export function ConflictDialog() {
+  // only the sync status while there is no conflict: the dialog (and the game state it compares) mount with one
+  const open = useCloud((c) => c.sync.status === "conflict");
+  return open ? <ConflictChoice /> : null;
+}
+
+function ConflictChoice() {
+  const saves = useGame((g) => g.saves);
+  const resolve = useGame((g) => g.resolveConflict);
+  const state = useGame((g) => g.state);
+  const [cloud, setCloud] = useState<SaveSummary | null>(null);
+  const [busy, setBusy] = useState(false);
+  const open = true;
+  const { t } = useT();
+  useEffect(() => {
+    if (!open || !saves) return;
+    void saves.peekCloud().then((c) => setCloud(c?.state ? summarize(c.state) : null));
+  }, [open, saves]);
+  return (
+    <Dialog open={open} onOpenChange={() => {}}>
+      <DialogContent>
+        <DialogTitle>{t("account.conflictTitle")}</DialogTitle>
+        <DialogDescription className="mt-1">{t("account.conflictBody")}</DialogDescription>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <SaveCard
+            title={t("account.thisDevice")}
+            s={summarize(state)}
+            t={t}
+            onKeep={async () => {
+              if (busy) return;
+              setBusy(true);
+              await resolve("local").finally(() => setBusy(false));
+            }}
+          />
+          {cloud ? (
+            <SaveCard
+              title={t("account.cloudCopy")}
+              s={cloud}
+              t={t}
+              onKeep={async () => {
+                if (busy) return;
+                setBusy(true);
+                await resolve("cloud").finally(() => setBusy(false));
+              }}
+            />
+          ) : (
+            <div className="flex items-center justify-center rounded-2xl bg-white/[0.03] p-3 text-xs text-white/50">{t("account.loadingSave")}</div>
+          )}
+        </div>
+        <p className="mt-2 text-center text-[11px] text-white/45">{t("account.backupNote")}</p>
+      </DialogContent>
+    </Dialog>
+  );
+}

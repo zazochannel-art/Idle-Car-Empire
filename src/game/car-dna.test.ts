@@ -1,0 +1,556 @@
+import { describe, expect, it, vi } from "vitest";
+import { DEPOT, WORLD_MAP } from "./city/layout";
+import { CAR_BY_ID } from "./config/cars";
+import { RACE_EVENTS } from "./config/racing";
+import { RESEARCH_BY_ID } from "./config/research";
+import { CAR_TECH, TECH_IDS } from "./config/tech";
+import * as Ch from "./engine/chain";
+import * as D from "./engine/car-dna";
+import * as R from "./engine/racing";
+import * as Sh from "./engine/showroom";
+import { carDemandMult, carPriceMult } from "./engine/market";
+import * as Br from "./engine/brand";
+import * as Ev from "./engine/events";
+import { resetRun } from "./engine/reset";
+import { createInitialState } from "./engine/state";
+import { tick } from "./engine/tick";
+import { migrate } from "./save/serialize";
+import type { GameEvent, GameState, RaceCarState } from "./types";
+
+const T0 = Date.UTC(2026, 2, 1, 12);
+
+function car(s: GameState, grades: RaceCarState["grades"] = {}): RaceCarState {
+  s.lifetime.carsByType.sports = 1;
+  const rc = R.receiveRaceCar(s, "sports", "factory");
+  Object.assign(rc.grades, grades);
+  return rc;
+}
+
+describe("Car DNA", () => {
+  it("the parts fitted decide the car: a better engine makes more power and a quicker car", () => {
+    const s = createInitialState(T0);
+    const base = car(s, { engine: 2, tires: 2, body: 2, suspension: 2 });
+    const strong = car(s, { engine: 4, tires: 2, body: 2, suspension: 2 });
+    const a = D.carDNA(s, base);
+    const b = D.carDNA(s, strong);
+    expect(b.hp).toBeGreaterThan(a.hp * 1.4);
+    expect(b.torque).toBeGreaterThan(a.torque);
+    expect(b.engine).not.toBe(a.engine);
+    expect(D.testCar(strong).zeroTo100).toBeLessThan(D.testCar(base).zeroTo100);
+    expect(D.testCar(strong).topSpeed).toBeGreaterThan(D.testCar(base).topSpeed);
+    expect(b.performance).toBeGreaterThan(a.performance);
+  });
+
+  it("poor tyres and brakes mean a longer stop and less grip", () => {
+    const s = createInitialState(T0);
+    const cheap = car(s, { engine: 2, tires: 1, body: 2, suspension: 1 });
+    const good = car(s, { engine: 2, tires: 5, body: 2, suspension: 5 });
+    expect(D.testCar(cheap).braking).toBeGreaterThan(D.testCar(good).braking);
+    expect(D.testCar(cheap).cornering).toBeLessThan(D.testCar(good).cornering);
+    expect(D.carDNA(s, good).tires).not.toBe(D.carDNA(s, cheap).tires);
+    // a lighter carbon body: lighter car
+    const carbon = car(s, { engine: 2, tires: 2, body: 5, suspension: 2 });
+    expect(D.carDNA(s, carbon).weight).toBeLessThan(D.carDNA(s, cheap).weight);
+    expect(D.carDNA(s, carbon).chassis).toBe("Carbon tub");
+  });
+
+  it("racing upgrades change the real figures, and wear shows up in the test", () => {
+    const s = createInitialState(T0);
+    const rc = car(s, { engine: 3, tires: 3, body: 3, suspension: 3 });
+    const before = D.testCar(rc);
+    rc.upgrades.engine = 3;
+    rc.upgrades.brakes = 3;
+    const after = D.testCar(rc);
+    expect(after.hp).toBeGreaterThan(before.hp);
+    expect(after.braking).toBeLessThan(before.braking);
+    rc.wear.tires = 0.2;
+    expect(D.testCar(rc).cornering).toBeLessThan(after.cornering);
+  });
+
+  it("the figures look like real cars", () => {
+    const s = createInitialState(T0);
+    s.lifetime.carsByType.city = 1;
+    const city = R.receiveRaceCar(s, "city", "factory");
+    const t = D.testCar(city);
+    expect(t.zeroTo100).toBeGreaterThan(8);
+    expect(t.zeroTo100).toBeLessThan(16);
+    expect(t.topSpeed).toBeGreaterThan(150);
+    expect(t.topSpeed).toBeLessThan(220);
+    expect(t.braking).toBeGreaterThan(30);
+    expect(t.braking).toBeLessThan(60);
+  });
+
+  it("the Test Track charges a fee, keeps the report and adds mileage", () => {
+    const s = createInitialState(T0);
+    const rc = car(s, { engine: 2 });
+    s.cash = 0;
+    expect(D.runTest(s, rc.id)).toBeNull();
+    s.cash = 1e6;
+    const r = D.runTest(s, rc.id)!;
+    expect(r.hp).toBe(D.carDNA(s, rc).hp);
+    expect(rc.test).toEqual(r);
+    expect(rc.mileage).toBe(D.TEST_TRACK.km);
+    expect(s.cash).toBeCloseTo(1e6 - D.testFee(rc));
+    const back = migrate(JSON.parse(JSON.stringify(s)), T0).racing.cars[0];
+    expect(back.test).toEqual(r);
+    expect(back.mileage).toBe(D.TEST_TRACK.km);
+    expect(back.location).toBe("factory");
+  });
+
+  it("My Cars: before the Racing District, a kept car stays at the factory lot", () => {
+    const s = createInitialState(T0);
+    s.lifetime.carsByType.city = 1;
+    expect(R.fleetCap(s)).toBe(R.MY_CARS_LOT);
+    expect(R.orderRaceCar(s, "city")).toBe(true);
+    const free = WORLD_MAP.plots.filter((x) => x.kind === "plot" && x.zone === "town" && !x.big && !s.city.buildings[x.id]).map((x) => x.id);
+    s.city.buildings[free[0]] = { type: "engineFactory", level: 1, plant: Ch.newPlant() };
+    s.city.buildings[free[1]] = { type: "assemblyPlant", level: 1, plant: Ch.newPlant() };
+    const p = s.city.buildings[free[1]].plant!;
+    p.out = 1;
+    p.outValue = 6_000;
+    tick(s, 0.5);
+    expect(s.racing.orders).toEqual([]);
+    expect(s.racing.cars).toHaveLength(1);
+    expect(s.racing.cars[0].location).toBe("factory");
+    expect(s.racing.cars[0].built).toBe(s.lastActiveAt);
+    expect(s.racing.cars[0].home).toBe(free[1]);
+  });
+});
+
+describe("My Cars on the road", () => {
+  function lotWithCar() {
+    const s = createInitialState(T0);
+    s.cash = 1e6;
+    const free = WORLD_MAP.plots.filter((x) => x.kind === "plot" && x.zone === "town" && !x.big && !s.city.buildings[x.id]).map((x) => x.id);
+    s.city.buildings[free[0]] = { type: "assemblyPlant", level: 1, plant: Ch.newPlant() };
+    const rc = car(s);
+    return { s, rc, lot: free[0] };
+  }
+
+  it("a car at the factory lot can't race until a transporter takes it to the paddock", () => {
+    const { s, rc, lot } = lotWithCar();
+    expect(Ch.sendCar(s, rc.id, "racing")).toBe(false); // no Racing District yet
+    s.racing.unlocked = true;
+    const amateur = RACE_EVENTS.find((e) => e.type !== "championship" && e.classes.includes(R.classOf(rc.car)))!;
+    s.racing.rep = amateur.minRep;
+    expect(R.eventLock(s, amateur, rc)).toEqual({ kind: "away" });
+    expect(R.bestEventFor(s, rc)).toBeNull();
+
+    const cash = s.cash;
+    expect(Ch.sendCar(s, rc.id, "racing")).toBe(true);
+    expect(s.cash).toBeLessThan(cash);
+    expect(rc.location).toBe("transit");
+    const sh = s.chain.shipments.find((x) => x.fleet?.includes(rc.id))!;
+    expect(sh).toMatchObject({ from: lot, vehicle: "carrier", models: ["sports"] });
+    // on the road: no test, no second trip, no race
+    expect(Ch.sendCar(s, rc.id, "racing")).toBe(false);
+    expect(D.runTest(s, rc.id)).toBeNull();
+    expect(Ch.carEta(s, rc.id)?.to).toBe("racing");
+
+    for (let i = 0; i < 2000 && rc.location === "transit"; i++) tick(s, 0.5);
+    expect(rc.location).toBe("racing");
+    expect(R.eventLock(s, amateur, rc)).not.toEqual({ kind: "away" });
+    // and back home
+    expect(Ch.sendCar(s, rc.id, "factory")).toBe(true);
+    expect(s.chain.shipments.find((x) => x.fleet?.includes(rc.id) && !x.back)?.to).toBe(lot);
+    for (let i = 0; i < 2000 && rc.location === "transit"; i++) tick(s, 0.5);
+    expect(rc.location).toBe("factory");
+  });
+
+  it("a trip survives a save; a car whose transporter was lost is back at the lot", () => {
+    const { s, rc } = lotWithCar();
+    s.racing.unlocked = true;
+    Ch.sendCar(s, rc.id, "racing");
+    const kept = migrate(JSON.parse(JSON.stringify(s)), T0);
+    expect(kept.racing.cars[0].location).toBe("transit");
+    expect(kept.chain.shipments.some((x) => x.fleet?.includes(rc.id))).toBe(true);
+    const raw = JSON.parse(JSON.stringify(s));
+    raw.chain.shipments = [];
+    expect(migrate(raw, T0).racing.cars[0].location).toBe("factory");
+  });
+});
+
+describe("drivetrain plants: transmission, wheels, brakes", () => {
+  it("Sedans and up need them; the supplier delivers them until the plants exist", () => {
+    expect(Ch.recipe(CAR_BY_ID.city)).not.toContain("brakes");
+    for (const c of ["transmission", "wheels", "brakes"] as const) expect(Ch.recipe(CAR_BY_ID.sedan)).toContain(c);
+    const s = createInitialState(T0);
+    expect(Ch.supplied(s, "brakes")).toBe(true);
+    // a Grade-2 model is not locked by them: the supplier delivers at the model's grade
+    expect(Ch.suppliedGrade("brakes", CAR_BY_ID.suv)).toBe(2);
+    expect(Ch.supplierPrice("brakes", 2)).toBeGreaterThan(Ch.supplierPrice("brakes", 1));
+    const plot = WORLD_MAP.plots.find((x) => x.kind === "plot" && x.zone === "town" && !x.big && !s.city.buildings[x.id])!.id;
+    s.city.buildings[plot] = { type: "brakeFactory", level: 1, plant: Ch.newPlant() };
+    expect(Ch.supplied(s, "brakes")).toBe(false);
+  });
+
+  it("better brakes, gearboxes and wheels make a measurably better car", () => {
+    const s = createInitialState(T0);
+    const base = car(s, { engine: 3, tires: 3, body: 3, suspension: 3, transmission: 1, wheels: 1, brakes: 1 });
+    const good = car(s, { engine: 3, tires: 3, body: 3, suspension: 3, transmission: 5, wheels: 5, brakes: 5 });
+    const a = D.testCar(base);
+    const b = D.testCar(good);
+    expect(b.braking).toBeLessThan(a.braking);
+    expect(b.zeroTo100).toBeLessThanOrEqual(a.zeroTo100);
+    expect(b.cornering).toBeGreaterThan(a.cornering);
+    expect(D.carDNA(s, good).brakes).toBe("Carbon-ceramic");
+    expect(D.carDNA(s, good).gearbox).not.toBe(D.carDNA(s, base).gearbox);
+  });
+});
+
+describe("the look of the build", () => {
+  it("paint, rims, engine and brakes on the line come from the design studio and the factories", () => {
+    const s = createInitialState(T0);
+    s.designs.city.color = "#1b46b8";
+    s.designs.city.rims = 2;
+    const a = D.lineBuildLook(s, "city");
+    expect(a.color).toBe("#1b46b8");
+    expect(a.engine).toBe(1);
+    const plot = WORLD_MAP.plots.find((x) => x.kind === "plot" && x.zone === "town" && !x.big && !s.city.buildings[x.id])!.id;
+    s.city.buildings[plot] = { type: "engineFactory", level: 1, plant: { ...Ch.newPlant(), grade: 4 } };
+    expect(D.lineBuildLook(s, "city").engine).toBe(4);
+    // forged wheels grow the rims
+    const w = D.buildLookFrom({ wheels: 5 }, { rims: 0 });
+    expect(w.rimScale).toBeGreaterThan(D.buildLookFrom({ wheels: 1 }, { rims: 0 }).rimScale);
+    expect(w.rims).toBe("black");
+  });
+});
+
+describe("the showroom", () => {
+  function shop() {
+    const s = createInitialState(T0);
+    s.cash = 1e6;
+    s.chain.firstCar = true;
+    const free = WORLD_MAP.plots.filter((x) => x.kind === "plot" && x.zone === "town" && !x.big && !s.city.buildings[x.id]).map((x) => x.id);
+    s.city.buildings[free[0]] = { type: "assemblyPlant", level: 1, plant: Ch.newPlant() };
+    s.dealers.local.owned = true;
+    const rc = car(s);
+    return { s, rc };
+  }
+
+  it("a transporter takes the car to a dealer the company owns, where it waits for a buyer", () => {
+    const { s, rc } = shop();
+    const fair = Sh.fairPrice(s, rc);
+    expect(Ch.sendCar(s, rc.id, "showroom")).toBe(false); // needs a price
+    expect(Ch.sendCar(s, rc.id, "showroom", fair)).toBe(true);
+    expect(rc.location).toBe("transit");
+    expect(Ch.carEta(s, rc.id)?.to).toBe("showroom");
+    // no buyer on the way (the tick that delivers the car also rolls for one)
+    const noBuyer = vi.spyOn(Math, "random").mockReturnValue(0.999);
+    for (let i = 0; i < 2000 && rc.location === "transit"; i++) tick(s, 0.5);
+    noBuyer.mockRestore();
+    expect(rc.location).toBe("showroom");
+    expect(R.atTrack(rc)).toBe(false);
+    // a buyer comes: the car is sold at the asking price
+    const cash = s.cash;
+    const ev: GameEvent[] = [];
+    expect(Sh.showroomTick(s, 1, ev, () => 0)).toBe(1);
+    expect(s.cash).toBeCloseTo(cash + fair);
+    expect(s.racing.cars).toHaveLength(0);
+    expect(s.showroom.sold).toBe(1);
+    expect(ev[0]).toMatchObject({ type: "sale", plot: "d:local" });
+  });
+
+  it("buyers weigh the price against the car: dearer sells slower, a racing record and reputation pay", () => {
+    const { s, rc } = shop();
+    const fair = Sh.fairPrice(s, rc);
+    expect(Sh.expectedSale(s, rc, fair * 1.5)).toBeGreaterThan(Sh.expectedSale(s, rc, fair) * 4);
+    expect(Sh.expectedSale(s, rc, fair * 0.8)).toBeLessThan(Sh.expectedSale(s, rc, fair));
+    rc.wins = 5;
+    rc.podiums = 8;
+    expect(Sh.fairPrice(s, rc)).toBeGreaterThan(fair * 1.2);
+    s.quality.rep = 90;
+    expect(Sh.fairPrice(s, rc)).toBeGreaterThan(fair * 1.25);
+    rc.wear.engine = 0.3;
+    expect(Sh.fairPrice(s, rc)).toBeLessThan(fair * 1.25);
+    // the asking price stays within reason
+    Ch.sendCar(s, rc.id, "showroom", fair);
+    expect(Sh.setPrice(s, rc.id, 1e15)).toBe(true);
+    expect(rc.listing!.price).toBeCloseTo(Sh.fairPrice(s, rc) * 3);
+  });
+
+  it("a marketing campaign costs money and speeds up dealer customers and showroom buyers", () => {
+    const { s, rc } = shop();
+    const before = carDemandMult(s, "city");
+    const slow = Sh.buyerRate(s, rc, 1e5);
+    const cash = s.cash;
+    expect(Sh.startCampaign(s)).toBe(true);
+    expect(s.cash).toBeLessThan(cash);
+    expect(Sh.startCampaign(s)).toBe(false); // one at a time
+    expect(carDemandMult(s, "city")).toBeCloseTo(before * 1.5);
+    expect(Sh.buyerRate(s, rc, 1e5)).toBeCloseTo(slow * 2);
+    s.market.t += 601;
+    expect(carDemandMult(s, "city")).toBeCloseTo(before);
+  });
+
+  it("a showroom listing survives a save; without the dealer the car is back at the lot", () => {
+    const { s, rc } = shop();
+    Ch.sendCar(s, rc.id, "showroom", 12_345);
+    s.chain.shipments = [];
+    rc.location = "showroom";
+    const back = migrate(JSON.parse(JSON.stringify(s)), T0);
+    expect(back.racing.cars[0]).toMatchObject({ location: "showroom", listing: { price: 12_345, dealer: "local" } });
+    s.dealers.local.owned = false;
+    const lost = migrate(JSON.parse(JSON.stringify(s)), T0);
+    expect(lost.racing.cars[0].location).toBe("factory");
+    expect(lost.racing.cars[0].listing).toBeUndefined();
+  });
+});
+
+describe("the brand", () => {
+  it("attributes are earned in the other systems, and racing image is not build quality", () => {
+    const s = createInitialState(T0);
+    const a = Br.brandAttrs(s);
+    expect(a.quality).toBe(50);
+    expect(a.sport).toBe(0);
+    s.racing.rep = 3000;
+    Object.assign(s.lifetime.carsByType, { city: 10, luxury: 10 });
+    s.research = ["a", "b", "c", "d", "e"];
+    s.proto.done = { sports: 80 };
+    const b = Br.brandAttrs(s);
+    expect(b.sport).toBeGreaterThan(80);
+    expect(b.luxury).toBeGreaterThan(a.luxury + 30);
+    expect(b.innovation).toBeGreaterThan(a.innovation + 10);
+    expect(b.quality).toBe(50); // winning races doesn't make the cars better built
+  });
+
+  it("a strong brand raises what dealers and the showroom pay, only for the classes judged on it", () => {
+    const s = createInitialState(T0);
+    s.chain.firstCar = true;
+    expect(Br.brandPriceMult(s, "city")).toBe(1);
+    const sports0 = carPriceMult(s, "sports");
+    s.racing.rep = 5000; // racing image ~96
+    expect(Br.brandPriceMult(s, "sports")).toBeGreaterThan(1.08);
+    expect(carPriceMult(s, "sports")).toBeGreaterThan(sports0 * 1.08);
+    expect(Br.brandPriceMult(s, "city")).toBe(1);
+    // being known for racing counts more
+    const plain = Br.brandPriceMult(s, "sports");
+    expect(Br.setBrand(s, { style: "sport" })).toBe(true);
+    expect(Br.brandPriceMult(s, "sports")).toBeGreaterThan(plain);
+    const rc = car(s);
+    const fair = Sh.fairPrice(s, rc);
+    s.racing.rep = 0;
+    expect(Sh.fairPrice(s, rc)).toBeLessThan(fair);
+  });
+
+  it("identity: the first name is free, a rebrand costs; the livery wears the brand colours", () => {
+    const s = createInitialState(T0);
+    s.cash = 0;
+    expect(Br.setBrand(s, { name: "  Apex   Motors " })).toBe(true);
+    expect(s.brand.name).toBe("Apex Motors");
+    expect(Br.setBrand(s, { name: "Nova" })).toBe(false); // no money for a rebrand
+    s.cash = 1e6;
+    expect(Br.setBrand(s, { name: "Nova" })).toBe(true);
+    expect(s.cash).toBe(1e6 - 50_000);
+    Br.setBrand(s, { color: "#ef4444", accent: "#111827", logo: "🐺", style: "nope" as never });
+    expect(s.brand).toMatchObject({ color: "#ef4444", accent: "#111827", logo: "🐺", style: "value" });
+    const rc = car(s);
+    s.designs[rc.car].color = "";
+    expect(R.liveryOf(s, rc)).toEqual({ color: "#ef4444", accent: "#111827" });
+    // saves keep it, junk is cleaned
+    const raw = JSON.parse(JSON.stringify(s));
+    raw.brand.color = "red";
+    raw.brand.style = 42;
+    const back = migrate(raw, T0);
+    expect(back.brand).toMatchObject({ name: "Nova", logo: "🐺", color: "#f5c451", style: "value", renames: 2 });
+  });
+});
+
+describe("R&D technologies", () => {
+  it("research builds real technology into the cars made afterwards, not into older ones", () => {
+    const s = createInitialState(T0);
+    const old = car(s);
+    expect(old.tech).toEqual([]);
+    s.research.push("carbon_body", "direct_injection", "dual_clutch", "wind_tunnel");
+    const fresh = car(s);
+    expect(fresh.tech).toEqual(["direct_injection", "dual_clutch", "wind_tunnel", "carbon_body"]);
+    const a = R.carStats(old);
+    const b = R.carStats(fresh);
+    expect(b.weight).toBeLessThan(a.weight * 0.95);
+    expect(b.hp).toBeGreaterThan(a.hp * 1.04);
+    expect(b.aero).toBeGreaterThan(a.aero + 5);
+    expect(D.testCar(fresh).zeroTo100).toBeLessThan(D.testCar(old).zeroTo100);
+    const dna = D.carDNA(s, fresh);
+    expect(dna.engine).toMatch(/ DI/);
+    expect(dna.chassis).toMatch(/carbon/);
+    expect(dna.gearbox).toBe("7-speed dual-clutch");
+    expect(dna.tech).toHaveLength(4);
+    // it stays with the car through a save
+    const back = migrate(JSON.parse(JSON.stringify(s)), T0);
+    expect(back.racing.cars.find((c) => c.id === fresh.id)!.tech).toEqual(fresh.tech);
+  });
+
+  it("every technology is a research node with a real effect", () => {
+    for (const t of TECH_IDS) {
+      const node = RESEARCH_BY_ID[t];
+      expect(node, t).toBeTruthy();
+      expect(node.effects).toContainEqual({ kind: "tech", tech: t });
+      expect(Object.keys(CAR_TECH[t].effect).length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("events with objectives and sponsor contracts", () => {
+  const H = 3_600_000;
+  it("an event counts its objective from the moment it starts and pays once", () => {
+    const s = createInitialState(T0);
+    s.chain.firstCar = true;
+    s.chain.steady = 100;
+    const t = [...Array(40)].map((_, b) => b * 3 * H + H + 1).find((x) => Ev.activeEvent(x)!.event.id === "rushOrders")!;
+    s.lifetime.carsByType.city = 50; // built before the event: doesn't count
+    Ev.eventGoalTick(s, t);
+    expect(Ev.eventGoal(s, t)).toMatchObject({ progress: 0, target: 25, done: false, open: true });
+    expect(Ev.claimEventGoal(s, t)).toBeNull();
+    s.lifetime.carsByType.city += 25;
+    expect(Ev.eventGoal(s, t)!.done).toBe(true);
+    const cash = s.cash;
+    expect(Ev.claimEventGoal(s, t)).toBeCloseTo(100 * 600);
+    expect(s.cash).toBeCloseTo(cash + 60_000);
+    expect(Ev.claimEventGoal(s, t)).toBeNull(); // once
+    // the next event starts counting afresh
+    const later = t + 3 * H;
+    Ev.eventGoalTick(s, later);
+    expect(Ev.eventGoal(s, later)!.claimed).toBe(false);
+  });
+
+  it("a racing objective isn't open without a racing team", () => {
+    const s = createInitialState(T0);
+    expect(Ev.eventGoalOpen(s, "raceWins")).toBe(false);
+    s.racing.unlocked = true;
+    car(s);
+    expect(Ev.eventGoalOpen(s, "raceWins")).toBe(true);
+  });
+
+  it("sponsor contract: the signing fee once, a bonus and renewal when met, the sponsor leaves when missed", () => {
+    const s = createInitialState(T0);
+    s.racing.unlocked = true;
+    s.racing.rep = 1000;
+    const cash0 = s.cash;
+    expect(R.signSponsor(s, "boltCola")).toBe(true);
+    expect(s.cash).toBe(cash0 + 10_000);
+    R.signSponsor(s, null);
+    expect(R.signSponsor(s, "boltCola")).toBe(true);
+    expect(s.cash).toBe(cash0 + 10_000); // no second signing fee
+    expect(R.contractStatus(s)).toMatchObject({ progress: 0, target: 3, goal: "podiums" });
+    s.racing.stats.podiums += 3;
+    const before = s.cash;
+    expect(R.contractTick(s)).toBe("met");
+    expect(s.cash).toBe(before + 15_000);
+    expect(s.racing.contract).toMatchObject({ met: 1 });
+    expect(R.contractStatus(s)!.progress).toBe(0);
+    s.racing.clock += 2 * 3600 + 1;
+    expect(R.contractTick(s)).toBe("lost");
+    expect(s.racing.sponsor).toBeNull();
+    // a save keeps the contract
+    R.signSponsor(s, "boltCola");
+    const back = migrate(JSON.parse(JSON.stringify(s)), T0);
+    expect(back.racing.contract).toEqual(s.racing.contract);
+    expect(back.racing.signed).toEqual(["boltCola"]);
+  });
+
+  it("a reset of the empire brings cars on the road or on display back to the lot", () => {
+    const s = createInitialState(T0);
+    const a = car(s);
+    const b = car(s);
+    a.location = "transit";
+    b.location = "showroom";
+    b.listing = { price: 1, dealer: "local", since: 0 };
+    resetRun(s, T0);
+    expect([a.location, b.location]).toEqual(["factory", "factory"]);
+    expect(b.listing).toBeUndefined();
+  });
+});
+
+describe("the supplier as a backup", () => {
+  it("emergency parts are off by default; switched on, they are bought at the emergency price and come by truck", () => {
+    const s = createInitialState(T0);
+    s.cash = 1e6;
+    s.chain.firstCar = true;
+    const free = WORLD_MAP.plots.filter((x) => x.kind === "plot" && x.zone === "town" && !x.big && !s.city.buildings[x.id]).map((x) => x.id);
+    for (const [i, t] of (["bodyWorks", "engineFactory", "tireFactory", "assemblyPlant", "interiorFactory", "suspensionFactory", "brakeFactory"] as const).entries())
+      s.city.buildings[free[i]] = { type: t, level: 1, plant: Ch.newPlant() };
+    const asm = s.city.buildings[free[3]].plant!;
+    const brakes = s.city.buildings[free[6]].plant!;
+    brakes.status = "noRaw";
+    // the line builds Sedans; the brake plant has nothing to give
+    asm.car = "sedan";
+    expect(Ch.supplied(s, "brakes")).toBe(false); // the company has a brake plant
+    // off by default: the supplier never steps in on its own
+    for (let i = 0; i < 20; i++) tick(s, 0.5);
+    expect(asm.inputs.brakes ?? 0).toBe(0);
+    expect(s.chain.shipments.some((sh) => sh.item === "brakes")).toBe(false);
+    // switched on: one batch, paid now at the emergency price, on a truck from the depot
+    const asmId = free[3];
+    expect(Ch.setBackupParts(s, asmId, true)).toBe(true);
+    const cash = s.cash;
+    tick(s, 0.5);
+    const order = s.chain.shipments.find((sh) => sh.item === "brakes" && sh.to === asmId);
+    expect(order).toBeDefined();
+    expect(order!.from).toBe(DEPOT);
+    expect(order!.value).toBeCloseTo(order!.qty * Ch.supplierPrice("brakes", CAR_BY_ID.sedan.grade, true), 6);
+    expect(cash - s.cash).toBeGreaterThanOrEqual(order!.value - 1e-6);
+    expect(s.chain.owed).toBe(0);
+    expect(asm.inputs.brakes ?? 0).toBe(0);
+    for (let i = 0; i < 400 && !(asm.inputs.brakes ?? 0); i++) tick(s, 0.5);
+    expect(asm.inputs.brakes ?? 0).toBeGreaterThan(0);
+  });
+});
+
+describe("the whole loop: one car from the factory to the sale", () => {
+  it("production → DNA → test track → transport → racing → brand → showroom → money", () => {
+    const s = createInitialState(T0);
+    s.cash = 1e7;
+    s.chain.firstCar = true;
+    s.research.push("carbon_body");
+    const free = WORLD_MAP.plots.filter((x) => x.kind === "plot" && x.zone === "town" && !x.big && !s.city.buildings[x.id]).map((x) => x.id);
+    s.city.buildings[free[0]] = { type: "engineFactory", level: 1, plant: { ...Ch.newPlant(), grade: 3 } };
+    s.city.buildings[free[1]] = { type: "assemblyPlant", level: 1, plant: Ch.newPlant() };
+    s.dealers.local.owned = true;
+    // 1. production: the next car off the line is kept, with the parts the plants make and the R&D of today
+    s.lifetime.carsByType.city = 1;
+    expect(R.orderRaceCar(s, "city")).toBe(true);
+    const asm = s.city.buildings[free[1]].plant!;
+    asm.out = 1;
+    asm.outValue = 6_000;
+    tick(s, 0.5);
+    const rc = s.racing.cars[0];
+    expect(rc.grades.engine).toBe(3);
+    expect(rc.tech).toContain("carbon_body");
+    // 2. its DNA and 3. the Test Track measure exactly that car
+    const dna = D.carDNA(s, rc);
+    expect(dna.chassis).toMatch(/carbon/);
+    expect(D.runTest(s, rc.id)!.hp).toBe(dna.hp);
+    // 4. a transporter takes it to the paddock
+    s.racing.unlocked = true;
+    expect(Ch.sendCar(s, rc.id, "racing")).toBe(true);
+    for (let i = 0; i < 2000 && rc.location === "transit"; i++) tick(s, 0.5);
+    expect(rc.location).toBe("racing");
+    // 5. it races: the same physics, a record, racing reputation
+    const ev = RACE_EVENTS.find((e) => e.type !== "championship" && e.classes.includes(R.classOf(rc.car)) && e.minRep === 0)!;
+    const rec = R.enterRace(s, ev.id, undefined, rc.id)!;
+    expect(rec.entrants.find((e) => e.id === "player")!.rating).toBeGreaterThan(0);
+    s.racing.clock = rec.startT + R.raceDuration(rec) + 1;
+    R.racingTick(s, 0.1);
+    expect(rc.races).toBe(1);
+    expect(rc.history).toHaveLength(1);
+    // 6. the brand: racing image comes from the track, separate from build quality
+    s.racing.rep = 4000;
+    expect(Br.brandAttrs(s).sport).toBeGreaterThan(90);
+    expect(Br.brandAttrs(s).quality).toBe(50);
+    // 7. the showroom prices the car from its DNA value, condition, record and reputation
+    rc.wins = 4;
+    const fair = Sh.fairPrice(s, rc);
+    expect(fair).toBeGreaterThan(R.carWorth(rc) * R.condition(rc) * 1.05);
+    expect(Ch.sendCar(s, rc.id, "showroom", fair)).toBe(true);
+    for (let i = 0; i < 2000 && rc.location === "transit"; i++) tick(s, 0.5);
+    expect(rc.location).toBe("showroom");
+    // 8. sold: money in the books as a car sale
+    const cash = s.cash;
+    const booked = () => s.chain.ledger.run.carSales + s.chain.ledger.pending.carSales;
+    const books = booked();
+    Sh.showroomTick(s, 1, undefined, () => 0);
+    expect(s.racing.cars).toHaveLength(0);
+    expect(s.cash).toBeGreaterThan(cash);
+    expect(booked() - books).toBeCloseTo(s.cash - cash);
+  });
+});

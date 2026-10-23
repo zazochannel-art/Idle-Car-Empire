@@ -1,0 +1,471 @@
+// Checks the installed Android app on a phone or an emulator, over adb:
+//
+//   node scripts/android-device-check.mjs <app-debug.apk> [--reboot] [--out dir]
+//
+// It installs the APK (a debug build: the only kind whose WebView can be inspected),
+// opens the game and drives it through what a phone does to an app:
+//   - the game itself starts (not a blank or placeholder page);
+//   - the Back button closes a dialog (the daily reward, then Settings), and with nothing
+//     open puts the app in the background (what the app did with each Back, it logs:
+//     lib/native.ts; the emulator can take a minute to hand it a key, which isn't timed);
+//   - leaving the app saves the game (the save on the phone is fresh);
+//   - the game survives the app being killed, an app update (reinstall over it) and,
+//     with --reboot, the phone restarting: same company, same settings;
+//   - a rewarded ad (Google's test ads) loads, plays and, watched to the end, gives its reward.
+// Screenshots go to the output folder (default android-check/). Needs adb on the PATH
+// (Android SDK platform-tools) and Node 22+. Exits non-zero if a check fails.
+import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+
+const args = process.argv.slice(2);
+const apk = args.find((a) => a.endsWith(".apk"));
+const reboot = args.includes("--reboot");
+const outDir = args.includes("--out") ? args[args.indexOf("--out") + 1] : "android-check";
+if (!apk) {
+  console.error("usage: node scripts/android-device-check.mjs <app-debug.apk> [--reboot] [--out dir]");
+  process.exit(2);
+}
+const PKG = process.env.APP_ID ?? "com.zazochannel.idlecarempire.debug";
+const ACTIVITY = "com.zazochannel.idlecarempire.MainActivity";
+const SAVE = "idle-car-empire:save:v1";
+const PORT = 9333;
+fs.mkdirSync(outDir, { recursive: true });
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const adb = (...a) => execFileSync("adb", a, { encoding: "utf8", maxBuffer: 64 << 20, stdio: ["ignore", "pipe", "pipe"] }).trim();
+const results = [];
+function check(ok, what, detail = "") {
+  results.push({ ok, what, detail });
+  console.log(`${ok ? "PASS" : "FAIL"}  ${what}${detail ? `  (${detail})` : ""}`);
+}
+
+// ─── the WebView, over the Chrome DevTools protocol ───
+
+let ws = null;
+let nextId = 1;
+const pending = new Map();
+
+async function connect(timeoutMs = 120_000) {
+  const end = Date.now() + timeoutMs;
+  while (Date.now() < end) {
+    try {
+      const pid = adb("shell", "pidof", PKG);
+      const sockets = adb("shell", "cat", "/proc/net/unix");
+      const name = `webview_devtools_remote_${pid}`;
+      if (pid && sockets.includes(name)) {
+        try {
+          adb("forward", "--remove", `tcp:${PORT}`);
+        } catch {
+          // nothing forwarded yet
+        }
+        adb("forward", `tcp:${PORT}`, `localabstract:${name}`);
+        const pages = await (await fetch(`http://127.0.0.1:${PORT}/json`)).json();
+        const games = pages.filter((p) => p.type === "page" && p.url.startsWith("https://localhost"));
+        const page = games[0];
+        if (page) {
+          // (one game page per app: more would mean two copies of the game running)
+          console.log(`      devtools: ${pages.length} target(s): ${pages.map((p) => `${p.type} ${p.url} ${p.id.slice(0, 8)}`).join(" | ")}`);
+          ws?.close();
+          ws = new WebSocket(page.webSocketDebuggerUrl);
+          await new Promise((res, rej) => {
+            ws.onopen = res;
+            ws.onerror = rej;
+          });
+          ws.onmessage = (m) => {
+            const msg = JSON.parse(m.data);
+            pending.get(msg.id)?.(msg);
+            pending.delete(msg.id);
+          };
+          return page.url;
+        }
+      }
+    } catch {
+      // the app is still starting
+    }
+    await sleep(1000);
+  }
+  throw new Error("the app's WebView never became inspectable");
+}
+
+// (generous: on an emulator without a GPU the first 3D frames keep the page busy for a while)
+async function evaluate(expression, timeoutMs = 120_000) {
+  const id = nextId++;
+  const reply = new Promise((res) => pending.set(id, res));
+  ws.send(JSON.stringify({ id, method: "Runtime.evaluate", params: { expression, awaitPromise: true, returnByValue: true } }));
+  const msg = await Promise.race([reply, sleep(timeoutMs).then(() => ({ error: { message: `no answer from the page in ${timeoutMs / 1000} s` } }))]);
+  if (msg.error) throw new Error(msg.error.message);
+  if (msg.result.exceptionDetails) throw new Error(msg.result.exceptionDetails.text);
+  return msg.result.result.value;
+}
+
+async function waitFor(expression, timeoutMs, what) {
+  const end = Date.now() + timeoutMs;
+  while (Date.now() < end) {
+    try {
+      if (await evaluate(expression)) return true;
+    } catch {
+      // a reload in progress
+    }
+    await sleep(1000);
+  }
+  throw new Error(`timed out waiting for ${what}`);
+}
+
+// the game screen is up: the HUD's cash counter is on screen
+const GAME_UP = `(document.querySelector("header .race-type")?.getBoundingClientRect().width ?? 0) > 0`;
+// (a dialog already closing doesn't count, as for the app's own Back button)
+const DIALOG_OPEN = `!!document.querySelector('[role="dialog"]:not([data-state="closed"]), [role="alertdialog"]:not([data-state="closed"])')`;
+const SAVED = `(() => { const r = localStorage.getItem(${JSON.stringify(SAVE)}); if (!r) return null; const d = JSON.parse(r); return { createdAt: d.state.createdAt, lang: d.state.settings.lang, savedAt: d.savedAt }; })()`;
+// the daily reward in the save (its dialog opens by itself after two minutes of a new game's play)
+const LOGIN = `(() => { const r = localStorage.getItem(${JSON.stringify(SAVE)}); if (!r) return null; const s = JSON.parse(r).state; return { day: s.login.day, claimed: s.login.claimed, playTime: Math.round(s.lifetime.playTime) }; })()`;
+
+/** What Android and the WebView said (the app's lifecycle, console errors, crashes), kept in the output folder. */
+function dumpLogcat(name, tail) {
+  try {
+    const log = adb("logcat", "-d", "-v", "time")
+      .split("\n")
+      .filter((l) => /Capacitor|chromium|AndroidRuntime|idlecarempire|WebView/.test(l) && !/Handling local request|Loading app at|AppsFilter/.test(l));
+    fs.writeFileSync(path.join(outDir, `${name}.txt`), log.join("\n"));
+    console.log(`\n${name} (${log.length} lines, last ${tail}):\n${log.slice(-tail).join("\n")}\n`);
+  } catch (e) {
+    console.log(`${name}:`, e.message);
+  }
+}
+
+const focus = () =>
+  adb("shell", "dumpsys", "window")
+    .split("\n")
+    .filter((l) => /mCurrentFocus|mFocusedApp/.test(l))
+    .map((l) => l.trim());
+const inFront = () => focus().some((l) => l.includes(PKG));
+const noDialog = () => evaluate(`!(${DIALOG_OPEN})`).catch(() => false);
+
+/**
+ * The emulator's own apps can stop answering (the launcher, starved by the software-rendered
+ * map): their "isn't responding" dialog takes the keys meant for the game. Such an app is
+ * stopped, its dialog with it, and the output says so. The game's own is left on screen.
+ * Then it waits for the game to have the focus again: a key sent while the dialog is going
+ * away is lost (seen: a Back that never reached the game). True if one was stopped.
+ */
+async function stopOthersNotResponding() {
+  const anr = focus().join(" ").match(/Application Not Responding: ([\w.]+)/);
+  if (!anr || anr[1] === PKG) return false;
+  console.log(`      (${anr[1]} was not responding and had the focus: stopped)`);
+  adb("shell", "am", "force-stop", anr[1]);
+  const back = await until(() => inFront() && !/Not Responding/.test(focus().join(" ")), 20_000);
+  if (!back) console.log(`      (the game didn't get the focus back: ${focus().join(" · ")})`);
+  return true;
+}
+
+/** Polls until the condition holds or the time is up, and returns its last value. On an emulator
+ * without a GPU the page can be busy for many seconds, so what Back starts may finish late. */
+async function until(fn, timeoutMs) {
+  const end = Date.now() + timeoutMs;
+  let v = await fn();
+  while (!v && Date.now() < end) {
+    await sleep(1000);
+    v = await fn();
+  }
+  return v;
+}
+
+/** The phone's clock as logcat writes it ("MM-DD hh:mm:ss"). */
+const deviceTime = () => adb("shell", "date '+%m-%d %H:%M:%S'");
+/** What the app did with each Back since `since`: lib/native.ts logs it ("minimize", "close dialog"…). */
+const backsSince = (since) =>
+  adb("logcat", "-d", "-v", "time", "-s", "Capacitor/Console")
+    .split("\n")
+    .filter((l) => l.slice(0, 14) >= since)
+    .map((l) => l.trimEnd().match(/Msg: Back: (.+)$/)?.[1])
+    .filter(Boolean);
+
+/**
+ * Presses Back and waits for the app to take it, and returns what the app did with it (null:
+ * it never did). On the emulator the app can be too busy to take a key for a minute (seen:
+ * 40-60 s, while the ad SDK starts beside the software-rendered map): that wait is the
+ * emulator's, so the checks time what Back does from the moment the app has it.
+ */
+let lastBack = "";
+async function pressBack(timeoutMs = 150_000) {
+  await stopOthersNotResponding();
+  const since = deviceTime();
+  lastBack = since;
+  const t = Date.now();
+  adb("shell", "input", "keyevent", "KEYCODE_BACK");
+  const did = await until(async () => {
+    const got = backsSince(since)[0];
+    if (got) return got;
+    // another app's "isn't responding" dialog that came up meanwhile took the key: once more
+    if (await stopOthersNotResponding()) adb("shell", "input", "keyevent", "KEYCODE_BACK");
+    return null;
+  }, timeoutMs);
+  const s = Math.round((Date.now() - t) / 1000);
+  if (!did) console.log(`      (Back never reached the app in ${s} s)`);
+  else if (s > 5) console.log(`      (Back reached the app after ${s} s: ${did})`);
+  return did;
+}
+
+/** What Android logged about the game's task, focus and input since `since` (a Back that didn't take the app away). */
+function androidSince(since, tail = 50) {
+  try {
+    const lines = adb("logcat", "-d", "-v", "time")
+      .split("\n")
+      .filter((l) => l.slice(0, 14) >= since && /idlecarempire|minimizeApp|moveTaskToBack|ActivityTaskManager|WindowManager|InputDispatcher|ActivityManager|not responding/i.test(l));
+    console.log(`\nAndroid since that Back (${lines.length} lines, last ${tail}):\n${lines.slice(-tail).join("\n")}\n`);
+  } catch (e) {
+    console.log("android log:", e.message);
+  }
+}
+
+/** The app's lifecycle as Android and Capacitor logged it (pauses, resumes, a WebView recreated). */
+function lifecycle() {
+  try {
+    const lines = adb("logcat", "-d", "-v", "time")
+      .split("\n")
+      .filter((l) => /Starting BridgeActivity|App (started|restarted|resumed|paused|stopped|destroyed)|Notifying listeners for event|destroyed WebView/.test(l));
+    console.log(`\nlifecycle (last 40 of ${lines.length}):\n${lines.slice(-40).join("\n")}\n`);
+  } catch (e) {
+    console.log("lifecycle:", e.message);
+  }
+}
+/** How the ad SDK's loads went, from logcat (loaded / failed to load). */
+function adLoads() {
+  try {
+    const lines = adb("logcat", "-d", "-v", "time", "-s", "Capacitor/AdMob").split("\n");
+    const count = (re) => lines.filter((l) => re.test(l)).length;
+    return `ads loaded ${count(/event onRewardedVideoAdLoaded/)}, failed to load ${count(/event onRewardedVideoAdFailedToLoad/)}`;
+  } catch (e) {
+    return e.message;
+  }
+}
+const shot = (name) => fs.writeFileSync(path.join(outDir, `${name}.png`), execFileSync("adb", ["exec-out", "screencap", "-p"], { maxBuffer: 64 << 20 }));
+
+/** Waits until the page answers quickly again (the map's first frames are heavy without a GPU). */
+async function settle() {
+  const end = Date.now() + 300_000;
+  while (Date.now() < end) {
+    const t = Date.now();
+    await evaluate("1", 120_000).catch(() => {});
+    if (Date.now() - t < 3000) return;
+  }
+}
+
+/** The game's pages in the app's WebView: one expected (more would be copies of the game running side by side). */
+async function gamePages() {
+  const pages = await (await fetch(`http://127.0.0.1:${PORT}/json`)).json();
+  return pages.filter((p) => p.type === "page" && p.url.startsWith("https://localhost"));
+}
+
+async function launch() {
+  adb("shell", "am", "start", "-W", "-n", `${PKG}/${ACTIVITY}`);
+  await connect();
+  // a build without the cloud (android.yml makes one for this check) goes straight in; a cloud
+  // build stops at the welcome page, where only an account gets in
+  const end = Date.now() + 240_000;
+  let since = Date.now();
+  while (Date.now() < end) {
+    if (await evaluate(GAME_UP, 30_000).catch(() => false)) {
+      await settle();
+      const t = await evaluate("performance.timeOrigin").catch(() => 0);
+      console.log(`      page started ${new Date(t).toISOString()}`);
+      return;
+    }
+    if (await evaluate(`!!document.querySelector('form input[type="password"]')`, 30_000).catch(() => false))
+      throw new Error("the welcome page asks for an account: this check needs a build without the Supabase settings");
+    // Android can recreate the activity as it starts (a new WebView, the first page dropped):
+    // after a while without the game, follow the newest page
+    if (Date.now() - since > 30_000) {
+      await connect();
+      since = Date.now();
+    }
+    await sleep(1500);
+  }
+  throw new Error("the game never appeared");
+}
+
+try {
+  console.log(
+    `device: ${adb("shell", "getprop", "ro.product.model")} · Android ${adb("shell", "getprop", "ro.build.version.release")} · WebView ${adb("shell", "dumpsys", "webviewupdate").match(/Current WebView package \(name, version\): \((.*?)\)/)?.[1] ?? "?"}`,
+  );
+  try {
+    adb("uninstall", PKG);
+  } catch {
+    // not installed yet
+  }
+  adb("install", apk);
+
+  // 1. the real game starts
+  const t0 = Date.now();
+  await launch();
+  const url = await evaluate("location.href");
+  check(url.startsWith("https://localhost/"), "the app opens the game from its own files", `${url}, ${Math.round((Date.now() - t0) / 1000)} s to the game screen`);
+  const title = await evaluate("document.title");
+  check(/Idle Car Empire/.test(title), "the page is the game", title);
+  await sleep(4000);
+  shot("1-game");
+  const first = await evaluate(SAVED);
+  check(!!first?.createdAt, "a save exists on the phone", JSON.stringify(first));
+  const copies = (await gamePages()).length;
+  check(copies === 1, "one copy of the game runs in the app", `${copies} game page(s)`);
+
+  // the daily reward opens by itself after two minutes of a new game's play, so it would be
+  // what a Back of the steps below closes (rightly): it is waited for first, and Back closes
+  // it and collects the reward
+  const loginShown = await until(() => evaluate(`(() => { const l = ${LOGIN}; return !!l?.day && (l.claimed || ${DIALOG_OPEN}); })()`).catch(() => false), 240_000);
+  if (loginShown && (await evaluate(DIALOG_OPEN))) {
+    const did = await pressBack();
+    const shut = !!did && (await until(noDialog, 30_000));
+    const collected = await until(() => evaluate(`(${LOGIN})?.claimed === true`).catch(() => false), 15_000);
+    check(shut && collected, "Back closes the daily reward and collects it", `Back: ${did ?? "never reached the app"} · ${JSON.stringify(await evaluate(LOGIN))}`);
+  } else if (!loginShown) console.log(`      (no daily reward after 4 min: ${JSON.stringify(await evaluate(LOGIN))})`);
+
+  // 2. a setting changed through the game's own screen (Settings → Română)
+  const opened = await evaluate(`(() => { const b = [...document.querySelectorAll("header button")].at(-1); b.click(); return true; })()`);
+  await waitFor(DIALOG_OPEN, 15_000, "the Settings dialog");
+  check(opened, "Settings opens");
+  shot("2-settings");
+  // 3. Back closes the dialog and the app stays open
+  const didClose = await pressBack();
+  const closed = !!didClose && (await until(noDialog, 30_000));
+  const stayed = inFront();
+  check(
+    closed && stayed,
+    "Back closes the dialog (the app stays open)",
+    !didClose ? "Back never reached the app" : !closed ? `Back: ${didClose}, and the dialog is still open 30 s later` : stayed ? "" : `the app left: ${focus().join(" · ")}`,
+  );
+  if (!didClose) androidSince(lastBack);
+
+  await evaluate(`[...document.querySelectorAll("header button")].at(-1).click()`);
+  await waitFor(DIALOG_OPEN, 15_000, "the Settings dialog");
+  await evaluate(`[...document.querySelectorAll('[role="dialog"] button')].find((b) => /Română/.test(b.textContent)).click()`);
+  await waitFor(`(${SAVED})?.lang === "ro"`, 20_000, "the language in the save");
+  // Back closes Settings (pressed again only if it is still open a while later)
+  await pressBack();
+  for (let i = 0; i < 2 && !(await until(noDialog, 20_000)); i++) await pressBack();
+
+  // 4. Back with nothing open: the app goes to the background, and leaving saves the game.
+  // Whatever the game opened by itself meanwhile (a story event, a card) is what Back closes
+  // first, rightly: then it is pressed again, and the output says what was open.
+  await settle();
+  const before = (await evaluate(SAVED)).savedAt;
+  await sleep(1500);
+  let didLeave = await pressBack();
+  for (let i = 0; i < 2 && didLeave?.startsWith("close"); i++) {
+    console.log(`      (Back closed what the game had opened by itself: ${didLeave.slice(6)}; pressed again)`);
+    await sleep(3000);
+    didLeave = await pressBack();
+  }
+  const left = didLeave === "minimize" && (await until(() => !inFront(), 60_000));
+  check(
+    left,
+    "Back with nothing open puts the app in the background",
+    left ? "" : didLeave === "minimize" ? `the app took Back to go to the background, but is still in front 60 s later: ${focus().join(" · ")}` : `Back: ${didLeave ?? "never reached the app"}`,
+  );
+  if (!left) androidSince(lastBack);
+  const after = await evaluate(SAVED);
+  check(after.savedAt > before, "leaving the app saved the game at once", `${new Date(before).toISOString()} → ${new Date(after.savedAt).toISOString()}`);
+  // while it plays, the game saves every 5 s; in the background, after the save of leaving (the
+  // app's pause) and the page's own one when Android hides it (on a slow phone, seconds later),
+  // nothing more is written
+  const hidden = await until(() => evaluate(`document.visibilityState === "hidden"`).catch(() => false), 30_000);
+  if (!hidden) console.log("      (the page never reported itself hidden)");
+  await sleep(2000);
+  const quiet = await evaluate(SAVED);
+  await sleep(12_000);
+  const later = await evaluate(SAVED);
+  check(
+    later.savedAt === quiet.savedAt,
+    "the game stops ticking in the background (no battery use)",
+    later.savedAt === quiet.savedAt ? "no saves for 12 s" : `still saving: ${new Date(quiet.savedAt).toISOString()} → ${new Date(later.savedAt).toISOString()}`,
+  );
+  lifecycle();
+
+  // 5. back to the app: it continues where it was
+  adb("shell", "am", "start", "-W", "-n", `${PKG}/${ACTIVITY}`);
+  await waitFor(GAME_UP, 60_000, "the game after coming back");
+  check(inFront(), "the app comes back to the game");
+
+  // 6. Android kills the app (low memory, swiped away): same company on the next start
+  await sleep(6000); // the WebView writes storage to disk a few seconds after a change
+  adb("shell", "am", "force-stop", PKG);
+  await sleep(1000);
+  await launch();
+  const killed = await evaluate(SAVED);
+  check(killed?.createdAt === first.createdAt && killed?.lang === "ro", "after the app is killed: same company, same settings", JSON.stringify(killed));
+  shot("3-after-kill");
+
+  // 7. an app update (installed over the old one): progress kept
+  await sleep(6000);
+  adb("install", "-r", apk);
+  await launch();
+  const updated = await evaluate(SAVED);
+  check(updated?.createdAt === first.createdAt && updated?.lang === "ro", "after an app update: same company, same settings", JSON.stringify(updated));
+
+  // 8. the phone restarts
+  if (reboot) {
+    dumpLogcat("logcat-before-reboot", 80);
+    await sleep(6000);
+    adb("shell", "input", "keyevent", "KEYCODE_HOME");
+    await sleep(3000);
+    adb("reboot");
+    adb("wait-for-device");
+    const end = Date.now() + 300_000;
+    while (Date.now() < end && adb("shell", "getprop", "sys.boot_completed") !== "1") await sleep(3000);
+    await sleep(10_000);
+    await launch();
+    const rebooted = await evaluate(SAVED);
+    check(rebooted?.createdAt === first.createdAt && rebooted?.lang === "ro", "after the phone restarts: same company, same settings", JSON.stringify(rebooted));
+    const copiesNow = (await gamePages()).length;
+    check(copiesNow === 1, "after the phone restarts: one copy of the game", `${copiesNow} game page(s)`);
+    shot("4-after-reboot");
+  }
+
+  // 9. a rewarded ad (Google's test ads): the offer appears once one is loaded, the ad
+  // plays in its own screen, and once it has played to the end the reward is given
+  const AD_OFFER = `!![...document.querySelectorAll("header button")].find((b) => b.textContent.includes("📺"))`;
+  // whatever the restart left open first (the offline report has an ad button of its own)
+  for (let i = 0; i < 4 && (await evaluate(DIALOG_OPEN).catch(() => false)); i++) {
+    await pressBack();
+    await until(noDialog, 10_000);
+  }
+  // On the emulator Google's test ads often fail to load for the first minutes after a start
+  // ("Internal error"), and the game tries again 30 s, 1 min, 2 min, 4 min later (lib/native-ads.ts)
+  const offered = await until(() => evaluate(AD_OFFER).catch(() => false), 360_000);
+  check(offered, "a rewarded test ad loads and the game offers it", offered ? "" : `no ad offer after 6 min (${adLoads()})`);
+  if (offered) {
+    const onAd = () => focus().some((l) => /AdActivity/.test(l));
+    await evaluate(`[...document.querySelectorAll("header button")].find((b) => b.textContent.includes("📺")).click()`);
+    await waitFor(DIALOG_OPEN, 15_000, "the ad offer");
+    // the button of the offer just opened (the newest dialog)
+    await evaluate(`[...[...document.querySelectorAll('[role="dialog"]:not([data-state="closed"])')].at(-1).querySelectorAll("button")].find((b) => b.textContent.includes("📺")).click()`);
+    const shown = await until(onAd, 30_000);
+    check(shown, "the ad plays in its own screen", focus().join(" · "));
+    if (shown) {
+      // a test ad plays for up to ~30 s; then Back closes it (the ad's own screen takes it, not the game)
+      await sleep(35_000);
+      shot("5-ad");
+      for (let i = 0; i < 8 && onAd(); i++) {
+        await stopOthersNotResponding();
+        adb("shell", "input", "keyevent", "KEYCODE_BACK");
+        await sleep(5000);
+      }
+      const rewarded = await until(() => evaluate(`document.querySelector("header")?.textContent.includes("📈")`).catch(() => false), 30_000);
+      check(rewarded, "the ad watched to the end gives its reward (×2 profit running)", rewarded ? "" : `focus: ${focus().join(" · ")}`);
+      shot("6-after-ad");
+    }
+  }
+} catch (e) {
+  check(false, "the run finished", e.message);
+  try {
+    shot("error");
+  } catch {
+    // no device
+  }
+}
+ws?.close();
+dumpLogcat("logcat", 60);
+const failed = results.filter((r) => !r.ok);
+console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
+fs.writeFileSync(path.join(outDir, "results.json"), JSON.stringify(results, null, 1));
+process.exit(failed.length ? 1 : 0);

@@ -1,0 +1,33 @@
+export type StarUpgradeId = "production" | "value" | "offline" | "cost" | "managers";
+
+export interface StarUpgradeConfig {
+  id: StarUpgradeId;
+  emoji: string;
+  /** Effect per level (0.1 = +10%, or −5% for costs). */
+  step: number;
+  max: number;
+}
+
+/** Permanent upgrades bought with ⭐ Stars. They survive every reset. */
+export const STAR_UPGRADES: StarUpgradeConfig[] = [
+  { id: "production", emoji: "🏭", step: 0.1, max: 10 },
+  { id: "value", emoji: "💎", step: 0.1, max: 10 },
+  { id: "offline", emoji: "🌙", step: 0.1, max: 10 },
+  { id: "cost", emoji: "🏷️", step: 0.05, max: 10 },
+  { id: "managers", emoji: "👔", step: 0.1, max: 10 },
+];
+
+export const STAR_UPGRADE_BY_ID = Object.fromEntries(STAR_UPGRADES.map((u) => [u.id, u])) as Record<StarUpgradeId, StarUpgradeConfig>;
+
+export const IMPERIUM = {
+  /** Run earnings needed for the reset. */
+  minRunEarnings: 20e9,
+  /** Stars = max(1, floor(perDecade × log10(earned since last reset / base))): 2 at $5B, 3 at $10B, 6 at $100B. */
+  perDecade: 2,
+  base: 10e9,
+};
+
+/** Stars cost one more for every level: 1, 2, 3 … */
+export function starUpgradeCost(level: number): number {
+  return level + 1;
+}

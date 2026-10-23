@@ -1,0 +1,1681 @@
+// The supply chain. Plants on the map turn raw material into components;
+// trucks (real objects with a route and a travel time) carry everything:
+// raw material from the Materials Depot, components to the Parts Market or
+// to a Car Assembly Plant, finished cars to dealerships. Money only comes in
+// when a load is sold at the market or a customer buys a car.
+import { startWorks } from "./construction";
+import { receiveRaceCar } from "./racing";
+import { CARS, CAR_BY_ID, CAR_MODEL, type CarConfig } from "../config/cars";
+import {
+  AUTOMATION,
+  BASE_RECIPE,
+  BODY_WORKSHOP,
+  OUTSOURCE,
+  OUTSOURCED_PARTS,
+  SUPPLIED_PARTS,
+  CHASSIS_BONUS,
+  CARRIER_CAPACITY,
+  COMPONENT_BY_ID,
+  DEALER_SALE,
+  WHOLESALE,
+  PARTS_DEMAND,
+  DOCK_TIME,
+  MAKER,
+  MAX_GRADE,
+  MAX_WAIT,
+  OUT_STORAGE,
+  PLANT_BY_ID,
+  PLANT_COPY_COST,
+  MAX_TRUCKS,
+  PLANT_LEVELS,
+  PLANT_MAX_LEVEL,
+  PLANT_TRUCKS,
+  PLANT_VEHICLE,
+  RATE_WINDOW,
+  SPEED,
+  ROAD_SPEED,
+  HEADWAY,
+  CAR_WAIT,
+  TRAFFIC_ALLOWANCE,
+  VEHICLE_CAPACITY,
+  isPlantType,
+} from "../config/chain";
+import { DEALERS, DEALER_BY_ID, DEALER_MARKUP_PER_LEVEL, DEALER_SPECIALTY } from "../config/dealerships";
+import { MATERIALS as MATERIALS_LIST, CAR_STORAGE, CLASS_DEMAND, CLASS_MARGIN, DEALER_FEE, DEBT, RESCUE, SALES_TAX, TRIP_FEE, UPGRADE_SCALING, WAREHOUSE_CAP, POWER_SYSTEM, type MaterialId } from "../config/economy";
+import { assemblyTime, carListPrice, carStdCost, componentPrice, componentStdCost, componentTime, netOfSale, opRates, opTotal, type OpRates } from "./costs";
+import {
+  addStock,
+  autoRestock,
+  book,
+  canOwe,
+  debtLimit,
+  depotTrip,
+  emergencyCost,
+  emergencyMaterials,
+  migrateCostBasis,
+  spendMaterials,
+  createLedger,
+  chainNet,
+  migrateLedger,
+  migrateStock,
+  orderCost,
+  payOrOwe,
+  powerCost,
+  repay,
+  settleLedger,
+  shortfall,
+  unitMaterials,
+  unitsInStock,
+  warehouseCap,
+  warehouseCost,
+} from "./materials";
+import { MANAGERS } from "../config/managers";
+import { OFFLINE } from "../config/offline";
+import { DEPOT, MARKET, RACING, plotOf, roadRoute } from "../city/layout";
+import type {
+  BuildingState,
+  CarId,
+  CarRoute,
+  ChainState,
+  ComponentId,
+  DealerId,
+  DealerStock,
+  GameEvent,
+  GameState,
+  ItemId,
+  MaterialStock,
+  PlantData,
+  PlantType,
+  QualityMode,
+  RaceCarState,
+  Shipment,
+} from "../types";
+import { QUALITY_MODES } from "../config/market";
+import { carDemandMult, carPriceMult, defectRate, onCarBuilt, qualityOf, qualityTick } from "./market";
+import { vipBuilt } from "./live";
+import { dockCars, exportTick, fleetTick, isExportRoute, portPlot, protoValueMult } from "./expansion";
+import { EXPORT_BY_ID, type ExportMarketId } from "../config/expansion";
+import { designStats } from "./design";
+import { logisticsMods } from "./logistics";
+import { starMods } from "./imperium";
+import { managerMult, type GlobalMods } from "./modifiers";
+import { floorPace, floorTick, MORALE } from "./floor";
+import { SKIN_BY_ID, type SkinId } from "../config/collection";
+
+// ───────────────────────────── state ─────────────────────────────
+
+/** A new plant: no upgrades, an empty warehouse (materials are bought at the market). */
+export function newPlant(): PlantData {
+  return {
+    workshop: { machines: 1, workers: 1 },
+    speed: 0,
+    automation: 0,
+    fleet: 1,
+    grade: 1,
+    route: "use",
+    progress: 0,
+    // the warehouse starts empty: materials are bought at the market
+    stock: {},
+    stockCost: 0,
+    stockCostBy: {},
+    warehouse: 1,
+    power: 0,
+    inputs: {},
+    out: 0,
+    outValue: 0,
+    car: null,
+    wait: 0,
+    made: 0,
+    status: "ok",
+  };
+}
+
+export function createChain(): ChainState {
+  return { shipments: [], nextShip: 1, dealers: {}, rate: 0, firstCar: false, wholesale: 0, ledger: createLedger(), owed: 0 };
+}
+
+export function emptyDealerStock(): DealerStock {
+  return { cars: 0, value: 0, models: [], next: 0, sold: 0 };
+}
+
+export type PlantEntry = [string, BuildingState & { plant: PlantData; type: PlantType }];
+
+export function plantsOf(s: GameState): PlantEntry[] {
+  return Object.entries(s.city.buildings).filter((e): e is PlantEntry => !!e[1].plant && isPlantType(e[1].type));
+}
+
+// counted in place (no list built): these run for every car and part, many times a tick
+export function plantCount(s: GameState, type: PlantType): number {
+  const all = s.city.buildings;
+  let n = 0;
+  for (const id in all) if (all[id].plant && all[id].type === type) n++;
+  return n;
+}
+
+export function hasPlant(s: GameState, type: PlantType): boolean {
+  const all = s.city.buildings;
+  for (const id in all) if (all[id].plant && all[id].type === type) return true;
+  return false;
+}
+
+/** Plants are numbered per type in build order: Engine Factory #2… */
+export function plantNumber(s: GameState, plotId: string): number {
+  const b = s.city.buildings[plotId];
+  if (!b) return 0;
+  return plantsOf(s).filter(([, o]) => o.type === b.type).findIndex(([id]) => id === plotId) + 1;
+}
+
+// ───────────────────────────── unlocks & costs ─────────────────────────────
+
+export type PlantLock =
+  | { kind: "plant"; plant: PlantType }
+  | { kind: "research"; research: string }
+  | { kind: "made"; item: ComponentId; n: number; have: number }
+  | null;
+
+/** What must happen before a plant type can be built (null = ready). */
+export function plantLock(s: GameState, type: PlantType): PlantLock {
+  const cfg = PLANT_BY_ID[type];
+  // the plant before it in the chain must be built or at least going up (sites can run side by side)
+  if (cfg.requires && !hasPlant(s, cfg.requires) && !Object.values(s.city.sites).some((st) => st.type === cfg.requires))
+    return { kind: "plant", plant: cfg.requires };
+  if (cfg.unlockMade && s.lifetime.parts[cfg.unlockMade.item] < cfg.unlockMade.n)
+    return { kind: "made", item: cfg.unlockMade.item, n: cfg.unlockMade.n, have: Math.floor(s.lifetime.parts[cfg.unlockMade.item]) };
+  if (cfg.research && !s.research.includes(cfg.research)) return { kind: "research", research: cfg.research };
+  return null;
+}
+
+/** A plant's shop floor: machines installed along its line and the operators running them. */
+export interface Workshop {
+  machines: number;
+  workers: number;
+}
+
+/** One machine slot of the Body Works line and what it adds to the plant's speed. */
+export interface WorkshopMachine {
+  index: number;
+  installed: boolean;
+  /** An operator runs it (operators take the machines in line order). */
+  staffed: boolean;
+  /** Share added to the plant's speed (the first machine is the plant's base: 0). */
+  bonus: number;
+}
+
+/** A plant's shop floor within its limits (older saves and other plants: one machine, one operator). */
+export function workshopOf(p: PlantData): Workshop {
+  const w = p.workshop;
+  const machines = Math.max(1, Math.min(BODY_WORKSHOP.max, Math.floor(w?.machines ?? 1)));
+  const workers = Math.max(1, Math.min(machines, Math.floor(w?.workers ?? 1)));
+  return { machines, workers };
+}
+
+/** Every machine slot of the Body Works line, in order, with its real contribution. */
+export function workshopMachines(w: Workshop): WorkshopMachine[] {
+  return Array.from({ length: BODY_WORKSHOP.max }, (_, index) => {
+    const installed = index < w.machines;
+    const staffed = installed && index < w.workers;
+    const bonus = index === 0 || !installed ? 0 : BODY_WORKSHOP.machine + (staffed ? BODY_WORKSHOP.operator : 0);
+    return { index, installed, staffed, bonus };
+  });
+}
+
+/** The shop floor's speed multiplier (1: the base machine and its operator; only the Body Works has one). */
+export function workshopSpeed(type: PlantType, w: Workshop): number {
+  if (type !== "bodyWorks") return 1;
+  return 1 + workshopMachines(w).reduce((a, m) => a + m.bonus, 0);
+}
+
+/** The next machine for the Body Works line (null: not a Body Works, or the line is full). */
+export function bodyMachineCost(s: GameState, plotId: string): number | null {
+  const b = s.city.buildings[plotId];
+  if (b?.type !== "bodyWorks" || !b.plant) return null;
+  const { machines } = workshopOf(b.plant);
+  if (machines >= BODY_WORKSHOP.max) return null;
+  return Math.round(BODY_WORKSHOP.machineCost.base * Math.pow(BODY_WORKSHOP.machineCost.growth, machines - 1));
+}
+
+/** The next operator (null: every machine already has one). */
+export function bodyWorkerCost(s: GameState, plotId: string): number | null {
+  const b = s.city.buildings[plotId];
+  if (b?.type !== "bodyWorks" || !b.plant) return null;
+  const { machines, workers } = workshopOf(b.plant);
+  if (workers >= machines) return null;
+  return Math.round(BODY_WORKSHOP.operatorCost.base * Math.pow(BODY_WORKSHOP.operatorCost.growth, workers - 1));
+}
+
+export function buyBodyMachine(s: GameState, plotId: string): boolean {
+  const b = s.city.buildings[plotId];
+  const cost = bodyMachineCost(s, plotId);
+  if (!b?.plant || cost === null || s.cash < cost) return false;
+  const w = workshopOf(b.plant);
+  s.cash -= cost;
+  book(s, "maintenance", cost);
+  b.plant.workshop = { ...w, machines: w.machines + 1 };
+  return true;
+}
+
+export function hireBodyWorker(s: GameState, plotId: string): boolean {
+  const b = s.city.buildings[plotId];
+  const cost = bodyWorkerCost(s, plotId);
+  if (!b?.plant || cost === null || s.cash < cost) return false;
+  const w = workshopOf(b.plant);
+  s.cash -= cost;
+  book(s, "labor", cost);
+  b.plant.workshop = { ...w, workers: w.workers + 1 };
+  return true;
+}
+
+export function plantBuildCost(s: GameState, type: PlantType): number {
+  const cfg = PLANT_BY_ID[type];
+  const n = plantCount(s, type);
+  return n === 0 && cfg.firstCost ? cfg.firstCost : cfg.cost * Math.pow(PLANT_COPY_COST, n);
+}
+
+const base = (b: BuildingState) => PLANT_BY_ID[b.type as PlantType].cost;
+
+/** Price of the next level: the plant's cost × level.base × level.growth^(level-1) (config/economy.ts). */
+export function levelCost(b: BuildingState, gm: GlobalMods): number | null {
+  if (b.works || b.level >= Math.min(PLANT_MAX_LEVEL, gm.maxPlantLevel)) return null;
+  const u = UPGRADE_SCALING.level;
+  return base(b) * u.base * Math.pow(u.growth, b.level - 1) * gm.costMult;
+}
+
+export function speedCost(b: BuildingState, gm: GlobalMods): number | null {
+  const p = b.plant!;
+  if (p.speed >= SPEED.max) return null;
+  const u = UPGRADE_SCALING.speed;
+  return base(b) * u.base * Math.pow(u.growth, p.speed) * gm.costMult;
+}
+
+export function automationCost(b: BuildingState, gm: GlobalMods): number | null {
+  const p = b.plant!;
+  if (p.automation >= AUTOMATION.length - 1) return null;
+  return base(b) * UPGRADE_SCALING.automation[p.automation + 1] * gm.costMult;
+}
+
+/** Whether an engine factory is making motorized chassis (only before the first assembly plant). */
+export function combines(s: GameState, b: BuildingState): boolean {
+  return b.type === "engineFactory" && !!b.plant?.combine && !hasPlant(s, "assemblyPlant");
+}
+
+/** Trucks a plant runs: they come with its level (older saves keep the ones they bought). */
+export function trucksOf(b: BuildingState): number {
+  return Math.min(MAX_TRUCKS, Math.max(b.plant?.fleet ?? 1, PLANT_TRUCKS[b.level - 1] ?? 1));
+}
+
+export function gradeCost(b: BuildingState, gm: GlobalMods): number | null {
+  const p = b.plant!;
+  if (b.type === "assemblyPlant" || p.grade >= MAX_GRADE) return null;
+  return base(b) * UPGRADE_SCALING.grade[p.grade] * gm.costMult;
+}
+
+// ───────────────────────────── cars ─────────────────────────────
+
+/** The parts a car is made of (one list per model, shared: never change it). */
+const RECIPES = new Map<CarConfig, readonly ComponentId[]>();
+export function recipe(car: CarConfig): ComponentId[] {
+  let r = RECIPES.get(car);
+  if (!r) {
+    r = Object.freeze([...BASE_RECIPE, ...car.extras]);
+    RECIPES.set(car, r);
+  }
+  return r as ComponentId[];
+}
+
+/**
+ * A part the company doesn't make yet that an outside supplier sells (tyres,
+ * drivetrain): ordered and paid by the assembly plant, delivered by truck.
+ * Bodies and engines never come from a supplier.
+ */
+export function supplied(s: GameState, c: ComponentId): boolean {
+  return OUTSOURCED_PARTS.includes(c) && !hasPlant(s, MAKER[c]);
+}
+
+/** The grade the supplier delivers for a model: base parts at grade 1, drivetrain parts at whatever the model needs. */
+export function suppliedGrade(c: ComponentId, car: CarConfig): number {
+  return SUPPLIED_PARTS.includes(c) ? car.grade : 1;
+}
+
+/**
+ * Emergency parts: a part the supplier sells, which the company makes itself
+ * but whose own plants deliver nothing (out of materials, stopped). Only when
+ * the player switched emergency parts on for this assembly plant, and at the
+ * emergency price: a way through a bad hour, never a way around the plants.
+ */
+export function backupSupply(s: GameState, c: ComponentId, p: PlantData): boolean {
+  if (!p.backup || !OUTSOURCED_PARTS.includes(c) || supplied(s, c) || (p.inputs[c] ?? 0) >= 1) return false;
+  return plantsOf(s).every(([, b]) => b.type !== MAKER[c] || (b.plant.out < 1 && b.plant.status !== "ok"));
+}
+
+/** Whether the supplier covers this part for this model. */
+const supplierCovers = (s: GameState, c: ComponentId, car: CarConfig) => supplied(s, c) && suppliedGrade(c, car) >= car.grade;
+
+/** What the supplier charges for one unit (emergency parts cost more). */
+export function supplierPrice(c: ComponentId, grade = 1, emergency = false): number {
+  return componentStdCost(c, grade) * (emergency ? OUTSOURCE.emergency : OUTSOURCE.markup);
+}
+
+/** Parts from the outside supplier on their way to an assembly plant. */
+const partsComing = (s: GameState, plot: string, c: ComponentId) => s.chain.shipments.some((sh) => !sh.back && sh.to === plot && sh.item === c && sh.from === DEPOT);
+
+/**
+ * An assembly line stopped on a bought-in part it can't get (no cash, no
+ * credit, nothing on the way): parts made for it are sold at the Parts
+ * Market meanwhile, which brings the cash to buy the missing part.
+ */
+function lineWaitsOnSupplier(s: GameState, plot: string, p: PlantData): boolean {
+  const m = p.missing;
+  return p.status === "noParts" && !!m && OUTSOURCED_PARTS.includes(m) && supplied(s, m) && !partsComing(s, plot, m);
+}
+
+/**
+ * Orders finished parts from the outside supplier for an assembly plant:
+ * a few batches' worth (one batch for emergency parts), paid now as far as
+ * the cash goes, and driven over from the depot. With no cash at all, the
+ * supplier gives trade credit for the next batch only, on the company's
+ * account and within its limit. Emergency parts are never on credit.
+ * Returns what the order cost.
+ */
+function orderParts(s: GameState, plot: string, p: PlantData, st: PlantStats, c: ComponentId): number {
+  if (!st.car) return 0;
+  const regular = supplied(s, c);
+  const emergency = !regular && backupSupply(s, c, p);
+  if ((!regular && !emergency) || partsComing(s, plot, c)) return 0;
+  const have = p.inputs[c] ?? 0;
+  // reorder while a batch is still on hand, so the line rarely waits for the truck
+  if (have >= (emergency ? 1 : st.lines * 2)) return 0;
+  const want = emergency ? st.lines : Math.min(st.inCap, st.lines * OUTSOURCE.cover);
+  const price = supplierPrice(c, suppliedGrade(c, st.car), emergency);
+  const affordable = Math.floor(Math.max(0, s.cash) / price);
+  let qty = Math.min(Math.floor(want - have), affordable);
+  const credit = qty < 1 && regular;
+  if (credit) qty = Math.ceil(st.lines - have);
+  if (qty < 1 || (credit && !canOwe(s, qty * price))) return 0;
+  const cost = qty * price;
+  payOrOwe(s, cost);
+  book(s, "materials", cost);
+  ship(s, { from: DEPOT, to: plot, item: c, qty, value: cost, dur: depotTrip(plot), vehicle: qty > VEHICLE_CAPACITY.truck ? "semi" : "truck" });
+  return cost;
+}
+
+/** Best grade available for a component across all plants that make it. */
+export function bestGrade(s: GameState, c: ComponentId): number {
+  const all = s.city.buildings;
+  const maker = MAKER[c];
+  let g = 0;
+  for (const id in all) {
+    const b = all[id];
+    if (b.plant && b.type === maker) g = Math.max(g, b.plant.grade);
+  }
+  return g;
+}
+
+/** Why a car model cannot be built yet, or null. */
+export type CarLock =
+  | { kind: "research"; research: string }
+  | { kind: "plant"; plant: PlantType }
+  | { kind: "grade"; plant: PlantType; grade: number }
+  | null;
+
+export function carLock(s: GameState, car: CarConfig, gm: GlobalMods): CarLock {
+  if (car.requiresResearch && !gm.unlockedCars.has(car.id)) return { kind: "research", research: car.requiresResearch };
+  if (!hasPlant(s, "assemblyPlant")) return { kind: "plant", plant: "assemblyPlant" };
+  // missing plants first (the bigger step), then grades
+  const parts = recipe(car);
+  const grades = parts.map((c) => bestGrade(s, c));
+  for (let i = 0; i < parts.length; i++) if (grades[i] === 0 && !supplierCovers(s, parts[i], car)) return { kind: "plant", plant: MAKER[parts[i]] };
+  for (let i = 0; i < parts.length; i++) if (grades[i] < car.grade && !supplierCovers(s, parts[i], car)) return { kind: "grade", plant: MAKER[parts[i]], grade: car.grade };
+  return null;
+}
+
+export function availableCars(s: GameState, gm: GlobalMods): CarConfig[] {
+  return CARS.filter((c) => carLock(s, c, gm) === null);
+}
+
+/** What the Parts Market pays for one unit of a component at a grade, before global multipliers. */
+export const componentBase = (c: ComponentId, grade: number) => componentPrice(c, grade);
+
+/** Standard production cost of one car (parts, assembly, QC, transport). */
+export function carPartsValue(car: CarConfig): number {
+  return carStdCost(car, recipe(car));
+}
+
+/** Sale value of one car before dealer markup (bonuses widen its margin). */
+export function carValue(s: GameState, car: CarConfig, gm: GlobalMods, extra = 1): number {
+  return carListPrice(car, recipe(car), carMarginMult(s, car, gm) * modelStats(s, car).valueMult * protoValueMult(s, car.id) * extra);
+}
+
+/** Sale value before the Design studio options (what R&D prices are based on). */
+export function carBaseValue(s: GameState, car: CarConfig, gm: GlobalMods): number {
+  return carListPrice(car, recipe(car), carMarginMult(s, car, gm));
+}
+
+/** How much the bonuses (refinement, research, prestige, events…) widen a car's margin. */
+export function carMarginMult(s: GameState, car: CarConfig, gm: GlobalMods): number {
+  const refine = Math.pow(CAR_MODEL.valuePerLevel, s.carModels[car.id] ?? 0);
+  return refine * gm.value[car.tier] * gm.income;
+}
+
+/** Market value of a component with the company's bonuses (widening its margin). */
+export function componentValue(c: ComponentId, grade: number, gm: GlobalMods, extra = 1): number {
+  return componentPrice(c, grade, gm.value[1] * gm.income * extra);
+}
+
+/** The player's model on this platform, with quality from the parts actually made. */
+export function modelStats(s: GameState, car: CarConfig) {
+  const grades = recipe(car).map((c) => (supplied(s, c) ? suppliedGrade(c, car) : bestGrade(s, c)));
+  const grade = grades.length ? Math.max(car.grade, grades.reduce((a, b) => a + b, 0) / grades.length) : car.grade;
+  return designStats(car, s.designs[car.id], grade);
+}
+
+// ───────────────────────────── stats ─────────────────────────────
+
+export interface PlantStats {
+  plotId: string;
+  type: PlantType;
+  level: number;
+  /** Seconds per batch. */
+  cycle: number;
+  lines: number;
+  unitsPerSec: number;
+  /** Warehouse capacity (material units). */
+  rawCap: number;
+  outCap: number;
+  inCap: number;
+  /** Market value of one finished unit (components) or sale value (cars, before markup). */
+  unitValue: number;
+  /** What one unit really costs this plant: materials at list price + running costs (+ parts for cars). */
+  unitCost: number;
+  /** Materials one unit uses. */
+  need: MaterialStock;
+  /** Running costs per second of work, and the crew and power behind them. */
+  op: OpRates;
+  opPerSec: number;
+  vehicle: Shipment["vehicle"];
+  capacity: number;
+  /** Assembly: model on the line. */
+  car: CarConfig | null;
+  /** Engine factory: making motorized chassis, and what one is worth (null on other plants). */
+  combine: boolean;
+  chassisValue: number | null;
+  /** Engine factory: what a plain engine is worth. */
+  engineValue: number;
+  /** Speed from the shop floor's machines and operators (Body Works; 1 elsewhere), part of `cycle`. */
+  workshopSpeed: number;
+  /** Seconds per tile for this plant's trucks. */
+  pace: number;
+  /** Dock time multiplier for loading and unloading (Loading upgrades and the delivery rate). */
+  load: number;
+  /** Trucks it runs (its level plus the Logistics Center), and its dock time multiplier. */
+  trucks: number;
+  dock: number;
+  offline: number;
+  rp: number;
+}
+
+export interface DealerStats {
+  id: DealerId;
+  interval: number;
+  markup: number;
+  stockCap: number;
+}
+
+export interface ChainSnapshot {
+  plants: Record<string, PlantStats>;
+  dealers: Partial<Record<DealerId, DealerStats>>;
+  cars: CarConfig[];
+  /** Best case income per second if every plant ran flat out and sold everything. */
+  potential: number;
+  carsPerSec: number;
+}
+
+function managerMods(s: GameState, plotId: string) {
+  const m = { speed: 1, value: 1, delivery: 1, offline: 0 };
+  for (const cfg of MANAGERS) {
+    const st = s.managers[cfg.id];
+    if (cfg.scope !== "factory" || !st?.hired || st.assignedTo !== plotId) continue;
+    const mult = managerMult(cfg, st.level, starMods(s).managers);
+    if (cfg.bonus.stat === "speed") m.speed *= mult;
+    else if (cfg.bonus.stat === "value") m.value *= mult;
+    else if (cfg.bonus.stat === "delivery") m.delivery *= mult;
+    else if (cfg.bonus.stat === "offline") m.offline += (mult - 1) * OFFLINE.baseEfficiency;
+  }
+  return m;
+}
+
+export function activeCar(s: GameState, p: PlantData, cars: CarConfig[]): CarConfig | null {
+  if (p.car) {
+    const chosen = cars.find((c) => c.id === p.car);
+    if (chosen) return chosen;
+  }
+  return cars[cars.length - 1] ?? null;
+}
+
+export function plantStats(s: GameState, plotId: string, gm: GlobalMods, cars: CarConfig[]): PlantStats | null {
+  const b = s.city.buildings[plotId];
+  if (!b?.plant || !isPlantType(b.type)) return null;
+  const cfg = PLANT_BY_ID[b.type];
+  const p = b.plant;
+  const lv = PLANT_LEVELS[b.level - 1];
+  const mm = managerMods(s, plotId);
+  const big = plotOf(plotId)?.big ? 1.5 : 1;
+  const qm = QUALITY_MODES[qualityOf(p)];
+  const speed = Math.pow(SPEED.mult, p.speed) * AUTOMATION[p.automation].speed * gm.speed * mm.speed * big * qm.speed;
+  const car = cfg.item ? null : activeCar(s, p, cars);
+  const baseTime = cfg.item ? componentTime(cfg.item, p.grade) : car ? assemblyTime(car) * modelStats(s, car).timeMult : assemblyTime(CAR_BY_ID.city);
+  // the Body Works shop floor: machines built and operators hired along the line
+  const floor = workshopSpeed(b.type, workshopOf(p));
+  const cycle = baseTime / (speed * floor);
+  const lines = lv.lines;
+  const itemValue = cfg.item ? componentValue(cfg.item, p.grade, gm, mm.value * qm.value) : car ? carValue(s, car, gm, mm.value * qm.value) : 0;
+  // engine + the best body you make, worth a little more together
+  const chassisValue = b.type === "engineFactory" ? (itemValue + componentValue("body", Math.max(1, bestGrade(s, "body")), gm)) * CHASSIS_BONUS : null;
+  const combine = combines(s, b);
+  const unitValue = combine && chassisValue !== null ? chassisValue : itemValue;
+  const need = unitMaterials(b.type, p.grade);
+  const op = opRates(b.type, b.level, p.automation, lv.lines, p.power, Math.pow(SPEED.mult, p.speed) * AUTOMATION[p.automation].speed);
+  const opPerSec = opTotal(op);
+  // what a unit really costs here: list-price materials (or the car's parts) and this plant's running time
+  const inputs = cfg.item ? stockValue(need) + (combine ? componentStdCost("body", 1) : 0) : car ? recipe(car).reduce((a, c) => a + componentStdCost(c, car.grade), 0) : 0;
+  const unitCost = inputs + (opPerSec * cycle) / lv.lines + (cfg.item ? 0 : TRIP_FEE.carrier / Math.max(1, CARRIER_CAPACITY[b.level - 1]));
+  const vehicle = cfg.item ? PLANT_VEHICLE[b.level - 1] : "carrier";
+  const lm = logisticsMods(s);
+  // delivery rate: trucks drive the city pace, so bonuses mean bigger loads and quicker docks
+  const haul = gm.delivery * mm.delivery * lm.speed;
+  const capacity = Math.max(1, Math.round((cfg.item ? VEHICLE_CAPACITY[vehicle] : CARRIER_CAPACITY[b.level - 1]) * lm.capacity * haul));
+  const storage = lv.storage * (plotOf(plotId)?.big ? 2 : 1) * lm.storage;
+  return {
+    plotId,
+    type: b.type,
+    level: b.level,
+    cycle,
+    lines,
+    unitsPerSec: lines / cycle,
+    rawCap: warehouseCap(p),
+    outCap: (cfg.item ? OUT_STORAGE : CAR_STORAGE) * storage,
+    inCap: OUT_STORAGE * storage,
+    unitValue,
+    unitCost,
+    need,
+    op,
+    opPerSec,
+    vehicle,
+    capacity,
+    car,
+    combine,
+    chassisValue,
+    engineValue: itemValue,
+    workshopSpeed: floor,
+    pace: 1 / ROAD_SPEED,
+    trucks: trucksOf(b) + lm.trucks,
+    dock: lm.dock,
+    load: lm.dock / haul,
+    offline: gm.offline + AUTOMATION[p.automation].offline + mm.offline,
+    rp: (cfg.item ? (COMPONENT_BY_ID[cfg.item].value / 5_000) * p.grade : (car?.rp ?? 0)) * gm.rp,
+  };
+}
+
+/** List-price value of a set of materials. */
+function stockValue(st: MaterialStock): number {
+  let v = 0;
+  for (const [m, n] of Object.entries(st) as [MaterialId, number][]) v += n * MATERIAL_PRICE[m];
+  return v;
+}
+const MATERIAL_PRICE = Object.fromEntries(MATERIALS_LIST.map((m) => [m.id, m.price])) as Record<MaterialId, number>;
+
+/** Whether a car is one of the dealer's specialities (+20% price, faster customers). */
+export function dealerMatches(id: DealerId, car: CarId): boolean {
+  return DEALER_BY_ID[id].classes.includes(CAR_BY_ID[car].class);
+}
+
+export function dealerStats(s: GameState, id: DealerId, gm: GlobalMods): DealerStats {
+  const cfg = DEALER_BY_ID[id];
+  const lvl = s.dealers[id].level;
+  return {
+    id,
+    interval: 60 / cfg.customers / (1 + DEALER_SALE.perLevelSpeed * (lvl - 1)) / gm.dealerCap,
+    markup: cfg.markup + DEALER_MARKUP_PER_LEVEL * (lvl - 1) + gm.markup,
+    stockCap: DEALER_SALE.stock + DEALER_SALE.perLevelStock * (lvl - 1),
+  };
+}
+
+export function chainSnapshot(s: GameState, gm: GlobalMods): ChainSnapshot {
+  const cars = availableCars(s, gm);
+  const plants: Record<string, PlantStats> = {};
+  let potential = 0;
+  let carsPerSec = 0;
+  for (const [id] of plantsOf(s)) {
+    const st = plantStats(s, id, gm, cars);
+    if (!st) continue;
+    plants[id] = st;
+    if (st.type === "assemblyPlant") carsPerSec += st.unitsPerSec;
+    else potential += st.unitsPerSec * (netOfSale(st.unitValue, false) - st.unitCost);
+  }
+  const dealers: Partial<Record<DealerId, DealerStats>> = {};
+  for (const d of DEALERS) if (s.dealers[d.id].owned) dealers[d.id] = dealerStats(s, d.id, gm);
+  return { plants, dealers, cars, potential, carsPerSec };
+}
+
+// ───────────────────────────── travel ─────────────────────────────
+
+/** Road distance between two lots, in tiles: the route the trucks drive on the map. */
+/** Road distances between lots (the map never changes: each pair is worked out once). */
+const DISTANCES = new Map<string, number>();
+export function distance(from: string, to: string): number {
+  const key = `${from}>${to}`;
+  let d = DISTANCES.get(key);
+  if (d === undefined) {
+    const a = plotOf(from)?.entry;
+    const b = plotOf(to)?.entry;
+    d = !a || !b ? 20 : roadRoute(a, b).length;
+    DISTANCES.set(key, d);
+  }
+  return d;
+}
+
+function legTime(from: string, to: string, pace: number, dock = 1) {
+  return DOCK_TIME * dock + distance(from, to) * pace * (1 + TRAFFIC_ALLOWANCE);
+}
+
+const incoming = (s: GameState, to: string, item: Shipment["item"]) =>
+  s.chain.shipments.reduce((n, sh) => (!sh.back && sh.to === to && sh.item === item ? n + sh.qty : n), 0);
+
+
+function ship(s: GameState, sh: Omit<Shipment, "id" | "t" | "back">) {
+  s.chain.shipments.push({ ...sh, id: s.chain.nextShip++, t: 0, back: false });
+}
+
+// ───────────────────────────── My Cars on the road ─────────────────────────────
+
+/** The factory lot of a car in the collection: its own assembly plant, or any other one. */
+export function lotOf(s: GameState, rc: RaceCarState): string | null {
+  if (rc.home && s.city.buildings[rc.home]?.type === "assemblyPlant") return rc.home;
+  return plantsOf(s).find(([, b]) => b.type === "assemblyPlant")?.[0] ?? null;
+}
+
+export type CarDestination = "factory" | "racing" | "showroom";
+
+/** The company showroom for a car: the dealer of its class it owns, else any it owns. */
+export function showroomFor(s: GameState, rc: RaceCarState): DealerId | null {
+  const cls = CAR_BY_ID[rc.car].class;
+  const owned = DEALERS.filter((d) => s.dealers[d.id]?.owned && plotOf(`d:${d.id}`));
+  return (owned.find((d) => d.classes.includes(cls)) ?? owned[0])?.id ?? null;
+}
+
+/** Where a car of the collection is parked now (plot id), or null on the road. */
+function parkedAt(s: GameState, rc: RaceCarState): string | null {
+  const at = rc.location ?? "racing";
+  if (at === "transit") return null;
+  if (at === "racing") return RACING;
+  if (at === "showroom") return rc.listing ? `d:${rc.listing.dealer}` : null;
+  return lotOf(s, rc);
+}
+
+/** Driving time and fee of moving a car of the collection; null if it can't go there now. */
+export function carTrip(s: GameState, rc: RaceCarState, to: CarDestination): { from: string; to: string; dur: number; fee: number } | null {
+  const at = rc.location ?? "racing";
+  if (at === "transit" || at === to || s.racing.live?.car === rc.id || rc.install) return null;
+  if (to === "racing" && !s.racing.unlocked) return null;
+  const from = parkedAt(s, rc);
+  const dealer = to === "showroom" ? showroomFor(s, rc) : null;
+  const dest = to === "racing" ? RACING : to === "showroom" ? (dealer ? `d:${dealer}` : null) : lotOf(s, rc);
+  if (!from || !dest || from === dest) return null;
+  return { from, to: dest, dur: legTime(from, dest, 1), fee: TRIP_FEE.carrier };
+}
+
+/** Loads a car of the collection onto its own transporter: to the paddock, a showroom or back to the factory lot. */
+export function sendCar(s: GameState, id: number, to: CarDestination, price?: number): boolean {
+  const rc = s.racing.cars.find((c) => c.id === id);
+  const trip = rc && carTrip(s, rc, to);
+  if (!rc || !trip || s.cash < trip.fee) return false;
+  if (to === "showroom" && !(price && price > 0)) return false;
+  s.cash -= trip.fee;
+  book(s, "logistics", trip.fee);
+  ship(s, { from: trip.from, to: trip.to, item: "car", qty: 1, value: 0, dur: trip.dur, vehicle: "carrier", models: [rc.car], fleet: [rc.id] });
+  if (to === "factory" && !rc.home) rc.home = trip.to;
+  if (to === "showroom") rc.listing = { price: price!, dealer: trip.to.slice(2) as DealerId, since: 0 };
+  else delete rc.listing;
+  rc.location = "transit";
+  return true;
+}
+
+const destOf = (to: string): CarDestination => (to === RACING ? "racing" : to.startsWith("d:") ? "showroom" : "factory");
+
+/** Where a car on the road is going (null: not on the road). */
+export function carEta(s: GameState, id: number): { to: CarDestination; left: number } | null {
+  const sh = s.chain.shipments.find((x) => !x.back && x.fleet?.includes(id));
+  return sh ? { to: destOf(sh.to), left: Math.max(0, sh.dur - sh.t) } : null;
+}
+
+// ───────────────────────────── tick ─────────────────────────────
+
+export interface ChainTickOut {
+  earned: number;
+  spent: number;
+  components: number;
+  cars: number;
+  deliveries: number;
+  rp: number;
+  /** Cars sold wholesale (dealers were full). */
+  wholesale: number;
+  carsSold: number;
+  /** Material units used. */
+  materials: number;
+}
+
+/** Where a finished load from this plant should go now, or null to wait. */
+function destination(s: GameState, snap: ChainSnapshot, id: string, b: BuildingState & { plant: PlantData }): { to: string; room: number; market?: ExportMarketId } | null {
+  const cfg = PLANT_BY_ID[b.type as PlantType];
+  // motorized chassis are sold at the market
+  if (snap.plants[id]?.combine) return { to: MARKET, room: Infinity };
+  if (!cfg.item) {
+    // cars: by the plant's route: the dealer that pays most for this model (its speciality first),
+    // the one that will sell it soonest, or a chosen dealer first; always one with room
+    const car = snap.plants[id]?.car?.id;
+    const route = b.plant.carRoute ?? "price";
+    // overseas: to the port, while the market is open
+    if (isExportRoute(route)) {
+      const port = portPlot(s);
+      const market = route.slice(7) as ExportMarketId;
+      if (port && s.export.open.includes(market)) return { to: port, room: Infinity, market };
+    }
+    let best: { to: string; room: number; score: number } | null = null;
+    for (const d of Object.values(snap.dealers)) {
+      if (!d) continue;
+      const to = `d:${d.id}`;
+      const stock = s.chain.dealers[d.id]?.cars ?? 0;
+      const queued = stock + incoming(s, to, "car");
+      const room = d.stockCap - queued;
+      if (room <= 0) continue;
+      const match = !!car && dealerMatches(d.id, car);
+      const markup = d.markup + (match ? DEALER_SPECIALTY.price : 0);
+      // soonest sale: fewer cars ahead of it and quicker customers for this model
+      const wait = ((queued + 1) * d.interval) / ((match ? DEALER_SPECIALTY.speed : 1) * (car ? CLASS_DEMAND[CAR_BY_ID[car].class] : 1));
+      const score = route === "fast" ? -wait : route !== "price" && route === d.id ? 1e9 + markup : markup;
+      if (!best || score > best.score) best = { to, room, score };
+    }
+    // every dealer is full: the cars wait in the plant's car storage
+    return best;
+  }
+  // parts go to the assembly plant that needs them most; the rest is sold
+  let best: { to: string; room: number } | null = null;
+  for (const [id, other] of plantsOf(s)) {
+    if (other.type !== "assemblyPlant") continue;
+    const ost = snap.plants[id];
+    if (!ost?.car || !recipe(ost.car).includes(cfg.item) || lineWaitsOnSupplier(s, id, other.plant)) continue;
+    const room = ost.inCap - (other.plant.inputs[cfg.item] ?? 0) - incoming(s, id, cfg.item);
+    if (room > 0 && (!best || room > best.room)) best = { to: id, room };
+  }
+  // before assembly: bodies go to engine factories that make motorized chassis
+  if (!best && cfg.item === "body")
+    for (const [id, other] of plantsOf(s)) {
+      const ost = snap.plants[id];
+      if (!ost?.combine) continue;
+      const room = ost.inCap - (other.plant.inputs.body ?? 0) - incoming(s, id, "body");
+      if (room > 0 && (!best || room > best.room)) best = { to: id, room };
+    }
+  return best ?? { to: MARKET, room: Infinity };
+}
+
+/**
+ * Advances the chain by `dt` seconds. `speedMult` slows production (offline
+ * efficiency); trucks always drive at full speed.
+ */
+export function chainTick(
+  s: GameState,
+  dt: number,
+  snap: ChainSnapshot,
+  credit: (amount: number) => void,
+  events?: GameEvent[],
+  offline = false,
+): ChainTickOut {
+  const out: ChainTickOut = { earned: 0, spent: 0, components: 0, cars: 0, deliveries: 0, rp: 0, wholesale: 0, carsSold: 0, materials: 0 };
+  const lm = logisticsMods(s);
+  s.market.t += dt;
+  accountTick(s, dt, snap, events);
+  rescue(s, events);
+  qualityTick(s, dt);
+  const earn = (amount: number) => {
+    credit(amount);
+    out.earned += amount;
+  };
+
+  // the plants with a manager (a lookup per plant below, not a search)
+  const managedPlots = new Set<string>();
+  for (const m of Object.values(s.managers)) if (m.hired && m.assignedTo) managedPlots.add(m.assignedTo);
+
+  // the trucks each plant has on the road (counted once, then kept up as trucks leave)
+  const busy = new Map<string, number>();
+  for (const sh of s.chain.shipments) busy.set(sh.from, (busy.get(sh.from) ?? 0) + 1);
+  const busyTrucks = (from: string) => busy.get(from) ?? 0;
+  const plants = plantsOf(s);
+  // each part maker's quality modes, in plant order (for the cars built in this step; looked up once)
+  let modesByMaker: Map<PlantType, ReturnType<typeof qualityOf>[]> | null = null;
+  const modesOf = (type: PlantType) => {
+    if (!modesByMaker) {
+      modesByMaker = new Map();
+      for (const [, o] of plants) {
+        const list = modesByMaker.get(o.type) ?? [];
+        list.push(qualityOf(o.plant));
+        modesByMaker.set(o.type, list);
+      }
+    }
+    return modesByMaker.get(type) ?? [];
+  };
+
+  for (const [id, b] of plants) {
+    const st = snap.plants[id];
+    if (!st) continue;
+    const cfg = PLANT_BY_ID[b.type];
+    const p = b.plant;
+
+    // 1. materials: restock automatically when the plant is set to (Wholesale supplier and up)
+    if (cfg.item && p.autoBuy) autoRestock(s, id, st.unitsPerSec);
+
+    // 1b. finished parts the company doesn't make yet come from an outside supplier:
+    // ordered and paid up front, delivered by truck (see orderParts)
+    if (!cfg.item && st.car) for (const c of recipe(st.car)) out.spent += orderParts(s, id, p, st, c);
+
+    // 2. production
+    const canMake = () => {
+      let n = Math.min(st.lines, Math.floor(st.outCap - p.out));
+      if (n <= 0) return { n: 0, why: "full" as const };
+      if (cfg.item) {
+        const inStock = unitsInStock(p, st.need);
+        if (inStock.n < n) {
+          n = inStock.n;
+          if (n <= 0) p.short = inStock.short;
+        }
+        if (n > 0 && st.combine) {
+          // a motorized chassis needs a body from the Body Works
+          const bodies = Math.floor(p.inputs.body ?? 0);
+          if (bodies < 1) {
+            p.missing = "body";
+            return { n: 0, why: "noParts" as const };
+          }
+          n = Math.min(n, bodies);
+        }
+        return { n, why: "noRaw" as const };
+      }
+      if (!st.car) return { n: 0, why: "noModel" as const };
+      let missing: ComponentId | undefined;
+      for (const c of recipe(st.car)) {
+        const have = Math.floor(p.inputs[c] ?? 0);
+        if (have < n) {
+          n = have;
+          if (have === 0 && !missing) missing = c;
+        }
+      }
+      p.missing = missing;
+      return { n, why: "noParts" as const };
+    };
+    let can = canMake();
+    // the floor: a boost, a broken machine, the crew's morale
+    const managed = managedPlots.has(id);
+    if (floorTick(id, p, dt, { running: p.status === "ok", offline, managed })) events?.push({ type: "breakdown", plot: id });
+    const speed = (offline ? st.offline : 1) * floorPace(p);
+    // running the plant costs wages, energy and maintenance for every second it works
+    // (whatever pace the floor keeps)
+    const runSpeed = offline ? st.offline : 1;
+    const run = st.opPerSec * dt * runSpeed;
+    if (can.n <= 0) {
+      p.status = can.why;
+    } else if (s.chain.suspended) {
+      // over the account's limit: the plant stands still until sales have paid it down
+      p.status = "suspended";
+    } else {
+      p.status = "ok";
+      p.missing = undefined;
+      p.short = undefined;
+      payOrOwe(s, run);
+      out.spent += run;
+      const k = run / Math.max(1e-9, st.opPerSec * dt * runSpeed);
+      book(s, "labor", st.op.labor * dt * runSpeed * k);
+      book(s, "energy", st.op.energy * dt * runSpeed * k);
+      book(s, "maintenance", st.op.maintenance * dt * runSpeed * k);
+      p.progress += (dt * speed) / st.cycle;
+      // the part plants' quality modes, for the cars built in this step (looked up once)
+      let partModes: ReturnType<typeof qualityOf>[] | undefined;
+      while (p.progress >= 1) {
+        can = canMake();
+        if (can.n <= 0) {
+          p.status = can.why;
+          p.progress = 0.999;
+          break;
+        }
+        p.progress -= 1;
+        const n = can.n;
+        if (cfg.item) {
+          out.materials += spendMaterials(s, p, st.need, n);
+          if (st.combine) p.inputs.body = (p.inputs.body ?? 0) - n;
+          p.out += n;
+          p.outValue += n * st.unitValue;
+          out.components += n;
+          s.run.parts[cfg.item] += n;
+          s.lifetime.parts[cfg.item] += n;
+        } else if (st.car) {
+          for (const c of recipe(st.car)) p.inputs[c] = (p.inputs[c] ?? 0) - n;
+          p.out += n;
+          p.outValue += n * st.unitValue;
+          out.cars += n;
+          s.run.carsProduced += n;
+          s.lifetime.carsProduced += n;
+          s.run.carsByType[st.car.id] += n;
+          s.lifetime.carsByType[st.car.id] += n;
+          const first = !s.chain.firstCar;
+          s.chain.firstCar = true;
+          // the first car opens the Local Dealer, so cars start selling right away
+          if (first && !s.dealers.local.owned) {
+            s.dealers.local.owned = true;
+            s.chain.dealers.local = emptyDealerStock();
+          }
+          events?.push({ type: "carBuilt", plot: id, car: st.car.id, first });
+          partModes ??= recipe(st.car).flatMap((c) => modesOf(MAKER[c]));
+          for (let k = 0; k < n; k++) onCarBuilt(s, st.car.id, defectRate(s, p, partModes), qualityOf(p));
+          vipBuilt(s, st.car.id, n, qualityOf(p));
+        }
+        p.made += n;
+        out.rp += n * st.rp;
+      }
+    }
+
+    // 3a. a car the company keeps (My Cars): before the Racing District it stays at the factory lot
+    if (!cfg.item && st.car && p.out >= 1 && !s.racing.unlocked && s.racing.orders.includes(st.car.id)) {
+      const value = p.outValue / p.out;
+      s.racing.orders.splice(s.racing.orders.indexOf(st.car.id), 1);
+      p.out -= 1;
+      p.outValue -= value;
+      receiveRaceCar(s, st.car.id, "factory").home = id;
+    }
+    // …with it, the car leaves for the paddock on its own transporter
+    if (!cfg.item && st.car && p.out >= 1 && s.racing.unlocked && s.racing.orders.includes(st.car.id) && busyTrucks(id) < st.trucks) {
+      const value = p.outValue / p.out;
+      payOrOwe(s, TRIP_FEE.carrier);
+      out.spent += TRIP_FEE.carrier;
+      book(s, "logistics", TRIP_FEE.carrier);
+      ship(s, { from: id, to: RACING, item: "car", qty: 1, value, dur: legTime(id, RACING, st.pace, st.load), vehicle: "carrier", models: [st.car.id] });
+      busy.set(id, busyTrucks(id) + 1);
+      s.racing.orders.splice(s.racing.orders.indexOf(st.car.id), 1);
+      p.out -= 1;
+      p.outValue -= value;
+    }
+
+    // 3. loading dock: send a truck when there is a full load (or it waited long enough)
+    if (p.out >= 1 && busyTrucks(id) < st.trucks) {
+      p.wait += dt;
+      // finished cars leave for the dealers straight away (no waiting for a full load);
+      // other goods wait for a full truck or MAX_WAIT
+      // HEADWAY: the next truck waits a moment so two never leave nose to tail on top of each other
+      // finished cars wait only a few seconds to fill the transporter
+      const maxWait = cfg.item ? MAX_WAIT : CAR_WAIT;
+      if (p.wait >= HEADWAY && (p.out >= st.capacity || p.wait >= maxWait * st.dock)) {
+        const dest = destination(s, snap, id, b);
+        if (dest) {
+          const qty = Math.min(Math.floor(p.out), st.capacity, dest.room);
+          // every trip costs fuel and a driver (on account when the cash is not there yet)
+          const fee = TRIP_FEE[st.vehicle];
+          if (qty >= 1) {
+            payOrOwe(s, fee);
+            out.spent += fee;
+            book(s, "logistics", fee);
+            const value = (p.outValue / p.out) * qty;
+            const models = cfg.item ? undefined : (new Array(qty).fill(st.car?.id ?? "city") as CarId[]);
+            ship(s, { from: id, to: dest.to, item: cfg.item ? (st.combine ? "chassis" : cfg.item) : "car", qty, value, dur: legTime(id, dest.to, st.pace, st.load), vehicle: st.vehicle, models, ...(dest.market ? { market: dest.market } : {}) });
+            busy.set(id, busyTrucks(id) + 1);
+            p.out -= qty;
+            p.outValue -= value;
+            p.wait = 0;
+          }
+        }
+      }
+    } else if (p.out < 1) {
+      p.wait = 0;
+    }
+  }
+
+  // 4. trucks on the road
+  const keep: Shipment[] = [];
+  for (const sh of s.chain.shipments) {
+    sh.t += dt;
+    if (sh.t < sh.dur) {
+      keep.push(sh);
+      continue;
+    }
+    if (sh.back) continue; // home again
+    out.wholesale += arrive(s, sh, snap, earn, events);
+    if (sh.item !== "raw") {
+      out.deliveries += sh.qty;
+      s.run.deliveries += sh.qty;
+      s.lifetime.deliveries += sh.qty;
+    }
+    // drive back empty (the leftover time counts on the way back)
+    sh.back = true;
+    sh.t = Math.min(sh.t - sh.dur, sh.dur);
+    keep.push(sh);
+  }
+  s.chain.shipments = keep;
+
+  // 4b. ships to the export markets, and the truck & bus division's line
+  out.earned += exportTick(s, dt);
+  out.earned += fleetTick(s, dt, offline ? snap.plants[Object.keys(snap.plants)[0]]?.offline ?? 0.5 : 1);
+
+  // 5. customers at the dealerships
+  for (const d of Object.values(snap.dealers)) {
+    if (!d) continue;
+    const stock = (s.chain.dealers[d.id] ??= emptyDealerStock());
+    stock.next -= dt;
+    while (stock.next <= 0) {
+      if (stock.cars < 1) {
+        stock.next = Math.max(stock.next, 0);
+        break;
+      }
+      const each = stock.value / stock.cars;
+      const model = stock.models.shift();
+      const match = !!model && dealerMatches(d.id, model);
+      // export (top transport tier) sells every car for more
+      const price = each * (1 + d.markup + (match ? DEALER_SPECIALTY.price : 0)) * (1 + lm.cars) * carPriceMult(s, model);
+      stock.cars -= 1;
+      stock.value -= each;
+      stock.sold += 1;
+      s.run.carsSold += 1;
+      s.lifetime.carsSold += 1;
+      s.run.carRevenue += price;
+      s.lifetime.carRevenue += price;
+      earn(price);
+      book(s, "carSales", price);
+      // the dealer keeps its fee and the state its tax
+      const fee = price * DEALER_FEE;
+      const tax = price * SALES_TAX;
+      s.cash -= fee + tax;
+      out.spent += fee + tax;
+      book(s, "dealerFees", fee);
+      book(s, "tax", tax);
+      out.carsSold += 1;
+      events?.push({ type: "sale", plot: `d:${d.id}`, item: "car", count: 1, amount: price - fee - tax });
+      // the next customer: popular classes sell faster than exotic ones
+      const demand = (model ? CLASS_DEMAND[CAR_BY_ID[model].class] : 1) * carDemandMult(s, model);
+      stock.next += d.interval / ((match ? DEALER_SPECIALTY.speed : 1) * demand);
+    }
+  }
+
+  s.rp += out.rp;
+  // a share of every sale pays the account back, so it shrinks with each car or load sold
+  if (s.chain.owed > 0) {
+    const P = s.chain.ledger.pending;
+    const proceeds = P.carSales + P.partSales - P.dealerFees - P.tax;
+    if (proceeds > 0) repay(s, DEBT.share * proceeds);
+  }
+  // net income: revenue minus every cost (materials count when a plant uses them), plus what the
+  // parts and cars made but not sold yet are worth at their cost (see goodsValue); an absence
+  // keeps the rates of the session, so it is measured once when it ends (simulateChain)
+  const goods = offline ? (s.chain.goods ?? 0) : goodsValue(s);
+  const madeNotSold = offline ? 0 : goods - (s.chain.goods ?? goods);
+  s.chain.goods = goods;
+  const net = chainNet(s.chain.ledger.pending) + madeNotSold; // garages and racing are counted on their own
+  s.chain.steady = (s.chain.steady ?? s.chain.rate) + (net / dt - (s.chain.steady ?? s.chain.rate)) * Math.min(1, dt / STEADY_WINDOW);
+  settleLedger(s, dt, RATE_WINDOW);
+  s.chain.goodsRate = (s.chain.goodsRate ?? 0) + (madeNotSold / dt - (s.chain.goodsRate ?? 0)) * Math.min(1, dt / RATE_WINDOW);
+  // the chain's income rate is read off the ledger (and the stock change), never smoothed on its own
+  s.chain.rate = chainNet(s.chain.ledger.rate) + s.chain.goodsRate;
+  s.chain.wholesale += (out.wholesale / dt - s.chain.wholesale) * Math.min(1, dt / 120);
+  // the Parts Market forgets what it bought, over its window
+  if (s.chain.demand) {
+    const k = Math.exp(-dt / PARTS_DEMAND.window);
+    for (const key of Object.keys(s.chain.demand) as ItemId[]) {
+      const v = (s.chain.demand[key] ?? 0) * k;
+      if (v < 0.01) delete s.chain.demand[key];
+      else s.chain.demand[key] = v;
+    }
+  }
+  return out;
+}
+
+/** Seconds the steady income averages over. */
+const STEADY_WINDOW = 600;
+
+/** Units of an item the Parts Market takes at full price per window: PARTS_DEMAND.depth per level of the plants making it (+1). */
+export function partsDepth(s: GameState, item: ItemId): number {
+  const maker = item === "chassis" ? "engineFactory" : item === "car" ? null : MAKER[item];
+  let levels = 0;
+  for (const [, b] of plantsOf(s)) if (b.type === maker) levels += b.level;
+  return PARTS_DEMAND.depth * (1 + levels);
+}
+
+/**
+ * What share of the price the Parts Market pays for `qty` more units of an
+ * item now: 1 while recent sales stay within its depth, then depth ÷ volume
+ * (at the middle of the load), never below PARTS_DEMAND.floor.
+ */
+export function partsPriceMult(s: GameState, item: ItemId, qty = 1): number {
+  const v = (s.chain.demand?.[item] ?? 0) + qty / 2;
+  const d = partsDepth(s, item);
+  return v <= d ? 1 : Math.max(PARTS_DEMAND.floor, d / v);
+}
+
+// Standard costs never change (list prices, a Level 1 plant): worked out once each.
+const CAR_COSTS = new Map<CarId, number>();
+const PART_COSTS = new Map<string, number>();
+function stdCarCost(id: CarId): number {
+  let c = CAR_COSTS.get(id);
+  if (c === undefined) CAR_COSTS.set(id, (c = carStdCost(CAR_BY_ID[id], recipe(CAR_BY_ID[id]))));
+  return c;
+}
+function stdItemCost(item: ItemId, grade: number): number {
+  if (item === "car") return 0;
+  if (item === "chassis") return stdItemCost("body", grade) + stdItemCost("engine", grade);
+  const key = `${item}:${grade}`;
+  let c = PART_COSTS.get(key);
+  if (c === undefined) PART_COSTS.set(key, (c = componentStdCost(item, grade)));
+  return c;
+}
+/** The share of a car's sale value that is its cost: its class margin, the dealer's fee and the tax taken off. */
+const carCostShare = (id: CarId | null | undefined) => (1 - DEALER_FEE - SALES_TAX) / (1 + CLASS_MARGIN[id ? CAR_BY_ID[id].class : "economy"]);
+
+/**
+ * What the parts and cars made but not sold yet cost to make (at standard
+ * cost): at the plants, on the road, at the dealers and at the export port.
+ * The ledger books materials and wages when a plant makes something and the
+ * revenue when it sells, so while stock builds up it shows a loss that isn't
+ * one: the profit shown adds the change of this value (the change in
+ * inventories of an income statement). Materials in the warehouses aren't in
+ * it — they are booked only when used.
+ */
+export function goodsValue(s: GameState): number {
+  const grade: Partial<Record<ComponentId, number>> = {};
+  const plants = plantsOf(s);
+  for (const [, b] of plants) {
+    const item = PLANT_BY_ID[b.type].item;
+    if (item) grade[item] = Math.max(grade[item] ?? 1, b.plant.grade);
+  }
+  const gradeOf = (item: ItemId) => (item === "car" || item === "chassis" ? (grade.body ?? 1) : (grade[item] ?? 1));
+  let v = 0;
+  for (const [, b] of plants) {
+    const p = b.plant;
+    const item = PLANT_BY_ID[b.type].item;
+    for (const [c, n] of Object.entries(p.inputs) as [ComponentId, number][]) if (n > 0) v += n * stdItemCost(c, gradeOf(c));
+    if (p.out > 0) v += item ? p.out * stdItemCost(item, p.grade) : p.outValue * carCostShare(p.car);
+  }
+  for (const sh of s.chain.shipments) {
+    if (sh.back || sh.fleet || sh.item === "raw") continue;
+    if (sh.item !== "car") v += sh.qty * stdItemCost(sh.item, gradeOf(sh.item));
+    else if (sh.models?.length) for (const m of sh.models) v += stdCarCost(m);
+    else v += sh.value * carCostShare(null);
+  }
+  for (const d of Object.values(s.chain.dealers)) {
+    if (!d) continue;
+    for (const m of d.models) v += stdCarCost(m);
+    // cars from older saves without their models: by their value
+    const rest = Math.floor(d.cars) - d.models.length;
+    if (rest > 0 && d.cars > 0) v += (d.value / d.cars) * rest * carCostShare(null);
+  }
+  for (const d of Object.values(s.export.dock)) if (d) for (const m of d.cars) v += stdCarCost(m);
+  for (const sh of s.export.ships) for (const m of sh.cars) v += stdCarCost(m);
+  return v;
+}
+
+/** Goods the company still has to sell: on the road, at a plant's dock, at a dealer or on a ship. */
+function goodsInPipeline(s: GameState): boolean {
+  if (s.chain.shipments.some((sh) => !sh.back && sh.item !== "raw" && sh.from !== DEPOT)) return true;
+  if (Object.values(s.chain.dealers).some((d) => (d?.cars ?? 0) >= 1)) return true;
+  if (plantsOf(s).some(([, b]) => b.plant.out >= 1)) return true;
+  return s.export.ships.length > 0 || Object.values(s.export.dock).some((d) => (d?.cars.length ?? 0) > 0);
+}
+
+/**
+ * The company's account (DEBT): its limit follows what the plants cost to
+ * run; it is paid back from every sale (see the end of chainTick) and out of
+ * profit (DEBT.repay of the average net income), and cash that covers it
+ * twice over (or at all, while suspended) settles it. Over the limit nothing
+ * more is bought on credit (canOwe) while the plants keep making what pays it
+ * back; only past DEBT.halt × the limit is every plant suspended, until it is
+ * paid down to DEBT.resume of that line — or until nothing is left to sell
+ * (then only producing again can pay it back).
+ */
+function accountTick(s: GameState, dt: number, snap: ChainSnapshot, events?: GameEvent[]) {
+  const C = s.chain;
+  const run = Object.values(snap.plants).reduce((a, st) => a + st.opPerSec, 0);
+  C.runCost = run;
+  C.debtLimit = Math.max(DEBT.min, run * DEBT.seconds);
+  if (C.owed > 0) {
+    // cash that covers it settles it; otherwise it is paid out of profit
+    if (s.cash >= 2 * C.owed || (C.suspended && s.cash >= C.owed)) repay(s, C.owed);
+    else repay(s, DEBT.repay * Math.max(0, C.steady ?? C.rate) * dt);
+  }
+  const was = !!C.suspended;
+  if (C.owed >= C.debtLimit * DEBT.halt) C.suspended = true;
+  if (C.suspended && (C.owed <= C.debtLimit * DEBT.halt * DEBT.resume || !goodsInPipeline(s))) delete C.suspended;
+  if (C.suspended && !was) events?.push({ type: "suspended" });
+}
+
+/**
+ * The emergency supplier. A company that is completely stuck — no plant can
+ * work, it can't afford one unit of material anywhere, and nothing is made,
+ * on the road or at a dealer — gets material for a couple of units at the
+ * emergency price (RESCUE.markup), on its account. Nothing is written off,
+ * material never cash, at most once per cooldown: a way out that costs,
+ * never a free supply.
+ */
+function rescue(s: GameState, events?: GameEvent[]) {
+  if (s.chain.shipments.length) return;
+  if (s.chain.rescueT !== undefined && s.market.t - s.chain.rescueT < RESCUE.cooldown) return;
+  for (const d of Object.values(s.chain.dealers)) if ((d?.cars ?? 0) >= 1) return;
+  const short: [string, MaterialStock][] = [];
+  for (const [id, b] of plantsOf(s)) {
+    const p = b.plant;
+    if (p.out >= 1 || p.status === "ok") return;
+    if (!PLANT_BY_ID[b.type as PlantType]?.item) continue;
+    const need = unitMaterials(b.type as PlantType, p.grade);
+    if (unitsInStock(p, need).n >= 1) return;
+    const missing = shortfall(p, need, RESCUE.units);
+    if ((Object.entries(shortfall(p, need, 1)) as [MaterialId, number][]).reduce((a, [m, n]) => a + orderCost(s, m, n), 0) <= s.cash) return;
+    short.push([id, missing]);
+  }
+  if (!short.length) return;
+  // on the company's account, within an emergency line of twice its limit: never an endless hole
+  const deliver = () => {
+    let cost = 0;
+    for (const [id, missing] of short) {
+      const c = emergencyCost(s, missing);
+      if (s.chain.owed + Math.max(0, c - Math.max(0, s.cash)) > 2 * debtLimit(s)) continue;
+      cost += emergencyMaterials(s, id, missing);
+    }
+    return cost;
+  };
+  let cost = deliver();
+  // the last resort: stuck with the emergency line full too, the creditors cut the account back
+  // to its limit and the company pays with its reputation (never more than once an hour)
+  const R = RESCUE.restructure;
+  if (cost <= 0 && s.chain.owed > debtLimit(s) && (s.chain.restructuredT === undefined || s.market.t - s.chain.restructuredT >= R.cooldown)) {
+    const cut = s.chain.owed - debtLimit(s);
+    s.chain.owed = debtLimit(s);
+    s.chain.restructuredT = s.market.t;
+    s.quality.rep = Math.max(0, s.quality.rep - R.rep);
+    events?.push({ type: "restructured", amount: cut });
+    cost = deliver();
+  }
+  if (cost <= 0) return;
+  s.chain.rescueT = s.market.t;
+  events?.push({ type: "emergency", cost });
+}
+
+/** Unloads a truck; returns how many cars it sold wholesale. */
+function arrive(s: GameState, sh: Shipment, snap: ChainSnapshot, earn: (n: number) => void, events?: GameEvent[]): number {
+  if (sh.fleet) {
+    // a car of the collection unloaded at the paddock or back at its factory lot
+    for (const id of sh.fleet) {
+      const rc = s.racing.cars.find((c) => c.id === id);
+      if (rc) rc.location = destOf(sh.to);
+    }
+    return 0;
+  }
+  if (sh.to === MARKET) {
+    if (sh.item === "car") {
+      // the dealers were full: a wholesale buyer takes the whole load, below dealer price
+      // (older saves only: cars no longer go to the wholesale buyer)
+      const amount = sh.value * WHOLESALE;
+      earn(amount);
+      book(s, "carSales", amount);
+      s.run.carsSold += sh.qty;
+      s.lifetime.carsSold += sh.qty;
+      s.run.carRevenue += amount;
+      s.lifetime.carRevenue += amount;
+      events?.push({ type: "sale", plot: MARKET, item: "car", count: sh.qty, amount });
+      return sh.qty;
+    }
+    // a port sells components for more abroad; the market's appetite is limited; tax is due on every sale
+    const item = sh.item as ItemId;
+    const amount = sh.value * (1 + logisticsMods(s).market) * partsPriceMult(s, item, sh.qty);
+    const sold = (s.chain.demand ??= {});
+    sold[item] = (sold[item] ?? 0) + sh.qty;
+    earn(amount);
+    book(s, "partSales", amount);
+    const tax = amount * SALES_TAX;
+    s.cash -= tax;
+    book(s, "tax", tax);
+    events?.push({ type: "sale", plot: MARKET, item: sh.item as ItemId, count: sh.qty, amount: amount - tax });
+    return 0;
+  }
+  if (sh.to.startsWith("d:")) {
+    const id = sh.to.slice(2) as DealerId;
+    const stock = (s.chain.dealers[id] ??= emptyDealerStock());
+    if (stock.cars < 1) stock.next = Math.max(stock.next, (snap.dealers[id]?.interval ?? 10) * 0.4);
+    stock.cars += sh.qty;
+    stock.value += sh.value;
+    stock.models.push(...(sh.models ?? []));
+    s.run.carsShipped = (s.run.carsShipped ?? 0) + sh.qty;
+    s.lifetime.carsShipped = (s.lifetime.carsShipped ?? 0) + sh.qty;
+    return 0;
+  }
+  if (sh.item === "car" && sh.market) {
+    // at the port: onto the next ship to that market
+    dockCars(s, sh.market, sh.models ?? [], sh.value);
+    return 0;
+  }
+  if (sh.to === RACING) {
+    // a car for the racing team: the paddock unloads it
+    for (const m of sh.models ?? []) s.racing.arrivals.push(m);
+    return 0;
+  }
+  const p = s.city.buildings[sh.to]?.plant;
+  if (!p) return 0;
+  if (sh.item === "raw") {
+    // a materials delivery: into the warehouse, each material at what it cost
+    addStock(p, sh.materials ?? {}, sh.value, sh.costs);
+  }
+  else if (sh.item !== "car" && sh.item !== "chassis") p.inputs[sh.item] = (p.inputs[sh.item] ?? 0) + sh.qty;
+  return 0;
+}
+
+// ───────────────────────────── offline ─────────────────────────────
+
+/**
+ * Runs the chain for `seconds` of absence in steps. Plants produce at their
+ * offline efficiency; trucks keep driving. Returns what happened; money is
+ * credited to the wallet as it is earned.
+ */
+export function simulateChain(s: GameState, seconds: number, snap: ChainSnapshot, credit: (amount: number) => void): ChainTickOut {
+  const total: ChainTickOut = { earned: 0, spent: 0, components: 0, cars: 0, deliveries: 0, rp: 0, wholesale: 0, carsSold: 0, materials: 0 };
+  if (seconds <= 0 || Object.keys(snap.plants).length === 0) return total;
+  const steps = Math.max(1, Math.min(Math.ceil(seconds), 20_000));
+  const dt = seconds / steps;
+  // the HUD and dashboard rates describe the session, not the absence: keep them
+  const rates = { ...s.chain.ledger.rate };
+  const steady = s.chain.steady;
+  const goodsRate = s.chain.goodsRate;
+  for (let i = 0; i < steps; i++) {
+    const r = chainTick(s, dt, snap, credit, undefined, true);
+    total.earned += r.earned;
+    total.spent += r.spent;
+    total.components += r.components;
+    total.cars += r.cars;
+    total.deliveries += r.deliveries;
+    total.rp += r.rp;
+    total.wholesale += r.wholesale;
+    total.carsSold += r.carsSold;
+    total.materials += r.materials;
+  }
+  s.chain.ledger.rate = rates;
+  s.chain.goods = goodsValue(s);
+  s.chain.goodsRate = goodsRate;
+  s.chain.rate = chainNet(rates) + (goodsRate ?? 0);
+  s.chain.steady = steady;
+  return total;
+}
+
+// ───────────────────────────── actions ─────────────────────────────
+
+function spend(s: GameState, cost: number | null): boolean {
+  if (cost === null || !Number.isFinite(cost) || s.cash < cost) return false;
+  s.cash -= cost;
+  return true;
+}
+
+function plantAt(s: GameState, plotId: string) {
+  const b = s.city.buildings[plotId];
+  return b?.plant ? (b as BuildingState & { plant: PlantData }) : null;
+}
+
+function countUpgrade(s: GameState, levels = false) {
+  s.run.upgradesBought += 1;
+  s.lifetime.upgradesBought += 1;
+  if (levels) {
+    s.run.levelsBought += 1;
+    s.lifetime.levelsBought += 1;
+  }
+}
+
+/** A new level is built onto the plant (it keeps producing at its level meanwhile). */
+export function upgradePlantLevel(s: GameState, plotId: string, gm: GlobalMods): boolean {
+  const b = plantAt(s, plotId);
+  if (!b || !startWorks(s, plotId, levelCost(b, gm))) return false;
+  countUpgrade(s, true);
+  return true;
+}
+
+export function upgradePlantSpeed(s: GameState, plotId: string, gm: GlobalMods): boolean {
+  const b = plantAt(s, plotId);
+  if (!b || !spend(s, speedCost(b, gm))) return false;
+  b.plant.speed += 1;
+  countUpgrade(s, true);
+  return true;
+}
+
+export function upgradeAutomation(s: GameState, plotId: string, gm: GlobalMods): boolean {
+  const b = plantAt(s, plotId);
+  if (!b || !spend(s, automationCost(b, gm))) return false;
+  b.plant.automation += 1;
+  countUpgrade(s);
+  return true;
+}
+
+export function upgradeGrade(s: GameState, plotId: string, gm: GlobalMods): boolean {
+  const b = plantAt(s, plotId);
+  if (!b || !spend(s, gradeCost(b, gm))) return false;
+  b.plant.grade += 1;
+  countUpgrade(s);
+  return true;
+}
+
+/** A bigger warehouse: more materials on site. */
+export function upgradeWarehouse(s: GameState, plotId: string, gm: GlobalMods): boolean {
+  const b = plantAt(s, plotId);
+  if (!b || !spend(s, warehouseCost(b, gm.costMult))) return false;
+  b.plant.warehouse += 1;
+  countUpgrade(s);
+  return true;
+}
+
+/** ⚡ Power System: a cheaper energy bill. */
+export function upgradePower(s: GameState, plotId: string, gm: GlobalMods): boolean {
+  const b = plantAt(s, plotId);
+  if (!b || b.plant.power >= POWER_SYSTEM.max || !spend(s, powerCost(b, gm.costMult))) return false;
+  b.plant.power += 1;
+  countUpgrade(s);
+  return true;
+}
+
+/** Switches emergency parts for an assembly plant (bought at the emergency price when the company's own plants stop). */
+export function setBackupParts(s: GameState, plotId: string, on: boolean): boolean {
+  const b = plantAt(s, plotId);
+  if (!b || b.type !== "assemblyPlant") return false;
+  if (on) b.plant.backup = true;
+  else delete b.plant.backup;
+  return true;
+}
+
+/** Switches automatic restocking (it only runs once a supplier allows it). */
+export function setAutoBuy(s: GameState, plotId: string, on: boolean): boolean {
+  const b = plantAt(s, plotId);
+  if (!b || !PLANT_BY_ID[b.type as PlantType].item) return false;
+  b.plant.autoBuy = on;
+  return true;
+}
+
+/** Engine factory strategy before assembly: sell engines, or motorized chassis. */
+/** Quality against quantity for one plant. */
+export function setQualityMode(s: GameState, plotId: string, mode: QualityMode): boolean {
+  const b = plantAt(s, plotId);
+  if (!b || qualityOf(b.plant) === mode) return false;
+  if (mode === "balanced") delete b.plant.mode;
+  else b.plant.mode = mode;
+  return true;
+}
+
+/** Where an assembly plant sends its cars. */
+export function setCarRoute(s: GameState, plotId: string, route: CarRoute): boolean {
+  const b = plantAt(s, plotId);
+  if (!b || b.type !== "assemblyPlant" || (b.plant.carRoute ?? "price") === route) return false;
+  if (route === "price") delete b.plant.carRoute;
+  else b.plant.carRoute = route;
+  return true;
+}
+
+export function setCombine(s: GameState, plotId: string, on: boolean): boolean {
+  const b = plantAt(s, plotId);
+  if (!b || b.type !== "engineFactory" || !!b.plant.combine === on) return false;
+  b.plant.combine = on;
+  return true;
+}
+
+export function setPlantCar(s: GameState, plotId: string, car: CarId | null, gm: GlobalMods): boolean {
+  const b = plantAt(s, plotId);
+  if (!b || b.type !== "assemblyPlant") return false;
+  if (car && carLock(s, CAR_BY_ID[car], gm) !== null) return false;
+  b.plant.car = car;
+  return true;
+}
+
+// ───────────────────────────── saves ─────────────────────────────
+
+type Json = Record<string, unknown>;
+const isObj = (v: unknown): v is Json => typeof v === "object" && v !== null && !Array.isArray(v);
+const num = (v: unknown, dflt = 0) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : dflt);
+const int = (v: unknown, min: number, max: number, dflt: number) =>
+  typeof v === "number" && Number.isFinite(v) ? Math.max(min, Math.min(max, Math.floor(v))) : dflt;
+
+export function migratePlant(type: PlantType, raw: unknown): PlantData {
+  const p = newPlant();
+  if (!isObj(raw)) return p;
+  p.speed = int(raw.speed, 0, SPEED.max, 0);
+  p.automation = int(raw.automation, 0, AUTOMATION.length - 1, 0);
+  p.fleet = int(raw.fleet, 1, MAX_TRUCKS, 1);
+  p.grade = int(raw.grade, 1, MAX_GRADE, 1);
+  // routing is automatic now: parts go where they are needed
+  p.route = "use";
+  if (raw.combine === true) p.combine = true;
+  if (raw.auto === true) p.auto = true;
+  // the machines built and operators hired on the shop floor (bought, so never lost on load)
+  if (isObj(raw.workshop)) p.workshop = workshopOf({ ...p, workshop: { machines: num(raw.workshop.machines) || 1, workers: num(raw.workshop.workers) || 1 } });
+  p.progress = Math.min(0.999, num(raw.progress));
+  p.stock = migrateStock(raw.stock);
+  p.warehouse = int(raw.warehouse, 1, WAREHOUSE_CAP.length, 1);
+  p.power = int(raw.power, 0, POWER_SYSTEM.max, 0);
+  if (raw.autoBuy === true) p.autoBuy = true;
+  if (raw.backup === true) p.backup = true;
+  if (typeof raw.short === "string") p.short = raw.short as MaterialId;
+  // saves from before the materials market: the old raw yard becomes a starter stock
+  if (raw.stock === undefined && PLANT_BY_ID[type].item) p.stock = starterStock(type, p.grade, 6);
+  // saves from before materials were costed on use: value the stock at list price
+  p.stockCost = typeof raw.stockCost === "number" && Number.isFinite(raw.stockCost) && raw.stockCost >= 0 ? raw.stockCost : stockValue(p.stock);
+  // each material's own cost; saves from before it split their total by list price
+  p.stockCostBy = migrateCostBasis(raw.stockCostBy, p);
+  p.out = num(raw.out);
+  p.outValue = num(raw.outValue);
+  p.made = num(raw.made);
+  p.wait = num(raw.wait);
+  if (raw.status === "noRaw" || raw.status === "full" || raw.status === "noParts" || raw.status === "noModel" || raw.status === "noCash" || raw.status === "suspended") p.status = raw.status;
+  if (typeof raw.missing === "string" && raw.missing in COMPONENT_BY_ID) p.missing = raw.missing as ComponentId;
+  p.car = typeof raw.car === "string" && raw.car in CAR_BY_ID ? (raw.car as CarId) : null;
+  if (raw.mode === "fast" || raw.mode === "premium") p.mode = raw.mode;
+  if (raw.carRoute === "fast" || (typeof raw.carRoute === "string" && (raw.carRoute in DEALER_BY_ID || isExportRoute(raw.carRoute)))) p.carRoute = raw.carRoute as CarRoute;
+  if (isObj(raw.inputs)) for (const c of Object.keys(COMPONENT_BY_ID) as ComponentId[]) if (raw.inputs[c] !== undefined) p.inputs[c] = num(raw.inputs[c]);
+  // the shop floor: the crew's morale, a boost or a breakdown in progress, the machines' wear
+  if (raw.morale !== undefined) p.morale = Math.min(100, num(raw.morale, MORALE.base));
+  for (const k of ["boost", "boostCd", "broken", "wear", "breaks"] as const) if (raw[k] !== undefined) p[k] = num(raw[k]);
+  if (typeof raw.skin === "string" && raw.skin in SKIN_BY_ID && raw.skin !== "auto") p.skin = raw.skin as SkinId;
+  return p;
+}
+
+export function migrateChain(raw: unknown, s: GameState): ChainState {
+  const chain = createChain();
+  if (!isObj(raw)) return chain;
+  chain.rate = typeof raw.rate === "number" && Number.isFinite(raw.rate) ? raw.rate : 0;
+  chain.firstCar = raw.firstCar === true;
+  chain.wholesale = 0;
+  chain.ledger = migrateLedger(raw.ledger);
+  chain.owed = num(raw.owed);
+  if (typeof raw.debtLimit === "number" && Number.isFinite(raw.debtLimit) && raw.debtLimit > 0) chain.debtLimit = raw.debtLimit;
+  if (raw.suspended === true) chain.suspended = true;
+  if (isObj(raw.demand))
+    for (const [k, v] of Object.entries(raw.demand))
+      if ((k in COMPONENT_BY_ID || k === "chassis") && typeof v === "number" && Number.isFinite(v) && v > 0) (chain.demand ??= {})[k as ItemId] = v;
+  if (typeof raw.steady === "number" && Number.isFinite(raw.steady)) chain.steady = raw.steady;
+  if (typeof raw.goods === "number" && Number.isFinite(raw.goods) && raw.goods >= 0) chain.goods = raw.goods;
+  if (typeof raw.goodsRate === "number" && Number.isFinite(raw.goodsRate)) chain.goodsRate = raw.goodsRate;
+  if (typeof raw.rescueT === "number" && Number.isFinite(raw.rescueT)) chain.rescueT = raw.rescueT;
+  if (typeof raw.restructuredT === "number" && Number.isFinite(raw.restructuredT)) chain.restructuredT = raw.restructuredT;
+  chain.nextShip = int(raw.nextShip, 1, 1e12, 1);
+  if (Array.isArray(raw.shipments)) {
+    for (const sh of raw.shipments) {
+      if (!isObj(sh) || typeof sh.from !== "string" || typeof sh.to !== "string" || typeof sh.item !== "string") continue;
+      if (!plotOf(sh.from) || !plotOf(sh.to)) continue;
+      chain.shipments.push({
+        id: chain.nextShip++,
+        from: sh.from,
+        to: sh.to,
+        item: sh.item as Shipment["item"],
+        qty: num(sh.qty),
+        value: num(sh.value),
+        t: num(sh.t),
+        dur: Math.max(1, num(sh.dur, 10)),
+        back: sh.back === true,
+        vehicle: (["van", "truck", "semi", "trailer", "carrier"].includes(sh.vehicle as string) ? sh.vehicle : "truck") as Shipment["vehicle"],
+        models: Array.isArray(sh.models) ? (sh.models.filter((m) => typeof m === "string" && m in CAR_BY_ID) as CarId[]) : undefined,
+        materials: isObj(sh.materials) ? migrateStock(sh.materials) : undefined,
+        ...(isObj(sh.costs) ? { costs: migrateStock(sh.costs) } : {}),
+        ...(typeof sh.market === "string" && sh.market in EXPORT_BY_ID ? { market: sh.market as ExportMarketId } : {}),
+        ...(Array.isArray(sh.fleet) ? { fleet: sh.fleet.filter((n): n is number => typeof n === "number") } : {}),
+      });
+    }
+  }
+  if (isObj(raw.dealers)) {
+    for (const d of DEALERS) {
+      const v = raw.dealers[d.id];
+      if (!isObj(v) || !s.dealers[d.id].owned) continue;
+      chain.dealers[d.id] = {
+        cars: num(v.cars),
+        value: num(v.value),
+        models: Array.isArray(v.models) ? (v.models.filter((m) => typeof m === "string" && m in CAR_BY_ID) as CarId[]) : [],
+        next: num(v.next),
+        sold: num(v.sold),
+      };
+    }
+  }
+  return chain;
+}
+
+
+/** Plants this automated can upgrade themselves. */
+export const AUTO_UPGRADE_FROM = 2;
+
+/**
+ * Auto-upgrade: each switched-on plant buys its cheapest speed or level
+ * upgrade, but only when it costs at most a quarter of the cash, so the
+ * player can still save for new plants. One purchase per plant per call.
+ */
+export function autoUpgrade(s: GameState, gm: GlobalMods): number {
+  let bought = 0;
+  for (const [id, b] of plantsOf(s)) {
+    if (!b.plant.auto || b.plant.automation < AUTO_UPGRADE_FROM) continue;
+    const sp = speedCost(b, gm);
+    const lv = levelCost(b, gm);
+    const pickLevel = lv !== null && (sp === null || lv <= sp);
+    const cost = pickLevel ? lv : sp;
+    if (cost === null || cost > s.cash * 0.25) continue;
+    if (pickLevel ? upgradePlantLevel(s, id, gm) : upgradePlantSpeed(s, id, gm)) bought++;
+  }
+  return bought;
+}
+
+/** What one finished unit costs the plant: materials (or a car's parts) and its running time. */
+export function plantUnitCost(st: PlantStats, gm: GlobalMods): number {
+  void gm;
+  return st.unitCost;
+}
+
+/** What one unit brings in after the dealer's fee and tax (components: tax only). */
+export function plantNetValue(st: PlantStats): number {
+  return netOfSale(st.unitValue, !PLANT_BY_ID[st.type].item);
+}
+
+/** Profit per minute at full speed: units made × (net sale value − cost). */
+export function plantProfitPerMin(st: PlantStats, gm: GlobalMods): number {
+  return st.unitsPerSec * 60 * (plantNetValue(st) - plantUnitCost(st, gm));
+}
+
+/** Materials for `units` finished units (a new plant's starter stock, and old saves). */
+export function starterStock(type: PlantType, grade: number, units: number): MaterialStock {
+  const out: MaterialStock = {};
+  for (const [m, n] of Object.entries(unitMaterials(type, grade)) as [MaterialId, number][]) out[m] = n * units;
+  return out;
+}
