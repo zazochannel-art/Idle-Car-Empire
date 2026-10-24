@@ -163,6 +163,8 @@ export function Toasts() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   // the first-car title takes this spot on phones while it plays
   const celebrating = useUi((u) => !!u.celebrate);
+  // a panel open over the map (game.tsx opens the sheet for any of these)
+  const sheet = useUi((u) => !!(u.view || u.plot || u.zone));
   useEffect(
     () =>
       uiEvents.on((e: UiEvent) => {
@@ -175,8 +177,9 @@ export function Toasts() {
   );
 
   return (
-    // phones: under the minimap and its zoom buttons (top 9.25rem + about 8.5rem), which a toast covered before
-    <div className="pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top)+18rem)] z-[45] flex flex-col items-center gap-1.5 px-5 md:top-20 md:items-end md:pr-6">
+    // phones, over the map: under the minimap and its zoom buttons (top 9.25rem + about 8.5rem),
+    // which a toast covered before; with a sheet open (from about 15rem down), above the sheet
+    <div className={cn("pointer-events-none fixed inset-x-0 z-[45] flex flex-col items-center gap-1.5 px-5 md:top-20 md:items-end md:pr-6", sheet ? "top-[calc(env(safe-area-inset-top)+8.75rem)]" : "top-[calc(env(safe-area-inset-top)+18rem)]")}>
       <AnimatePresence initial={false}>
         {(celebrating ? [] : toasts).map((t) => (
           <motion.div
