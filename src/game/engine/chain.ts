@@ -1642,8 +1642,9 @@ export const AUTO_UPGRADE_FROM = 2;
  * Auto-upgrade: each switched-on plant buys its cheapest speed or level
  * upgrade, but only when it costs at most a quarter of the cash, so the
  * player can still save for new plants. One purchase per plant per call.
+ * `log` gets each purchase (the plant and what it paid), so the player can be told.
  */
-export function autoUpgrade(s: GameState, gm: GlobalMods): number {
+export function autoUpgrade(s: GameState, gm: GlobalMods, log?: { plot: string; cost: number }[]): number {
   let bought = 0;
   for (const [id, b] of plantsOf(s)) {
     if (!b.plant.auto || b.plant.automation < AUTO_UPGRADE_FROM) continue;
@@ -1652,7 +1653,11 @@ export function autoUpgrade(s: GameState, gm: GlobalMods): number {
     const pickLevel = lv !== null && (sp === null || lv <= sp);
     const cost = pickLevel ? lv : sp;
     if (cost === null || cost > s.cash * 0.25) continue;
-    if (pickLevel ? upgradePlantLevel(s, id, gm) : upgradePlantSpeed(s, id, gm)) bought++;
+    const cash = s.cash;
+    if (pickLevel ? upgradePlantLevel(s, id, gm) : upgradePlantSpeed(s, id, gm)) {
+      bought++;
+      log?.push({ plot: id, cost: cash - s.cash });
+    }
   }
   return bought;
 }

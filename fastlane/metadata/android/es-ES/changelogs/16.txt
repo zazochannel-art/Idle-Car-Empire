@@ -4,3 +4,5 @@ Novedades en 1.0.2:
 • Copias en la nube: elimina las que no necesites
 • Beneficio más estable en la barra superior
 • Isla 3D más fluida en móviles
+• Ponle nombre a tu empresa tras tu primer coche
+• En dos dispositivos ya no se pregunta qué partida conservar si son iguales

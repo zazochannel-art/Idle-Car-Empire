@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { plantsOf } from "@/game/engine/chain";
 import { isCleanName } from "@/game/engine/names";
 import { formatDuration, formatMoney, formatNumber } from "@/game/format";
-import { summarize, type AuthResult, type CloudBackup, type MyInvite, type SaveSummary } from "@/game/save";
+import { nearlySame, summarize, type AuthResult, type CloudBackup, type MyInvite, type SaveSummary } from "@/game/save";
 import { INVITE } from "@/game/engine/invites";
 import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
@@ -1081,12 +1081,29 @@ function ConflictChoice() {
   const state = useGame((g) => g.state);
   const [cloud, setCloud] = useState<SaveSummary | null>(null);
   const [busy, setBusy] = useState(false);
+  // the cloud's copy is looked at first: the same game open on two devices needs no choice
+  const [checked, setChecked] = useState(false);
   const open = true;
   const { t } = useT();
   useEffect(() => {
     if (!open || !saves) return;
-    void saves.peekCloud().then((c) => setCloud(c?.state ? summarize(c.state) : null));
-  }, [open, saves]);
+    let live = true;
+    void saves.peekCloud().then(async (c) => {
+      if (!live) return;
+      const ahead = c?.state ? nearlySame(useGame.getState().state, c.state) : null;
+      if (ahead) {
+        await resolve(ahead);
+        uiEvents.emit({ type: "toast", tone: "info", icon: "☁️", title: t("account.conflictAuto") });
+        return;
+      }
+      setCloud(c?.state ? summarize(c.state) : null);
+      setChecked(true);
+    });
+    return () => {
+      live = false;
+    };
+  }, [open, saves, resolve, t]);
+  if (!checked) return null;
   return (
     <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent>

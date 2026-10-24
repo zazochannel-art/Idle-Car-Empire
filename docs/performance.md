@@ -34,6 +34,8 @@ What keeps the game light, and how to measure it.
   island, its scenery and roads, and the parts of every vehicle keep fixed matrices
   (`freezeStatic`); only what moves is worked out again each frame. The district cards are
   placed again only when the view moves, with every size read before any style is written.
+  A vehicle's shadow comes from its big parts only (`shadowFromLargest`): wheels, glass and
+  lights cast none, which takes about a third of the draws out of the shadow pass.
 - **Absence**: the offline settlement simulates the chain step by step; recipes, unit materials
   and road distances are worked out once, so it runs about a third faster with the same results.
 - The battery saver (`docs/battery-saver.md`) lowers frames and ticks further.
@@ -56,8 +58,14 @@ Production build (`next build --no-mangling`), headless Chrome with the GPU on, 
 | Late game (8 plants, $11M) | 16.6 ms | 12.1 ms |
 | Program checks (`getParameters`) per 16 s | ~1 s | ~0 |
 
-What is left is the cost of each draw call (about 460 a frame on the late-game map): merging the
-lots' and the traffic's meshes would be the next step.
+With the vehicles' smaller parts out of the shadow pass, a frame that redraws the shadows went
+from 1,119 draw calls to 846 on the late-game map. Measured again with every change in, on a
+busier machine (an Android emulator running beside it), the median of three runs: 28.1 ms per
+frame before any of this, 22.0 ms after.
+
+What is left is the cost of each draw call, most of them in the shadow pass (about 720 trees and
+other scenery cells cast shadows): merging the lots' and the traffic's meshes, or cheaper
+shadows for the scenery, would be the next step.
 
 ### Measured (October 2026)
 

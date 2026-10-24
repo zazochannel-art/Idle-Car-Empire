@@ -6,7 +6,7 @@ import { SAVE_VERSION, createInitialState } from "../engine/state";
 import type { GameState } from "../types";
 import { SIGNED_OUT_KEY, SaveManager, type StartHooks } from "./index";
 import { LocalStore, LOCAL_SAVE_KEY, memoryStorage, type KeyValue } from "./local";
-import { decideStart, summarize, trustedLastActive } from "./policy";
+import { decideStart, nearlySame, summarize, trustedLastActive } from "./policy";
 import { CloudSync, type SyncInfo } from "./sync";
 import { storedAccount } from "./supabase";
 import type { Account, AuthResult, CloudBackend, CloudBackup, CloudCopy, LocalCopy, Profile } from "./types";
@@ -232,7 +232,37 @@ describe("choosing the save at the start", () => {
   });
 
   it("asks when both moved on, instead of overwriting either", () => {
-    expect(decideStart(copy(50, { owner: "a", base: 3, dirty: true }), null, cloud(90, 5), SAVE_VERSION)).toMatchObject({ use: "ask", reason: "both-changed" });
+    const mine = copy(50, { owner: "a", base: 3, dirty: true });
+    mine.state.lifetime.moneyEarned = 40_000;
+    const theirs = cloud(90, 5);
+    (theirs.state as GameState).lifetime.moneyEarned = 90_000;
+    expect(decideStart(mine, null, theirs, SAVE_VERSION)).toMatchObject({ use: "ask", reason: "both-changed" });
+  });
+
+  it("keeps the copy ahead without asking when both are the same game, a moment apart", () => {
+    const mine = copy(50, { owner: "a", base: 3, dirty: true });
+    mine.state.lifetime.moneyEarned = 1_000_400;
+    const theirs = cloud(90, 5);
+    (theirs.state as GameState).lifetime.moneyEarned = 1_000_000;
+    expect(decideStart(mine, null, theirs, SAVE_VERSION)).toMatchObject({ use: "local", upload: true, base: 5 });
+    mine.state.lifetime.moneyEarned = 999_000;
+    expect(decideStart(mine, null, theirs, SAVE_VERSION).use).toBe("cloud");
+    // played an hour apart: the player chooses
+    mine.state.lastActiveAt = T0 + 3_600_000;
+    expect(decideStart(mine, null, theirs, SAVE_VERSION).use).toBe("ask");
+  });
+
+  it("tells copies of one game that are nearly the same from ones that differ", () => {
+    const a = game(10);
+    const b = game(10);
+    a.lifetime.moneyEarned = 2e9;
+    b.lifetime.moneyEarned = 2.004e9;
+    expect(nearlySame(a, b)).toBe("cloud");
+    expect(nearlySame(b, a)).toBe("local");
+    b.lifetime.moneyEarned = 2.2e9;
+    expect(nearlySame(a, b)).toBeNull();
+    // another company is never "the same"
+    expect(nearlySame(a, game(10, T0 + 1))).toBeNull();
   });
 
   it("moves a save from before accounts into an empty account", () => {

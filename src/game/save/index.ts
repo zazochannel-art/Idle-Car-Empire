@@ -16,7 +16,7 @@ import type { Account, AuthResult, CloudBackend, CloudBackup, CloudCopy, LocalCo
 
 export type { Account, AuthResult, CloudBackend, CloudBackup, CloudCopy, LocalCopy, Profile, SaveAdapter, SavePayload } from "./types";
 export type { SaveSummary } from "./policy";
-export { summarize } from "./policy";
+export { nearlySame, summarize } from "./policy";
 export type { SyncInfo, SyncStatus } from "./sync";
 export type { AllianceMember, AllianceSummary, BoardKind, BoardRow, ClaimTierResult, CreateAllianceResult, CupPlace, CupRow, CupSubmitResult, EmpireCard, GiftResult, JoinAllianceResult, MyAlliance, MyInvite, RedeemInviteResult, ReportReason, ReportResult } from "./social";
 export { GIFTS_PER_DAY, REPORT_REASONS } from "./social";
@@ -193,7 +193,11 @@ export class SaveManager {
       upload = decision.upload;
       base = decision.base;
       if (decision.copy === legacy && cloud) this.retireLegacy(legacy);
+      // this device's copy replaces a cloud save that moved on (nearlySame): kept here too
+      if (decision.copy === own && own.dirty && cloud && cloud.revision > 0 && own.base !== cloud.revision) this.local.backup({ state: cloud.state as GameState, savedAt: cloud.updatedAt }, "cloud");
     } else if (decision.use === "cloud" && cloud) {
+      // this device had progress the cloud doesn't (nearlySame chose the cloud's): kept as a backup
+      if (own?.dirty) this.local.backup({ state: own.state, savedAt: own.savedAt }, "device");
       state = this.read(cloud.state, now);
       // a damaged cloud save: this device's copy, if there is one, takes over (and repairs the cloud)
       if (!state) {

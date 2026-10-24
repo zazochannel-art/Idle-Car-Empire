@@ -614,6 +614,28 @@ export function splitSharedMaterials(root: THREE.Object3D) {
 }
 
 /**
+ * A vehicle's shadow comes from its big parts (body, cab, cargo): its wheels, glass and lights
+ * add nothing seen from above, but each would be one more draw in the shadow pass, for every
+ * car on the road. Parts smaller than `share` of the biggest stop casting.
+ */
+export function shadowFromLargest(root: THREE.Object3D, share = 0.5) {
+  const parts: [THREE.Mesh, number][] = [];
+  root.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh || !m.castShadow) return;
+    if (!m.geometry.boundingSphere) m.geometry.computeBoundingSphere();
+    const s = m.getWorldScale(V3);
+    parts.push([m, m.geometry.boundingSphere!.radius * Math.max(s.x, s.y, s.z)]);
+  });
+  const top = Math.max(0, ...parts.map(([, r]) => r));
+  for (const [m, r] of parts) {
+    const mats = Array.isArray(m.material) ? m.material : [m.material];
+    if (r < top * share || mats.every((x) => x.transparent)) m.castShadow = false;
+  }
+}
+const V3 = new THREE.Vector3();
+
+/**
  * Parts of the map that never move keep the matrices they were built with: three.js
  * otherwise works out every object's matrix again on every frame. `moving` stay as they are.
  */

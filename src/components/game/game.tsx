@@ -49,6 +49,7 @@ import { FirstCarOverlay } from "./first-car";
 import { Onboarding } from "./onboarding";
 import { UnlockCard } from "./unlock-card";
 import { RecallDialog } from "./recall-dialog";
+import { CompanyNameDialog } from "./company-name";
 import { PoachDialog } from "../views/expansion-cards";
 import { HAS_INTERIOR } from "../plant/interior/layout";
 
@@ -350,6 +351,7 @@ function Shell() {
       <Onboarding />
       <UnlockCard />
       <RecallDialog />
+      <CompanyNameDialog />
       <PoachDialog />
 
       <Toasts />

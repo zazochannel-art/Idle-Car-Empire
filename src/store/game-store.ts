@@ -89,6 +89,8 @@ const SAVE_MS = 5_000;
 const FUNNEL_MS = 30_000;
 /** A gap this long between ticks (sleeping laptop, frozen tab) counts as being away. */
 const AWAY_GAP_S = 30;
+/** The plants' auto-upgrade purchases are told in one toast, at most this often. */
+const AUTO_BOUGHT_EVERY_MS = 60_000;
 
 /** Settles time away; an absence too short for the report is told in a toast. */
 function settleAway(s: GameState, now: number) {
@@ -348,6 +350,37 @@ export const useGame = create<GameStore>((set, get) => {
     saves.save({ ...s, lastActiveAt: Date.now() }, force);
   }
 
+  /** What the plants' auto-upgrade bought since the player was last told (once a minute at most). */
+  const autoBought = { n: 0, money: 0, plots: new Set<string>(), since: 0 };
+  function tellAutoBought(log: { plot: string; cost: number }[], s: GameState, now: number) {
+    for (const p of log) {
+      autoBought.n++;
+      autoBought.money += p.cost;
+      autoBought.plots.add(p.plot);
+    }
+    if (!autoBought.n) {
+      autoBought.since = now;
+      return;
+    }
+    if (now - autoBought.since < AUTO_BOUGHT_EVERY_MS) return;
+    const names = [...autoBought.plots]
+      .map((id) => s.city.buildings[id])
+      .filter((b) => !!b)
+      .map((b) => tr(`structure.${b.type}` as MessageKey));
+    const shown = [...new Set(names)];
+    uiEvents.emit({
+      type: "toast",
+      tone: "info",
+      icon: "⚙️",
+      title: tr("toast.autoBought", { n: autoBought.n, money: formatMoney(autoBought.money) }),
+      body: tr("toast.autoBoughtBody", { plants: shown.slice(0, 3).join(", ") + (shown.length > 3 ? "…" : "") }),
+    });
+    autoBought.n = 0;
+    autoBought.money = 0;
+    autoBought.plots.clear();
+    autoBought.since = now;
+  }
+
   function runTick() {
     const now = Date.now();
     // the battery saver ticks less often (the engine runs on elapsed time, so nothing is lost)
@@ -368,7 +401,9 @@ export const useGame = create<GameStore>((set, get) => {
     const events = engineTick(next, dt, snap);
     next.lastActiveAt = now;
     recordHistory(next, now, snap.incomePerSec);
-    Ch.autoUpgrade(next, snap.gm);
+    const autoLog: { plot: string; cost: number }[] = [];
+    Ch.autoUpgrade(next, snap.gm, autoLog);
+    tellAutoBought(autoLog, next, now);
     R.updateLogin(next, now);
     for (const r of R.checkRivals(next, now)) {
       uiEvents.emit({ type: "toast", tone: "gold", icon: r.emoji, title: tr("rival.beaten", { name: r.name }), body: tr("rival.beatenBody", { n: r.stars }) });

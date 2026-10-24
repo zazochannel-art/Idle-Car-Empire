@@ -975,8 +975,12 @@ describe("late-game depth", () => {
     expect(Ch.autoUpgrade(s, snapshot(s).gm)).toBe(0); // still Manual
     b.plant.automation = 2;
     const before = b.level + b.plant.speed;
-    expect(Ch.autoUpgrade(s, snapshot(s).gm)).toBe(1);
+    const log: { plot: string; cost: number }[] = [];
+    expect(Ch.autoUpgrade(s, snapshot(s).gm, log)).toBe(1);
     expect(s.city.buildings[id].level + s.city.buildings[id].plant!.speed).toBe(before + 1);
+    // each purchase is logged with what it cost, so the player can be told
+    expect(log).toEqual([{ plot: id, cost: 1e6 - s.cash }]);
+    expect(log[0].cost).toBeGreaterThan(0);
     s.cash = 0;
     expect(Ch.autoUpgrade(s, snapshot(s).gm)).toBe(0);
   });

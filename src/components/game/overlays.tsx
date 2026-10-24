@@ -175,7 +175,8 @@ export function Toasts() {
   );
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top)+8.75rem)] z-[45] flex flex-col items-center gap-1.5 px-5 md:top-20 md:items-end md:pr-6">
+    // phones: under the minimap and its zoom buttons (top 9.25rem + about 8.5rem), which a toast covered before
+    <div className="pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top)+18rem)] z-[45] flex flex-col items-center gap-1.5 px-5 md:top-20 md:items-end md:pr-6">
       <AnimatePresence initial={false}>
         {(celebrating ? [] : toasts).map((t) => (
           <motion.div

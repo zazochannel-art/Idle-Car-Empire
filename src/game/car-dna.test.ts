@@ -11,6 +11,7 @@ import * as Sh from "./engine/showroom";
 import { carDemandMult, carPriceMult } from "./engine/market";
 import * as Br from "./engine/brand";
 import * as Ev from "./engine/events";
+import { NAME_WORDS } from "./engine/names";
 import { resetRun } from "./engine/reset";
 import { createInitialState } from "./engine/state";
 import { tick } from "./engine/tick";
@@ -336,6 +337,9 @@ describe("the brand", () => {
   it("identity: the first name is free, a rebrand costs; the livery wears the brand colours", () => {
     const s = createInitialState(T0);
     s.cash = 0;
+    // a name the word checks block is refused (others see it on cards and in the leaderboard)
+    expect(Br.setBrand(s, { name: `${NAME_WORDS[0]} Motors` })).toBe(false);
+    expect(s.brand.name).toBe("");
     expect(Br.setBrand(s, { name: "  Apex   Motors " })).toBe(true);
     expect(s.brand.name).toBe("Apex Motors");
     expect(Br.setBrand(s, { name: "Nova" })).toBe(false); // no money for a rebrand

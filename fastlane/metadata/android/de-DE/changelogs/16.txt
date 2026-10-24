@@ -4,3 +4,5 @@ Neu in 1.0.2:
 • Cloud-Sicherungen: Lösche die, die du nicht brauchst
 • Ruhigere Gewinnanzeige oben
 • Flüssigere 3D-Insel auf Handys
+• Benenne deine Firma nach dem ersten Auto
+• Auf zwei Geräten keine Spielstand-Frage mehr, wenn beide gleich sind
