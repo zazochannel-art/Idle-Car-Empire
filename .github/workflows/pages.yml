@@ -1,0 +1,48 @@
+name: Deploy to GitHub Pages
+
+# The game is a phone app (Android, iOS); the site only carries the pages the
+# stores and players need: the privacy policy, account deletion, and a page
+# that confirms account emails and hands a save left in a browser to the app.
+# They are plain files in site/: nothing to build.
+on:
+  push:
+    branches: [main]
+    paths: ["site/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - name: The robot check's public site key, once the owner set it up (docs/captcha.md)
+        env:
+          TURNSTILE_SITE_KEY: ${{ vars.TURNSTILE_SITE_KEY }}
+        run: |
+          if [ -n "$TURNSTILE_SITE_KEY" ]; then
+            sed -i "s|<meta name=\"turnstile-sitekey\" content=\"\">|<meta name=\"turnstile-sitekey\" content=\"$TURNSTILE_SITE_KEY\">|" site/admin/index.html
+            grep -q "content=\"$TURNSTILE_SITE_KEY\"" site/admin/index.html
+          fi
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

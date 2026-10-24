@@ -1,0 +1,42 @@
+name: Supabase keep-alive
+
+# Supabase's free plan pauses a project after a week without activity, and a paused
+# project means no new accounts (so no new players), no cloud saves and no leaderboards.
+# Every two days this calls the game's public API once, the way the game does (the
+# anonymous funnel's "ping", which writes nothing), so the project never sits idle.
+# If the call fails, the project is down or paused: this run turns red and GitHub
+# emails the repository's owner. Restore it from the Supabase dashboard.
+# (GitHub stops scheduled workflows in a repository with no activity for 60 days:
+# the Actions tab then offers to turn this one back on.)
+on:
+  schedule:
+    - cron: "17 6 */2 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call the game's API
+        env:
+          # the public project and key, the same the apps ship with (android.yml, ios.yml)
+          SUPABASE_URL: https://orffhhsogoymalyogfzl.supabase.co
+          SUPABASE_KEY: sb_publishable_hqGfNt6uaNbq0AgGyp0I8g_QLjjFaJ-
+        run: |
+          for i in 1 2 3; do
+            code=$(curl -sS -o body.txt -w "%{http_code}" -X POST "$SUPABASE_URL/rest/v1/rpc/track_step" \
+              -H "apikey: $SUPABASE_KEY" -H "Content-Type: application/json" \
+              --data '{"p_step":"ping","p_minutes":0}' || true)
+            if [ "$code" = "200" ] && grep -q '"ok"' body.txt; then
+              echo "The Supabase project answered (HTTP $code)."
+              exit 0
+            fi
+            echo "Try $i: HTTP $code $(head -c 300 body.txt 2>/dev/null)"
+            sleep $((i * 20))
+          done
+          echo "::error::The Supabase project doesn't answer: it may be paused. Restore it in the Supabase dashboard (docs/android/play-store.md)."
+          exit 1

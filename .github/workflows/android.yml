@@ -1,0 +1,319 @@
+name: Android
+
+# Builds the Android app from the game code (the iOS app is built by ios.yml):
+# - a debug APK (install it on a phone to test: docs/android/README.md),
+# - a release App Bundle (.aab) for Google Play, signed with the upload key when the
+#   repository has it in its secrets (docs/android/signing.md), unsigned otherwise,
+# runs the app on an Android emulator (scripts/android-device-check.mjs), and puts main's
+# debug APK on the "test-apk" release, a link to download it straight onto a phone.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: APK and App Bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # the Gradle wrapper in the repository is Gradle's own (not a tampered jar)
+      - uses: gradle/actions/wrapper-validation@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+          cache-dependency-path: android/**/*.gradle*
+      - run: npm ci
+      - name: Firebase, for notifications from the server (once the owner set it up)
+        # the Firebase project's google-services.json, a repository secret (docs/push.md); unset,
+        # the app is built without Firebase and never asks for a notification token
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+            echo "NEXT_PUBLIC_PUSH=1" >> "$GITHUB_ENV"
+          fi
+      - name: Build the game for the app
+        run: npm run build:android
+        env:
+          # the public Supabase project and key (the same as the iOS app's, ios.yml)
+          NEXT_PUBLIC_SUPABASE_URL: https://orffhhsogoymalyogfzl.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_hqGfNt6uaNbq0AgGyp0I8g_QLjjFaJ-
+          # the rewarded ad unit of the AdMob account, a repository variable (docs/android/ads.md);
+          # unset: Google's test ads
+          NEXT_PUBLIC_ADMOB_REWARDED_ID: ${{ vars.ADMOB_REWARDED_ID }}
+          # the in-app products' ids in Google Play, repository variables (docs/android/iap.md);
+          # unset: nothing is sold
+          NEXT_PUBLIC_IAP_STARTER_ID: ${{ vars.IAP_STARTER_ID }}
+          NEXT_PUBLIC_IAP_ADFREE_ID: ${{ vars.IAP_ADFREE_ID }}
+          # the test app compares it with the test-apk release's and offers a newer build (lib/test-update.ts)
+          NEXT_PUBLIC_TEST_BUILD: ${{ github.run_number }}
+          # "on" once Supabase sends email to every address (custom SMTP): the game then emails password
+          # reset links; unset, it shows the contact address instead (docs/cloud-save.md)
+          NEXT_PUBLIC_PASSWORD_RESET: ${{ vars.PASSWORD_RESET }}
+          # the robot check's public site key (Cloudflare Turnstile), a repository variable once CAPTCHA
+          # is on in Supabase (docs/captcha.md); unset: no check
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.TURNSTILE_SITE_KEY }}
+          # this build's source maps, kept as an artifact (not in the app) to read players' error reports
+          SOURCE_MAPS: "1"
+      # The upload key signs the release bundle on main and on manual runs, never on pull
+      # requests (their code could read it). Without the secrets the bundle is unsigned.
+      - name: Upload key (when the repository has it)
+        if: github.event_name != 'pull_request'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+            {
+              echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/upload.jks"
+              echo "ANDROID_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD"
+              echo "ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS"
+              echo "ANDROID_KEY_PASSWORD=$ANDROID_KEY_PASSWORD"
+            } >> "$GITHUB_ENV"
+            echo "The release bundle will be signed with the upload key."
+          else
+            echo "No ANDROID_KEYSTORE_BASE64 secret: the release bundle will be unsigned."
+          fi
+      # The debug key that signs the debug APK, kept from run to run in the Actions cache: a
+      # newer test APK then installs over an older one, which Android refuses when the key
+      # changes. Made here when the cache has none (the first run, or after 7 days unused).
+      # A debug key with Android's usual passwords, nothing secret; Gradle reads its path from
+      # ANDROID_DEBUG_KEYSTORE (android/app/build.gradle).
+      - uses: actions/cache@v4
+        with:
+          path: ~/.idle-car-empire/debug.keystore
+          key: android-debug-keystore-v2
+      - name: Debug key
+        run: |
+          f="$HOME/.idle-car-empire/debug.keystore"
+          if [ ! -f "$f" ]; then
+            mkdir -p "$(dirname "$f")"
+            keytool -genkeypair -keystore "$f" -storetype PKCS12 -storepass android -keypass android \
+              -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+            echo "::warning::A new debug key: this test APK does not install over ones signed with the previous key"
+          fi
+          echo "ANDROID_DEBUG_KEYSTORE=$f" >> "$GITHUB_ENV"
+      - name: Gradle build (debug APK, release bundle, lint)
+        working-directory: android
+        env:
+          # the AdMob app id, a repository variable (unset: Google's sample id, test ads only)
+          ADMOB_APP_ID: ${{ vars.ADMOB_APP_ID }}
+        run: ./gradlew --no-daemon --stacktrace assembleDebug bundleRelease lintDebug
+      - name: Inspect the APK and the bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ADMOB_APP_ID: ${{ vars.ADMOB_APP_ID }}
+        run: |
+          set -e
+          BT="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          AAB=android/app/build/outputs/bundle/release/app-release.aab
+          echo "::group::debug APK"
+          "$BT/aapt2" dump badging "$APK" | grep -E "^(package|sdkVersion|targetSdkVersion|application-label|uses-permission)"
+          # the same from run to run while the cached debug key lasts
+          "$BT/apksigner" verify --print-certs "$APK" | grep -m1 "SHA-256 digest"
+          echo "::endgroup::"
+          # (GitHub's release downloads answer 500 now and then: a few tries before giving up)
+          for i in 1 2 3 4; do
+            gh release download --repo google/bundletool --pattern 'bundletool-all-*.jar' --dir "$RUNNER_TEMP" --clobber && break
+            [ "$i" = 4 ] && exit 1
+            sleep $((i * 10))
+          done
+          BUNDLETOOL=$(ls "$RUNNER_TEMP"/bundletool-all-*.jar | tail -1)
+          echo "::group::release bundle ($(basename "$BUNDLETOOL"))"
+          java -jar "$BUNDLETOOL" validate --bundle "$AAB"
+          java -jar "$BUNDLETOOL" dump manifest --bundle "$AAB" > "$RUNNER_TEMP/manifest.xml"
+          grep -oE '(package|android:versionCode|android:versionName)="[^"]*"' "$RUNNER_TEMP/manifest.xml" | head -3
+          grep -E "minSdkVersion|targetSdkVersion|uses-permission|screenOrientation" "$RUNNER_TEMP/manifest.xml"
+          ADMOB=$(grep -A3 "com.google.android.gms.ads.APPLICATION_ID" "$RUNNER_TEMP/manifest.xml" | grep -oE 'android:value="[^"]*"' | head -1)
+          echo "AdMob app id: ${ADMOB:-not found}"
+          echo "::endgroup::"
+          ls -la "$APK" "$AAB"
+          SIGNED=no
+          if jarsigner -verify "$AAB" | grep -q "jar verified"; then SIGNED=yes; echo "release bundle: SIGNED"; else echo "release bundle: unsigned (Google Play needs it signed with the upload key)"; fi
+          # Google Play's own checks on an upload, done here first (docs/android/play-store.md)
+          echo "::group::Google Play pre-flight"
+          TARGET=$(grep -oE 'targetSdkVersion="[0-9]+"' "$RUNNER_TEMP/manifest.xml" | grep -oE '[0-9]+' | head -1)
+          if [ "${TARGET:-0}" -lt 35 ]; then echo "::error::targetSdkVersion ${TARGET:-?}: Google Play takes 35 or higher"; exit 1; fi
+          echo "target SDK $TARGET: ok"
+          if grep -q 'android:debuggable="true"' "$RUNNER_TEMP/manifest.xml"; then echo "::error::the release bundle is debuggable: Google Play refuses it"; exit 1; fi
+          echo "not debuggable: ok"
+          # native code must be built for 16 KB memory pages (apps targeting Android 15+): every LOAD
+          # segment of every 64-bit library aligned to 0x4000 or more
+          rm -rf "$RUNNER_TEMP/so" && mkdir -p "$RUNNER_TEMP/so"
+          unzip -q -o "$AAB" 'base/lib/*' -d "$RUNNER_TEMP/so" 2>/dev/null || true
+          LIBS=$(find "$RUNNER_TEMP/so" -name '*.so' \( -path '*arm64-v8a*' -o -path '*x86_64*' \))
+          if [ -z "$LIBS" ]; then
+            echo "16 KB pages: no native code in the bundle, nothing to align"
+          else
+            for f in $LIBS; do
+              for a in $(readelf -lW "$f" | awk '$1 == "LOAD" { print $NF }'); do
+                if [ $((a)) -lt 16384 ]; then echo "::error::$(basename "$f") is aligned to $a, not 16 KB: Google Play refuses it"; exit 1; fi
+              done
+              echo "16 KB pages: $(basename "$f") ok"
+            done
+          fi
+          ADMOB_ID=$(echo "$ADMOB" | grep -oE 'ca-app-pub-[0-9]+~[0-9]+' || true)
+          # the app id must be an app id: Google Mobile Ads stops the app at launch on anything else
+          [ -n "$ADMOB_ID" ] || { echo "::error::The bundle's AdMob app id is not ca-app-pub-…~…: the app would close as it starts"; exit 1; }
+          if [ -n "$ADMOB_APP_ID" ] && ! echo "$ADMOB_APP_ID" | grep -qE '^ca-app-pub-[0-9]+~[0-9]+$'; then
+            WHAT="not an AdMob app id (ca-app-pub-…~…)"
+            echo "$ADMOB_APP_ID" | grep -q / && WHAT="an ad unit id, not the app id (ca-app-pub-…~…)"
+            echo "::warning::The ADMOB_APP_ID variable is $WHAT: these builds use Google's sample app id (test ads only). Set the app id from AdMob → Apps → App settings (docs/android/ads.md)."
+          fi
+          if [ "$SIGNED" = yes ] && [ "${ADMOB_ID%%~*}" = "ca-app-pub-3940256099942544" ]; then
+            echo "::warning::This signed bundle uses Google's sample AdMob app id: it shows test ads only, which pay nothing (set the ADMOB_APP_ID variable, docs/android/ads.md)"
+          fi
+          echo "::endgroup::"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: idle-car-empire-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: idle-car-empire-release-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+      # the game's scripts and their source maps: node scripts/error-place.mjs reads a report's place with them
+      - uses: actions/upload-artifact@v4
+        with:
+          name: source-maps
+          path: source-maps
+          retention-days: 90
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-lint-report
+          path: android/app/build/reports/lint-results-debug.html
+          if-no-files-found: ignore
+
+  # main's debug APK on a release of its own (tag test-apk), replaced by every build of main:
+  # https://github.com/<repo>/releases/download/test-apk/idle-car-empire-test.apk opened on a
+  # phone downloads it, with no zip and no GitHub account (docs/android/README.md). Never a
+  # pull request's build. The only job that may write to the repository, and it runs none
+  # of the repository's code.
+  release:
+    name: Test APK release
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: idle-car-empire-debug-apk
+          path: apk
+      - name: Publish the APK on the test-apk release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -e
+          # a slower run of an older commit never replaces a newer build
+          current=$(gh release view test-apk --json body -q .body 2>/dev/null | sed -n 's/.*<!-- test-build: \([0-9]*\) -->.*/\1/p')
+          if [ -n "$current" ] && [ "$current" -gt "$GITHUB_RUN_NUMBER" ]; then
+            echo "build $current is already on the release; this is build $GITHUB_RUN_NUMBER"
+            exit 0
+          fi
+          mv apk/app-debug.apk idle-car-empire-test.apk
+          cat > notes.md <<EOF
+          The game's latest Android test build (build ${GITHUB_RUN_NUMBER}), from \`main\` at ${GITHUB_SHA::7} ($(date -u '+%Y-%m-%d %H:%M UTC')). Every change to \`main\` replaces it, and the installed test app offers the new build itself.
+
+          **Install:** open \`idle-car-empire-test.apk\` on an Android phone, allow installs from that source, and if Play Protect warns, choose *More details → Install anyway*. It installs as **Car Empire DEBUG**, next to the Google Play app, and shows Google's test ads. Playing needs an account.
+
+          **Instalare:** deschide \`idle-car-empire-test.apk\` pe telefon, permite instalarea din această sursă, iar dacă apare Play Protect, alege *Mai multe detalii → Instalează oricum*. Se instalează ca **Car Empire DEBUG**, separat de aplicația din Google Play, cu reclame de test. Pentru joc e nevoie de un cont. Aplicația de test anunță singură când apare un build nou.
+
+          <!-- test-build: ${GITHUB_RUN_NUMBER} -->
+          EOF
+          if gh release view test-apk >/dev/null 2>&1; then
+            # the tag moves to this build's commit; the APK and the notes are replaced
+            gh api -X PATCH "repos/$GH_REPO/git/refs/tags/test-apk" -f sha="$GITHUB_SHA" -F force=true >/dev/null
+            gh release upload test-apk idle-car-empire-test.apk --clobber
+            gh release edit test-apk --notes-file notes.md
+          else
+            gh release create test-apk idle-car-empire-test.apk --target "$GITHUB_SHA" --prerelease \
+              --title "Test APK (latest main)" --notes-file notes.md
+          fi
+          echo "https://github.com/$GH_REPO/releases/download/test-apk/idle-car-empire-test.apk"
+
+  device:
+    name: Runs on an Android emulator
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+          cache-dependency-path: android/**/*.gradle*
+      - run: npm ci
+      # Without the Supabase settings: such a build goes straight into the game (with them, the
+      # game asks for an account), and a test run must not create players on the live server.
+      # Cloud saves are checked by cloud-e2e.yml.
+      - name: Build the game for the app (no cloud)
+        run: npm run build:android
+      - name: Debug APK
+        working-directory: android
+        env:
+          # the same AdMob app id as the published test APK, so a wrong one shows here too
+          ADMOB_APP_ID: ${{ vars.ADMOB_APP_ID }}
+        run: ./gradlew --no-daemon assembleDebug
+      - name: Enable KVM (hardware-accelerated emulator)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install, play, Back button, background, kill, update, reboot, rewarded ad
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          # the runner's 4 cores and more memory: with the ad SDK's own web views, 2 cores left
+          # the emulator so busy that Android reported its launcher and the app not responding
+          cores: 4
+          ram-size: 4096M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: node scripts/android-device-check.mjs android/app/build/outputs/apk/debug/app-debug.apk --reboot --out android-check
+      # a small JPEG of the game on the emulator, in the log (base64), to look at without downloading
+      - name: Game screen thumbnail
+        if: always()
+        run: |
+          f=android-check/1-game.png
+          if [ -f "$f" ]; then node -e "require('sharp')(process.argv[1]).resize(360).jpeg({ quality: 55 }).toBuffer().then((b) => console.log(b.toString('base64')))" "$f" || true; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-emulator-check
+          path: android-check
+          if-no-files-found: ignore

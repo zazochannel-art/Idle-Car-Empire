@@ -1,0 +1,60 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+/e2e-results
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+!.env.example
+
+# Android signing (the upload key and its passwords stay on your computer / in CI secrets)
+*.jks
+*.keystore
+keystore.properties
+keystore.properties.txt
+# a build's source maps (SOURCE_MAPS=1, scripts/build-app.mjs)
+/source-maps
+
+# the Android project is its own repository (github.com/zazochannel-art/android)
+/android/
+# Android Studio's files when it opens this folder
+/.gradle/
+/.idea/
+/.kotlin/
+/local.properties

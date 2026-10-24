@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    name: Lint, types, tests, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  first-minutes:
+    name: A new player's first minutes (browser)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      # the game built against a fake Supabase that the test answers itself: nothing reaches the real project
+      - name: Build against a fake Supabase
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://e2e.supabase.test
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: e2e-public-key
+      - name: Install Chromium
+        run: npx playwright-core install --with-deps chromium
+      # welcome page → account → tutorial → first body → first cloud save (e2e/first-minutes.mjs)
+      - name: Play the first minutes
+        run: npm run e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: first-minutes
+          path: e2e-results
+          if-no-files-found: ignore
