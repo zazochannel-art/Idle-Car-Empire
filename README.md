@@ -156,8 +156,14 @@ src/components/
               shipments (traffic.ts), race cars (race.ts), labels, and the
               engine with its camera and picking (engine.ts). iso.ts,
               camera.ts, props.ts and vehicles.ts are the 2D painter still
-              used by the garage interior, the factory floor and the race
-              viewer
+              used by the garage interior, the factory floor and, without
+              WebGL, the race viewer
+  racing/     the race viewer: preparation, the race with its timing tower
+              and three cameras, the results; race3d/ draws it in 3D (the
+              circuit with kerbs, gravel, barriers and the start gantry, the
+              scenery of each theme, the real car models, the podium), and
+              race-canvas.ts is the 2D fallback. The circuits' shapes are in
+              game/racing/tracks.ts (tracks.test.ts checks them)
   three/      the 3D models (Three.js, loaded lazily): cars, trucks and
               transporters (car-models), plant buildings (building-models),
               factory machines and robots (industrial-models), and the sprite

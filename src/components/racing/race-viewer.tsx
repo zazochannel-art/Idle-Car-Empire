@@ -17,7 +17,8 @@ import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
-import { RaceCanvas, type CameraMode } from "./race-canvas";
+import type { CameraMode } from "./race-canvas";
+import { createRaceView, type RaceView } from "./race-view";
 
 export const raceName = (t: (k: MessageKey) => string, event: string, special?: string) => (special ? t(`race.sp.${special}` as MessageKey) : t(`race.ev.${event}` as MessageKey));
 export const trackName = (t: (k: MessageKey) => string, id: TrackId) => t(`race.track.${id}` as MessageKey);
@@ -32,13 +33,13 @@ export function RaceViewer() {
   );
 }
 
-/** A canvas that renders a RaceCanvas (created per track / race). */
-function useRaceCanvas(track: TrackId, rec: RaceRecord | null, setup?: (r: RaceCanvas) => void) {
+/** A canvas that renders the race (3D, or 2D without WebGL), created per track / race. */
+function useRaceCanvas(track: TrackId, rec: RaceRecord | null, setup?: (r: RaceView) => void) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const inst = useRef<RaceCanvas | null>(null);
+  const inst = useRef<RaceView | null>(null);
   useEffect(() => {
     if (!ref.current) return;
-    const r = new RaceCanvas(ref.current, track, rec);
+    const r = createRaceView(ref.current, track, rec);
     setup?.(r);
     r.start();
     inst.current = r;

@@ -242,6 +242,8 @@ function Shell() {
   const zone = useUi((u) => u.zone);
   const garage = useUi((u) => u.garage);
   const floor = useUi((u) => u.floor);
+  // the race viewer covers the map with its own 3D scene: the map rests meanwhile
+  const racing = useUi((u) => !!u.race);
   const showcase = useUi((u) => !!u.showcase);
   const tutorial = useUi((u) => u.tutorial);
   const closeAll = useUi((u) => u.closeAll);
@@ -315,7 +317,7 @@ function Shell() {
 
   return (
     <div className="game-shell fixed inset-0 overflow-hidden bg-ink">
-      <EmpireMap active={!garage && !floor} panelOffset={panelOffset} />
+      <EmpireMap active={!garage && !floor && !racing} panelOffset={panelOffset} />
       <Hud onSettings={() => setSettings(true)} />
       <LeftRail />
       {/* on phones the showroom card sits where the goal tracker is */}
