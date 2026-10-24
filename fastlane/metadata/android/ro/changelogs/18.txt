@@ -1,0 +1,7 @@
+Noutăți în 1.0.4:
+• Bonusuri pe hartă: mașina de aur, lada adusă de dronă, limuzina VIP și camionul stricat (atinge-le pentru bani)
+• Vreme: ploaie, ceață, zăpadă iarna, petale primăvara
+• Nave în port, avioane care decolează, tren de marfă
+• Artificii la momentele mari
+• Vederea fluxului livrărilor și iconițe noi peste fabrici
+• Vizitează imperiul unui prieten în 3D

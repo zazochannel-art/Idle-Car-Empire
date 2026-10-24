@@ -1,0 +1,7 @@
+What's new in 1.0.4:
+• Map bonuses: a golden car, a drone's crate, a VIP limousine and a broken-down truck (tap them for cash)
+• Weather: rain, fog, snow in winter, petals in spring
+• Ships in the port, planes taking off, a freight train
+• Fireworks for the big moments
+• Delivery flow view and new icons over the plants
+• Visit a friend's empire in 3D

@@ -1,0 +1,7 @@
+Novedades en la 1.0.4:
+• Bonificaciones en el mapa: un coche dorado, la caja de un dron, una limusina VIP y un camión averiado (tócalos para ganar dinero)
+• Clima: lluvia, niebla, nieve en invierno, pétalos en primavera
+• Barcos en el puerto, aviones que despegan, un tren de mercancías
+• Fuegos artificiales en los grandes momentos
+• Vista del flujo de entregas e iconos nuevos sobre las fábricas
+• Visita el imperio de un amigo en 3D
