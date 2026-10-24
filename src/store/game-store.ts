@@ -75,6 +75,9 @@ import { IAP_ICON, type IapProduct } from "@/game/config/iap";
 import * as Wt from "@/game/engine/winter";
 import * as Fe from "@/game/engine/festival";
 import * as Ps from "@/game/engine/pass";
+import * as Mb from "@/game/engine/map-bonus";
+import { RACING } from "@/game/city/layout";
+import { MAP_BONUS_BY_KIND, type MapBonusKind } from "@/game/config/map-bonus";
 import { funnelDue, funnelMinutes } from "@/game/engine/funnel";
 import { browserOptOut, sendStep } from "@/game/save/funnel";
 import { PASS, type WeeklyId } from "@/game/config/pass";
@@ -268,6 +271,8 @@ interface GameStore {
   setShowroomPrice: (id: number, price: number) => boolean;
   startCampaign: () => boolean;
   claimEventGoal: () => void;
+  /** Takes the bonus on the Empire Map (engine/map-bonus.ts): its money, or null when it is gone. */
+  claimMapBonus: (id: number) => number | null;
   unlockTerritory: (id: import("@/game/config/city").TerritoryId) => boolean;
   setBrand: (patch: Parameters<typeof Br.setBrand>[1]) => boolean;
   cancelRaceOrder: (car: CarId) => boolean;
@@ -432,6 +437,8 @@ export const useGame = create<GameStore>((set, get) => {
           body: e.upgrade ? tr("toast.upgradeDoneBody") : tr("toast.constructionDoneBody"),
           action: { label: tr("toast.open"), plot: e.plot },
         });
+        // a round level (5, 10, 15) is worth fireworks over the building
+        if (e.upgrade && e.level % 5 === 0) uiEvents.emit({ type: "fireworks", plot: e.plot, big: e.level >= 15 });
       }
       else if (e.type === "emergency") uiEvents.emit({ type: "toast", tone: "warn", icon: "🆘", title: tr("toast.emergency"), body: tr("toast.emergencyBody", { money: formatMoney(e.cost) }) });
       else if (e.type === "restructured") uiEvents.emit({ type: "toast", tone: "warn", icon: "🏦", title: tr("toast.restructured"), body: tr("toast.restructuredBody", { money: formatMoney(e.amount), rep: RESCUE.restructure.rep }) });
@@ -446,6 +453,7 @@ export const useGame = create<GameStore>((set, get) => {
         if (rec && rw) {
           const n = contentFor(next.settings.lang);
           uiEvents.emit({ type: "race", id: rec.id });
+          if (rw.position === 0) uiEvents.emit({ type: "fireworks", plot: RACING });
           uiEvents.emit({
             type: "toast",
             tone: rw.position === 0 ? "gold" : rw.position <= 2 ? "success" : "info",
@@ -473,6 +481,9 @@ export const useGame = create<GameStore>((set, get) => {
     if (Wt.winterTick(next, snap, now)) uiEvents.emit({ type: "toast", tone: "gold", icon: "🎄", title: tr("winter.startToast"), body: tr("winter.startToastBody"), action: { label: tr("winter.open"), view: "winter" } });
     const fest = Fe.festivalTick(next, snap, now);
     if (fest) uiEvents.emit({ type: "toast", tone: "gold", icon: fest === "spring" ? "🌸" : "☀️", title: tr(`festival.${fest}Start`), body: tr("festival.startBody"), action: { label: tr("winter.open"), view: "festival" } });
+    // the bonuses on the Empire Map come and go only while the map is on screen
+    const ui = useUi.getState();
+    if (!ui.garage && !ui.floor && !ui.race && !ui.visit) Mb.mapBonusTick(next, dt, now);
     const fo = Ex.fleetOrderTick(next, now);
     if (fo === "offer") uiEvents.emit({ type: "toast", tone: "info", icon: "🚌", title: tr("fleet.offerToast") });
     else if (fo === "failed") uiEvents.emit({ type: "toast", tone: "warn", icon: "⌛", title: tr("fleet.failed") });
@@ -982,6 +993,16 @@ export const useGame = create<GameStore>((set, get) => {
     sendCar: (id, to, price) => act((s) => Ch.sendCar(s, id, to, price)),
     setShowroomPrice: (id, price) => act((s) => Sh.setPrice(s, id, price)),
     startCampaign: () => act((s) => Sh.startCampaign(s)),
+    claimMapBonus: (id) => {
+      let cash: number | null = null;
+      let kind: MapBonusKind | null = null;
+      act((s) => {
+        kind = s.mapBonus.active?.id === id ? s.mapBonus.active.kind : null;
+        return (cash = Mb.claimMapBonus(s, id, Date.now())) !== null;
+      });
+      if (cash !== null && kind) uiEvents.emit({ type: "toast", tone: "gold", icon: MAP_BONUS_BY_KIND[kind as MapBonusKind].emoji, title: tr(`mapBonus.${kind as MapBonusKind}.taken`), body: tr("mapBonus.reward", { money: formatMoney(cash) }) });
+      return cash;
+    },
     claimEventGoal: () => {
       let cash: number | null = null;
       act((s) => (cash = Ev.claimEventGoal(s, s.lastActiveAt)) !== null);
@@ -990,7 +1011,10 @@ export const useGame = create<GameStore>((set, get) => {
     setBrand: (patch) => act((s) => Br.setBrand(s, patch)),
     unlockTerritory: (id) => {
       const ok = act((s) => Tr.unlockTerritory(s, id));
-      if (ok) uiEvents.emit({ type: "toast", tone: "gold", icon: "🗺️", title: tr("territory.opened", { name: tr(`territory.${id}`) }) });
+      if (ok) {
+        uiEvents.emit({ type: "toast", tone: "gold", icon: "🗺️", title: tr("territory.opened", { name: tr(`territory.${id}`) }) });
+        uiEvents.emit({ type: "fireworks", area: `t:${id}` });
+      }
       return ok;
     },
     cancelRaceOrder: (car) => act((s) => Rc.cancelOrder(s, car)),
@@ -1039,6 +1063,7 @@ export const useGame = create<GameStore>((set, get) => {
       const ok = act((s) => C.unlockZone(s, id));
       if (ok) {
         uiEvents.emit({ type: "toast", tone: "gold", icon: "🗺️", title: tr("toast.zone", { name: tr(`zone.${id}`) }), body: tr("toast.zoneBody") });
+        uiEvents.emit({ type: "fireworks", area: id });
         persist(true);
       }
       return ok;

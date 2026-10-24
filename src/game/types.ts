@@ -621,6 +621,8 @@ export interface GameState {
   pass: import("./engine/pass").PassState;
   /** Rewarded ads (engine/ads.ts): today's count, the sales boost, the instant-build pause. */
   ads: import("./engine/ads").AdsState;
+  /** Bonuses on the Empire Map (engine/map-bonus.ts): the one on the map now, the wait for the next, today's count. */
+  mapBonus: import("./engine/map-bonus").MapBonusState;
   /** The shop (engine/shop.ts): the free crate's timer and today's ad packs. */
   shop: import("./engine/shop").ShopState;
   /** In-app purchases (engine/iap.ts): the products owned and the purchases already given. */

@@ -36,6 +36,14 @@ What keeps the game light, and how to measure it.
   placed again only when the view moves, with every size read before any style is written.
   A vehicle's shadow comes from its big parts only (`shadowFromLargest`): wheels, glass and
   lights cast none, which takes about a third of the draws out of the shadow pass.
+- **Life on the map**: rain, snow and petals are one draw each, their drops moved by the
+  graphics card in a box that wraps round the view (nothing per drop on the main thread);
+  snow on the roofs and wet ground are a few lines in the map's shared shader, skipped while
+  the weather is dry. Fireworks, sparkles, coins and smoke are two batches of points (glowing
+  and solid), hidden when empty. The ships' sea lanes are found once, when the first ship
+  sails; the railway is planned beforehand (`rail-line.ts`) and its track is built once and
+  frozen. The flow view's arcs are worked out only while it is on. Low graphics draws fewer
+  drops and particles.
 - **Absence**: the offline settlement simulates the chain step by step; recipes, unit materials
   and road distances are worked out once, so it runs about a third faster with the same results.
 - The battery saver (`docs/battery-saver.md`) lowers frames and ticks further.

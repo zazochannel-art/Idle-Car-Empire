@@ -9,6 +9,7 @@ import { migrateFunnel } from "../engine/funnel";
 import { migrateEv } from "../engine/ev";
 import { migratePass } from "../engine/pass";
 import { migrateAds } from "../engine/ads";
+import { migrateMapBonus } from "../engine/map-bonus";
 import { migrateIap } from "../engine/iap";
 import { migrateShop } from "../engine/shop";
 import { migrateCity, unlockOwnedZones } from "../engine/city";
@@ -133,6 +134,7 @@ export function migrate(raw: unknown, now: number): GameState {
   // the season pass has open-ended lists (tiers taken, challenges, hall styles)
   state.pass = migratePass(raw.pass);
   state.ads = migrateAds(state.ads, now);
+  state.mapBonus = migrateMapBonus(state.mapBonus);
   state.shop = migrateShop(state.shop, now);
   state.iap = migrateIap(raw.iap);
   migrateLive(raw, state);

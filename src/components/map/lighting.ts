@@ -50,6 +50,14 @@ export function skyAt(mode: TimeMode, t: number): Sky {
   return { dark, tint: tintFor(dark) };
 }
 
+/** Morning mist (0–1): it lies over the land for a while at dawn (the automatic cycle only). */
+export function dawnMist(mode: TimeMode, t: number): number {
+  if (mode !== "auto") return 0;
+  const ph = (t / CYCLE + 0.15) % 1;
+  const d = Math.min(Math.abs(ph - 0.97), 1 - Math.abs(ph - 0.97));
+  return 1 - smooth(0.025, 0.09, d);
+}
+
 const sprites = new Map<string, HTMLCanvasElement>();
 function glow(color: string): HTMLCanvasElement {
   let s = sprites.get(color);

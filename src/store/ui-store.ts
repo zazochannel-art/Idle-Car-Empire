@@ -4,6 +4,7 @@ import { create } from "zustand";
 import type { CarId, StructureType, ZoneId } from "@/game/types";
 import type { TimeMode } from "@/components/map/lighting";
 import type { VehiclePick } from "@/components/map/map-types";
+import type { VisitMap } from "@/game/engine/visit";
 
 const TIME_KEY = "idle-car-empire:time";
 function savedTime(): TimeMode {
@@ -91,6 +92,9 @@ interface UiStore {
   setCelebrate: (c: { plot: string; car: CarId } | null) => void;
   closeAll: () => void;
   map: (cmd: DistributiveOmit<MapCommand, "n">) => void;
+  /** Another player's empire shown on the map instead of the player's own (null: the player's). */
+  visit: { name: string; map: VisitMap } | null;
+  setVisit: (v: { name: string; map: VisitMap } | null) => void;
 }
 
 type DistributiveOmit<T, K extends keyof T> = T extends unknown ? Omit<T, K> : never;
@@ -146,4 +150,6 @@ export const useUi = create<UiStore>((set) => ({
   setCelebrate: (celebrate) => set(celebrate ? { celebrate, view: null, plot: null, zone: null, floor: null } : { celebrate }),
   closeAll: () => set({ view: null, plot: null, zone: null, preview: null, showcase: null }),
   map: (cmd) => set({ command: { ...cmd, n: ++n } as MapCommand }),
+  visit: null,
+  setVisit: (visit) => set({ visit, view: null, plot: null, zone: null, preview: null, showcase: null }),
 }));

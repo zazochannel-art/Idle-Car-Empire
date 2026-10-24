@@ -3,8 +3,8 @@
 import { BUYABLE_TERRITORIES, TERRITORIES, TERRITORY_BY_ID, type TerritoryId } from "@/game/config/city";
 import { territoryLock } from "@/game/engine/territory";
 import { unlockedAreas } from "@/game/engine/territory";
-import { Lock, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { ArrowLeft, Eye, Lock, Route, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CAR_BY_ID } from "@/game/config/cars";
 import { COMPONENT_BY_ID } from "@/game/config/chain";
 import { ZONES, ZONE_BY_ID } from "@/game/config/city";
@@ -14,6 +14,8 @@ import { racingBlocker, racingCost } from "@/game/engine/racing";
 import { zoneBlocker } from "@/game/engine/city";
 import { plotStatus, type PlotStatus } from "@/game/engine/construction";
 import * as Ch from "@/game/engine/chain";
+import { snapshot } from "@/game/engine/economy";
+import { visitState } from "@/game/engine/visit";
 import { formatMoney } from "@/game/format";
 import type { GameState, ZoneId } from "@/game/types";
 import { useContent } from "@/i18n/content";
@@ -87,6 +89,23 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
   const [status, setStatus] = useState<"loading" | "ready" | "failed">("loading");
   /** The padlock whose card is open. */
   const [lockOpen, setLockOpen] = useState<MapArea | null>(null);
+  /** The flow view: where every plant's loads go, and how they run. */
+  const [flow, setFlow] = useState(false);
+  /** Another player's empire on the map instead of the player's own (made once per visit, never ticked). */
+  const visit = useUi((u) => u.visit);
+  const visitLive = useMemo(() => {
+    if (!visit) return null;
+    // its clock never runs: the moment it is made at does not matter
+    const st = visitState(visit.map, 0);
+    return { state: st, snap: snapshot(st) };
+  }, [visit]);
+  const visitRef = useRef(visitLive);
+  useEffect(() => {
+    visitRef.current = visitLive;
+  }, [visitLive]);
+  useEffect(() => {
+    if (engineRef.current) engineRef.current.flow = flow && !visitLive;
+  }, [engine, flow, visitLive]);
   // Subscribe only to changes that can affect the map. The simulation still ticks at
   // 100ms, but money/progress changes no longer rerender this entire 3D map shell.
   const mapKey = useGame((g) => sceneKey(g.state));
@@ -132,9 +151,15 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
           (target) => {
             const ui = useUi.getState();
             setLockOpen(null);
+            // a visit: the visited empire's lots and vehicles aren't the player's to open
+            if (visitRef.current) return;
             if (!target) ui.closeAll();
             else if (target.kind === "zone") ui.selectZone(target.id);
             else if (target.kind === "vehicle") ui.setShowcase(target.v);
+            else if (target.kind === "bonus") {
+              const cash = useGame.getState().claimMapBonus(target.id);
+              if (cash !== null) e.bonusTaken(cash);
+            }
             else if (target.id === RACING) ui.setView("racing");
             else if (hasInterior(target.id)) {
               if (enterTimer) clearTimeout(enterTimer);
@@ -150,6 +175,7 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
         setStatus("ready");
         e.money = (v) => formatMoney(v);
         e.live = () => {
+          if (visitRef.current) return visitRef.current;
           const g = useGame.getState();
           return { state: g.state, snap: g.snap };
         };
@@ -162,6 +188,8 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
         offs.push(() => document.removeEventListener("visibilitychange", onVis));
         offs.push(
           uiEvents.on((ev) => {
+            // the player's own sales and moments don't show over a visited empire
+            if (visitRef.current) return;
             if (ev.type === "sale") {
               e.pop(ev.plot, `+${formatMoney(ev.amount)}`);
               // a buyer drives off in the car they just bought
@@ -173,7 +201,9 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
             } else if (ev.type === "firstCar") {
               const car = CAR_BY_ID[ev.car];
               e.celebrateFirstCar(ev.plot, CAR_MODEL_FOR[car.id], car.color);
-            }
+              e.fireworks({ plot: ev.plot, big: true });
+            } else if (ev.type === "fireworks") e.fireworks(ev);
+            else if (ev.type === "imperium") e.fireworks({ big: true });
           }),
         );
         // cars wear the colours picked in the Design studio
@@ -185,7 +215,7 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
             if (g.state.designs !== prev.state.designs) paint(g.state.designs);
             if (g.state.settings.lowGraphics !== prev.state.settings.lowGraphics) e.setLowGraphics(g.state.settings.lowGraphics);
             // trucks follow the engine's shipments
-            if (g.state.chain.shipments !== prev.state.chain.shipments) e.traffic.setShipments(shipViews(g.state));
+            if (g.state.chain.shipments !== prev.state.chain.shipments && !visitRef.current) e.traffic.setShipments(shipViews(g.state));
           }),
         );
         setEngine((k) => k + 1);
@@ -237,7 +267,7 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
   useEffect(() => {
     const e = engineRef.current;
     if (!e) return;
-    const s = useGame.getState().state;
+    const s = visitLive?.state ?? useGame.getState().state;
     const names: MapNames = {
       garage: (no) => t("garage.title", { no: String(no).padStart(2, "0") }),
       plant: (id) => plantName(s, id, t),
@@ -248,23 +278,34 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
       level: (lv) => t("common.lv", { level: lv }),
       money: (v) => formatMoney(v),
       racing: t("racing.district"),
+      bonusTap: t("mapBonus.tap"),
+      bonusSlowed: t("mapBonus.slowed"),
     };
     e.setState(s, names);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine, key, lang]);
+  }, [engine, key, lang, visitLive]);
+
+  // a visit starts or ends: their island without the player's trucks, from its start
+  useEffect(() => {
+    const e = engineRef.current;
+    if (!e) return;
+    e.visiting = !!visitLive;
+    e.traffic.setShipments(visitLive ? [] : shipViews(useGame.getState().state));
+    if (visitLive) e.home();
+  }, [engine, visitLive]);
 
   // the town drives the company's cars, and its billboard shows the newest model
   const lifeKey = useGame((g) => cityLifeKey(g.state, g.snap));
   useEffect(() => {
     const e = engineRef.current;
     if (!e) return;
-    const { state: s, snap } = useGame.getState();
+    const { state: s, snap } = visitLive ?? useGame.getState();
     const life = cityLife(s, snap);
     const car = life.ad ? CAR_BY_ID[life.ad.car] : null;
     const ad = life.ad && car ? { name: life.ad.name || n.car(car), logo: life.ad.logo, color: life.ad.color, accent: life.ad.accent, line: t("city.billboard", { car: s.designs[car.id]?.name || car.modelName || n.car(car) }) } : null;
-    e.setCityLife(life, ad);
+    e.setCityLife(life, visitLive ? null : ad);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine, lifeKey, lang]);
+  }, [engine, lifeKey, lang, visitLive]);
 
   // floating "+$" over everything that earns on its own
   useEffect(() => {
@@ -272,10 +313,14 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
     if (!e) return;
     const snap = useGame.getState().snap;
     const list: { plotId: string; perSec: number }[] = [];
+    if (visitLive) {
+      e.setEarners([]);
+      return;
+    }
     for (const [id, st] of Object.entries(snap.city.garages)) list.push({ plotId: id, perSec: st.incomePerSec });
     for (const [id, inc] of Object.entries(snap.city.structureIncome)) list.push({ plotId: id, perSec: inc });
     e.setEarners(list);
-  }, [engine, earnersKey]);
+  }, [engine, earnersKey, visitLive]);
 
   useEffect(() => {
     const e = engineRef.current;
@@ -322,9 +367,9 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
     else if (command.kind === "look") e.lookAt(command.x, command.y);
   }, [command]);
 
-  const areas = unlockedAreas(state);
-  // one padlock on every district and territory still locked (and on the paddock)
-  const locks: { id: MapArea; ready: boolean; name: string }[] = [
+  const areas = unlockedAreas(visitLive?.state ?? state);
+  // one padlock on every district and territory still locked (and on the paddock); none on a visit
+  const locks: { id: MapArea; ready: boolean; name: string }[] = visitLive ? [] : [
     ...ZONES.filter((z) => !state.city.zones.includes(z.id)).map((z) => ({ id: z.id as MapArea, ready: !zoneBlocker(state, z.id) && state.cash >= z.cost, name: t(`zone.${z.id}`) })),
     ...BUYABLE_TERRITORIES.filter((x) => !areas.has(x.id)).map((x) => ({ id: `t:${x.id}` as MapArea, ready: territoryLock(state, x.id) === null && state.cash >= x.cost, name: t(`territory.${x.id}`) })),
     ...(!state.racing.unlocked && state.chain.firstCar ? [{ id: "racing" as MapArea, ready: racingBlocker(state) === null && state.cash >= racingCost(state), name: t("racing.district") }] : []),
@@ -359,8 +404,57 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
       )}
       <div className="pointer-events-none absolute right-[calc(env(safe-area-inset-right)+0.5rem)] top-[calc(env(safe-area-inset-top)+9.25rem)] z-20 md:right-[calc(env(safe-area-inset-right)+0.75rem)] md:top-[calc(env(safe-area-inset-top)+5.5rem)]">
         <Minimap engine={engineRef} />
+        {!visit && <FlowToggle on={flow} onToggle={() => setFlow((f) => !f)} />}
       </div>
+      {flow && !visit && <FlowLegend />}
+      {visit && <VisitBanner name={visit.name} />}
       <Showcase />
+    </div>
+  );
+}
+
+/** Turns the flow view on and off; while on, its legend. */
+function FlowToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+  const { t } = useT();
+  return (
+    <button
+      onClick={onToggle}
+      aria-pressed={on}
+      className={cn(
+        "pointer-events-auto ml-auto mt-1.5 flex h-8 w-fit items-center gap-1.5 rounded-full px-3 text-[10px] font-black uppercase tracking-wide shadow-[0_3px_0_0_rgba(0,0,0,0.35)] backdrop-blur-md transition",
+        on ? "bg-gold text-[#2a1d00]" : "bg-[#141a3f]/80 text-white hover:brightness-110",
+      )}
+    >
+      <Route className="size-3.5" strokeWidth={2.5} /> {t("map.flow")}
+    </button>
+  );
+}
+
+/** On a visit: whose empire this is, and the way back to the player's own. */
+function VisitBanner({ name }: { name: string }) {
+  const { t } = useT();
+  return (
+    <div className="pointer-events-auto absolute left-1/2 top-[calc(env(safe-area-inset-top)+5rem)] z-30 flex -translate-x-1/2 items-center gap-2 rounded-full bg-[#141a3f]/90 py-1 pl-3 pr-1 text-xs font-black text-white shadow-[0_3px_0_0_rgba(0,0,0,0.35)] backdrop-blur-md md:top-[calc(env(safe-area-inset-top)+5.5rem)]">
+      <Eye className="size-4 text-gold" />
+      <span className="max-w-[40vw] truncate">{t("visit.banner", { name })}</span>
+      <button onClick={() => useUi.getState().setVisit(null)} className="flex items-center gap-1 rounded-full bg-gold px-2.5 py-1 text-[10px] uppercase tracking-wide text-[#2a1d00] shadow-[0_2px_0_0_#c48300]">
+        <ArrowLeft className="size-3.5" strokeWidth={3} /> {t("visit.back")}
+      </button>
+    </div>
+  );
+}
+
+/** What the flow view's colours mean (under the top bar, while the flow view is on). */
+function FlowLegend() {
+  const { t } = useT();
+  return (
+    <div className="pointer-events-none absolute left-1/2 top-[calc(env(safe-area-inset-top)+5rem)] z-20 flex -translate-x-1/2 gap-2.5 rounded-full bg-[#141a3f]/85 px-3 py-1 text-[10px] font-bold text-white/90 shadow-[0_3px_0_0_rgba(0,0,0,0.3)] backdrop-blur-md md:top-[calc(env(safe-area-inset-top)+5.5rem)]">
+      {(["ok", "slow", "stuck"] as const).map((k) => (
+        <span key={k} className="flex items-center gap-1">
+          <span className={cn("size-2 rounded-full", k === "ok" ? "bg-[#22c55e]" : k === "slow" ? "bg-[#f59e0b]" : "bg-[#ef4444]")} />
+          {t(`map.flow.${k}`)}
+        </span>
+      ))}
     </div>
   );
 }

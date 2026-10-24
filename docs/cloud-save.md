@@ -152,8 +152,11 @@ a **gift** once a day.
 - **What others can see**: only a public card the server builds from each
   save after it is written (`public.empires`): the profile's name and avatar,
   the company name, money earned, cars built, Stars, and the plants with
-  their levels, number of districts, racing totals and resets. Nothing else
-  of a save is ever readable by another player.
+  their levels, number of districts, racing totals and resets, and (from
+  `0018_visit_map.sql`) the map of their island for visits in 3D: which
+  building stands on which lot at what level, the districts and territories
+  open, the dealerships owned and whether the Racing District is built.
+  Nothing else of a save is ever readable by another player.
 - **Plausible totals**: the card's money earned can't grow faster than the
   game allows on the server's clock: at most doubling every 30 minutes, plus
   $20K a second and $1M (for the early game); a first card starts at no more
@@ -273,7 +276,9 @@ Migrations in `supabase/migrations/`, in order:
 4. `0004_leaderboard_visits_gifts.sql` — the public empire cards, the
    leaderboard, visits and gifts (see "Leaderboard, visits and gifts").
    Independent of 0003. Players who saved before it get their card at their
-   next save.
+   next save. `0018_visit_map.sql` adds the island's map to the cards (visits
+   in 3D) and draws the cards already published again from their saves. Until it
+   runs, cards have no map and the visit only offers the card itself.
 5. `0005_ghosts_and_alliances.sql` — ghosts on the cards, and alliances (see
    "Ghost duels and alliances"). Safe to run again.
 6. `0011_cloud_backups.sql` — cloud backups (see "Cloud backups"): the

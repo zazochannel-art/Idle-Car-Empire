@@ -3,6 +3,7 @@
 // and alliances. Everything goes through the server's functions: another
 // player's save is never read, only the public card the server builds from it.
 import { parseGhost, type Ghost } from "../engine/ghost";
+import { parseVisitMap, type VisitMap } from "../engine/visit";
 
 export type BoardKind = "all" | "week";
 
@@ -34,6 +35,8 @@ export interface EmpireCard {
   updatedAt: number;
   /** Their best race car, to race one against one (null: none published). */
   ghost: Ghost | null;
+  /** What stands where on their island, to look round it in 3D (null: their card is older). */
+  map: VisitMap | null;
 }
 
 export type GiftResult = "sent" | "already" | "limit" | "full" | "self" | "unknown";
@@ -184,6 +187,7 @@ export class Social {
       resets: num(card.resets),
       updatedAt: Date.parse(str(r.updated_at)) || 0,
       ghost: parseGhost(card.ghost),
+      map: parseVisitMap(card.map),
     };
   }
 

@@ -23,7 +23,7 @@ export interface VehiclePick {
   empty?: boolean;
 }
 
-export type MapTarget = { kind: "plot"; id: string } | { kind: "zone"; id: ZoneId } | { kind: "vehicle"; v: VehiclePick } | null;
+export type MapTarget = { kind: "plot"; id: string } | { kind: "zone"; id: ZoneId } | { kind: "vehicle"; v: VehiclePick } | { kind: "bonus"; id: number } | null;
 
 /** A lot vehicles drive to or from. */
 export interface Site {
@@ -62,4 +62,7 @@ export interface MapNames {
   level: (lv: number) => string;
   money: (v: number) => string;
   racing: string;
+  /** Over a bonus: "Tap!", and over the broken-down truck. */
+  bonusTap: string;
+  bonusSlowed: string;
 }

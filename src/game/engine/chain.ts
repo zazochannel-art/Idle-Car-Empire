@@ -97,6 +97,7 @@ import { dockCars, exportTick, fleetTick, isExportRoute, portPlot, protoValueMul
 import { EXPORT_BY_ID, type ExportMarketId } from "../config/expansion";
 import { designStats } from "./design";
 import { logisticsMods } from "./logistics";
+import { deliverySlowdown } from "./map-bonus";
 import { starMods } from "./imperium";
 import { managerMult, type GlobalMods } from "./modifiers";
 import { floorPace, floorTick, MORALE } from "./floor";
@@ -1033,10 +1034,11 @@ export function chainTick(
     }
   }
 
-  // 4. trucks on the road
+  // 4. trucks on the road (slower while a truck is broken down on the map; never while away)
   const keep: Shipment[] = [];
+  const pace = offline ? 1 : deliverySlowdown(s);
   for (const sh of s.chain.shipments) {
-    sh.t += dt;
+    sh.t += dt * pace;
     if (sh.t < sh.dur) {
       keep.push(sh);
       continue;

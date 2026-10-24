@@ -1,6 +1,6 @@
 "use client";
 
-import { Gift, RefreshCw } from "lucide-react";
+import { Gift, Map as MapIcon, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -269,6 +269,22 @@ function Visit({ userId, sent, onSent, onClose }: { userId: string; sent: number
               <p className="text-[11px] text-white/50">{t("visit.noPlants")}</p>
             )}
           </div>
+
+          {!mine &&
+            (c.map?.buildings.length ? (
+              <Button
+                variant="gold"
+                className="w-full"
+                onClick={() => {
+                  useUi.getState().setVisit({ name: c.company || c.username, map: c.map! });
+                  onClose();
+                }}
+              >
+                <MapIcon /> {t("visit.see3d")}
+              </Button>
+            ) : (
+              <p className="text-center text-[11px] text-white/50">{t("visit.noMap")}</p>
+            ))}
 
           {c.ghost && !mine && <GhostDuel rival={c.userId} ghost={c.ghost} />}
 

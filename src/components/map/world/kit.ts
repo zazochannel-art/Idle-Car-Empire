@@ -495,13 +495,22 @@ export const LOCK = {
     uLockOn: { value: 0 },
     uLockSize: { value: new THREE.Vector2(1, 1) },
     uLockCol: { value: new THREE.Color("#a9b8c6") },
+    /** Snow lying on what faces up (0–1), and rain on it (0–1): the weather (weather-fx.ts). */
+    uSnow: { value: 0 },
+    uWet: { value: 0 },
   },
 };
 
-/** Lets a material fade under the locked-land haze (programs are shared between materials of a kind). */
+/**
+ * Lets a material fade under the locked-land haze, and take snow and rain
+ * from the weather (programs are shared between materials of a kind; a
+ * material's userData.snowK, 0–1, says how much snow stays on it: less on
+ * the roads).
+ */
 export function hazed<M extends THREE.Material>(m: M): M {
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, LOCK.uniforms);
+    sh.uniforms.uSnowK = { value: typeof m.userData.snowK === "number" ? m.userData.snowK : 1 };
     sh.vertexShader = sh.vertexShader
       .replace("#include <common>", "#include <common>\nvarying vec2 vLockUv;\nuniform vec2 uLockSize;")
       .replace(
@@ -515,7 +524,30 @@ lkW = modelMatrix * lkW;
 vLockUv = vec2(lkW.x / uLockSize.x + 0.5, lkW.z / uLockSize.y + 0.5);`,
       );
     sh.fragmentShader = sh.fragmentShader
-      .replace("#include <common>", "#include <common>\nvarying vec2 vLockUv;\nuniform sampler2D uLockMap;\nuniform float uLockOn;\nuniform vec3 uLockCol;")
+      .replace("#include <common>", "#include <common>\nvarying vec2 vLockUv;\nuniform sampler2D uLockMap;\nuniform float uLockOn;\nuniform vec3 uLockCol;\nuniform vec2 uLockSize;\nuniform float uSnow;\nuniform float uWet;\nuniform float uSnowK;")
+      .replace(
+        "#include <normal_fragment_maps>",
+        `#include <normal_fragment_maps>
+if (uSnow > 0.001 || uWet > 0.001) {
+  float up = dot(normal, normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz));
+  if (uSnow > 0.001) {
+    vec2 wp = floor(vLockUv * uLockSize * 3.0);
+    float nz = fract(sin(dot(wp, vec2(12.9898, 78.233))) * 43758.5453);
+    float cover = smoothstep(0.35, 0.75, up + (nz - 0.5) * 0.3) * uSnow * uSnowK;
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.92, 0.95, 1.0), cover);
+#ifdef STANDARD
+    roughnessFactor = mix(roughnessFactor, 0.9, cover);
+#endif
+  }
+  if (uWet > 0.001) {
+    float wet = smoothstep(0.3, 0.8, up) * uWet;
+    diffuseColor.rgb *= 1.0 - 0.22 * wet;
+#ifdef STANDARD
+    roughnessFactor = mix(roughnessFactor, roughnessFactor * 0.45, wet);
+#endif
+  }
+}`,
+      )
       .replace(
         "#include <opaque_fragment>",
         `#include <opaque_fragment>

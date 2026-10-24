@@ -15,6 +15,7 @@ import { createStory } from "./story";
 import { createEditions } from "./collection";
 import { createPass } from "./pass";
 import { createAds } from "./ads";
+import { createMapBonus } from "./map-bonus";
 import { createIap } from "./iap";
 import { createShop } from "./shop";
 import type { CarDesign, CarId, ComponentId, DealerId, DealerState, GameState, ManagerId, ManagerState, Stats } from "../types";
@@ -104,6 +105,7 @@ export function createInitialState(now: number): GameState {
     editions: createEditions(),
     pass: createPass(),
     ads: createAds(),
+    mapBonus: createMapBonus(),
     shop: createShop(),
     iap: createIap(),
     research: [],

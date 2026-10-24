@@ -71,6 +71,8 @@ interface RoadCar {
   paint?: boolean;
   /** One of the company's own cars (the town drives them as sales grow). */
   own?: boolean;
+  /** A bonus on the map (the golden car, the VIP's limousine): it drives until it is let go. */
+  special?: { finish: "metallic" | "gloss" | "matte"; stretch: number };
   /** Cached road segment to avoid a binary search every rendered frame. */
   seg: number;
   /** Last visual alpha scale applied; avoids redundant matrix updates every frame. */
@@ -303,7 +305,7 @@ export class Traffic3D {
     this.ownShare = own.length ? share : 0;
     let i = 0;
     for (const c of this.cars) {
-      if (c.life || c.buyer || c.hero) continue;
+      if (c.life || c.buyer || c.hero || c.special) continue;
       const k = i++;
       const want = this.own.length > 0 && ((k * 0.6180339887) % 1) < this.ownShare;
       const mine = want ? this.own[k % this.own.length] : null;
@@ -343,12 +345,71 @@ export class Traffic3D {
     this.hero = c;
   }
 
+  /**
+   * A bonus car joins the traffic on an open road (the golden car, the VIP's
+   * limousine): painted `color`, in `finish`, `stretch` times its length.
+   * It drives until releaseSpecial.
+   */
+  spawnSpecial(model: CarModel, color: string, finish: "metallic" | "gloss" | "matte", stretch = 1, scale = 1.15): object | null {
+    const road = this.randomRoad();
+    if (road < 0) return null;
+    const r = WORLD_MAP.roads[road];
+    const c = this.newCar(road, Math.random() * r.len, Math.random() < 0.5 ? 1 : -1, color, model, 0, scale, false);
+    c.special = { finish, stretch };
+    c.alpha = 0;
+    // built again now that it is special (its finish and length)
+    this.refreshCarVisual(c);
+    c.speed *= 0.8;
+    this.cars.push(c);
+    return c;
+  }
+
+  /** The bonus car leaves (it fades out where it is). */
+  releaseSpecial(ref: object) {
+    const c = this.cars.find((x) => x === ref);
+    if (c && !c.life) c.life = 1;
+  }
+
+  /** A truck model like those on the road (a red cab), for a truck that isn't a shipment. */
+  truckObject(vehicle: ShipView["vehicle"], cargo = "#c08a4a"): THREE.Object3D {
+    const site = { id: "", entry: WORLD_MAP.plots[0].entry, weight: 1 };
+    return this.truckModel({ id: 0, from: site, to: site, t: 0, dur: 1, back: false, vehicle, color: cargo });
+  }
+
+  /**
+   * A spot by the side of a road the trucks drive (on one of their routes when
+   * some are out, else any open road): position and heading.
+   */
+  roadSpot(): { x: number; y: number; z: number; yaw: number } | null {
+    const trucks = [...this.trucks.values()].filter((t) => !t.gone && t.path.length > 3);
+    if (trucks.length) {
+      const tr = trucks[Math.floor(Math.random() * trucks.length)];
+      const L = tr.acc[tr.acc.length - 1];
+      const p = at3(tr.path, tr.acc, L * (0.3 + Math.random() * 0.4));
+      const yaw = Math.atan2(-p.tz, p.tx);
+      // pulled over onto the right-hand shoulder
+      return { x: p.x - p.tz * 0.18, y: p.y, z: p.z + p.tx * 0.18, yaw };
+    }
+    const road = this.randomRoad();
+    if (road < 0) return null;
+    const r = WORLD_MAP.roads[road];
+    const p = along(r.pts, r.acc, r.len * (0.3 + Math.random() * 0.4));
+    const lane = r.oneway ? 0 : r.w * 0.25 + 0.18;
+    const x = p.x - p.ty * lane;
+    const z = p.y + p.tx * lane;
+    const mr = this.mapRoads[road];
+    const y = (mr ? roadSurface(this.ground, mr, (r.len * 0.5 * mr.L) / r.len, x, z) : this.ground.at(x, z) + ROAD_LIFT) + 0.005;
+    return { x, y: Math.max(y, this.ground.at(x, z) + ROAD_LIFT), z, yaw: Math.atan2(-p.ty, p.tx) };
+  }
+
   /** Replace the generic traffic silhouette with the actual GLB-backed model. */
   private refreshCarVisual(c: RoadCar) {
-    const model = buildCar(THREE, { model: c.model, color: c.hex, finish: "gloss", build: c.paint ? { color: c.hex } : undefined });
+    const model = buildCar(THREE, { model: c.model, color: c.hex, finish: c.special?.finish ?? "gloss", build: c.paint || c.special ? { color: c.hex } : undefined });
     if (!model.children.length) return;
     c.visual.clear();
     model.scale.setScalar(0.118 * c.scale);
+    // a limousine: the same car, longer
+    if (c.special) model.scale.x *= c.special.stretch;
     c.visual.add(model);
     // the model's parts only move with the car (c.visual); its shadow comes from the body
     freezeStatic(model);
@@ -563,11 +624,11 @@ export class Traffic3D {
     // keep the town's traffic at its level
     const want = this.target();
     let ambient = 0;
-    for (const c of this.cars) if (!c.life) ambient++;
+    for (const c of this.cars) if (!c.life && !c.special) ambient++;
     for (let i = 0; i < 3 && ambient < want; i++, ambient++) this.spawnAmbient();
     let extra = ambient - want;
     for (const c of this.cars) {
-      if (extra > 0 && !c.life && c.alpha >= 1) {
+      if (extra > 0 && !c.life && !c.special && c.alpha >= 1) {
         c.life = 1;
         extra--;
       }
@@ -679,7 +740,7 @@ export class Traffic3D {
       const v = tr.view;
       yield [tr.x, tr.y + 0.2, tr.z, { ref: tr, kind: v.vehicle, model: v.models?.[0] ?? "sedan", color: v.color, models: v.back ? [] : v.models, item: v.item, empty: v.back }];
     }
-    for (const c of this.cars) if (c.alpha > 0.5) yield [c.x, c.y + 0.1, c.z, { ref: c, kind: "car", model: c.model, color: c.hex }];
+    for (const c of this.cars) if (c.alpha > 0.5 && !c.special) yield [c.x, c.y + 0.1, c.z, { ref: c, kind: "car", model: c.model, color: c.hex }];
   }
 
   /** Where a tapped vehicle is now (null once it is gone). */
