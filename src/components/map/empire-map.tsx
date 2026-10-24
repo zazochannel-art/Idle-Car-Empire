@@ -285,13 +285,16 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine, key, lang, visitLive]);
 
-  // a visit starts or ends: their island without the player's trucks, from its start
+  // a visit starts or ends: their island without the player's trucks; the camera starts at
+  // the first plant on the way in, and comes back there on the way out
+  const wasVisiting = useRef(false);
   useEffect(() => {
     const e = engineRef.current;
     if (!e) return;
     e.visiting = !!visitLive;
     e.traffic.setShipments(visitLive ? [] : shipViews(useGame.getState().state));
-    if (visitLive) e.home();
+    if (visitLive || wasVisiting.current) e.home();
+    wasVisiting.current = !!visitLive;
   }, [engine, visitLive]);
 
   // the town drives the company's cars, and its billboard shows the newest model
