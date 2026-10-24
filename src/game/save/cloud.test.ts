@@ -165,6 +165,12 @@ class FakeCloud implements CloudBackend {
     if (row) this.keep(row, "restore", id);
     return { state: JSON.parse(JSON.stringify(b.data)), version: b.version };
   }
+  async deleteBackup(id: number) {
+    if (this.offline) throw new Error("network");
+    const before = this.server.backups.length;
+    this.server.backups = this.server.backups.filter((b) => !(b.id === id && b.user === this.user));
+    return this.server.backups.length < before;
+  }
 }
 
 /** A browser: its own storage and its own session on the shared server. */
@@ -663,6 +669,28 @@ describe("players and devices", () => {
     expect(await b.saves.cloudBackups()).toEqual([]);
     expect(await b.saves.restoreCloudBackup(mine.id, game(5), T0)).toBeNull();
     expect(await b.cloud.takeBackup(mine.id)).toBeNull();
+    expect((server.rows.get(a.cloud.user!)!.data as GameState).cash).toBe(2_000);
+  });
+
+  it("a player deletes only their own cloud backups", async () => {
+    const server = new Server();
+    const a = device(server);
+    await a.saves.start(T0, registers(a));
+    a.saves.save(game(1_000), true);
+    await vi.advanceTimersByTimeAsync(2_100);
+    a.saves.save(game(2_000), true);
+    await vi.advanceTimersByTimeAsync(2_100);
+    const [mine] = (await a.saves.cloudBackups())!;
+
+    const b = device(server);
+    await b.saves.start(T0, registers(b));
+    expect(await b.saves.deleteCloudBackup(mine.id)).toBe(false);
+    expect(await a.saves.cloudBackups()).toHaveLength(1);
+
+    expect(await a.saves.deleteCloudBackup(mine.id)).toBe(true);
+    expect(await a.saves.cloudBackups()).toEqual([]);
+    expect(await a.saves.deleteCloudBackup(mine.id)).toBe(false);
+    // the save itself stays
     expect((server.rows.get(a.cloud.user!)!.data as GameState).cash).toBe(2_000);
   });
 

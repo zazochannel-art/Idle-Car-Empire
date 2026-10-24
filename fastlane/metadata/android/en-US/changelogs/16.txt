@@ -1,0 +1,6 @@
+What's new in 1.0.2:
+• Stars are now permanent: collect ⭐ as your total earnings grow and keep every plant, your cash and research
+• Rebalanced economy
+• Cloud backups: delete the ones you don't need
+• Steadier profit display in the top bar
+• Smoother 3D island on phones

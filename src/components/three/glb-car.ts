@@ -150,6 +150,10 @@ export async function loadGlbCar(T: Three, url: string | ArrayBuffer, opts: GlbC
           mm.color.multiplyScalar(0.35);
           mm.depthWrite = false;
         }
+      // see-through and two-sided (the pack's glass): drawn in one pass. Otherwise three.js
+      // draws the back and then the front, rebuilding the material's program for each, on
+      // every car, on every frame
+      for (const mm of mats) if (mm.transparent && mm.side === T.DoubleSide) mm.forceSinglePass = true;
       m.castShadow = true;
       m.receiveShadow = true;
     }

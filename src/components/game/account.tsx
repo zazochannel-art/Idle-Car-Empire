@@ -417,10 +417,10 @@ export function ProfileView() {
             <div className="text-[11px] text-white/55">
               {t("account.lastSaved")}: <span className="font-semibold text-white/80">{ago(t, sync.lastSaved)}</span> · {t("account.revision", { n: sync.revision })}
             </div>
-            <Button size="sm" variant="gold" className="w-full" disabled={sync.status === "saving" || sync.status === "conflict"} onClick={() => {
-              localStorage.removeItem("idle-car-empire:deleted-cloud-main");
-              void syncNow();
-              uiEvents.emit({ type: "toast", tone: "success", icon: "☁️", title: "Jocul a fost salvat cu succes în Cloud!" });
+            <Button size="sm" variant="gold" className="w-full" disabled={sync.status === "saving" || sync.status === "conflict"} onClick={async () => {
+              await syncNow().catch(() => {});
+              // only once the server has it (otherwise the status above says what went wrong)
+              if (useCloud.getState().sync.status === "saved") uiEvents.emit({ type: "toast", tone: "success", icon: "☁️", title: t("account.savedNow") });
             }}>
               <RefreshCw /> {t("account.saveNow")}
             </Button>
@@ -537,20 +537,18 @@ function DeleteAccount() {
 function BackupsCard() {
   const saves = useGame((g) => g.saves);
   const restore = useGame((g) => g.restoreBackup);
-  const state = useGame((g) => g.view.state);
-
-  const createBackup = () => {
-    if (!saves) return;
-    saves.local.backup({ state, savedAt: Date.now() }, "device");
-    setList(saves.backups());
-    uiEvents.emit({ type: "toast", tone: "success", icon: "💾", title: "Copia de rezervă a fost creată cu succes!" });
-  };
   const { t } = useT();
   const [asking, setAsking] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
-  // read once (they are large): again only after a restore
+  // read once (they are large): again only after a change
   const [list, setList] = useState(() => saves?.backups() ?? []);
-  
+
+  const createBackup = () => {
+    if (!saves) return;
+    const ok = saves.local.backup({ state: useGame.getState().state, savedAt: Date.now() }, "device") !== null;
+    setList(saves.backups());
+    uiEvents.emit({ type: "toast", tone: ok ? "success" : "warn", icon: ok ? "💾" : "⚠️", title: t(ok ? "account.backupCreated" : "account.err.unknown") });
+  };
   const from = (reason: string) => t(reason === "cloud" ? "account.backup.cloud" : reason === "replaced" ? "account.backup.replaced" : "account.backup.device");
   return (
     <div className="space-y-2 rounded-2xl bg-[#2b2b2e] p-3 ring-1 ring-white/10">
@@ -559,9 +557,9 @@ function BackupsCard() {
       </div>
       <p className="text-[11px] text-white/55">{t("account.backupsHint")}</p>
       <Button size="sm" variant="gold" className="w-full" onClick={createBackup}>
-        ➕ Creează o copie nouă de rezervă
+        ➕ {t("account.backupCreate")}
       </Button>
-      {!list.length ? (<p className="text-center text-xs text-white/40 py-2">Nu există salvări de rezervă înregistrate.</p>) : list.map((b) => (
+      {!list.length ? (<p className="text-center text-xs text-white/40 py-2">{t("account.backupsNone")}</p>) : list.map((b) => (
         <div key={b.key} className="space-y-2 rounded-xl bg-white/[0.04] p-2.5 ring-1 ring-white/10">
           <div className="flex items-center gap-2">
             <div className="min-w-0 flex-1">
@@ -600,7 +598,7 @@ function BackupsCard() {
             </>
           ) : deleting === b.key ? (
             <>
-              <p className="text-[11px] text-rose-300">Ștergi definitiv această salvare de rezervă?</p>
+              <p className="text-[11px] text-rose-300">{t("account.backupDeleteConfirm")}</p>
               <div className="grid grid-cols-2 gap-1.5">
                 <Button size="sm" variant="secondary" onClick={() => setDeleting(null)}>
                   {t("common.cancel")}
@@ -609,13 +607,13 @@ function BackupsCard() {
                   size="sm"
                   className="bg-none bg-rose-600 shadow-none text-white"
                   onClick={() => {
-                    try { window.localStorage.removeItem(b.key); } catch {}
+                    saves?.deleteBackup(b.key);
                     setDeleting(null);
                     setList(saves?.backups() ?? []);
-                    uiEvents.emit({ type: "toast", tone: "success", icon: "🗑️", title: "Salvarea a fost ștearsă" });
+                    uiEvents.emit({ type: "toast", tone: "success", icon: "🗑️", title: t("account.backupDeleted") });
                   }}
                 >
-                  <Trash2 className="size-3.5" /> Șterge
+                  <Trash2 className="size-3.5" /> {t("account.backupDelete")}
                 </Button>
               </div>
             </>
@@ -625,7 +623,7 @@ function BackupsCard() {
                 <History /> {t("account.restore")}
               </Button>
               <Button size="sm" variant="ghost" className="text-rose-300 hover:bg-rose-500/10" onClick={() => setDeleting(b.key)}>
-                <Trash2 className="size-3.5" /> Șterge
+                <Trash2 className="size-3.5" /> {t("account.backupDelete")}
               </Button>
             </div>
           )}
@@ -645,7 +643,6 @@ function InviteCard() {
   const [info, setInfo] = useState<MyInvite | null>(null);
   const [failed, setFailed] = useState(false);
   const [reads, setReads] = useState(0);
-  const lastSaved = useCloud((c) => c.sync.lastSaved);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null);
@@ -751,7 +748,6 @@ function InviteCard() {
 function CloudBackupsCard() {
   const lastSaved = useCloud((c) => c.sync.lastSaved);
   const saves = useGame((g) => g.saves);
-  const state = useGame((g) => g.view.state);
   const restore = useGame((g) => g.restoreCloudBackup);
   const mode = useCloud((c) => c.mode);
   const { t } = useT();
@@ -766,12 +762,7 @@ function CloudBackupsCard() {
     let live = true;
     saves
       ?.cloudBackups()
-      .then((l) => {
-        if (!live) return;
-        let deletedArr = [];
-        try { deletedArr = JSON.parse(localStorage.getItem("idle-car-empire:deleted-cloud-backups") || "[]"); } catch {}
-        setList((l ?? []).filter((item) => !deletedArr.includes(item.id)));
-      })
+      .then((l) => live && setList(l ?? []))
       .catch(() => live && setFailed(true));
     return () => {
       live = false;
@@ -786,21 +777,6 @@ function CloudBackupsCard() {
   if (mode !== "cloud") return null;
   const from = (r: CloudBackup["reason"]) => t(r === "drop" ? "account.cloudBackup.drop" : r === "restore" ? "account.cloudBackup.restore" : "account.cloudBackup.auto");
 
-  const hasMainSave = lastSaved && !localStorage.getItem("idle-car-empire:deleted-cloud-main");
-  const displayList: CloudBackup[] = list && list.length > 0 ? list : hasMainSave ? [{
-    id: 999999,
-    at: lastSaved,
-    reason: "auto" as const,
-    device: "Cloud",
-    version: 1,
-    company: state.brand?.name || t("account.noCompany"),
-    cash: state.cash,
-    earned: state.lifetime?.moneyEarned || 0,
-    cars: state.lifetime?.carsProduced || 0,
-    plants: plantsOf(state).length,
-    lastPlayed: lastSaved,
-  }] : [];
-
   return (
     <div className="space-y-2 rounded-2xl bg-[#2b2b2e] p-3 ring-1 ring-white/10">
       <div className="flex items-center gap-2 text-sm font-bold">
@@ -814,10 +790,10 @@ function CloudBackupsCard() {
         </Button>
       ) : !list ? (
         <p className="text-[11px] text-white/40">{t("account.cloudBackupsLoading")}</p>
-      ) : !displayList.length ? (
+      ) : !list.length ? (
         <p className="text-[11px] text-white/40">{t("account.cloudBackupsNone")}</p>
       ) : (
-        displayList.map((b) => (
+        list.map((b) => (
           <div key={b.id} className="space-y-2 rounded-xl bg-white/[0.04] p-2.5 ring-1 ring-white/10">
             <div className="flex items-center gap-2">
               <div className="min-w-0 flex-1">
@@ -861,7 +837,7 @@ function CloudBackupsCard() {
               </>
             ) : deleting === b.id ? (
               <>
-                <p className="text-[11px] text-rose-300">Ștergi această copie din Cloud?</p>
+                <p className="text-[11px] text-rose-300">{t("account.cloudBackupDeleteConfirm")}</p>
                 <div className="grid grid-cols-2 gap-1.5">
                   <Button size="sm" variant="secondary" disabled={busy} onClick={() => setDeleting(null)}>
                     {t("common.cancel")}
@@ -872,20 +848,15 @@ function CloudBackupsCard() {
                     disabled={busy}
                     onClick={async () => {
                       setBusy(true);
-                      try {
-                        let deletedArr = [];
-                        try { deletedArr = JSON.parse(localStorage.getItem("idle-car-empire:deleted-cloud-backups") || "[]"); } catch {}
-                        if (!deletedArr.includes(b.id)) deletedArr.push(b.id);
-                        localStorage.setItem("idle-car-empire:deleted-cloud-backups", JSON.stringify(deletedArr));
-                        await (saves as any)?.deleteCloudBackup?.(b.id);
-                      } catch {}
-                      setList((prev) => prev ? prev.filter((item) => item.id !== b.id) : []);
+                      const ok = (await saves?.deleteCloudBackup(b.id).catch(() => false)) ?? false;
                       setBusy(false);
                       setDeleting(null);
-                      uiEvents.emit({ type: "toast", tone: "success", icon: "🗑️", title: "Copia din Cloud a fost ștearsă" });
+                      // read again from the server: what it shows is what is kept
+                      load();
+                      uiEvents.emit({ type: "toast", tone: ok ? "success" : "warn", icon: ok ? "🗑️" : "⚠️", title: t(ok ? "account.cloudBackupDeleted" : "account.cloudBackupDeleteFailed") });
                     }}
                   >
-                    <Trash2 className="size-3.5" /> Șterge
+                    <Trash2 className="size-3.5" /> {t("account.backupDelete")}
                   </Button>
                 </div>
               </>
@@ -895,7 +866,7 @@ function CloudBackupsCard() {
                   <History /> {t("account.restore")}
                 </Button>
                 <Button size="sm" variant="ghost" className="text-rose-300 hover:bg-rose-500/10" onClick={() => setDeleting(b.id)}>
-                  <Trash2 className="size-3.5" /> Șterge
+                  <Trash2 className="size-3.5" /> {t("account.backupDelete")}
                 </Button>
               </div>
             )}

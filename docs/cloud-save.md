@@ -110,6 +110,8 @@ account's save (`0011_cloud_backups.sql`), shown in the Profile under
 - before a restore, the cloud save it is about to replace.
 
 Each player keeps the newest 12; they go with the account when it is deleted.
+A player can also delete one of their own from the Profile
+(`delete_my_backup`, `0017_delete_backups.sql`).
 A restore works like a device backup's: the server hands the backup to the
 game (`take_my_backup`, after keeping the current cloud save), the game it
 replaces is kept on the device too, and the game saves the restored one
@@ -277,6 +279,7 @@ Migrations in `supabase/migrations/`, in order:
 6. `0011_cloud_backups.sql` — cloud backups (see "Cloud backups"): the
    `ops.save_backups` table (not reachable from the API), the trigger on
    `game_saves` that keeps them, `list_my_backups()` and `take_my_backup()`.
+   `0017_delete_backups.sql` adds `delete_my_backup()`.
 7. `0012_invites.sql` — invite codes (see "Invite codes"): the
    `ops.invite_codes` and `ops.invites` tables (not reachable from the API),
    `my_invite()`, `redeem_invite()` and `claim_invite_rewards()`.
@@ -311,6 +314,8 @@ Functions (all for signed-in players only, `search_path` pinned):
 - `take_my_backup(p_id)` → `data, save_version` of one of the caller's own
   backups (nothing for anyone else's), after keeping the caller's current
   cloud save as a `restore` backup.
+- `delete_my_backup(p_id)` → `true` when one of the caller's own backups was
+  deleted, `false` for anyone else's or one already gone (0017).
 - `leaderboard(p_kind)` (`'week'` or `'all'`) → the top 50 listed players
   plus the caller's own row: `rank, user_id, username, avatar, company,
   value, me`.

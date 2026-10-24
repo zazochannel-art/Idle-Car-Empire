@@ -7,7 +7,8 @@ import { createLogistics } from "./logistics";
 import { createDealers, createStats, emptyCarCounts } from "./state";
 
 /**
- * Clears the current run (Reset Imperium): cash, plants, the map, dealers,
+ * Clears the current run (the old Reset Imperium; collecting ⭐ Stars no longer
+ * calls it, see imperium.ts): cash, plants, the map, dealers,
  * car models, ports and the fleet division. The racing team, managers
  * (unassigned), launched models, engineers and lifetime stats stay.
  */

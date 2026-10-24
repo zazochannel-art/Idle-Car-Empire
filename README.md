@@ -106,8 +106,8 @@ npm run ios:open        # Xcode (on a Mac)
    - follow the objectives (Produce 100 car bodies → Build your second
      factory → … → Build your automotive empire);
    - open plant levels 11–15 as your total earnings grow ($50M → $25B);
-   - run **Reset Imperium** after earning $5B in a run, for ⭐ **Stars** and
-     permanent upgrades.
+   - collect ⭐ **Stars** for permanent upgrades as total earnings grow (the
+     first at $20B, then 3 more for every tenfold); nothing is reset.
    - Garages, car washes and other city buildings are a side business.
 
 Drag to pan, pinch or scroll to zoom, tap buildings; the minimap jumps the
@@ -135,8 +135,9 @@ src/game/
     tick.ts       advances time in small steps
     actions.ts    player actions (buy, hire, research…)
     offline.ts    plays out the time away, report + collect
-    reset.ts      clears a run (used by Reset Imperium)
-    imperium.ts   Reset Imperium, ⭐ Stars and their upgrades
+    reset.ts      clears a run (the old Reset Imperium; collecting Stars no
+                  longer resets anything)
+    imperium.ts   collecting ⭐ Stars from total earnings, and their upgrades
     progress.ts   achievements, daily & milestone missions
     insights.ts   "next goal" hints and lock reasons for the UI
     city.ts       districts, plot buildings, garages: placement rules,

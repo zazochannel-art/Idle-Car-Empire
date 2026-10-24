@@ -262,6 +262,17 @@ export class SaveManager {
     return state;
   }
 
+  /** Deletes a backup kept on this device. */
+  deleteBackup(key: string) {
+    this.local.removeBackup(key);
+  }
+
+  /** Deletes one of this account's cloud backups; false when it can't (no cloud, gone, or another player's). */
+  async deleteCloudBackup(id: number): Promise<boolean> {
+    if (this.closed || !this.account || !this.backend?.deleteBackup) return false;
+    return this.backend.deleteBackup(id);
+  }
+
   /** The older copies of this account's save kept in the cloud (newest first); null without the cloud. */
   async cloudBackups(): Promise<CloudBackup[] | null> {
     if (!this.account || !this.backend?.backups) return null;

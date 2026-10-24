@@ -28,7 +28,7 @@ const TRAFFIC_SCALE: Record<CarModel, number> = {
   pickup: 1,
   robotaxi: 1,
 };
-import { hazed } from "./kit";
+import { freezeStatic, hazed } from "./kit";
 import { ROAD_LIFT, carGeometry, roadSurface, type MapRoad } from "./scenery";
 import { bake } from "./structures";
 import type { Ground } from "./terrain";
@@ -350,6 +350,8 @@ export class Traffic3D {
     c.visual.clear();
     model.scale.setScalar(0.118 * c.scale);
     c.visual.add(model);
+    // the model's parts only move with the car (c.visual)
+    freezeStatic(model);
     c.visual.visible = c.alpha > 0.01;
   }
 
@@ -482,6 +484,8 @@ export class Traffic3D {
         m.add(car);
       });
     }
+    // the truck's parts (and the cars on a carrier) only move with the truck
+    for (const part of m.children) freezeStatic(part);
     return m;
   }
 

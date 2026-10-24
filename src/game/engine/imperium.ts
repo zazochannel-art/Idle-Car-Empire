@@ -1,38 +1,47 @@
 import { IMPERIUM, STAR_UPGRADE_BY_ID, starUpgradeCost, type StarUpgradeId } from "../config/imperium";
 import type { GameState } from "../types";
-import { resetRun } from "./reset";
 
-/** Lifetime earnings since the last Reset Imperium. */
+/** Lifetime earnings since Stars were last collected. */
 export function earnedSinceImperium(s: GameState): number {
   return Math.max(0, s.lifetime.moneyEarned - s.epBase);
 }
 
-export function pendingStars(s: GameState): number {
-  const earned = earnedSinceImperium(s);
+/**
+ * The Stars a company has earned in all by the time it has earned `earned`. They grow with the
+ * logarithm of total earnings, so collecting often or once gives the same Stars.
+ */
+export function starsAt(earned: number): number {
   if (earned < IMPERIUM.minRunEarnings) return 0;
-  const x = earned / IMPERIUM.base;
-  return Math.max(1, Math.floor(IMPERIUM.perDecade * Math.log10(x)));
+  return Math.max(1, Math.floor(IMPERIUM.perDecade * Math.log10(earned / IMPERIUM.base)));
+}
+
+/** Stars waiting to be collected: those earned since the last collection. */
+export function pendingStars(s: GameState): number {
+  return Math.max(0, starsAt(s.lifetime.moneyEarned) - starsAt(s.epBase));
+}
+
+/** Total earnings at which the next Star (after those waiting) is due. */
+export function nextStarAt(s: GameState): number {
+  const have = Math.max(starsAt(s.lifetime.moneyEarned), starsAt(s.epBase));
+  if (have === 0) return IMPERIUM.minRunEarnings;
+  return Math.max(IMPERIUM.minRunEarnings, IMPERIUM.base * 10 ** ((have + 1) / IMPERIUM.perDecade));
 }
 
 export function canImperium(s: GameState): boolean {
-  return s.run.moneyEarned >= IMPERIUM.minRunEarnings && pendingStars(s) > 0;
+  return pendingStars(s) > 0;
 }
 
 /**
- * Reset Imperium: the end-game reset. Starts the company over (resetRun) and
- * clears research too. Keeps ⭐ Stars and their upgrades, milestone boosts,
- * managers, achievements, statistics and the plant levels opened by total
- * earnings.
+ * Collects the ⭐ Stars earned since the last collection. Nothing is reset: the plants, the
+ * cash and research all stay (the progress is permanent). Saves from before kept their
+ * epBase from the old resets, so they count from there.
  */
-export function imperium(s: GameState, now: number): number {
-  if (!canImperium(s)) return 0;
+export function imperium(s: GameState): number {
   const gained = pendingStars(s);
+  if (gained <= 0) return 0;
   s.stars += gained;
   s.imperiumCount += 1;
   s.epBase = s.lifetime.moneyEarned;
-  s.research = [];
-  s.rp = 0;
-  // resetRun(s, now); // Progress is 100% permanent!
   return gained;
 }
 

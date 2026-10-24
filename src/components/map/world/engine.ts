@@ -17,7 +17,7 @@ import type { ComponentId, GameState, StructureType, ZoneId } from "@/game/types
 import { skyAt, worldClock, type TimeMode } from "../lighting";
 import type { MapArea, MapNames, MapTarget, ShipView, Site, ZoomTier } from "../map-types";
 import type { CarModel } from "../vehicles";
-import { LOCK, mapMaterials, type MapMaterials } from "./kit";
+import { LOCK, freezeStatic, mapMaterials, splitSharedMaterials, type MapMaterials } from "./kit";
 import { banner, pop, tag } from "./labels";
 import { PlotLayer, plotViews, type PlotView } from "./plots";
 import { RaceCars } from "./race";
@@ -190,6 +190,12 @@ export class MapEngine {
   /** Shadows are drawn (close enough), and the frame parity for redrawing them. */
   private shadowLive = false;
   private shadowTick = 0;
+  /** Frames since shared materials were last split (splitSharedMaterials). */
+  private splitTick = 0;
+  /** Bumped whenever the camera moves; the HTML cards are placed again only then (or now and then). */
+  private viewVersion = 0;
+  private cardsAt = { version: -1, frame: 0 };
+  private cardStyle = new WeakMap<HTMLElement, { vis: string; tf: string }>();
   private plots: PlotLayer | null = null;
   readonly traffic: TrafficFacade;
   private trafficLayer: Traffic3D | null = null;
@@ -261,8 +267,7 @@ export class MapEngine {
     this.home(0);
     this.detach = this.attachControls();
     this.ready = this.load();
-    this.ready.catch((e) => console.error("map: could not load the world", e));
-  }
+    this.ready.catch((e) => console.error("map: could not load the world", e));  }
 
   // ───────────────────────── loading ─────────────────────────
 
@@ -337,6 +342,11 @@ export class MapEngine {
     this.plots.setSelected(this._selected);
     this.plots.setBuildInfo(this._buildInfo);
     this.plots.setPreview(this._preview);
+    // the island, its scenery and roads never move (but the rotors, pumps and cable cars)
+    for (const t of [...this.terrain.tiles, this.terrain.sea, this.terrain.floor]) freezeStatic(t);
+    freezeStatic(this.scenery.root, this.scenery.movingParts());
+    freezeStatic(roads.root);
+    splitSharedMaterials(this.scene);
     // compile everything once, before the first frame
     this.place(0);
     if (this.renderer.compileAsync) await this.renderer.compileAsync(this.scene, this.camera);
@@ -612,6 +622,7 @@ export class MapEngine {
     this.lastCamera.az = c.az;
     this.lastCamera.ty = this.ty;
     this.cameraDirty = false;
+    this.viewVersion++;
   }
 
   private render(dt: number) {
@@ -668,6 +679,11 @@ export class MapEngine {
     // the shadows of moving cars and trucks follow at 30 FPS: the shadow pass
     // (about half the draw calls up close) runs every other frame
     if (this.shadowLive && (this.shadowTick ^= 1)) this.renderer.shadowMap.needsUpdate = true;
+    // lots and traffic add meshes as the game goes: give them their own materials too (kit.ts)
+    if (++this.splitTick >= 60) {
+      this.splitTick = 0;
+      splitSharedMaterials(this.scene);
+    }
     this.renderer.render(this.scene, this.camera);
     // HTML cards remain frame-accurate; the heavier canvas labels only need ~30 FPS.
     const labelDt = this.t - this.lastLabelsAt;
@@ -842,8 +858,21 @@ export class MapEngine {
    * padlock, kept on the screen).
    */
   private placeCards() {
-    const cards = this.overlay?.children ?? [];
+    const cards = this.overlay?.children;
+    if (!cards) return;
+    // only when the view moved, a card came or went, or now and then (a card's size can change)
+    const at = this.cardsAt;
+    const n = cards.length;
+    if (at.version === this.viewVersion && at.frame < 10 && n === this.cardCount) {
+      at.frame++;
+      return;
+    }
+    at.version = this.viewVersion;
+    at.frame = 0;
+    this.cardCount = n;
     const k = Math.max(0.5, Math.min(1, this.cam.zoom * 2.4));
+    // every size is read before any style is written: one layout, not one per card
+    const plan: { el: HTMLElement; vis: string; tf: string }[] = [];
     for (const node of cards) {
       const el = node as HTMLElement;
       const id = el.dataset.zone as MapArea | undefined;
@@ -853,20 +882,29 @@ export class MapEngine {
       const far = el.dataset.far !== undefined;
       const above = el.dataset.anchor === "above";
       const off = !this.onScreen(p, above ? 0 : 200) || (far && this.cam.zoom > LABEL_ZOOM);
-      el.style.visibility = off ? "hidden" : "visible";
-      if (!p || off) continue;
-      if (above) {
-        // the card sits over its padlock, or under it when there is no room above
-        const hw = el.offsetWidth / 2;
-        const x = Math.max(hw + 8, Math.min(this.w - hw - 8, p[0]));
-        const up = p[1] - el.offsetHeight - 26 > 8;
-        el.style.transform = `translate(${Math.round(x)}px, ${Math.round(p[1])}px) translate(-50%, ${up ? "calc(-100% - 22px)" : "22px"})`;
-      } else {
-        const s = el.dataset.fixed !== undefined ? 1 : k;
-        el.style.transform = `translate(${Math.round(p[0])}px, ${Math.round(p[1])}px) translate(-50%, -50%) scale(${s.toFixed(2)})`;
+      let tf = "";
+      if (p && !off) {
+        if (above) {
+          // the card sits over its padlock, or under it when there is no room above
+          const hw = el.offsetWidth / 2;
+          const x = Math.max(hw + 8, Math.min(this.w - hw - 8, p[0]));
+          const up = p[1] - el.offsetHeight - 26 > 8;
+          tf = `translate(${Math.round(x)}px, ${Math.round(p[1])}px) translate(-50%, ${up ? "calc(-100% - 22px)" : "22px"})`;
+        } else {
+          const s = el.dataset.fixed !== undefined ? 1 : k;
+          tf = `translate(${Math.round(p[0])}px, ${Math.round(p[1])}px) translate(-50%, -50%) scale(${s.toFixed(2)})`;
+        }
       }
+      plan.push({ el, vis: off ? "hidden" : "visible", tf });
+    }
+    for (const { el, vis, tf } of plan) {
+      const was = this.cardStyle.get(el);
+      if (was?.vis !== vis) el.style.visibility = vis;
+      if (tf && was?.tf !== tf) el.style.transform = tf;
+      this.cardStyle.set(el, { vis, tf: tf || was?.tf || "" });
     }
   }
+  private cardCount = -1;
 
   private areaCenter(id: MapArea): { x: number; y: number } {
     if (id === "racing") {

@@ -129,6 +129,14 @@ check(takeA?.data?.cash === 100, "A takes its backup to play again", JSON.string
 const keptA = (await a.client.rpc("list_my_backups")).data ?? [];
 check(keptA[0]?.reason === "restore" && keptA[0].cash === 250, "the save it would replace is kept first", JSON.stringify(keptA[0]));
 check(one(await a.client.rpc("load_game"))?.data?.cash === 250, "taking a backup leaves the save as it is");
+// deleting one (0017): each player's own only
+const deleteB = await b.client.rpc("delete_my_backup", { p_id: keptA[0]?.id ?? 0 });
+check(!deleteB.error && deleteB.data === false, "B can't delete A's backup", deleteB.error?.message ?? JSON.stringify(deleteB.data));
+const deleteA = await a.client.rpc("delete_my_backup", { p_id: keptA[0]?.id ?? 0 });
+check(!deleteA.error && deleteA.data === true, "A deletes its own backup", deleteA.error?.message ?? JSON.stringify(deleteA.data));
+const leftA = (await a.client.rpc("list_my_backups")).data ?? [];
+check(leftA.length === keptA.length - 1 && !leftA.some((r) => Number(r.id) === Number(keptA[0]?.id)), "the deleted backup is gone", JSON.stringify(leftA));
+check(one(await a.client.rpc("load_game"))?.data?.cash === 250, "deleting a backup leaves the save as it is");
 
 // ── invite codes (0012): B uses A's code; A's reward waits for B's first car, and is taken once ──
 const inviteA = (await a.client.rpc("my_invite")).data;
@@ -258,6 +266,8 @@ const anonRead = await anon.client.from("game_saves").select("user_id");
 check(!!anonRead.error || (anonRead.data ?? []).length === 0, "signed out: the table shows nothing", anonRead.error?.code);
 const anonBackups = await anon.client.rpc("list_my_backups");
 check(!!anonBackups.error, "no backups without signing in", anonBackups.error?.code);
+const anonDelete = await anon.client.rpc("delete_my_backup", { p_id: 1 });
+check(!!anonDelete.error, "no deleting backups without signing in", anonDelete.error?.code);
 const anonInvite = await anon.client.rpc("redeem_invite", { p_code: "ABCDEF" });
 check(!!anonInvite.error, "no invite codes without signing in", anonInvite.error?.code);
 const anonCup = await anon.client.rpc("cup_board", { p_week: 1 });

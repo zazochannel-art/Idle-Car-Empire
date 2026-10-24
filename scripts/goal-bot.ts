@@ -91,7 +91,7 @@ function fullStep(t: number) {
   // Reset Imperium as soon as it is allowed
   if (!skip.has("imperium") && canImperium(s)) {
     const stars = pendingStars(s);
-    imperium(s, s.lastActiveAt);
+    imperium(s);
     console.log(`>> imperium at ${fmtT(t)}: +${stars} stars`);
     counts.imperium = (counts.imperium ?? 0) + 1;
   }

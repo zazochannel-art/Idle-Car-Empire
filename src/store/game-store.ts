@@ -1178,7 +1178,7 @@ export const useGame = create<GameStore>((set, get) => {
       if (amount > 0) setTimeout(() => void maybeAskForReview(get().state), 1500);
     },
     imperium: () => {
-      const gained = act((s) => doImperium(s, Date.now()));
+      const gained = act((s) => doImperium(s));
       if (gained > 0) {
         uiEvents.emit({ type: "imperium", stars: gained });
         persist(true);

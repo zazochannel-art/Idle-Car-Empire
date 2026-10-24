@@ -1,7 +1,7 @@
 "use client";
 
 import { ProfileButton } from "./account";
-import { Car, Factory, Moon, Settings, Star, Store, Sun, Sunset, SunMoon, TrendingDown, TrendingUp } from "lucide-react";
+import { Car, Factory, Moon, Settings, Star, Store, Sun, Sunset, SunMoon, TrendingUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { TIME_MODES } from "@/components/map/lighting";
 import { formatMoney, formatNumber } from "@/game/format";
@@ -83,15 +83,16 @@ function ShopButton() {
 
 function IncomePill() {
   const steady = useGame((g) => g.snap.steadyIncomePerSec);
-  const [displayIncome, setDisplayIncome] = useState(steady);
+  // the profit shown is sampled once a minute, so it reads steadily
+  const [sampled, setSampled] = useState(steady);
   useEffect(() => {
-    setDisplayIncome(useGame.getState().snap.steadyIncomePerSec);
     const interval = setInterval(() => {
-      setDisplayIncome(useGame.getState().snap.steadyIncomePerSec);
+      setSampled(useGame.getState().snap.steadyIncomePerSec);
     }, 60000);
     return () => clearInterval(interval);
   }, []);
-  const income = formatMoney(displayIncome);
+  // until there is a sample (the game still loading at the first render), the live value
+  const income = formatMoney(sampled > 0 ? sampled : steady);
   const { t } = useT();
   const icon = <TrendingUp className="size-4 stroke-[3] text-lime" />;
   return <Pill icon={icon} label={t("hud.profit")} value={`${income}${t("unit.perSec")}`} />;

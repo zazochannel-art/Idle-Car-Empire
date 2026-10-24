@@ -547,6 +547,84 @@ export function hazeAll(o: THREE.Object3D) {
   });
 }
 
+/**
+ * What makes three.js build a different shader program for the same material: instancing,
+ * instance colours, receiving shadows, the geometry's vertex colours, tangents, morphs, skins.
+ */
+function programKind(mesh: THREE.Mesh): string {
+  const g = mesh.geometry;
+  const inst = mesh as THREE.InstancedMesh;
+  return [inst.isInstancedMesh ? (inst.instanceColor ? "ic" : "i") : "m", mesh.receiveShadow ? "r" : "", g.attributes.color?.itemSize ?? 0, g.attributes.tangent ? "t" : "", g.morphAttributes.position ? "p" : "", (mesh as THREE.SkinnedMesh).isSkinnedMesh ? "s" : ""].join("");
+}
+
+/** The copies made of a material, by kind of object; and the kind each original stays with. */
+const variants = new WeakMap<THREE.Material, Map<string, THREE.Material>>();
+const originOf = new WeakMap<THREE.Material, THREE.Material>();
+const ownKind = new WeakMap<THREE.Material, string>();
+
+/** The shadow pass's depth material for each kind of caster (see splitSharedMaterials). */
+const depthByKind = new Map<string, THREE.MeshDepthMaterial>();
+
+/**
+ * Gives every kind of object (see programKind) its own copy of a material it shares with
+ * other kinds. three.js checks a material's program again each time the object drawing it
+ * needs another one, and the map's few shared materials are drawn by hundreds of instanced
+ * and plain meshes, with and without shadows: one material per kind keeps the programs
+ * steady from draw to draw. The copies look the same (same textures and haze), and the
+ * map's materials never change after they are made. The shadow pass gets the same: three.js
+ * draws every plain caster with one depth material, so each kind of caster gets its own.
+ * Cheap enough to run again as lots and traffic add meshes.
+ */
+export function splitSharedMaterials(root: THREE.Object3D) {
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh || Array.isArray(mesh.material)) return;
+    const m = mesh.material as THREE.Material;
+    // see-through and two-sided: one pass (two would rebuild the program twice per draw)
+    if (m.transparent && m.side === THREE.DoubleSide) m.forceSinglePass = true;
+    // the casters three.js would draw with its one shared depth material
+    if (mesh.castShadow && !mesh.customDepthMaterial && !m.alphaTest && !m.alphaToCoverage && !(m as THREE.MeshStandardMaterial).displacementMap && !m.clippingPlanes?.length) {
+      const inst = mesh as THREE.InstancedMesh;
+      const key = `${inst.isInstancedMesh ? (inst.instanceColor ? "ic" : "i") : "m"}${mesh.geometry.morphAttributes.position ? "p" : ""}${(mesh as THREE.SkinnedMesh).isSkinnedMesh ? "s" : ""}`;
+      let d = depthByKind.get(key);
+      if (!d) depthByKind.set(key, (d = new THREE.MeshDepthMaterial()));
+      mesh.customDepthMaterial = d;
+    }
+    if ((m as THREE.ShaderMaterial).isShaderMaterial) return;
+    const base = originOf.get(m) ?? m;
+    const kind = programKind(mesh);
+    const own = ownKind.get(base);
+    if (own === undefined) ownKind.set(base, kind);
+    if (own === undefined || own === kind) {
+      if (m !== base) mesh.material = base;
+      return;
+    }
+    let byKind = variants.get(base);
+    if (!byKind) variants.set(base, (byKind = new Map()));
+    let v = byKind.get(kind);
+    if (!v) {
+      v = base.clone();
+      v.onBeforeCompile = base.onBeforeCompile;
+      v.customProgramCacheKey = base.customProgramCacheKey;
+      originOf.set(v, base);
+      byKind.set(kind, v);
+    }
+    if (mesh.material !== v) mesh.material = v;
+  });
+}
+
+/**
+ * Parts of the map that never move keep the matrices they were built with: three.js
+ * otherwise works out every object's matrix again on every frame. `moving` stay as they are.
+ */
+export function freezeStatic(root: THREE.Object3D, moving: Iterable<THREE.Object3D> = []) {
+  const keep = new Set(moving);
+  root.updateMatrixWorld(true);
+  root.traverse((o) => {
+    if (!keep.has(o)) o.matrixAutoUpdate = false;
+  });
+}
+
 // ───────────────────────────── shared materials ─────────────────────────────
 
 export interface MapMaterials {

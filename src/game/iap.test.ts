@@ -56,7 +56,7 @@ describe("in-app purchases", () => {
     expect(back.iap).toEqual(s.iap);
     back.run.moneyEarned = IMPERIUM.minRunEarnings;
     back.lifetime.moneyEarned = IMPERIUM.minRunEarnings;
-    expect(imperium(back, T0)).toBeGreaterThan(0);
+    expect(imperium(back)).toBeGreaterThan(0);
     expect(back.iap).toEqual(s.iap);
   });
 

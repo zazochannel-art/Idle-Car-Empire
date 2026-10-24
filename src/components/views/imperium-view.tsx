@@ -6,15 +6,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { BASE_MAX_LEVEL, PLANT_LEVEL_UNLOCKS } from "@/game/config/chain";
-import { IMPERIUM, STAR_UPGRADES } from "@/game/config/imperium";
-import { canImperium, pendingStars, starCost, starLevel } from "@/game/engine/imperium";
+import { STAR_UPGRADES } from "@/game/config/imperium";
+import { canImperium, nextStarAt, pendingStars, starCost, starLevel } from "@/game/engine/imperium";
 import { formatMoney, formatNumber, formatPercent } from "@/game/format";
 import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { useGame } from "@/store/game-store";
 
-/** Reset Imperium (the reset for ⭐ Stars), the Star upgrades shop, and the plant levels opened by total earnings. */
+/** Collecting ⭐ Stars (nothing is reset), the Star upgrades shop, and the plant levels opened by total earnings. */
 export function ImperiumView() {
   const state = useGame((g) => g.view.state);
   const { imperium, buyStarUpgrade } = useGame.getState();
@@ -22,7 +22,8 @@ export function ImperiumView() {
   const { t } = useT();
   const ready = canImperium(state);
   const stars = pendingStars(state);
-  const runPct = Math.min(100, (state.run.moneyEarned / IMPERIUM.minRunEarnings) * 100);
+  const next = nextStarAt(state);
+  const nextPct = Math.min(100, (state.lifetime.moneyEarned / next) * 100);
 
   return (
     <div className="space-y-4">
@@ -41,9 +42,12 @@ export function ImperiumView() {
         </div>
 
         <div className="relative mt-3 space-y-1.5 rounded-2xl bg-black/30 p-3 text-xs ring-1 ring-white/10">
-          <Req ok={runPct >= 100} label={t("imperium.req2", { amount: formatMoney(IMPERIUM.minRunEarnings), pct: Math.floor(runPct) })} />
-          <div className="pt-1 text-white/50">{t("imperium.grants", { n: formatNumber(stars) })}</div>
-          <div className="text-[11px] text-white/40">Progresul tău este 100% permanent! Colecționează Stele ⭐ fără a pierde fabricile.</div>
+          {ready ? (
+            <Req ok label={t("imperium.grants", { n: formatNumber(stars) })} />
+          ) : (
+            <Req ok={false} label={t("imperium.req2", { amount: formatMoney(next), pct: Math.floor(nextPct) })} />
+          )}
+          <div className="text-[11px] text-white/40">{t("imperium.resets")}</div>
           <Button variant={ready ? "gold" : "locked"} disabled={!ready} size="lg" className="mt-1 w-full" onClick={() => setConfirm(true)}>
             👑 {t("imperium.button")}
           </Button>

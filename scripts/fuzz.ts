@@ -153,7 +153,7 @@ const actions: [string, () => unknown][] = [
     Rt.updateLogin(s, now);
     return Rt.claimLogin(s, snapshot(s));
   }],
-  ["imperium", () => rnd() < 0.01 && I.imperium(s, now)],
+  ["imperium", () => rnd() < 0.01 && I.imperium(s)],
   ["star", () => {
     s.stars += rnd() < 0.1 ? 50 : 0;
     return I.buyStarUpgrade(s, pick(STAR_UPGRADES).id);

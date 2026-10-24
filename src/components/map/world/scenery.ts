@@ -1402,6 +1402,12 @@ export class Scenery {
     }
   }
 
+  /** The parts animate() moves (everything else stands still). */
+  movingParts(): THREE.Object3D[] {
+    const a = this.animated;
+    return [...a.rotors.map(([o]) => o), ...a.pumps.map(([o]) => o), ...a.cabins.map((c) => c.c)];
+  }
+
   /** Moves the rotors, the pumps and the cable cars. */
   animate(dt: number, t: number) {
     for (const [o, v, ax] of this.animated.rotors) o.rotation[ax] += v * dt;

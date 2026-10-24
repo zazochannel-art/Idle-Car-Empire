@@ -25,6 +25,15 @@ What keeps the game light, and how to measure it.
   income as it comes and glides only on jumps; the minimap checks the camera 20 times a second
   on a timer and redraws only when its picture changes. The map's name tags are drawn once and
   copied; trucks are built once per kind and repainted per copy.
+- **The 3D map's draws** (`map/world/kit.ts`): three.js checks a material's shader program again
+  whenever the object drawing it needs a different one, so a material is never shared between
+  kinds of objects (instanced or not, with instance colours or not): `splitSharedMaterials`
+  gives each kind its own copy, and each kind of shadow caster its own depth material (three.js
+  draws them all with one). See-through two-sided materials (the cars' glass) draw in one pass
+  (`forceSinglePass`); in two, three.js rebuilds their program twice per car per frame. The
+  island, its scenery and roads, and the parts of every vehicle keep fixed matrices
+  (`freezeStatic`); only what moves is worked out again each frame. The district cards are
+  placed again only when the view moves, with every size read before any style is written.
 - **Absence**: the offline settlement simulates the chain step by step; recipes, unit materials
   and road distances are worked out once, so it runs about a third faster with the same results.
 - The battery saver (`docs/battery-saver.md`) lowers frames and ticks further.
@@ -35,6 +44,20 @@ What keeps the game light, and how to measure it.
 - `npx tsx scripts/bench-offline.ts <save.json>`: the settlement of 1, 8 and 20 hours away.
 - Bundled like the browser (no module getters):
   `npx esbuild scripts/bench-tick.ts --bundle --platform=node --format=esm --outfile=/tmp/b.mjs && node /tmp/b.mjs <save.json>`.
+
+### The 3D map's draws (24 October 2026)
+
+Production build (`next build --no-mangling`), headless Chrome with the GPU on, a phone profile
+(390×844 at 3×, CPU slowed 4×), 15 s on the map. Main-thread CPU per frame:
+
+| | before | after |
+| --- | --- | --- |
+| Starting map | 14.3 ms | 6.4 ms |
+| Late game (8 plants, $11M) | 16.6 ms | 12.1 ms |
+| Program checks (`getParameters`) per 16 s | ~1 s | ~0 |
+
+What is left is the cost of each draw call (about 460 a frame on the late-game map): merging the
+lots' and the traffic's meshes would be the next step.
 
 ### Measured (October 2026)
 

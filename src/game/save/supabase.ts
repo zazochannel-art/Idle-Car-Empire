@@ -246,32 +246,20 @@ export class SupabaseBackend implements CloudBackend {
     return row ? { state: row.data, version: row.save_version } : null;
   }
 
-    async createCloudBackup(state: GameState, version: number, device: string): Promise<boolean> {
-    try {
-      const c = await this.client;
-      const { error } = await c.from("game_backups").insert({
-        save_version: version,
-        data: state,
-        reason: "auto",
-        device: device,
-        company: (state as any).brand?.name || "Idle Car Empire",
-        cash: state.cash,
-        earned: state.lifetime?.moneyEarned || 0,
-        cars: state.lifetime?.carsProduced || 0,
-        plants: Object.keys((state as any).chain?.plants || {}).length,
-      });
-      return !error;
-    } catch {
-      return false;
-    }
+  async deleteBackup(id: number): Promise<boolean> {
+    const c = await this.client;
+    const { data, error } = await c.rpc("delete_my_backup", { p_id: id });
+    if (error) throw error;
+    return data === true;
   }
+
+  // the server keeps the backups itself, when a save replaces the one before it (0011)
   async save(state: GameState, version: number, baseRevision: number, device: string) {
     const c = await this.client;
     const { data, error } = await c.rpc("save_game", { p_data: state, p_save_version: version, p_base_revision: baseRevision, p_device: device });
     if (error) throw error;
     const row = (data as { ok: boolean; revision: number | string; updated_at: string | null }[] | null)?.[0];
     if (!row) throw new Error("no answer from save_game");
-    void this.createCloudBackup(state, version, device).catch(() => {});
     return { ok: !!row.ok, revision: Number(row.revision), updatedAt: ms(row.updated_at) };
   }
 }

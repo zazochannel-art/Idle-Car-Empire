@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CARS, CAR_BY_ID } from "./config/cars";
 import { CHASSIS_BONUS, MAX_WAIT, PLANT_BY_ID, VEHICLE_CAPACITY } from "./config/chain";
 import { COMPONENT_TIME, DEALER_FEE, PARTS_MARGIN, SALES_TAX, START_CASH } from "./config/economy";
+import { IMPERIUM } from "./config/imperium";
 import * as M from "./engine/materials";
 import { componentStdCost } from "./engine/costs";
 import { MANAGER_BY_ID } from "./config/managers";
@@ -853,21 +854,29 @@ describe("saves from when Global Expansion existed", () => {
 });
 
 describe("reset imperium", () => {
-  it("trades the run and research for permanent Stars", () => {
+  it("collects permanent Stars and keeps the company", () => {
     const s = createInitialState(0);
     expect(I.canImperium(s)).toBe(false);
     s.research = ["x"];
+    s.rp = 7;
+    s.cash = 123;
     s.run.moneyEarned = 1e12;
     s.lifetime.moneyEarned = 1e14;
+    const plants = Object.keys(s.city.buildings).length;
     expect(I.canImperium(s)).toBe(true);
     expect(I.pendingStars(s)).toBe(15);
-    const gained = I.imperium(s, 1);
+    const gained = I.imperium(s);
     expect(gained).toBe(15);
     expect(s.stars).toBe(15);
     expect(s.imperiumCount).toBe(1);
-    expect(s.research).toEqual([]);
+    // nothing is reset
+    expect(s.research).toEqual(["x"]);
+    expect(s.rp).toBe(7);
+    expect(s.cash).toBe(123);
+    expect(Object.keys(s.city.buildings).length).toBe(plants);
     expect(I.canImperium(s)).toBe(false);
-    // the next reset's Stars count from here
+    expect(I.imperium(s)).toBe(0);
+    // the next Stars count from here
     expect(I.earnedSinceImperium(s)).toBe(0);
 
     const speed = snapshot(s).gm.speed;
@@ -875,6 +884,25 @@ describe("reset imperium", () => {
     expect(I.buyStarUpgrade(s, "production")).toBe(true);
     expect(s.stars).toBe(12);
     expect(snapshot(s).gm.speed).toBeCloseTo(speed * 1.2);
+  });
+
+  it("gives the same Stars whether they are collected often or once", () => {
+    const often = createInitialState(0);
+    const once = createInitialState(0);
+    let total = 0;
+    for (let earned = 1e9; earned <= 1e15; earned *= 1.7) {
+      often.lifetime.moneyEarned = earned;
+      once.lifetime.moneyEarned = earned;
+      total += I.imperium(often);
+      // the next Star is always further on than what has been earned
+      expect(I.nextStarAt(often)).toBeGreaterThan(earned);
+    }
+    expect(total).toBe(I.imperium(once));
+    expect(total).toBe(I.starsAt(once.lifetime.moneyEarned));
+    // none before the first threshold, then a few for every tenfold
+    expect(I.starsAt(IMPERIUM.minRunEarnings - 1)).toBe(0);
+    expect(I.starsAt(IMPERIUM.minRunEarnings)).toBe(3);
+    expect(I.starsAt(1e12)).toBe(9);
   });
 });
 
@@ -935,7 +963,7 @@ describe("late-game depth", () => {
     s.lifetime.moneyEarned = 1e12;
     expect(snapshot(s).gm.maxPlantLevel).toBe(15);
     s.run.moneyEarned = 1e12;
-    I.imperium(s, 1);
+    I.imperium(s);
     expect(snapshot(s).gm.maxPlantLevel).toBe(15);
   });
 

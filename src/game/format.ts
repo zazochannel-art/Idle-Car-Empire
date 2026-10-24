@@ -1,4 +1,6 @@
 const SUFFIXES = ["", "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc"];
+/** Whole numbers with thousands separators (made once: toLocaleString builds one on every call). */
+const WHOLE = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 
 /**
  * Compact number: 1,250 · 25.4K · 3.2M · 4.7B · 2.8T. Values under 10,000 are
@@ -9,7 +11,7 @@ export function formatNumber(n: number, decimals = 1): string {
   const sign = n < 0 ? "-" : "";
   n = Math.abs(n);
   if (n < 10) return sign + (Number.isInteger(n) ? String(n) : n.toFixed(decimals === 0 ? 0 : Math.min(2, decimals + 1)).replace(/\.?0+$/, ""));
-  if (n < 10_000) return sign + Math.floor(n).toLocaleString("en-US");
+  if (n < 10_000) return sign + WHOLE.format(Math.floor(n));
   const tier = Math.floor(Math.log10(n) / 3);
   const scaled = n / Math.pow(1000, tier);
   let suffix: string;
@@ -64,7 +66,7 @@ export function formatTime(seconds: number): string {
 
 export function formatPercent(fraction: number): string {
   const pct = fraction * 100;
-  return `${pct >= 100 ? Math.round(pct).toLocaleString("en-US") : Number(pct.toFixed(1))}%`;
+  return `${pct >= 100 ? WHOLE.format(Math.round(pct)) : Number(pct.toFixed(1))}%`;
 }
 
 /** Time to afford `cost` at `rate`/s, or null if it will never happen. */

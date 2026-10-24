@@ -1,0 +1,6 @@
+Noutăți în 1.0.2:
+• Stelele sunt acum permanente: colectezi ⭐ pe măsură ce cresc câștigurile totale și păstrezi fabricile, banii și cercetarea
+• Economie reechilibrată
+• Copii de rezervă în cloud: le poți șterge pe cele de care nu ai nevoie
+• Profitul din bara de sus se afișează mai stabil
+• Insula 3D merge mai fluid pe telefoane
