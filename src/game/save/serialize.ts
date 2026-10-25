@@ -1,4 +1,7 @@
 import { migrateChain } from "../engine/chain";
+import { migrateMaintenance } from "../engine/maintenance";
+import { migrateStock } from "../engine/stock";
+import { NOTICE_KINDS } from "../config/notices";
 import { migrateBrand } from "../engine/brand";
 import { migrateRacing } from "../engine/racing";
 import { migrateQuality } from "../engine/market";
@@ -41,6 +44,9 @@ function cleanSettings(state: GameState, saved: unknown): GameState {
     .filter((h): h is { id: string; name: unknown } => isObject(h) && typeof h.id === "string" && h.id.length > 0 && h.id.length <= 64)
     .map((h) => ({ id: h.id, name: typeof h.name === "string" ? h.name.slice(0, 40) : "" }))
     .slice(-200);
+  // the kinds of notices kept off the screen: known ones, each once
+  const off: unknown[] = Array.isArray(state.settings.toastsOff) ? state.settings.toastsOff : [];
+  state.settings.toastsOff = NOTICE_KINDS.filter((k) => off.includes(k));
   return state;
 }
 
@@ -137,6 +143,8 @@ export function migrate(raw: unknown, now: number): GameState {
   state.ads = migrateAds(state.ads, now);
   state.mapBonus = migrateMapBonus(state.mapBonus);
   state.landmarks = migrateLandmarks(raw.landmarks);
+  state.maintenance = migrateMaintenance(raw.maintenance);
+  state.stock = migrateStock(raw.stock);
   state.shop = migrateShop(state.shop, now);
   state.iap = migrateIap(raw.iap);
   migrateLive(raw, state);

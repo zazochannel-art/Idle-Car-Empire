@@ -7,6 +7,7 @@ import { snapshot } from "./economy";
 import { credit } from "./tick";
 import { constructionTick } from "./construction";
 import { book, chainNet, LEDGER_KEYS, settleLedger } from "./materials";
+import { payDividends } from "./stock";
 
 /**
  * Plays out the time between `lastActiveAt` and `now`: plants keep producing
@@ -85,13 +86,17 @@ function absence(s: GameState, now: number): OfflineReport {
   return report;
 }
 
-/** Pays out a report computed by computeOffline (earnings were already counted). */
-export function applyOffline(s: GameState, report: OfflineReport) {
+/**
+ * Pays out a report computed by computeOffline (earnings were already counted); the
+ * shareholders take their part (engine/stock.ts). Returns what reached the wallet.
+ */
+export function applyOffline(s: GameState, report: OfflineReport): number {
   s.cash += report.money;
   s.run.offlineEarned += report.money;
   s.lifetime.offlineEarned += report.money;
   s.rp += report.rp;
   s.city.carsServiced += report.serviced ?? 0;
+  return report.money - payDividends(s, report.money);
 }
 
 /**
@@ -142,7 +147,7 @@ export function settleOffline(s: GameState, now: number): OfflineReport | null {
 export function collectOffline(s: GameState, multiplier = 1): number {
   const p = s.pendingOffline;
   if (!p) return 0;
-  applyOffline(s, { ...p, money: p.money * multiplier });
+  const got = applyOffline(s, { ...p, money: p.money * multiplier });
   s.pendingOffline = null;
-  return p.money * multiplier;
+  return got;
 }

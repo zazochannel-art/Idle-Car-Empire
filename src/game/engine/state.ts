@@ -6,6 +6,8 @@ import { MANAGER_IDS } from "../config/managers";
 import { START_CASH } from "../config/economy";
 import { createChain } from "./chain";
 import { createCity } from "./city";
+import { createMaintenance } from "./maintenance";
+import { createStock } from "./stock";
 import { createLogistics } from "./logistics";
 import { createRacing } from "./racing";
 import { createSeason, createShow, createVip } from "./live";
@@ -108,6 +110,8 @@ export function createInitialState(now: number): GameState {
     ads: createAds(),
     mapBonus: createMapBonus(),
     landmarks: createLandmarks(),
+    maintenance: createMaintenance(),
+    stock: createStock(),
     shop: createShop(),
     iap: createIap(),
     research: [],
@@ -129,7 +133,7 @@ export function createInitialState(now: number): GameState {
     season: createSeason(),
     show: createShow(),
     quality: { rep: 50, defects: 0, recall: null, scandalUntil: 0, recalls: 0 },
-    settings: { buyAmount: 1, lang: "en", lowGraphics: false, sound: true, music: true, haptics: true, notify: false, saver: "auto", stats: true, hidden: [] },
+    settings: { buyAmount: 1, lang: "en", lowGraphics: false, sound: true, music: true, haptics: true, notify: false, saver: "auto", stats: true, hidden: [], toastsOff: [] },
     funnel: [],
     createdAt: now,
     runStartedAt: now,

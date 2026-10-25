@@ -5,7 +5,7 @@
 // RaceCanvas, which stays the fallback where there is no WebGL.
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { RACE_COUNTDOWN, TRACK_BY_ID, type TrackId, type TrackTheme } from "@/game/config/racing";
+import { RACE_COUNTDOWN, RACE_TIME_SCALE, TRACK_BY_ID, type TrackId, type TrackTheme } from "@/game/config/racing";
 import { pointAt, trackOf, type CarOnTrack, type Track } from "@/game/racing/tracks";
 import type { RaceRecord } from "@/game/types";
 import { isSaving, shouldDraw } from "@/lib/power";
@@ -25,6 +25,16 @@ interface Look {
   sun: string;
   dust?: string;
 }
+
+/**
+ * The finish-line shot: from this long before a car takes the flag until this long after (race
+ * seconds), from this far past the line, this far out from the middle beyond the asphalt's edge
+ * (the gantry's post stands at 0.55) and this high (m).
+ */
+const FLAG_SHOT = { before: 1.8, after: 0.9, past: 2.4, out: 0.3, high: 2.2 };
+/** The TV camera's sides of the car: its usual one, a quarter turn either way, the opposite one. */
+const TV_TURNS = [0, Math.PI / 2, -Math.PI / 2, Math.PI];
+const UP = new THREE.Vector3(0, 1, 0);
 
 const KERB = { asphalt: "#3b414b", kerbA: "#dc2626", kerbB: "#f8fafc", gravel: "#d6c08c", shoulder: "#9ca3af", walls: false };
 const LOOKS: Record<TrackTheme, Look> = {
@@ -226,6 +236,13 @@ export class RaceScene3D {
       o.matrixAutoUpdate = false;
     });
     this.world.updateMatrixWorld(true);
+    // the scenery taller than a car's camera height is worth checking: stands, the pit building
+    this.decor.root.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh || (m as unknown as THREE.InstancedMesh).isInstancedMesh) return;
+      const box = new THREE.Box3().setFromObject(m);
+      if (box.max.y - box.min.y >= 6) this.tall.push(m);
+    });
     this.scene.add(this.world);
 
     // the cars' extras: shadows under them, brake and head lights, smoke, the player's marker
@@ -255,6 +272,8 @@ export class RaceScene3D {
     this.scene.add(this.marker);
 
     if (rec) this.replay = new RaceReplay(rec, this.track);
+    // in development the scene on screen is reachable from the console (camera checks), as the map is
+    if (process.env.NODE_ENV !== "production") Object.assign(window, { __race: this, __THREE: THREE });
     void loadHeroes(THREE).then(() => {
       if (this.disposed) return;
       this.heroes = true;
@@ -353,7 +372,7 @@ export class RaceScene3D {
       this.sea.tex.offset.x = (this.sea.tex.offset.x + dt * 0.006) % 1;
       this.sea.tex.offset.y = (this.sea.tex.offset.y + dt * 0.003) % 1;
     }
-    this.aim(views, cars, dt);
+    this.aim(views, cars, dt, elapsed);
     // the cars' shadows at 30 FPS: the shadow pass runs every other frame
     if (this.renderer.shadowMap.enabled && (this.shadowTick ^= 1)) this.renderer.shadowMap.needsUpdate = true;
     this.renderer.render(this.scene, this.camera);
@@ -462,19 +481,33 @@ export class RaceScene3D {
 
   // ───────────────────────── cameras ─────────────────────────
 
-  private aim(views: RaceCarView[], cars: CarOnTrack[], dt: number) {
+  private aim(views: RaceCarView[], cars: CarOnTrack[], dt: number, elapsed: number) {
     const L = this.track.layout;
     const R = Math.hypot(L.w, L.d) * U * 0.5;
     const centre = new THREE.Vector3((L.w / 2) * U, 0, (L.d / 2) * U);
     const me = views.find((v) => v.id === "player");
     const at = (v: RaceCarView) => new THREE.Vector3(v.x * U, this.H(v.x, v.y), v.y * U);
+    // how much the screen shows across and up (a phone held upright is narrow: the app is portrait)
+    const tanV = Math.tan((this.camera.fov * Math.PI) / 360);
+    const tanH = tanV * this.camera.aspect;
     let pos: THREE.Vector3;
     let look: THREE.Vector3;
     let k = Math.min(1, dt * 2.5);
+    /** How fast the eye follows (the camera's position glides at `k`). */
+    let kLook: number | undefined;
     if (this.mode === "overhead" || !me) {
-      // the whole circuit; before a race it turns slowly round
-      const a = this.rec ? 0.6 : 0.6 + this.t * 0.05;
-      pos = centre.clone().add(new THREE.Vector3(Math.sin(a) * R * 0.85, R * 1.05, Math.cos(a) * R * 0.85));
+      // the whole circuit; before a race it turns slowly round. On a narrow screen it looks
+      // along the circuit's long side (and only sways), from as far as it takes to fit it all.
+      const narrow = this.camera.aspect < 1;
+      const along = L.w >= L.d ? Math.PI / 2 : 0;
+      const a = narrow ? along + (this.rec ? 0 : Math.sin(this.t * 0.25) * 0.18) : this.rec ? 0.6 : 0.6 + this.t * 0.05;
+      const hx = (L.w / 2) * U * 1.08;
+      const hz = (L.d / 2) * U * 1.08;
+      const across = Math.abs(Math.cos(a)) * hx + Math.abs(Math.sin(a)) * hz;
+      const deep = Math.abs(Math.sin(a)) * hx + Math.abs(Math.cos(a)) * hz;
+      const dir = new THREE.Vector3(Math.sin(a) * 0.85, 1.05, Math.cos(a) * 0.85).normalize();
+      const D = Math.max(R * 1.351, across / tanH, (deep * dir.y) / tanV);
+      pos = centre.clone().addScaledVector(dir, D);
       look = centre.clone().setY(-R * 0.05);
     } else if (this.mode === "follow") {
       const p = at(me);
@@ -483,28 +516,58 @@ export class RaceScene3D {
       look = p.clone().addScaledVector(f, 9).setY(p.y + 1.2);
       k = Math.min(1, dt * 4.5);
     } else {
-      // the TV camera: high to one side of the pack, between the player and the leader
+      // the TV camera: high to one side of the pack, between the player and the leader on a
+      // wide screen; on a narrow one there is no room for both, and it keeps to the player
       const lead = [...cars].sort((a, b) => b.s - a.s)[0];
       const lv = views.find((v) => v.id === lead?.id) ?? me;
-      const p = at(me).multiplyScalar(2).add(at(lv)).multiplyScalar(1 / 3);
+      const w = Math.max(0, Math.min(1, (this.camera.aspect - 0.8) / 0.6)) / 3;
+      const p = at(me).lerp(at(lv), w);
       const spread = Math.min(90, at(me).distanceTo(at(lv)));
-      const d = 46 + spread * 0.7;
-      pos = p.clone().add(new THREE.Vector3(-d * 0.62, d * 0.72, -d * 0.48));
-      look = p;
-    }
-    // the leader about to take the flag: by the line, low
-    const rec = this.rec;
-    if (rec && this.mode !== "overhead") {
-      const end = this.track.startS + rec.laps * this.track.length;
-      const near = cars.find((c) => !c.finished && end - c.s < 3 && end - c.s > 0);
-      if (near) {
-        const half = L.width / 2;
-        const side = pointAt(this.track, this.track.startS + 0.8, half + 0.95);
-        const tgt = pointAt(this.track, this.track.startS - 1.2, 0);
-        pos = new THREE.Vector3(side.x * U, this.H(side.x, side.y) + 2.6, side.y * U);
-        look = new THREE.Vector3(tgt.x * U, this.H(tgt.x, tgt.y) + 1, tgt.y * U);
-        k = Math.min(1, dt * 3);
+      const d = 46 + spread * 0.7 * w * 3;
+      // a grandstand or the pit building between it and the player's car: it goes round to another side
+      const off = (turn: number) => new THREE.Vector3(-d * 0.62, d * 0.72, -d * 0.48).applyAxisAngle(UP, TV_TURNS[turn]);
+      if (this.t - this.tv.at > 0.3) {
+        this.tv.at = this.t;
+        const car = at(me).add(new THREE.Vector3(0, 1, 0));
+        const clear = (turn: number) => !this.hidden(p.clone().add(off(turn)), car);
+        if (!clear(this.tv.turn)) {
+          const free = TV_TURNS.findIndex((_, i) => i !== this.tv.turn && clear(i));
+          if (free >= 0) this.tv.turn = free;
+        }
       }
+      pos = p.clone().add(off(this.tv.turn));
+      look = p;
+      // a narrow picture has no room for the camera to lag behind a fast car: it keeps its eye
+      // on the car (only its position glides)
+      if (w === 0) kLook = Math.min(1, dt * 12);
+    }
+    // the winner, then the player, about to take the flag: a cut to the line, low by the track,
+    // a moment before (a cut both ways: a camera flying down to the line looked lost on the way).
+    // It stands past the line on the track's edge, inside the gantry's post (which hid the cars
+    // from just outside it), and turns with the car taking the flag.
+    const rec = this.rec;
+    let shot: string | null = null;
+    if (rec && this.mode !== "overhead") {
+      // both close together (the player just behind the winner): the one still to cross
+      const due = [rec.order[0], "player"]
+        .map((id) => {
+          const e = rec.entrants.find((x) => x.id === id);
+          return { id, flag: e ? RACE_COUNTDOWN + e.total / RACE_TIME_SCALE : -1 };
+        })
+        .filter((c) => c.flag > 0 && elapsed > c.flag - FLAG_SHOT.before && elapsed < c.flag + FLAG_SHOT.after);
+      shot = (due.find((c) => elapsed < c.flag) ?? due[0])?.id ?? null;
+      const car = shot ? views.find((v) => v.id === shot) : undefined;
+      if (car) {
+        const side = pointAt(this.track, this.track.startS + FLAG_SHOT.past, L.width / 2 + FLAG_SHOT.out);
+        pos = new THREE.Vector3(side.x * U, this.H(side.x, side.y) + FLAG_SHOT.high, side.y * U);
+        look = at(car).add(new THREE.Vector3(0, 0.9, 0));
+        k = 1;
+        kLook = Math.min(1, dt * 10);
+      } else shot = null;
+    }
+    if (shot !== this.shot) {
+      this.shot = shot;
+      this.cam.init = false;
     }
     if (!this.cam.init) {
       this.cam.pos.copy(pos);
@@ -512,19 +575,39 @@ export class RaceScene3D {
       this.cam.init = true;
     }
     this.cam.pos.lerp(pos, k);
-    this.cam.look.lerp(look, k);
+    this.cam.look.lerp(look, kLook ?? k);
     this.camera.position.copy(this.cam.pos);
     this.camera.lookAt(this.cam.look);
     // before the race the panel of entrants covers the lower half: the circuit shows above it
-    const lift = this.rec ? 0 : 0.24;
-    if (lift !== this.lift) {
-      this.lift = lift;
-      const { w, h } = this.size;
-      if (lift) this.camera.setViewOffset(w, h, 0, h * lift, w, h);
-      else this.camera.clearViewOffset();
-    }
+    this.setLift(this.rec ? 0 : 0.24);
   }
   private lift = -1;
+  /** The finish-line shot on screen (whose flag), or null. */
+  private shot: string | null = null;
+  /** The TV camera's side of the car (TV_TURNS), and when it last looked for a clear view. */
+  private tv = { turn: 0, at: -1 };
+  /** Tall scenery (grandstands, the pit building and its tower) that can hide a car from the TV camera. */
+  private tall: THREE.Object3D[] = [];
+  private ray = new THREE.Raycaster();
+
+  /** Whether tall scenery stands between `from` and `to`. */
+  private hidden(from: THREE.Vector3, to: THREE.Vector3) {
+    const dir = to.clone().sub(from);
+    const far = dir.length() - 2;
+    if (far <= 0) return false;
+    this.ray.set(from, dir.normalize());
+    this.ray.far = far;
+    return this.ray.intersectObjects(this.tall, false).length > 0;
+  }
+
+  /** Moves the picture up by a share of the screen (a panel covers the lower part). */
+  private setLift(lift: number) {
+    if (lift === this.lift) return;
+    this.lift = lift;
+    const { w, h } = this.size;
+    if (lift) this.camera.setViewOffset(w, h, 0, h * lift, w, h);
+    else this.camera.clearViewOffset();
+  }
 
   // ───────────────────────── podium ─────────────────────────
 
@@ -553,10 +636,21 @@ export class RaceScene3D {
       ps.confetti.setMatrixAt(i, m4);
     }
     ps.confetti.instanceMatrix.needsUpdate = true;
-    // from the pit side, the stand full of people behind the podium, swaying gently
+    // from the pit side, the stand full of people behind the podium, swaying gently. A narrow
+    // screen needs to be far back for all three steps: from there it looks down over the pit
+    // building and its control tower, and the podium sits above the results covering the lower half.
     ps.group.updateMatrixWorld(true);
-    const a = Math.sin(this.t * 0.3) * 0.55;
-    this.camera.position.copy(ps.group.localToWorld(new THREE.Vector3(Math.sin(a) * 15, 6.5, Math.cos(a) * 15)));
+    const narrow = this.camera.aspect < 1;
+    const a = Math.sin(this.t * 0.3) * (narrow ? 0.3 : 0.55);
+    if (narrow) {
+      const d = 10 / (Math.tan((this.camera.fov * Math.PI) / 360) * this.camera.aspect);
+      const up = Math.PI / 4;
+      this.setLift(0.22);
+      this.camera.position.copy(ps.group.localToWorld(new THREE.Vector3(Math.sin(a) * d * Math.cos(up), 3 + d * Math.sin(up), Math.cos(a) * d * Math.cos(up))));
+    } else {
+      this.setLift(0);
+      this.camera.position.copy(ps.group.localToWorld(new THREE.Vector3(Math.sin(a) * 15, 6.5, Math.cos(a) * 15)));
+    }
     this.camera.lookAt(ps.group.localToWorld(new THREE.Vector3(0, 3, 0)));
     this.cam.init = false;
     this.renderer.render(this.scene, this.camera);

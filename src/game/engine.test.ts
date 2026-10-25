@@ -985,6 +985,32 @@ describe("late-game depth", () => {
     expect(Ch.autoUpgrade(s, snapshot(s).gm)).toBe(0);
   });
 
+  it("auto-upgrade invests a share of the earnings, never money collected or given", () => {
+    const { s } = fullChain();
+    for (const [, b] of Ch.plantsOf(s)) {
+      b.plant.auto = true;
+      b.plant.automation = 2;
+    }
+    const gm = snapshot(s).gm;
+    // a windfall (time away collected, a daily reward) with nothing earned in play: it all stays
+    s.cash = 1e9;
+    expect(Ch.autoUpgrade(s, gm, undefined, Ch.autoBudget(0, 0, s.cash))).toBe(0);
+    expect(s.cash).toBe(1e9);
+    // the budget grows with a share of what was earned, never past that share of the cash
+    expect(Ch.autoBudget(0, 1000, 1e9)).toBe(1000 * Ch.AUTO_UPGRADE_SHARE);
+    expect(Ch.autoBudget(200, -500, 1e9)).toBe(200);
+    expect(Ch.autoBudget(1e9, 1000, 100)).toBe(100 * Ch.AUTO_UPGRADE_SHARE);
+    // every plant could buy alone, yet together they stay within the budget
+    const costs = Ch.plantsOf(s).map(([, b]) => Math.min(Ch.levelCost(b, gm) ?? Infinity, Ch.speedCost(b, gm) ?? Infinity));
+    const budget = Math.max(...costs) * 1.5;
+    const log: { plot: string; cost: number }[] = [];
+    const bought = Ch.autoUpgrade(s, gm, log, budget);
+    expect(bought).toBeGreaterThan(0);
+    expect(bought).toBeLessThan(costs.length);
+    expect(log.reduce((a, p) => a + p.cost, 0)).toBeLessThanOrEqual(budget);
+    expect(s.cash).toBeGreaterThanOrEqual(1e9 - budget);
+  });
+
   it("runs a customer contract from offer to payout", () => {
     const { s } = fullChain();
     s.cash = 1e9;

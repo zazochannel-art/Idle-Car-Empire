@@ -41,6 +41,26 @@ export const MORALE = {
   per: 1 / 250,
 } as const;
 
+/**
+ * The maintenance crew (engine/maintenance.ts buys its levels): every level the machines
+ * wear slower and a broken one runs again sooner; from `calmFrom` up a breakdown leaves the
+ * crew's morale alone.
+ */
+export const CREW = {
+  maxLevel: 5,
+  /** Level 5: half as many breakdowns. */
+  wearPerLevel: 0.1,
+  /** Level 5: a tenth of the repair time. */
+  repairPerLevel: 0.18,
+  calmFrom: 3,
+} as const;
+
+const crewLevel = (level: number) => Math.max(0, Math.min(CREW.maxLevel, Math.floor(level) || 0));
+/** How fast machines wear with this crew (1: no crew). */
+export const crewWear = (level: number) => 1 - CREW.wearPerLevel * crewLevel(level);
+/** The share of the repair time left with this crew (1: no crew). */
+export const crewRepair = (level: number) => 1 - CREW.repairPerLevel * crewLevel(level);
+
 /** The crew's morale, 0..100 (older saves: the base). */
 export const moraleOf = (p: PlantData) => p.morale ?? MORALE.base;
 
@@ -72,7 +92,7 @@ export const brokenSlot = (id: string, p: PlantData) => Math.floor(hash01(`${id}
  * home, and a running machine wears (online only: nothing breaks while the
  * player is away). Returns true when a machine just broke.
  */
-export function floorTick(id: string, p: PlantData, dt: number, opts: { running: boolean; offline: boolean; managed: boolean }): boolean {
+export function floorTick(id: string, p: PlantData, dt: number, opts: { running: boolean; offline: boolean; managed: boolean; crew?: number }): boolean {
   if (p.boost) p.boost = Math.max(0, p.boost - dt);
   if (p.boostCd) p.boostCd = Math.max(0, p.boostCd - dt);
   // the mechanic gets there in the end (always, away from the game)
@@ -82,12 +102,13 @@ export function floorTick(id: string, p: PlantData, dt: number, opts: { running:
   const step = MORALE.drift * dt;
   p.morale = m < target ? Math.min(target, m + step) : Math.max(target, m - step);
   if (!opts.running || opts.offline || p.broken || p.made < BREAKDOWN.runIn) return false;
-  p.wear = (p.wear ?? 0) + dt;
+  const crew = opts.crew ?? 0;
+  p.wear = (p.wear ?? 0) + dt * crewWear(crew);
   if (p.wear < wearLimit(id, p.breaks ?? 0)) return false;
   p.wear = 0;
   p.breaks = (p.breaks ?? 0) + 1;
-  p.broken = opts.managed ? BREAKDOWN.repairManaged : BREAKDOWN.repair;
-  p.morale = Math.max(0, moraleOf(p) - BREAKDOWN.morale);
+  p.broken = (opts.managed ? BREAKDOWN.repairManaged : BREAKDOWN.repair) * crewRepair(crew);
+  if (crewLevel(crew) < CREW.calmFrom) p.morale = Math.max(0, moraleOf(p) - BREAKDOWN.morale);
   return true;
 }
 

@@ -69,6 +69,9 @@ const SCREENS = {
   missions: () => import("../views/missions-view"),
   imperium: () => import("../views/imperium-view"),
   landmarks: () => import("../views/landmarks-view"),
+  inbox: () => import("../views/inbox-view"),
+  stock: () => import("../views/stock-view"),
+  maintenance: () => import("../views/maintenance-card"),
   leaderboard: () => import("../views/leaderboard-view"),
   alliance: () => import("../views/alliance-view"),
   winter: () => import("../views/winter-view"),
@@ -94,6 +97,9 @@ const ManagersView = lazy(() => retry(SCREENS.managers).then((m) => ({ default: 
 const MissionsView = lazy(() => retry(SCREENS.missions).then((m) => ({ default: m.MissionsView })));
 const ImperiumView = lazy(() => retry(SCREENS.imperium).then((m) => ({ default: m.ImperiumView })));
 const LandmarksView = lazy(() => retry(SCREENS.landmarks).then((m) => ({ default: m.LandmarksView })));
+const InboxView = lazy(() => retry(SCREENS.inbox).then((m) => ({ default: m.InboxView })));
+const StockView = lazy(() => retry(SCREENS.stock).then((m) => ({ default: m.StockView })));
+const MaintenanceCard = lazy(() => retry(SCREENS.maintenance).then((m) => ({ default: m.MaintenanceCard })));
 const LeaderboardView = lazy(() => retry(SCREENS.leaderboard).then((m) => ({ default: m.LeaderboardView })));
 const AllianceView = lazy(() => retry(SCREENS.alliance).then((m) => ({ default: m.AllianceView })));
 const WinterView = lazy(() => retry(SCREENS.winter).then((m) => ({ default: m.WinterView })));
@@ -416,6 +422,7 @@ const ViewSwitch = memo(function ViewSwitch({ view, onSettings }: { view: View; 
     case "managers":
       return (
         <>
+          <MaintenanceCard />
           <MechanicsSummary />
           <ManagersView />
         </>
@@ -450,6 +457,10 @@ const ViewSwitch = memo(function ViewSwitch({ view, onSettings }: { view: View; 
       return <ShopView />;
     case "landmarks":
       return <LandmarksView />;
+    case "inbox":
+      return <InboxView />;
+    case "stock":
+      return <StockView />;
   }
 });
 
@@ -463,7 +474,7 @@ export const PILLARS: { id: PillarId; icon: Icon; views: View[] }[] = [
   { id: "empire", icon: Factory, views: ["empire", "garages", "logistics", "research", "managers", "imperium", "landmarks"] },
   { id: "cars", icon: Car, views: ["cars"] },
   { id: "racing", icon: Flag, views: ["racing"] },
-  { id: "business", icon: Briefcase, views: ["dealers", "economy", "missions", "stats", "achievements", "story", "leaderboard", "alliance", "winter", "festival", "pass"] },
+  { id: "business", icon: Briefcase, views: ["dealers", "economy", "missions", "stats", "achievements", "story", "leaderboard", "alliance", "winter", "festival", "pass", "stock"] },
 ];
 export const pillarOf = (v: View | null) => (v ? (PILLARS.find((p) => p.views.includes(v))?.id ?? null) : null);
 

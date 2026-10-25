@@ -916,7 +916,7 @@ export function chainTick(
     let can = canMake();
     // the floor: a boost, a broken machine, the crew's morale
     const managed = managedPlots.has(id);
-    if (floorTick(id, p, dt, { running: p.status === "ok", offline, managed })) events?.push({ type: "breakdown", plot: id });
+    if (floorTick(id, p, dt, { running: p.status === "ok", offline, managed, crew: s.maintenance?.level ?? 0 })) events?.push({ type: "breakdown", plot: id });
     const speed = (offline ? st.offline : 1) * floorPace(p);
     // running the plant costs wages, energy and maintenance for every second it works
     // (whatever pace the floor keeps)
@@ -1646,25 +1646,39 @@ export function migrateChain(raw: unknown, s: GameState): ChainState {
 
 /** Plants this automated can upgrade themselves. */
 export const AUTO_UPGRADE_FROM = 2;
+/**
+ * The share of what the company earns in play that auto-upgrades may invest. The rest, and
+ * money that is collected or given (time away, daily rewards, gifts), stays in the wallet.
+ */
+export const AUTO_UPGRADE_SHARE = 0.5;
+
+/** What auto-upgrades may spend after a tick that earned `earned` (never more than the share of the cash). */
+export function autoBudget(budget: number, earned: number, cash: number): number {
+  return Math.max(0, Math.min(budget + Math.max(0, earned) * AUTO_UPGRADE_SHARE, cash * AUTO_UPGRADE_SHARE));
+}
 
 /**
  * Auto-upgrade: each switched-on plant buys its cheapest speed or level
  * upgrade, but only when it costs at most a quarter of the cash, so the
- * player can still save for new plants. One purchase per plant per call.
+ * player can still save for new plants. One purchase per plant per call,
+ * all of them together within `budget` (see autoBudget: before it, a
+ * company with many plants spent a whole windfall in one tick).
  * `log` gets each purchase (the plant and what it paid), so the player can be told.
  */
-export function autoUpgrade(s: GameState, gm: GlobalMods, log?: { plot: string; cost: number }[]): number {
+export function autoUpgrade(s: GameState, gm: GlobalMods, log?: { plot: string; cost: number }[], budget = Infinity): number {
   let bought = 0;
+  let left = budget;
   for (const [id, b] of plantsOf(s)) {
     if (!b.plant.auto || b.plant.automation < AUTO_UPGRADE_FROM) continue;
     const sp = speedCost(b, gm);
     const lv = levelCost(b, gm);
     const pickLevel = lv !== null && (sp === null || lv <= sp);
     const cost = pickLevel ? lv : sp;
-    if (cost === null || cost > s.cash * 0.25) continue;
+    if (cost === null || cost > s.cash * 0.25 || cost > left) continue;
     const cash = s.cash;
     if (pickLevel ? upgradePlantLevel(s, id, gm) : upgradePlantSpeed(s, id, gm)) {
       bought++;
+      left -= cash - s.cash;
       log?.push({ plot: id, cost: cash - s.cash });
     }
   }

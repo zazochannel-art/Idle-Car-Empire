@@ -35,7 +35,7 @@ import { tick as engineTick } from "@/game/engine/tick";
 import { formatDuration, formatMoney, formatNumber, formatPercent } from "@/game/format";
 import { decodeSave, encodeSave, SaveManager, type CupPlace, type CupSubmitResult, type RedeemInviteResult, type SaveWhere } from "@/game/save";
 import { askStartChoice, askWelcome, useCloud } from "./cloud-store";
-import type { BuyAmount, CarId, CarRoute, DealerId, FacilityType, GameState, Lang, ManagerId, PlantType, QualityMode, Specialization, StructureType, ZoneId } from "@/game/types";
+import type { BuyAmount, CarId, CarRoute, DealerId, FacilityType, GameState, Lang, ManagerId, NoticeKind, PlantType, QualityMode, Specialization, StructureType, ZoneId } from "@/game/types";
 import { applyLanguage, detectLanguage, loadLanguage, translate, type MessageKey, type Vars } from "@/i18n";
 import { contentFor } from "@/i18n/content";
 import { uiEvents } from "./events";
@@ -67,8 +67,10 @@ import * as Cu from "@/game/engine/cup";
 import * as Gh from "@/game/engine/ghost";
 import { allianceReward } from "@/game/engine/alliance";
 import { grantAd } from "@/game/engine/ads";
-import { ADS, type AdReward } from "@/game/config/ads";
+import type { AdReward } from "@/game/config/ads";
 import * as Shop from "@/game/engine/shop";
+import * as St from "@/game/engine/stock";
+import * as Mt from "@/game/engine/maintenance";
 import { SHOP_ITEM_BY_ID, type ShopItemId } from "@/game/config/shop";
 import * as Iap from "@/game/engine/iap";
 import { IAP_ICON, type IapProduct } from "@/game/config/iap";
@@ -94,8 +96,6 @@ const SAVE_MS = 5_000;
 const FUNNEL_MS = 30_000;
 /** A gap this long between ticks (sleeping laptop, frozen tab) counts as being away. */
 const AWAY_GAP_S = 30;
-/** The plants' auto-upgrade purchases are told in one toast, at most this often. */
-const AUTO_BOUGHT_EVERY_MS = 60_000;
 
 /** Settles time away; an absence too short for the report is told in a toast. */
 function settleAway(s: GameState, now: number) {
@@ -264,6 +264,13 @@ interface GameStore {
   declineContract: () => void;
   claimContract: () => void;
   collectOffline: () => void;
+  /** The maintenance crew's next level. */
+  buyMaintenance: () => boolean;
+  /** The stock exchange: sell a tenth of the company, or buy one back. */
+  sellShares: () => boolean;
+  buyBackShares: () => boolean;
+  /** A kind of notice on screen or only in the notification center. */
+  setToastOff: (kind: NoticeKind, off: boolean) => void;
   imperium: () => void;
   buyStarUpgrade: (id: StarUpgradeId) => boolean;
   unlockRacing: () => boolean;
@@ -306,6 +313,8 @@ let starting = false;
 /** The app is in the background (Android): the loop stays stopped until it is back. */
 let away = false;
 let lastTick = 0;
+/** What the plants' auto-upgrades may still spend (Ch.autoBudget): it starts empty with each session. */
+let autoMoney = 0;
 let lastView = 0;
 let lastSave = 0;
 /** The ghost last published (JSON), so an unchanged one isn't sent again. */
@@ -330,7 +339,7 @@ export const useGame = create<GameStore>((set, get) => {
       snap = snapshot(next);
       for (const id of fresh) {
         const a = ACHIEVEMENT_BY_ID[id];
-        uiEvents.emit({ type: "toast", tone: "gold", icon: a.icon, title: tr("toast.achievement", { name: names().achievement(a) }), body: tr("toast.achievementBody", { desc: names().achievementDesc(a) }) });
+        uiEvents.emit({ type: "toast", kind: "progress", tone: "gold", icon: a.icon, title: tr("toast.achievement", { name: names().achievement(a) }), body: tr("toast.achievementBody", { desc: names().achievementDesc(a) }) });
       }
     }
     const prev = get().state;
@@ -357,37 +366,6 @@ export const useGame = create<GameStore>((set, get) => {
     saves.save({ ...s, lastActiveAt: Date.now() }, force);
   }
 
-  /** What the plants' auto-upgrade bought since the player was last told (once a minute at most). */
-  const autoBought = { n: 0, money: 0, plots: new Set<string>(), since: 0 };
-  function tellAutoBought(log: { plot: string; cost: number }[], s: GameState, now: number) {
-    for (const p of log) {
-      autoBought.n++;
-      autoBought.money += p.cost;
-      autoBought.plots.add(p.plot);
-    }
-    if (!autoBought.n) {
-      autoBought.since = now;
-      return;
-    }
-    if (now - autoBought.since < AUTO_BOUGHT_EVERY_MS) return;
-    const names = [...autoBought.plots]
-      .map((id) => s.city.buildings[id])
-      .filter((b) => !!b)
-      .map((b) => tr(`structure.${b.type}` as MessageKey));
-    const shown = [...new Set(names)];
-    uiEvents.emit({
-      type: "toast",
-      tone: "info",
-      icon: "⚙️",
-      title: tr("toast.autoBought", { n: autoBought.n, money: formatMoney(autoBought.money) }),
-      body: tr("toast.autoBoughtBody", { plants: shown.slice(0, 3).join(", ") + (shown.length > 3 ? "…" : "") }),
-    });
-    autoBought.n = 0;
-    autoBought.money = 0;
-    autoBought.plots.clear();
-    autoBought.since = now;
-  }
-
   function runTick() {
     const now = Date.now();
     // the battery saver ticks less often (the engine runs on elapsed time, so nothing is lost)
@@ -405,49 +383,60 @@ export const useGame = create<GameStore>((set, get) => {
       return;
     }
 
+    const cash = next.cash;
     const events = engineTick(next, dt, snap);
     next.lastActiveAt = now;
     recordHistory(next, now, snap.incomePerSec);
+    // the shareholders take their part of what was just earned (engine/stock.ts)
+    const earned = next.cash - cash;
+    const dividends = St.payDividends(next, earned);
+    St.stockTick(next, snap, now);
+    // the auto-upgrades invest a share of what is left of it, never collected or reward money;
+    // they buy quietly (the plant's panel shows its levels; a toast for each came too often)
+    autoMoney = Ch.autoBudget(autoMoney, earned - dividends, next.cash);
     const autoLog: { plot: string; cost: number }[] = [];
-    Ch.autoUpgrade(next, snap.gm, autoLog);
-    tellAutoBought(autoLog, next, now);
+    Ch.autoUpgrade(next, snap.gm, autoLog, autoMoney);
+    for (const p of autoLog) autoMoney -= p.cost;
     R.updateLogin(next, now);
     for (const r of R.checkRivals(next, now)) {
-      uiEvents.emit({ type: "toast", tone: "gold", icon: r.emoji, title: tr("rival.beaten", { name: r.name }), body: tr("rival.beatenBody", { n: r.stars }) });
+      uiEvents.emit({ type: "toast", kind: "progress", tone: "gold", icon: r.emoji, title: tr("rival.beaten", { name: r.name }), body: tr("rival.beatenBody", { n: r.stars }) });
     }
     const deal = K.refreshContracts(next, now, snap);
-    if (deal === "offer") uiEvents.emit({ type: "toast", tone: "info", icon: "📨", title: tr("contract.offerToast"), body: tr("contract.offerToastBody") });
-    else if (deal === "expired") uiEvents.emit({ type: "toast", tone: "warn", icon: "⌛", title: tr("contract.expired") });
+    if (deal === "offer") uiEvents.emit({ type: "toast", kind: "clients", tone: "info", icon: "📨", title: tr("contract.offerToast"), body: tr("contract.offerToastBody") });
+    else if (deal === "expired") uiEvents.emit({ type: "toast", kind: "clients", tone: "warn", icon: "⌛", title: tr("contract.expired") });
     const ev = activeEvent(now);
     if (ev && !activeEvent(state.lastActiveAt)) {
       const n = contentFor(next.settings.lang);
-      uiEvents.emit({ type: "toast", tone: "gold", icon: ev.event.emoji, title: tr("event.started", { name: n.event(ev.event) }), body: n.eventDesc(ev.event) });
+      uiEvents.emit({ type: "toast", kind: "events", tone: "gold", icon: ev.event.emoji, title: tr("event.started", { name: n.event(ev.event) }), body: n.eventDesc(ev.event) });
     }
     if (refreshDaily(next, now, snap)) {
-      uiEvents.emit({ type: "toast", tone: "info", icon: "📋", title: tr("toast.daily"), body: tr("toast.dailyBody") });
+      uiEvents.emit({ type: "toast", kind: "events", tone: "info", icon: "📋", title: tr("toast.daily"), body: tr("toast.dailyBody") });
     }
     for (const e of events) {
       if (e.type === "sale") uiEvents.emit(e);
       else if (e.type === "carBuilt" && e.first) uiEvents.emit({ type: "firstCar", plot: e.plot, car: e.car });
       else if (e.type === "built") {
-        const name = tr(`structure.${e.structure}`);
-        uiEvents.emit({
-          type: "toast",
-          tone: "gold",
-          icon: e.upgrade ? "⬆️" : STRUCTURE_BY_ID[e.structure].emoji,
-          title: e.upgrade ? tr("toast.upgradeDone", { name, level: e.level }) : tr("toast.constructionDone", { name }),
-          body: e.upgrade ? tr("toast.upgradeDoneBody") : tr("toast.constructionDoneBody"),
-          action: { label: tr("toast.open"), plot: e.plot },
-        });
+        // a finished upgrade has no toast (with many plants they covered the map); a new building does
+        if (!e.upgrade) {
+          uiEvents.emit({
+            type: "toast",
+            kind: "progress",
+            tone: "gold",
+            icon: STRUCTURE_BY_ID[e.structure].emoji,
+            title: tr("toast.constructionDone", { name: tr(`structure.${e.structure}`) }),
+            body: tr("toast.constructionDoneBody"),
+            action: { label: tr("toast.open"), plot: e.plot },
+          });
+        }
         // a round level (5, 10, 15) is worth fireworks over the building
-        if (e.upgrade && e.level % 5 === 0) uiEvents.emit({ type: "fireworks", plot: e.plot, big: e.level >= 15 });
+        else if (e.level % 5 === 0) uiEvents.emit({ type: "fireworks", plot: e.plot, big: e.level >= 15 });
       }
-      else if (e.type === "emergency") uiEvents.emit({ type: "toast", tone: "warn", icon: "🆘", title: tr("toast.emergency"), body: tr("toast.emergencyBody", { money: formatMoney(e.cost) }) });
-      else if (e.type === "restructured") uiEvents.emit({ type: "toast", tone: "warn", icon: "🏦", title: tr("toast.restructured"), body: tr("toast.restructuredBody", { money: formatMoney(e.amount), rep: RESCUE.restructure.rep }) });
-      else if (e.type === "suspended") uiEvents.emit({ type: "toast", tone: "warn", icon: "⛔", title: tr("toast.suspended"), body: tr("toast.suspendedBody") });
+      else if (e.type === "emergency") uiEvents.emit({ type: "toast", kind: "problems", tone: "warn", icon: "🆘", title: tr("toast.emergency"), body: tr("toast.emergencyBody", { money: formatMoney(e.cost) }) });
+      else if (e.type === "restructured") uiEvents.emit({ type: "toast", kind: "problems", tone: "warn", icon: "🏦", title: tr("toast.restructured"), body: tr("toast.restructuredBody", { money: formatMoney(e.amount), rep: RESCUE.restructure.rep }) });
+      else if (e.type === "suspended") uiEvents.emit({ type: "toast", kind: "problems", tone: "warn", icon: "⛔", title: tr("toast.suspended"), body: tr("toast.suspendedBody") });
       else if (e.type === "breakdown") {
         const b = next.city.buildings[e.plot];
-        if (b) uiEvents.emit({ type: "toast", tone: "warn", icon: "🔧", title: tr("floor.brokeToast", { name: tr(`structure.${b.type}` as MessageKey) }), body: tr("floor.brokeToastBody"), action: { label: tr("floor.repair"), plot: e.plot } });
+        if (b) uiEvents.emit({ type: "toast", kind: "problems", tone: "warn", icon: "🔧", title: tr("floor.brokeToast", { name: tr(`structure.${b.type}` as MessageKey) }), body: tr("floor.brokeToastBody"), action: { label: tr("floor.repair"), plot: e.plot } });
       }
       else if (e.type === "raceFinished") {
         const rec = next.racing.last;
@@ -458,6 +447,7 @@ export const useGame = create<GameStore>((set, get) => {
           if (rw.position === 0) uiEvents.emit({ type: "fireworks", plot: RACING });
           uiEvents.emit({
             type: "toast",
+            kind: "racing",
             tone: rw.position === 0 ? "gold" : rw.position <= 2 ? "success" : "info",
             icon: rw.position === 0 ? "🏆" : rw.position <= 2 ? "🏅" : "🏁",
             title: tr("racing.toast", { pos: rw.position + 1, event: n.raceEvent(rec.event) }),
@@ -467,22 +457,22 @@ export const useGame = create<GameStore>((set, get) => {
       }
     }
     const vip = Lv.vipTick(next, now, snap);
-    if (vip === "offer") uiEvents.emit({ type: "toast", tone: "gold", icon: "💎", title: tr("vip.offerToast"), body: tr(`vip.client.${next.vip.offer!.client}` as MessageKey) });
-    else if (vip === "failed") uiEvents.emit({ type: "toast", tone: "warn", icon: "⌛", title: tr("vip.failed") });
+    if (vip === "offer") uiEvents.emit({ type: "toast", kind: "clients", tone: "gold", icon: "💎", title: tr("vip.offerToast"), body: tr(`vip.client.${next.vip.offer!.client}` as MessageKey) });
+    else if (vip === "failed") uiEvents.emit({ type: "toast", kind: "clients", tone: "warn", icon: "⌛", title: tr("vip.failed") });
     if (Lv.seasonTick(next, now) && next.season.last && !next.season.last.claimed)
-      uiEvents.emit({ type: "toast", tone: "gold", icon: "🏆", title: tr("season.over", { rank: next.season.last.rank + 1 }) });
+      uiEvents.emit({ type: "toast", kind: "events", tone: "gold", icon: "🏆", title: tr("season.over", { rank: next.season.last.rank + 1 }) });
     const restored = Cl.classicsTick(next, now);
-    if (restored) uiEvents.emit({ type: "toast", tone: "gold", icon: "🏛️", title: tr("classics.done", { name: tr(`classic.${restored}` as MessageKey) }), body: tr("classics.doneBody") });
+    if (restored) uiEvents.emit({ type: "toast", kind: "progress", tone: "gold", icon: "🏛️", title: tr("classics.done", { name: tr(`classic.${restored}` as MessageKey) }), body: tr("classics.doneBody") });
     const eng = Ex.engineersTick(next, now, dt);
-    if (eng === "candidate") uiEvents.emit({ type: "toast", tone: "info", icon: "👩‍🔬", title: tr("eng.candidateToast", { name: ENGINEER_BY_ID[next.engineers.candidate!.id].name }) });
-    else if (eng === "lost") uiEvents.emit({ type: "toast", tone: "warn", icon: "🕵️", title: tr("eng.lostToast") });
+    if (eng === "candidate") uiEvents.emit({ type: "toast", kind: "clients", tone: "info", icon: "👩‍🔬", title: tr("eng.candidateToast", { name: ENGINEER_BY_ID[next.engineers.candidate!.id].name }) });
+    else if (eng === "lost") uiEvents.emit({ type: "toast", kind: "clients", tone: "warn", icon: "🕵️", title: tr("eng.lostToast") });
     // the season pass: a new season (paying what was left untaken), new weekly challenges
     const pass = Ps.passTick(next, snap, now);
-    if (pass.leftover) uiEvents.emit({ type: "toast", tone: "gold", icon: "🎟️", title: tr("pass.leftoverToast", { n: pass.leftover }) });
-    if (pass.season && next.pass.season > 1 && next.lifetime.playTime > 600) uiEvents.emit({ type: "toast", tone: "gold", icon: "🎟️", title: tr("pass.newSeason", { n: next.pass.season }), action: { label: tr("pass.open"), view: "pass" } });
-    if (Wt.winterTick(next, snap, now)) uiEvents.emit({ type: "toast", tone: "gold", icon: "🎄", title: tr("winter.startToast"), body: tr("winter.startToastBody"), action: { label: tr("winter.open"), view: "winter" } });
+    if (pass.leftover) uiEvents.emit({ type: "toast", kind: "events", tone: "gold", icon: "🎟️", title: tr("pass.leftoverToast", { n: pass.leftover }) });
+    if (pass.season && next.pass.season > 1 && next.lifetime.playTime > 600) uiEvents.emit({ type: "toast", kind: "events", tone: "gold", icon: "🎟️", title: tr("pass.newSeason", { n: next.pass.season }), action: { label: tr("pass.open"), view: "pass" } });
+    if (Wt.winterTick(next, snap, now)) uiEvents.emit({ type: "toast", kind: "events", tone: "gold", icon: "🎄", title: tr("winter.startToast"), body: tr("winter.startToastBody"), action: { label: tr("winter.open"), view: "winter" } });
     const fest = Fe.festivalTick(next, snap, now);
-    if (fest) uiEvents.emit({ type: "toast", tone: "gold", icon: fest === "spring" ? "🌸" : "☀️", title: tr(`festival.${fest}Start`), body: tr("festival.startBody"), action: { label: tr("winter.open"), view: "festival" } });
+    if (fest) uiEvents.emit({ type: "toast", kind: "events", tone: "gold", icon: fest === "spring" ? "🌸" : "☀️", title: tr(`festival.${fest}Start`), body: tr("festival.startBody"), action: { label: tr("winter.open"), view: "festival" } });
     // the bonuses on the Empire Map come and go only while the map is on screen
     const ui = useUi.getState();
     if (!ui.garage && !ui.floor && !ui.race && !ui.visit) Mb.mapBonusTick(next, dt, now);
@@ -490,37 +480,37 @@ export const useGame = create<GameStore>((set, get) => {
     const lm = Lm.landmarkNews(next);
     for (const f of lm.firstCar) {
       const car = CAR_BY_ID[f.car];
-      uiEvents.emit({ type: "toast", tone: "gold", icon: car.emoji, title: tr("landmark.firstCarToast", { car: names().car(car) }), body: tr("landmark.firstCarBody", { money: formatMoney(f.cash), stars: f.stars }), action: { label: tr("toast.open"), view: "landmarks" } });
+      uiEvents.emit({ type: "toast", kind: "progress", tone: "gold", icon: car.emoji, title: tr("landmark.firstCarToast", { car: names().car(car) }), body: tr("landmark.firstCarBody", { money: formatMoney(f.cash), stars: f.stars }), action: { label: tr("toast.open"), view: "landmarks" } });
       uiEvents.emit({ type: "fireworks", plot: `w:${f.territory}`, big: true });
     }
     for (const u of lm.levelUp) {
       const works = LANDMARK_BY_TERRITORY[u.territory]!.works;
-      uiEvents.emit({ type: "toast", tone: "gold", icon: "🏗️", title: tr("landmark.levelToast", { works: tr(`structure.${works}`), n: u.level }), body: tr("landmark.levelToastBody"), action: { label: tr("toast.open"), view: "landmarks" } });
+      uiEvents.emit({ type: "toast", kind: "progress", tone: "gold", icon: "🏗️", title: tr("landmark.levelToast", { works: tr(`structure.${works}`), n: u.level }), body: tr("landmark.levelToastBody"), action: { label: tr("toast.open"), view: "landmarks" } });
       uiEvents.emit({ type: "fireworks", plot: `w:${u.territory}` });
     }
     const fo = Ex.fleetOrderTick(next, now);
-    if (fo === "offer") uiEvents.emit({ type: "toast", tone: "info", icon: "🚌", title: tr("fleet.offerToast") });
-    else if (fo === "failed") uiEvents.emit({ type: "toast", tone: "warn", icon: "⌛", title: tr("fleet.failed") });
+    if (fo === "offer") uiEvents.emit({ type: "toast", kind: "clients", tone: "info", icon: "🚌", title: tr("fleet.offerToast") });
+    else if (fo === "failed") uiEvents.emit({ type: "toast", kind: "clients", tone: "warn", icon: "⌛", title: tr("fleet.failed") });
     // now and then a car off the line is a limited edition
     const built = events.find((e) => e.type === "carBuilt");
     const edition = Cn.editionTick(next, built?.type === "carBuilt" ? built.car : null, now);
     if (edition) {
       const car = built?.type === "carBuilt" ? names().car(CAR_BY_ID[built.car]) : "";
-      uiEvents.emit({ type: "toast", tone: "gold", icon: edition.icon, title: tr("edition.toast", { name: tr(`edition.${edition.id}` as MessageKey), car }), body: tr("edition.toastBody", { pct: formatPercent(EDITION.income) }), action: { label: tr("edition.see"), view: "cars" } });
+      uiEvents.emit({ type: "toast", kind: "progress", tone: "gold", icon: edition.icon, title: tr("edition.toast", { name: tr(`edition.${edition.id}` as MessageKey), car }), body: tr("edition.toastBody", { pct: formatPercent(EDITION.income) }), action: { label: tr("edition.see"), view: "cars" } });
     }
     const story = Sy.storyTick(next, snap);
     if (story === "offer") {
       const { id, plot } = next.story.pending!;
       const b = next.city.buildings[plot];
       const plant = b ? tr(`structure.${b.type}` as MessageKey) : "";
-      uiEvents.emit({ type: "toast", tone: "gold", icon: DILEMMA_BY_ID[id].icon, title: tr("story.offerToast"), body: tr(`story.d.${id}.title` as MessageKey, { plant }), action: { label: tr("story.decide"), view: "story" } });
-    } else if (story === "expired") uiEvents.emit({ type: "toast", tone: "warn", icon: "⌛", title: tr("story.expired") });
-    else if (story === "chapter") uiEvents.emit({ type: "toast", tone: "gold", icon: RIVAL_CEO.emoji, title: tr("story.chapterToast"), body: tr("story.chapterToastBody"), action: { label: tr("story.open"), view: "story" } });
+      uiEvents.emit({ type: "toast", kind: "clients", tone: "gold", icon: DILEMMA_BY_ID[id].icon, title: tr("story.offerToast"), body: tr(`story.d.${id}.title` as MessageKey, { plant }), action: { label: tr("story.decide"), view: "story" } });
+    } else if (story === "expired") uiEvents.emit({ type: "toast", kind: "clients", tone: "warn", icon: "⌛", title: tr("story.expired") });
+    else if (story === "chapter") uiEvents.emit({ type: "toast", kind: "clients", tone: "gold", icon: RIVAL_CEO.emoji, title: tr("story.chapterToast"), body: tr("story.chapterToastBody"), action: { label: tr("story.open"), view: "story" } });
     const pa = state.proto.active;
-    if (pa && state.lastActiveAt < pa.until && now >= pa.until) uiEvents.emit({ type: "toast", tone: "success", icon: "🧪", title: tr("proto.stageDone") });
+    if (pa && state.lastActiveAt < pa.until && now >= pa.until) uiEvents.emit({ type: "toast", kind: "progress", tone: "success", icon: "🧪", title: tr("proto.stageDone") });
     const trend = Mk.trendOf(next);
     if (trend.hot && trend.block !== Mk.trendOf(state).block) {
-      uiEvents.emit({ type: "toast", tone: "info", icon: "📰", title: tr("news.toast"), body: tr("news.hot", { cls: tr(`class.${trend.hot}` as MessageKey), price: formatPercent(HOT_CLASS.price), demand: formatPercent(HOT_CLASS.demand - 1) }) });
+      uiEvents.emit({ type: "toast", kind: "events", tone: "info", icon: "📰", title: tr("news.toast"), body: tr("news.hot", { cls: tr(`class.${trend.hot}` as MessageKey), price: formatPercent(HOT_CLASS.price), demand: formatPercent(HOT_CLASS.demand - 1) }) });
     }
     commit(next, snap, true);
     if (now - lastSave > SAVE_MS) persist();
@@ -640,7 +630,7 @@ export const useGame = create<GameStore>((set, get) => {
       let money = 0;
       act((s) => (money = Gf.receiveGifts(s, n, get().snap)) > 0);
       persist(true);
-      uiEvents.emit({ type: "toast", tone: "gold", icon: "🎁", title: tr("gift.received", { n }), body: tr("gift.receivedBody", { money: formatMoney(money) }) });
+      uiEvents.emit({ type: "toast", kind: "events", tone: "gold", icon: "🎁", title: tr("gift.received", { n }), body: tr("gift.receivedBody", { money: formatMoney(money) }) });
       return n;
     },
     claimInviteRewards: async () => {
@@ -652,7 +642,7 @@ export const useGame = create<GameStore>((set, get) => {
       let paid = { stars: 0, money: 0 };
       act((s) => (paid = Iv.inviteRewards(s, n, get().snap)).stars > 0);
       persist(true);
-      uiEvents.emit({ type: "toast", tone: "gold", icon: "🤝", title: tr("invite.rewarded", { n }), body: tr("invite.rewardedBody", { stars: paid.stars, money: formatMoney(paid.money) }) });
+      uiEvents.emit({ type: "toast", kind: "events", tone: "gold", icon: "🤝", title: tr("invite.rewarded", { n }), body: tr("invite.rewardedBody", { stars: paid.stars, money: formatMoney(paid.money) }) });
       return n;
     },
     redeemInvite: async (code) => {
@@ -698,6 +688,7 @@ export const useGame = create<GameStore>((set, get) => {
         paid++;
         uiEvents.emit({
           type: "toast",
+          kind: "racing",
           tone: "gold",
           icon: Cu.CUP_ICON[got.prize.tier],
           title: tr("cup.prize", { rank: p.rank, n: p.entrants }),
@@ -865,7 +856,7 @@ export const useGame = create<GameStore>((set, get) => {
         // a moment later: at start the battery is read before the game screen listens for toasts
         setTimeout(() => {
           const b = batteryState();
-          if (isSaving() && get().state.settings.saver === "auto" && b) uiEvents.emit({ type: "toast", tone: "info", icon: "🔋", title: tr("saver.autoOn"), body: tr("saver.autoOnBody", { n: Math.round(b.level * 100) }) });
+          if (isSaving() && get().state.settings.saver === "auto" && b) uiEvents.emit({ type: "toast", kind: "events", tone: "info", icon: "🔋", title: tr("saver.autoOn"), body: tr("saver.autoOnBody", { n: Math.round(b.level * 100) }) });
         }, 2000);
       });
 
@@ -1114,10 +1105,10 @@ export const useGame = create<GameStore>((set, get) => {
       return ok;
     },
     adReward: (reward, plot) => {
-      const offline = get().state.pendingOffline?.money ?? 0;
+      const cash = get().state.cash;
       const ok = act((s) => grantAd(s, reward, Date.now(), plot));
       if (!ok) return false;
-      if (reward === "offline") uiEvents.emit({ type: "toast", tone: "gold", icon: "💰", title: tr("toast.collected", { amount: formatMoney(offline * ADS.offlineMult) }), body: tr("toast.collectedBody") });
+      if (reward === "offline") uiEvents.emit({ type: "toast", tone: "gold", icon: "💰", title: tr("toast.collected", { amount: formatMoney(get().state.cash - cash) }), body: tr("toast.collectedBody") });
       else if (reward === "boost") uiEvents.emit({ type: "toast", tone: "gold", icon: "📈", title: tr("ad.boostStarted"), body: tr("ad.boostStartedBody") });
       persist(true);
       return true;
@@ -1234,7 +1225,11 @@ export const useGame = create<GameStore>((set, get) => {
       }
     },
     claimLogin: () => {
-      if (act((s) => R.claimLogin(s, get().snap))) persist(true);
+      const r = R.loginReward(get().state);
+      const amount = r.stars ? `${r.stars} ⭐` : formatMoney(rewardCash(r, get().snap));
+      if (!act((s) => R.claimLogin(s, get().snap))) return;
+      uiEvents.emit({ type: "toast", tone: "gold", icon: "🎁", title: tr("toast.collected", { amount }) });
+      persist(true);
     },
     dismissTip: (id) => {
       act((s) => !s.tips.includes(id) && s.tips.push(id) > 0);
@@ -1244,12 +1239,49 @@ export const useGame = create<GameStore>((set, get) => {
       act((s) => claimMilestone(s, id));
     },
     collectOffline: () => {
-      const amount = get().state.pendingOffline?.money ?? 0;
-      act((s) => collectOffline(s) > 0 || s.pendingOffline === null);
+      // what reaches the wallet (the shareholders take their part: engine/stock.ts)
+      let amount = 0;
+      act((s) => {
+        if (!s.pendingOffline) return false;
+        amount = collectOffline(s);
+        return true;
+      });
       if (amount > 0) uiEvents.emit({ type: "toast", tone: "gold", icon: "💰", title: tr("toast.collected", { amount: formatMoney(amount) }), body: tr("toast.collectedBody") });
       persist(true);
       // a good moment for the store's rating card (lib/review.ts decides whether it is due)
       if (amount > 0) setTimeout(() => void maybeAskForReview(get().state), 1500);
+    },
+    buyMaintenance: () => {
+      const ok = act((s) => Mt.upgradeMaintenance(s, get().snap));
+      if (ok) {
+        uiEvents.emit({ type: "toast", tone: "success", icon: "🔧", title: tr("crew.hiredToast", { n: get().state.maintenance.level }) });
+        persist(true);
+      }
+      return ok;
+    },
+    sellShares: () => {
+      const cash = act((s) => St.sellShares(s, get().snap));
+      if (cash > 0) {
+        uiEvents.emit({ type: "toast", tone: "gold", icon: "📈", title: tr("stock.soldToast", { money: formatMoney(cash) }), body: tr("stock.soldToastBody", { pct: Math.round(get().state.stock.sold * 100) }) });
+        persist(true);
+      }
+      return cash > 0;
+    },
+    buyBackShares: () => {
+      const ok = act((s) => St.buyBack(s, get().snap));
+      if (ok) {
+        uiEvents.emit({ type: "toast", tone: "success", icon: "🏦", title: tr("stock.boughtToast", { pct: Math.round(get().state.stock.sold * 100) }) });
+        persist(true);
+      }
+      return ok;
+    },
+    setToastOff: (kind, off) => {
+      act((s) => {
+        const list = s.settings.toastsOff.filter((k) => k !== kind);
+        s.settings.toastsOff = off ? [...list, kind] : list;
+        return true;
+      });
+      persist(true);
     },
     imperium: () => {
       const gained = act((s) => doImperium(s));

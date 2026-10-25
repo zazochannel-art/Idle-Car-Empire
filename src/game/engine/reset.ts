@@ -4,6 +4,7 @@ import { createChain } from "./chain";
 import { createCity } from "./city";
 import { resetDesignLevels } from "./design";
 import { createLogistics } from "./logistics";
+import { createStock } from "./stock";
 import { createDealers, createStats, emptyCarCounts } from "./state";
 
 /**
@@ -40,4 +41,6 @@ export function resetRun(s: GameState, now: number) {
   s.fleet = createFleet();
   s.proto.active = null;
   for (const m of Object.values(s.managers)) m.assignedTo = null;
+  // a new company, with all its shares (the maintenance crew stays)
+  s.stock = createStock();
 }
