@@ -42,6 +42,7 @@ import { TestUpdate } from "./test-update";
 import { PlayUpdate } from "./play-update";
 import { retry, ScreenBoundary } from "./screen-boundary";
 import { LoginDialog } from "./login-dialog";
+import { WhatsNewDialog } from "./whats-new";
 import { goalText, runGoal } from "./goals";
 import { Hud } from "./hud";
 import { ImperiumOverlay, OfflineDialog, SettingsDialog, Toasts } from "./overlays";
@@ -369,6 +370,7 @@ function Shell() {
       <MusicBridge />
       <LiveEvents />
       <LoginDialog />
+      <WhatsNewDialog onSettings={() => setSettings(true)} />
       <OfflineDialog />
       <ImperiumOverlay />
       <RaceViewer />

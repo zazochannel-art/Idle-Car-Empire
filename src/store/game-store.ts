@@ -71,6 +71,7 @@ import type { AdReward } from "@/game/config/ads";
 import * as Shop from "@/game/engine/shop";
 import * as St from "@/game/engine/stock";
 import * as Mt from "@/game/engine/maintenance";
+import * as Ap from "@/game/engine/autopilot";
 import { SHOP_ITEM_BY_ID, type ShopItemId } from "@/game/config/shop";
 import * as Iap from "@/game/engine/iap";
 import { IAP_ICON, type IapProduct } from "@/game/config/iap";
@@ -271,6 +272,11 @@ interface GameStore {
   buyBackShares: () => boolean;
   /** A kind of notice on screen or only in the notification center. */
   setToastOff: (kind: NoticeKind, off: boolean) => void;
+  /** The standing orders for recalls, VIP and fleet orders, cashing in (engine/autopilot.ts). */
+  setAutoRecall: (policy: Ap.RecallPolicy) => void;
+  setAutoDecide: (key: "autoVip" | "autoFleet" | "autoCollect", on: boolean) => void;
+  /** The "what's new" card put away. */
+  seenWhatsNew: (id: string) => void;
   imperium: () => void;
   buyStarUpgrade: (id: StarUpgradeId) => boolean;
   unlockRacing: () => boolean;
@@ -398,6 +404,10 @@ export const useGame = create<GameStore>((set, get) => {
     Ch.autoUpgrade(next, snap.gm, autoLog, autoMoney);
     for (const p of autoLog) autoMoney -= p.cost;
     R.updateLogin(next, now);
+    // a recall settled by the player's standing order: the dialog never shows
+    const recall = Ap.autoRecall(next, snap);
+    if (recall && "paid" in recall) uiEvents.emit({ type: "toast", kind: "problems", tone: "success", icon: "🛠️", title: tr("autoDecide.recallPaid", { money: formatMoney(recall.paid) }), body: tr("recall.paidToast", { n: RECALL.repPaid }) });
+    else if (recall) uiEvents.emit({ type: "toast", kind: "problems", tone: recall.ignored === "scandal" ? "warn" : "info", icon: recall.ignored === "scandal" ? "📰" : "🤫", title: tr("autoDecide.recallIgnored"), body: tr(recall.ignored === "scandal" ? "recall.scandalToast" : "recall.quietToast") });
     for (const r of R.checkRivals(next, now)) {
       uiEvents.emit({ type: "toast", kind: "progress", tone: "gold", icon: r.emoji, title: tr("rival.beaten", { name: r.name }), body: tr("rival.beatenBody", { n: r.stars }) });
     }
@@ -457,7 +467,10 @@ export const useGame = create<GameStore>((set, get) => {
       }
     }
     const vip = Lv.vipTick(next, now, snap);
-    if (vip === "offer") uiEvents.emit({ type: "toast", kind: "clients", tone: "gold", icon: "💎", title: tr("vip.offerToast"), body: tr(`vip.client.${next.vip.offer!.client}` as MessageKey) });
+    // a VIP order the plants can already make, taken on by the standing order: one notice, not two
+    const vipClient = next.vip.offer?.client;
+    if (Ap.autoVip(next, now, snap)) uiEvents.emit({ type: "toast", kind: "clients", tone: "gold", icon: "💎", title: tr("autoDecide.vipAccepted"), body: tr(`vip.client.${vipClient!}` as MessageKey), action: { label: tr("toast.open"), view: "missions" } });
+    else if (vip === "offer") uiEvents.emit({ type: "toast", kind: "clients", tone: "gold", icon: "💎", title: tr("vip.offerToast"), body: tr(`vip.client.${next.vip.offer!.client}` as MessageKey) });
     else if (vip === "failed") uiEvents.emit({ type: "toast", kind: "clients", tone: "warn", icon: "⌛", title: tr("vip.failed") });
     if (Lv.seasonTick(next, now) && next.season.last && !next.season.last.claimed)
       uiEvents.emit({ type: "toast", kind: "events", tone: "gold", icon: "🏆", title: tr("season.over", { rank: next.season.last.rank + 1 }) });
@@ -489,7 +502,8 @@ export const useGame = create<GameStore>((set, get) => {
       uiEvents.emit({ type: "fireworks", plot: `w:${u.territory}` });
     }
     const fo = Ex.fleetOrderTick(next, now);
-    if (fo === "offer") uiEvents.emit({ type: "toast", kind: "clients", tone: "info", icon: "🚌", title: tr("fleet.offerToast") });
+    if (Ap.autoFleet(next, now)) uiEvents.emit({ type: "toast", kind: "clients", tone: "info", icon: "🚌", title: tr("autoDecide.fleetAccepted") });
+    else if (fo === "offer") uiEvents.emit({ type: "toast", kind: "clients", tone: "info", icon: "🚌", title: tr("fleet.offerToast") });
     else if (fo === "failed") uiEvents.emit({ type: "toast", kind: "clients", tone: "warn", icon: "⌛", title: tr("fleet.failed") });
     // now and then a car off the line is a limited edition
     const built = events.find((e) => e.type === "carBuilt");
@@ -512,6 +526,11 @@ export const useGame = create<GameStore>((set, get) => {
     if (trend.hot && trend.block !== Mk.trendOf(state).block) {
       uiEvents.emit({ type: "toast", kind: "events", tone: "info", icon: "📰", title: tr("news.toast"), body: tr("news.hot", { cls: tr(`class.${trend.hot}` as MessageKey), price: formatPercent(HOT_CLASS.price), demand: formatPercent(HOT_CLASS.demand - 1) }) });
     }
+    // finished orders and contracts cashed in by the standing order
+    const got = Ap.autoCollect(next, now, snap);
+    if (got.vip !== null) uiEvents.emit({ type: "toast", kind: "clients", tone: "gold", icon: "💎", title: tr("vip.paid"), body: tr("autoDecide.collected", { money: formatMoney(got.vip) }) });
+    if (got.fleet) uiEvents.emit({ type: "toast", kind: "clients", tone: "gold", icon: "🚌", title: tr("fleet.doneToast") });
+    if (got.contract) uiEvents.emit({ type: "toast", kind: "clients", tone: "gold", icon: "🤝", title: tr("contract.paid"), body: tr("contract.paidBody") });
     commit(next, snap, true);
     if (now - lastSave > SAVE_MS) persist();
     if (now - lastFunnel > FUNNEL_MS) {
@@ -1274,6 +1293,27 @@ export const useGame = create<GameStore>((set, get) => {
         persist(true);
       }
       return ok;
+    },
+    setAutoRecall: (policy) => {
+      act((s) => {
+        s.settings.autoRecall = policy;
+        return true;
+      });
+      persist(true);
+    },
+    setAutoDecide: (key, on) => {
+      act((s) => {
+        s.settings[key] = on;
+        return true;
+      });
+      persist(true);
+    },
+    seenWhatsNew: (id) => {
+      act((s) => {
+        s.settings.whatsNew = id;
+        return true;
+      });
+      persist(true);
     },
     setToastOff: (kind, off) => {
       act((s) => {

@@ -2,6 +2,7 @@ import { migrateChain } from "../engine/chain";
 import { migrateMaintenance } from "../engine/maintenance";
 import { migrateStock } from "../engine/stock";
 import { NOTICE_KINDS } from "../config/notices";
+import { RECALL_POLICIES } from "../engine/autopilot";
 import { migrateBrand } from "../engine/brand";
 import { migrateRacing } from "../engine/racing";
 import { migrateQuality } from "../engine/market";
@@ -47,6 +48,9 @@ function cleanSettings(state: GameState, saved: unknown): GameState {
   // the kinds of notices kept off the screen: known ones, each once
   const off: unknown[] = Array.isArray(state.settings.toastsOff) ? state.settings.toastsOff : [];
   state.settings.toastsOff = NOTICE_KINDS.filter((k) => off.includes(k));
+  if (!RECALL_POLICIES.includes(state.settings.autoRecall)) state.settings.autoRecall = "ask";
+  // a save from before the "what's new" card has not seen it
+  if (isObject(saved) && typeof saved.whatsNew !== "string") state.settings.whatsNew = "";
   return state;
 }
 

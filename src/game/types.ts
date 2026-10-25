@@ -673,7 +673,7 @@ export interface GameState {
   /** Unlock bonuses already claimed this run ("car:sedan", "plant:engineFactory"). */
   unlocks: string[];
   /** stats: send the anonymous new-player funnel steps (engine/funnel.ts). hidden: players hidden from the boards and visits (Profile lists them). */
-  settings: { buyAmount: BuyAmount; lang: Lang; lowGraphics: boolean; sound: boolean; /** The background music (separate from the game's sounds). */ music: boolean; haptics: boolean; notify: boolean; /** Battery saver: "auto" (on when the battery is low), "on" or "off". */ saver: "auto" | "on" | "off"; stats: boolean; hidden: HiddenPlayer[]; /** Kinds of notices kept off the screen (the notification center still lists them). */ toastsOff: NoticeKind[] };
+  settings: { buyAmount: BuyAmount; lang: Lang; lowGraphics: boolean; sound: boolean; /** The background music (separate from the game's sounds). */ music: boolean; haptics: boolean; notify: boolean; /** Battery saver: "auto" (on when the battery is low), "on" or "off". */ saver: "auto" | "on" | "off"; stats: boolean; hidden: HiddenPlayer[]; /** Kinds of notices kept off the screen (the notification center still lists them). */ toastsOff: NoticeKind[]; /** Standing orders (engine/autopilot.ts): a recall asked about, paid or ignored; VIP orders the plants can already make and fleet orders taken on; finished orders and contracts cashed in. */ autoRecall: "ask" | "pay" | "ignore"; autoVip: boolean; autoFleet: boolean; autoCollect: boolean; /** The "what's new" card last seen (config/whats-new.ts). */ whatsNew: string };
   /** Funnel steps already sent for this company ("legacy": a company from before the funnel, never counted). */
   funnel: string[];
   createdAt: number;

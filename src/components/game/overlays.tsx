@@ -19,6 +19,7 @@ import { useInbox } from "@/store/inbox";
 import { useUi } from "@/store/ui-store";
 import { LedgerTable } from "../views/ledger-table";
 import { AdPrivacyButton, OfflineAdButton } from "./ad-buttons";
+import { AutoDecideSection } from "./auto-decide";
 
 /** "Welcome Back!" — shown while an offline report is waiting to be collected. */
 export function OfflineDialog() {
@@ -354,6 +355,8 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
           <NotifyToggle />
           <Toggle label={t("settings.stats")} hint={t("settings.statsHint")} k="stats" />
         </div>
+
+        <AutoDecideSection />
 
         <div className="mt-4">
           <CloudSection onOpen={() => onOpenChange(false)} />
