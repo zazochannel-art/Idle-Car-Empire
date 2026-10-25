@@ -41,6 +41,7 @@ export type View =
   | "story"
   | "profile"
   | "shop"
+  | "landmarks"
   | "menu";
 
 /** Requests for the map camera, consumed by the map component. */

@@ -202,7 +202,8 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
   // The next plant in the chain.
   // (a plant whose site is going up already counts: the next one can start alongside it)
   const building = (t: PlantType) => Object.entries(s.city.sites).find(([, st]) => st.type === t)?.[0];
-  const next = PLANTS.find((p) => !hasPlant(s, p.id) && !building(p.id) && plantLock(s, p.id) === null);
+  // (the landmark works have their own screen and steps: config/landmarks.ts)
+  const next = PLANTS.find((p) => !p.landmark && !hasPlant(s, p.id) && !building(p.id) && plantLock(s, p.id) === null);
   if (next) {
     const plot = freePlotFor(s, next.id);
     if (plot) {

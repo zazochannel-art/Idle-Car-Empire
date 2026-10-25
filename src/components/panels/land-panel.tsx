@@ -1,5 +1,6 @@
 "use client";
 
+import { isTerritoryOpen } from "@/game/engine/territory";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { STRUCTURE_BY_ID, ZONE_BY_ID } from "@/game/config/city";
@@ -96,14 +97,20 @@ export function LandPanel({ id }: { id: string }) {
         ? n.plantLock(lock.lock)
         : lock?.kind === "onePerZone"
           ? t("land.reqOne")
-          : null;
+          : lock?.kind === "territory"
+            ? t("req.territory", { name: t(`territory.${lock.territory}`) })
+            : null;
+  // a landmark works' lot: it stands in a territory, and its works is restored rather than built
+  const territory = plot.territory;
+  const territoryOpen = !territory || isTerritoryOpen(state, territory);
+  const buildLabel = territory ? t("landmark.restore") : t("land.build");
 
   return (
     <div className="space-y-3 pb-2">
       <div className="flex flex-wrap items-center gap-1.5">
         <StatusChip status={status} />
         <Badge variant="muted">📐 {t(`land.size.${plot.size ?? "small"}` as MessageKey)}</Badge>
-        <Badge variant="muted">📍 {t(`zone.${plot.zone}`)}</Badge>
+        <Badge variant="muted">📍 {territory ? t(`territory.${territory}`) : t(`zone.${plot.zone}`)}</Badge>
       </div>
 
       {choices.length > 1 && (
@@ -150,21 +157,27 @@ export function LandPanel({ id }: { id: string }) {
 
       <div className="rounded-2xl bg-white/[0.03] p-3 text-xs ring-1 ring-white/[0.06]">
         <div className="mb-1 font-bold uppercase tracking-wider text-white/40">{t("land.requires")}</div>
-        <div className={cn(state.city.zones.includes(plot.zone) ? "text-emerald-300" : "text-amber-300")}>
-          {state.city.zones.includes(plot.zone) ? "✓" : "🔒"} {t("land.reqZone", { name: t(`zone.${plot.zone}`), stage: zone.stage })}
-        </div>
-        {lock && lock.kind !== "zone" && <div className="text-amber-300">🔒 {lockText}</div>}
+        {territory ? (
+          <div className={cn(territoryOpen ? "text-emerald-300" : "text-amber-300")}>
+            {territoryOpen ? "✓" : "🔒"} {t("req.territory", { name: t(`territory.${territory}`) })}
+          </div>
+        ) : (
+          <div className={cn(state.city.zones.includes(plot.zone) ? "text-emerald-300" : "text-amber-300")}>
+            {state.city.zones.includes(plot.zone) ? "✓" : "🔒"} {t("land.reqZone", { name: t(`zone.${plot.zone}`), stage: zone.stage })}
+          </div>
+        )}
+        {lock && lock.kind !== "zone" && lock.kind !== "territory" && <div className="text-amber-300">🔒 {lockText}</div>}
       </div>
 
       {owned ? (
         <>
           <p className="px-1 text-xs text-white/55">{t("land.ownedNote")}</p>
-          <CostButton className="w-full" size="lg" variant="gold" cost={build} locked={!!lock} label={`🏗️ ${t("land.build")}`} onBuy={() => startConstruction(id, use)} />
+          <CostButton className="w-full" size="lg" variant="gold" cost={build} locked={!!lock} label={`🏗️ ${buildLabel}`} onBuy={() => startConstruction(id, use)} />
         </>
       ) : (
         <div className="grid grid-cols-2 gap-2">
           <CostButton size="lg" cost={land} locked={!!lock} label={`📜 ${t("land.buy")}`} onBuy={() => buyLand(id)} />
-          <CostButton size="lg" variant="gold" cost={land + build} locked={!!lock} label={`🏗️ ${t("land.buyBuild")}`} onBuy={() => buildStructure(id, use)} />
+          <CostButton size="lg" variant="gold" cost={land + build} locked={!!lock} label={`🏗️ ${territory ? buildLabel : t("land.buyBuild")}`} onBuy={() => buildStructure(id, use)} />
         </div>
       )}
       {lock && <p className="px-1 text-center text-[11px] text-amber-300/90">🔒 {lockText}</p>}

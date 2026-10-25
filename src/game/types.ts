@@ -12,10 +12,37 @@ export type CarId =
   | "supercar"
   | "hypercar"
   | "electric"
-  | "autonomous";
+  | "autonomous"
+  // the lines of the map's landmark works (config/landmarks.ts): one in each territory
+  | "pickup"
+  | "minivan"
+  | "offroad"
+  | "estate"
+  | "hotHatch"
+  | "shuttle";
 
 /** Parts that plants make and the Car Assembly Plant puts together. */
-export type ComponentId = "body" | "engine" | "interior" | "suspension" | "glass" | "tires" | "paint" | "electronics" | "battery" | "software" | "transmission" | "wheels" | "brakes";
+export type ComponentId =
+  | "body"
+  | "engine"
+  | "interior"
+  | "suspension"
+  | "glass"
+  | "tires"
+  | "paint"
+  | "electronics"
+  | "battery"
+  | "software"
+  | "transmission"
+  | "wheels"
+  | "brakes"
+  // the landmark works' signature parts (config/landmarks.ts)
+  | "frame"
+  | "seats"
+  | "drive4x4"
+  | "coachwork"
+  | "rustproof"
+  | "lidar";
 /** What trucks carry: a component, a motorized chassis (body + engine) or a car. */
 export type ItemId = ComponentId | "car" | "chassis";
 
@@ -34,7 +61,14 @@ export type PlantType =
   | "electronicsFactory"
   | "batteryFactory"
   | "softwareStudio"
-  | "assemblyPlant";
+  | "assemblyPlant"
+  // the landmark works, one in each territory (config/landmarks.ts)
+  | "frameWorks"
+  | "familyWorks"
+  | "trailWorks"
+  | "coachWorks"
+  | "harbourWorks"
+  | "mobilityHub";
 
 export type DealerId = "local" | "city" | "premium" | "luxury" | "supercar" | "global";
 
@@ -621,6 +655,8 @@ export interface GameState {
   pass: import("./engine/pass").PassState;
   /** Rewarded ads (engine/ads.ts): today's count, the sales boost, the instant-build pause. */
   ads: import("./engine/ads").AdsState;
+  /** The landmark works (engine/landmarks.ts): leasing, the robotaxi fleet, first-car rewards paid, levels announced. */
+  landmarks: import("./engine/landmarks").LandmarksState;
   /** Bonuses on the Empire Map (engine/map-bonus.ts): the one on the map now, the wait for the next, today's count. */
   mapBonus: import("./engine/map-bonus").MapBonusState;
   /** The shop (engine/shop.ts): the free crate's timer and today's ad packs. */

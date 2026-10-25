@@ -28,7 +28,9 @@ describe("land plots", () => {
     for (const p of WORLD_MAP.plots.filter((pl) => pl.kind === "plot")) {
       expect(p.use, p.id).toBeDefined();
       expect(p.size, p.id).toBeDefined();
-      expect([...PLOT_USES[p.zone].cells, ...PLOT_USES[p.zone].big, "bodyWorks"]).toContain(p.use);
+      // a landmark works's lot is zoned for its territory's works (config/landmarks.ts)
+      if (p.territory) expect(PLANTS.find((x) => x.id === p.use)?.landmark, p.id).toBe(p.territory);
+      else expect([...PLOT_USES[p.zone].cells, ...PLOT_USES[p.zone].big, "bodyWorks"]).toContain(p.use);
     }
     expect(plotOf(STARTER_PLOT)!.use).toBe("bodyWorks");
     // every plant has somewhere to go, and the first ones are in the starting town

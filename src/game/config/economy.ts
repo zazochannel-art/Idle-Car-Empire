@@ -52,6 +52,12 @@ export const COMPONENT_RECIPE: Record<ComponentId, Partial<Record<MaterialId, nu
   transmission: { steel: 14, aluminum: 8, fluids: 3 },
   wheels: { aluminum: 16, steel: 3 },
   brakes: { steel: 10, copper: 2, plastic: 2 },
+  frame: { steel: 40, aluminum: 4 },
+  seats: { fabric: 18, leather: 4, plastic: 6 },
+  drive4x4: { steel: 16, aluminum: 10, fluids: 4 },
+  coachwork: { aluminum: 10, leather: 8, paint: 3 },
+  rustproof: { paint: 6, fluids: 4, copper: 2 },
+  lidar: { electronics: 16, glass: 4, copper: 4 },
 };
 
 /** Material per unit grows with the component grade (Standard … Carbon). */
@@ -72,6 +78,12 @@ export const COMPONENT_TIME: Record<ComponentId, number> = {
   transmission: 45,
   wheels: 30,
   brakes: 30,
+  frame: 40,
+  seats: 40,
+  drive4x4: 45,
+  coachwork: 50,
+  rustproof: 45,
+  lidar: 55,
 };
 
 /** Prices drift a little, slowly and predictably (no wild swings): ±amp over a period of minutes. */

@@ -1,4 +1,5 @@
 import type { CarId, ComponentId } from "../types";
+import type { TerritoryId } from "./city";
 
 export type CarClass = "economy" | "sport" | "premium" | "luxury" | "supercar" | "hypercar";
 export type BodyType = "hatchback" | "sedan" | "wagon" | "coupe" | "suv" | "supercar";
@@ -32,6 +33,11 @@ export interface CarConfig {
   design: number;
   /** Default name of the player's model on this platform. */
   modelName: string;
+  /**
+   * A landmark works' line (config/landmarks.ts): the territory whose works makes its part.
+   * An assembly plant builds it only when chosen (it is never picked on its own).
+   */
+  line?: TerritoryId;
 }
 
 export const CARS: CarConfig[] = [
@@ -44,7 +50,14 @@ export const CARS: CarConfig[] = [
   { id: "supercar", tier: 7, name: "Supercar", emoji: "🏁", grade: 4, extras: ["interior", "suspension", "glass", "paint", "electronics", "transmission", "wheels", "brakes"], markup: 2.45, time: 130, rp: 150, color: "#fb923c", tagline: "Carbon, noise and waiting lists.", class: "supercar", body: "coupe", engine: "4.0 Flat-6", hp: 520, comfort: 50, design: 88, modelName: "MC RS" },
   { id: "hypercar", tier: 8, name: "Hypercar", emoji: "💎", grade: 5, extras: ["interior", "suspension", "glass", "paint", "electronics", "transmission", "wheels", "brakes"], markup: 2.7, time: 150, rp: 400, color: "#facc15", tagline: "Limited run. Unlimited price.", class: "hypercar", body: "supercar", engine: "V8 Twin Turbo", hp: 800, comfort: 55, design: 95, modelName: "MC Hyper" },
   { id: "electric", tier: 9, name: "Electric Performance", emoji: "⚡", grade: 5, extras: ["interior", "suspension", "glass", "paint", "electronics", "battery", "transmission", "wheels", "brakes"], markup: 3, time: 140, rp: 1_000, requiresResearch: "electric_motors", color: "#a3e635", tagline: "Silent. Brutal. Expensive.", class: "hypercar", body: "coupe", engine: "Electric", hp: 1000, comfort: 72, design: 92, modelName: "MC E-Volt" },
+  // the landmark works' lines, one in each territory (config/landmarks.ts): each needs its works' part
+  { id: "pickup", tier: 2, name: "Workhorse Pickup", emoji: "🛻", grade: 1, extras: ["frame", "interior", "suspension", "transmission", "wheels", "brakes"], markup: 1.88, time: 70, rp: 3, line: "raw", color: "#a16207", tagline: "Built on a frame from our own steel works.", class: "economy", body: "suv", engine: "2.8 Diesel", hp: 190, comfort: 52, design: 58, modelName: "MC Workhorse" },
+  { id: "minivan", tier: 3, name: "Family Minivan", emoji: "🚐", grade: 2, extras: ["seats", "interior", "suspension", "glass", "transmission", "wheels", "brakes"], markup: 1.86, time: 80, rp: 6, line: "suburbs", color: "#0ea5e9", tagline: "Seven seats that fold flat in one move.", class: "premium", body: "wagon", engine: "2.0 Hybrid", hp: 180, comfort: 82, design: 60, modelName: "MC Familia" },
+  { id: "offroad", tier: 4, name: "Trail 4x4", emoji: "🏔️", grade: 2, extras: ["drive4x4", "interior", "suspension", "glass", "paint", "transmission", "wheels", "brakes"], markup: 2.02, time: 95, rp: 14, line: "mountain", color: "#65a30d", tagline: "Locking differentials, real low range, no excuses.", class: "premium", body: "suv", engine: "3.0 Twin Turbo", hp: 340, comfort: 66, design: 72, modelName: "MC Summit" },
+  { id: "estate", tier: 6, name: "Shooting Brake", emoji: "🧳", grade: 3, extras: ["coachwork", "interior", "suspension", "glass", "paint", "electronics", "transmission", "wheels", "brakes"], markup: 2.3, time: 115, rp: 70, line: "boulevard", color: "#b45309", tagline: "A coupé's lines, a hound's boot, a coachbuilder's hands.", class: "luxury", body: "wagon", engine: "V12", hp: 560, comfort: 88, design: 90, modelName: "MC Royale" },
+  { id: "hotHatch", tier: 7, name: "Export Hot Hatch", emoji: "🚤", grade: 4, extras: ["rustproof", "interior", "suspension", "glass", "paint", "electronics", "transmission", "wheels", "brakes"], markup: 3.1, time: 125, rp: 160, line: "port", color: "#0f766e", tagline: "Sealed against salt air and sold on every coast.", class: "supercar", body: "hatchback", engine: "2.0 Turbo Rally", hp: 420, comfort: 60, design: 84, modelName: "MC Harbour R" },
   { id: "autonomous", tier: 10, name: "Autonomous Lounge", emoji: "🤖", grade: 5, extras: ["interior", "suspension", "glass", "paint", "electronics", "battery", "software", "transmission", "wheels", "brakes"], markup: 3.2, time: 150, rp: 2_500, requiresResearch: "self_driving", color: "#2dd4bf", tagline: "No wheel, no driver, no traffic jam it can't work through.", class: "luxury", body: "sedan", engine: "Dual Electric", hp: 650, comfort: 96, design: 90, modelName: "MC Pilot" },
+  { id: "shuttle", tier: 10, name: "Robotaxi Shuttle", emoji: "🚕", grade: 5, extras: ["lidar", "interior", "suspension", "glass", "paint", "electronics", "battery", "software", "transmission", "wheels", "brakes"], markup: 3.45, time: 155, rp: 2_800, requiresResearch: "self_driving", line: "airport", color: "#7c3aed", tagline: "Eight seats, no driver, a city's worth of rides.", class: "luxury", body: "sedan", engine: "Quad Electric", hp: 500, comfort: 94, design: 86, modelName: "MC Skyline" },
 ];
 
 export const CAR_BY_ID: Record<CarId, CarConfig> = Object.fromEntries(CARS.map((c) => [c.id, c])) as Record<CarId, CarConfig>;

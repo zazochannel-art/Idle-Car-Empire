@@ -336,12 +336,14 @@ export class MapEngine {
     this.areaSize = [cv.width, cv.height];
 
     const ground = new Ground(data, heights);
+    // the landmark works' lots came after the map: their ground is levelled here
+    ground.level(WORLD_MAP.plots.filter((p) => p.territory));
     this.ground = ground;
     this.ty = ground.at(this.cam.x, this.cam.z);
     this.mats = mapMaterials(aniso);
     this.terrain = buildTerrain(ground, tiles);
     this.scene.add(...this.terrain.tiles, this.terrain.sea, this.terrain.floor);
-    this.scenery = new Scenery(data, ground, this.mats, { low: this.low, lots: WORLD_MAP.plots.map((p) => ({ x: p.x, y: p.y, w: p.w, d: p.d, rot: p.rot })) });
+    this.scenery = new Scenery(data, ground, this.mats, { low: this.low, lots: WORLD_MAP.plots.map((p) => ({ x: p.x, y: p.y, w: p.w, d: p.d, rot: p.rot, clear: !!p.territory })) });
     this.scene.add(this.scenery.root);
     this.scenery.setClose(this.cam.dist < CLOSE_VIEW);
     const roads = buildRoads(data, ground, this.scenery.roads, aniso);

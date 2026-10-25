@@ -1,4 +1,5 @@
 // Hall styles and limited editions (see config/collection.ts).
+import { editionsSooner } from "./landmarks";
 import { EDITION, EDITION_BY_ID, EDITIONS, SKIN_BY_ID, type EditionConfig, type SkinId } from "../config/collection";
 import type { CarId, GameState } from "../types";
 
@@ -53,7 +54,8 @@ export function editionTick(s: GameState, built: CarId | null, now: number): Edi
   const next = EDITIONS.find((x) => !e.got.some((g) => g.id === x.id));
   if (!next) return null;
   e.got.push({ id: next.id, car: built, at: now });
-  e.nextAt = t + EDITION.every + hash01(`edition:${e.got.length}`) * EDITION.spread;
+  // the boulevard's coachworks (a landmark works) brings the next one sooner
+  e.nextAt = t + (EDITION.every + hash01(`edition:${e.got.length}`) * EDITION.spread) * (1 - editionsSooner(s));
   return next;
 }
 

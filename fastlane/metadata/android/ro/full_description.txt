@@ -3,13 +3,13 @@ Pornește de la un mic atelier și construiește-ți propriul imperiu auto.
 Idle Car Empire este un joc tycoon despre fabricarea mașinilor de la zero. Construiește fabrici de caroserii și de motoare, uzine de anvelope, sticlă, vopsea, interioare, electronică și baterii, plus o linie de asamblare care transformă piesele lor în mașini gata de drum. Camioanele duc fiecare piesă printr-un oraș 3D plin de viață. Vinde mașinile prin dealerii tăi și vezi cum vin banii, chiar și când nu joci.
 
 CONSTRUIEȘTE ÎNTREG LANȚUL DE PRODUCȚIE
-• 14 tipuri de fabrici, fiecare o alimentează pe următoarea
+• 20 de tipuri de fabrici, fiecare o alimentează pe următoarea, și câte o uzină veche de restaurat în fiecare zonă a hărții
 • Cumpără teren, ridică clădiri și îmbunătățește fiecare fabrică pe 15 niveluri
 • Intră în fabrici: mașini, muncitori și linii de asamblare la lucru
 • Camioane, transportoare auto și îmbunătățiri logistice țin piesele în mișcare
 
 PROIECTEAZĂ ȘI VINDE MAȘINI
-• 10 modele, de la mașini de oraș la supercaruri, hypercaruri, electrice și autonome
+• 16 modele, de la mașini de oraș, pickupuri, monovolume și 4x4 la supercaruri, hypercaruri, electrice și autonome
 • Vopsește-le și modifică-le în garaj
 • Dealeri cu cerere reală, evenimente de piață, comenzi VIP și contracte cu clienți
 

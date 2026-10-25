@@ -458,6 +458,7 @@ export function MenuPanel({ onSettings }: { onSettings: () => void }) {
     { icon: "📊", label: t("nav.economy"), go: () => setView("economy"), gold: true },
     { icon: "🏁", label: t("nav.racing"), go: () => setView("racing"), gold: true },
     { icon: "👑", label: t("imperium.title"), go: () => setView("imperium"), gold: true },
+    { icon: "🏗️", label: t("nav.landmarks"), go: () => setView("landmarks"), gold: true },
     ...(winter !== null ? [{ icon: "🎄", label: t("nav.winter"), go: () => setView("winter"), gold: true, badge: winter }] : []),
     ...(festival ? [{ icon: SEASON_ICON[festival], label: t(`festival.${festival}`), go: () => setView("festival"), gold: true, badge: festivalBadge }] : []),
     { icon: "🎟️", label: t("nav.pass"), go: () => setView("pass"), gold: true, badge: pass },

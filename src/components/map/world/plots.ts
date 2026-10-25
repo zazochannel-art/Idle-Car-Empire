@@ -11,7 +11,7 @@ import type { PlotStatus } from "@/game/engine/construction";
 import { chargerLevel } from "@/game/engine/ev";
 import type { DealerId, GameState, StructureType } from "@/game/types";
 import type { MapNames } from "../map-types";
-import { dealerModel, depotModel, emptyDealerModel, garageModel, lotMarker, lotOutline, marketModel, paddockModel, plantModel, siteModel, structureModel, worksModel, type SiteModel } from "./structures";
+import { ruinModel, dealerModel, depotModel, emptyDealerModel, garageModel, lotMarker, lotOutline, marketModel, paddockModel, plantModel, siteModel, structureModel, worksModel, type SiteModel } from "./structures";
 import type { Ground } from "./terrain";
 
 export type PlotLook =
@@ -77,6 +77,8 @@ function model(look: PlotLook, plot: Plot, seed: number): THREE.Object3D | null 
   const { w: W, d: D } = plot;
   switch (look.kind) {
     case "empty":
+      // a landmark works' lot: the old works, waiting to be restored
+      return plot.territory && plot.use && isPlantType(plot.use) ? ruinModel(W, D, PLANT_BY_ID[plot.use].roof) : null;
     case "site":
       return null;
     case "market":

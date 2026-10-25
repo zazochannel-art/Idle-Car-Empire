@@ -10,6 +10,7 @@ import { migrateEv } from "../engine/ev";
 import { migratePass } from "../engine/pass";
 import { migrateAds } from "../engine/ads";
 import { migrateMapBonus } from "../engine/map-bonus";
+import { migrateLandmarks } from "../engine/landmarks";
 import { migrateIap } from "../engine/iap";
 import { migrateShop } from "../engine/shop";
 import { migrateCity, unlockOwnedZones } from "../engine/city";
@@ -135,6 +136,7 @@ export function migrate(raw: unknown, now: number): GameState {
   state.pass = migratePass(raw.pass);
   state.ads = migrateAds(state.ads, now);
   state.mapBonus = migrateMapBonus(state.mapBonus);
+  state.landmarks = migrateLandmarks(raw.landmarks);
   state.shop = migrateShop(state.shop, now);
   state.iap = migrateIap(raw.iap);
   migrateLive(raw, state);

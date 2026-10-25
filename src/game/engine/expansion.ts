@@ -1,6 +1,7 @@
 // Prototype development, export overseas, the truck & bus division and star
 // engineers (config/expansion.ts). Real time (`now`, ms) drives the slow
 // parts; the chain tick runs the export ships and the division's line.
+import { exportBonus } from "./landmarks";
 import { CAR_BY_ID, type CarClass } from "../config/cars";
 import { COMPONENT_BY_ID } from "../config/chain";
 import { RIVAL_TEAMS } from "../config/racing";
@@ -205,7 +206,8 @@ export function exportTick(s: GameState, dt: number): number {
       continue;
     }
     const each = sh.value / Math.max(1, sh.cars.length);
-    const price = sh.cars.reduce((a, c) => a + each * exportMult(sh.market, c), 0);
+    // buyers overseas pay more once the port's works stands (a landmark works)
+    const price = sh.cars.reduce((a, c) => a + each * exportMult(sh.market, c), 0) * exportBonus(s);
     const duty = price * EXPORT_BY_ID[sh.market].duty;
     credit(s, price, "carSales");
     s.cash -= duty;

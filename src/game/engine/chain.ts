@@ -98,6 +98,7 @@ import { EXPORT_BY_ID, type ExportMarketId } from "../config/expansion";
 import { designStats } from "./design";
 import { logisticsMods } from "./logistics";
 import { deliverySlowdown } from "./map-bonus";
+import { landmarkSale, landmarkTick, localValueMult } from "./landmarks";
 import { starMods } from "./imperium";
 import { managerMult, type GlobalMods } from "./modifiers";
 import { floorPace, floorTick, MORALE } from "./floor";
@@ -443,7 +444,8 @@ export function carPartsValue(car: CarConfig): number {
 
 /** Sale value of one car before dealer markup (bonuses widen its margin). */
 export function carValue(s: GameState, car: CarConfig, gm: GlobalMods, extra = 1): number {
-  return carListPrice(car, recipe(car), carMarginMult(s, car, gm) * modelStats(s, car).valueMult * protoValueMult(s, car.id) * extra);
+  // a landmark works' line sells for more to its territory's buyers
+  return carListPrice(car, recipe(car), carMarginMult(s, car, gm) * modelStats(s, car).valueMult * protoValueMult(s, car.id) * extra) * localValueMult(s, car);
 }
 
 /** Sale value before the Design studio options (what R&D prices are based on). */
@@ -549,7 +551,8 @@ export function activeCar(s: GameState, p: PlantData, cars: CarConfig[]): CarCon
     const chosen = cars.find((c) => c.id === p.car);
     if (chosen) return chosen;
   }
-  return cars[cars.length - 1] ?? null;
+  // a landmark works' line only when chosen: a plant never switches to one on its own
+  return [...cars].reverse().find((c) => !c.line) ?? cars[cars.length - 1] ?? null;
 }
 
 export function plantStats(s: GameState, plotId: string, gm: GlobalMods, cars: CarConfig[]): PlantStats | null {
@@ -1059,6 +1062,8 @@ export function chainTick(
 
   // 4b. ships to the export markets, and the truck & bus division's line
   out.earned += exportTick(s, dt);
+  // rent from leased minivans and rides of the robotaxi fleet (the landmark works)
+  out.earned += landmarkTick(s, dt, credit);
   out.earned += fleetTick(s, dt, offline ? snap.plants[Object.keys(snap.plants)[0]]?.offline ?? 0.5 : 1);
 
   // 5. customers at the dealerships
@@ -1085,6 +1090,8 @@ export function chainTick(
       s.lifetime.carRevenue += price;
       earn(price);
       book(s, "carSales", price);
+      // a minivan starts a lease, a shuttle joins the robotaxi fleet (the landmark works)
+      landmarkSale(s, model, price);
       // the dealer keeps its fee and the state its tax
       const fee = price * DEALER_FEE;
       const tax = price * SALES_TAX;

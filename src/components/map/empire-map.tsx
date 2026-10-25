@@ -32,6 +32,7 @@ import { Minimap } from "./minimap";
 import { plantName } from "../panels/plant-panel";
 import type { MapArea, MapNames, ShipView, Site } from "./map-types";
 import { CAR_MODEL_FOR } from "./vehicles";
+import { LANDMARK_BY_TERRITORY } from "@/game/config/landmarks";
 import { cityLife, cityLifeKey } from "./world/city-life";
 
 /** Changes only when something visible on the map changes (not every tick). */
@@ -545,8 +546,11 @@ function TerritoryInfo({ id }: { id: TerritoryId }) {
   const state = useGame((g) => g.state);
   const lock = territoryLock(state, id);
   const unlock = useGame((g) => g.unlockTerritory);
-  const { t } = useT();
+  const { t, lang } = useT();
+  const n = useContent(lang);
   const cfg = TERRITORY_BY_ID[id];
+  // the old works waiting there, and the car line it opens
+  const works = LANDMARK_BY_TERRITORY[id];
   const can = !lock && state.cash >= cfg.cost;
   const why =
     lock?.kind === "zone"
@@ -560,6 +564,11 @@ function TerritoryInfo({ id }: { id: TerritoryId }) {
         {cfg.emoji} {t(`territory.${id}`)}
       </div>
       <div className="mt-0.5 text-[10px] leading-snug text-white/55">{t(`territoryDesc.${id}`)}</div>
+      {works && (
+        <div className="mt-1 rounded-md bg-emerald-500/10 px-1.5 py-1 text-[10px] font-semibold leading-snug text-emerald-200/90">
+          🏗️ {t("landmark.here", { works: t(`structure.${works.works}`), car: `${CAR_BY_ID[works.car].emoji} ${n.car(CAR_BY_ID[works.car])}` })}
+        </div>
+      )}
       <button onClick={() => can && unlock(id)} disabled={!can} className={unlockBtn(can)}>
         🔓 {t("map.unlock")} · {formatMoney(cfg.cost)}
       </button>

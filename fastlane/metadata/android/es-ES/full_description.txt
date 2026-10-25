@@ -3,13 +3,13 @@ Empieza con un pequeño taller y construye tu propio imperio del automóvil.
 Idle Car Empire es un juego de magnate sobre fabricar coches desde cero. Construye fábricas de carrocerías, de motores, de neumáticos, de vidrio, de pintura, de interiores, de electrónica y de baterías, y una línea de montaje que convierte sus piezas en coches terminados. Los camiones llevan cada pieza por una ciudad 3D llena de vida. Vende los coches en tus concesionarios y mira cómo entra el dinero, incluso cuando no estás.
 
 CONSTRUYE TODA LA CADENA DE SUMINISTRO
-• 14 tipos de fábricas, cada una abastece a la siguiente
+• 20 tipos de fábricas, cada una abastece a la siguiente, y una fábrica antigua que restaurar en cada zona del mapa
 • Compra terreno, levanta edificios y mejora cada planta hasta 15 niveles
 • Entra en tus fábricas: máquinas, trabajadores y líneas de montaje en acción
 • Camiones, portacoches y mejoras de logística mantienen las piezas en movimiento
 
 DISEÑA Y VENDE TUS COCHES
-• 10 modelos de coche, de urbanos a superdeportivos, hiperdeportivos, eléctricos y autónomos
+• 16 modelos de coche, de urbanos, pickups, monovolúmenes y 4x4 a superdeportivos, hiperdeportivos, eléctricos y autónomos
 • Píntalos y modifícalos en el garaje
 • Concesionarios con demanda real, eventos de mercado, pedidos VIP y contratos de clientes
 

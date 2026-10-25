@@ -10,6 +10,7 @@
 // one unit is about 10 m. Pure data — shared by the engine (plot rules,
 // delivery times) and the renderer.
 import DATA from "./world-data.json";
+import { LANDMARK_LOTS } from "./landmark-lots";
 import { PLOT_USES, ZONES, plotSizeOf, type PlotSize, type TerritoryId } from "../config/city";
 import type { DealerId, StructureType, ZoneId } from "../types";
 
@@ -57,6 +58,8 @@ export interface Plot {
   size?: PlotSize;
   /** Order in which plots are offered: earlier districts first, nearest first. */
   rank?: number;
+  /** A landmark works' lot: the territory that must be open first (config/landmarks.ts). */
+  territory?: TerritoryId;
   entry: Entry;
 }
 
@@ -210,6 +213,13 @@ function build(): World {
       else if (p.big) p.use = uses.big[bi++ % uses.big.length];
       else p.use = uses.cells[ci++ % uses.cells.length];
     }
+  }
+
+  // the landmark works: one lot in each territory, zoned for its works
+  for (const l of LANDMARK_LOTS) {
+    const road = roads[l.edge];
+    const at = along(road.pts, road.acc, l.s);
+    plots.push({ id: l.id, zone: l.zone, kind: "plot", x: l.x, y: l.y, w: l.w, d: l.d, rot: l.rot, h: l.h, territory: l.territory, use: l.use, size: "large", rank: rank++, entry: { edge: l.edge, s: Math.min(l.s, road.len), x: at.x, y: at.y, drive: l.drive } });
   }
 
   const plotById = Object.fromEntries(plots.map((p) => [p.id, p]));

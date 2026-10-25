@@ -2,6 +2,7 @@
 // what it sells for, and how plants grow. All balance numbers live here;
 // engine/chain.ts runs them.
 import type { ComponentId, PlantType, Vehicle } from "../types";
+import type { TerritoryId } from "./city";
 
 export interface ComponentConfig {
   id: ComponentId;
@@ -26,6 +27,13 @@ export const COMPONENTS: ComponentConfig[] = [
   { id: "transmission", emoji: "🕹️", value: 4_000, color: "#64748b" },
   { id: "wheels", emoji: "⭕", value: 5_000, color: "#cbd5e1" },
   { id: "brakes", emoji: "🛑", value: 3_000, color: "#dc2626" },
+  // the signature parts of the landmark works, one in each territory (config/landmarks.ts)
+  { id: "frame", emoji: "🏗️", value: 8_000, color: "#78716c" },
+  { id: "seats", emoji: "🪑", value: 45_000, color: "#0ea5e9" },
+  { id: "drive4x4", emoji: "🧭", value: 200_000, color: "#65a30d" },
+  { id: "coachwork", emoji: "✂️", value: 900_000, color: "#b45309" },
+  { id: "rustproof", emoji: "🛡️", value: 3_000_000, color: "#0f766e" },
+  { id: "lidar", emoji: "📡", value: 6_000_000, color: "#7c3aed" },
 ];
 
 export const COMPONENT_BY_ID = Object.fromEntries(COMPONENTS.map((c) => [c.id, c])) as Record<ComponentId, ComponentConfig>;
@@ -82,6 +90,8 @@ export interface PlantConfig {
   research?: string;
   /** A production milestone needed first (lifetime units of a component). */
   unlockMade?: { item: ComponentId; n: number };
+  /** A landmark works: the territory whose one lot it stands on (config/landmarks.ts). */
+  landmark?: TerritoryId;
   color: string;
   roof: string;
 }
@@ -106,6 +116,14 @@ export const PLANTS: PlantConfig[] = [
   { id: "transmissionFactory", emoji: "🕹️", item: "transmission", raw: "alloy", rawPer: 10, time: 45, cost: 250_000, requires: "suspensionFactory", color: "#e2e8f0", roof: "#475569" },
   { id: "wheelFactory", emoji: "⭕", item: "wheels", raw: "alloy", rawPer: 10, time: 30, cost: 300_000, requires: "transmissionFactory", color: "#f1f5f9", roof: "#94a3b8" },
   { id: "brakeFactory", emoji: "🛑", item: "brakes", raw: "metal", rawPer: 10, time: 30, cost: 450_000, requires: "wheelFactory", color: "#fee2e2", roof: "#b91c1c" },
+  // the landmark works: one in each territory, an old works to restore on its own lot, making the
+  // part its territory's car line needs (config/landmarks.ts)
+  { id: "frameWorks", emoji: "🏗️", item: "frame", raw: "steel", rawPer: 10, time: 35, cost: 120_000, requires: "assemblyPlant", landmark: "raw", color: "#d6d3d1", roof: "#57534e" },
+  { id: "familyWorks", emoji: "🪑", item: "seats", raw: "fabric", rawPer: 10, time: 40, cost: 1_200_000, requires: "interiorFactory", landmark: "suburbs", color: "#e0f2fe", roof: "#0369a1" },
+  { id: "trailWorks", emoji: "🧭", item: "drive4x4", raw: "alloy", rawPer: 10, time: 45, cost: 5_000_000, requires: "suspensionFactory", landmark: "mountain", color: "#ecfccb", roof: "#3f6212" },
+  { id: "coachWorks", emoji: "✂️", item: "coachwork", raw: "leather", rawPer: 10, time: 50, cost: 25_000_000, requires: "paintFactory", landmark: "boulevard", color: "#fef3c7", roof: "#92400e" },
+  { id: "harbourWorks", emoji: "🛡️", item: "rustproof", raw: "pigment", rawPer: 10, time: 50, cost: 60_000_000, requires: "electronicsFactory", landmark: "port", color: "#ccfbf1", roof: "#115e59" },
+  { id: "mobilityHub", emoji: "📡", item: "lidar", raw: "chips", rawPer: 10, time: 55, cost: 250_000_000, requires: "softwareStudio", landmark: "airport", color: "#ede9fe", roof: "#5b21b6" },
 ];
 
 export const PLANT_BY_ID = Object.fromEntries(PLANTS.map((p) => [p.id, p])) as Record<PlantType, PlantConfig>;

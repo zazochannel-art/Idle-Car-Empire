@@ -108,8 +108,8 @@ export interface Animated {
 export interface SceneryOptions {
   /** Phones: thinner forests in the new regions, fewer shadows. */
   low: boolean;
-  /** Skip parked cars and scenery standing on these lots (world rectangles). */
-  lots?: { x: number; y: number; w: number; d: number; rot: number }[];
+  /** Skip parked cars and scenery standing on these lots (world rectangles); `clear`: the buildings on it too (lots placed after the map was made). */
+  lots?: { x: number; y: number; w: number; d: number; rot: number; clear?: boolean }[];
 }
 
 /** A container ship (length along x, about 3.6 × 1 units), as merged parts. */
@@ -305,6 +305,8 @@ export class Scenery {
     const g = this.ground;
     const trucks: [number, number, number][] = [];
     for (const b of this.data.cladiri) {
+      // a landmark works stands here now
+      if (this.cleared(b)) continue;
       const tile = this.tileOf(b.x, b.z);
       const put = (mat: FacadeKind | "plain" | "metal" | "roof", geo: THREE.BufferGeometry | null) => {
         if (geo) (B[`${tile}|${mat}`] ||= []).push(geo);
@@ -890,6 +892,18 @@ export class Scenery {
       const dx = x - l.x, dz = z - l.y, c = Math.cos(l.rot), s = Math.sin(l.rot);
       const u = dx * c - dz * s, v = dx * s + dz * c;
       if (Math.abs(u) < l.w / 2 + margin && Math.abs(v) < l.d / 2 + margin * 3) return true;
+    }
+    return false;
+  }
+
+  /** A building standing (partly) on a lot that clears its ground. */
+  private cleared(b: Building) {
+    for (const l of this.opt.lots ?? []) {
+      if (!l.clear) continue;
+      const c = Math.cos(l.rot), s = Math.sin(l.rot);
+      const dx = b.x - l.x, dz = b.z - l.y;
+      const u = Math.abs(dx * c - dz * s), v = Math.abs(dx * s + dz * c);
+      if (u < l.w / 2 + Math.max(b.w, b.d) / 2 + 0.3 && v < l.d / 2 + Math.max(b.w, b.d) / 2 + 0.3) return true;
     }
     return false;
   }

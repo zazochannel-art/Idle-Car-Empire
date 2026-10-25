@@ -4,6 +4,7 @@
 // trophies. Races are decided here, deterministically, lap by lap; the map
 // and the race viewer only replay the lap times. Prizes go back into the
 // empire; better plants make faster cars. All numbers: config/racing.ts.
+import { raceMult } from "./landmarks";
 import { addSeasonPoints } from "./live";
 import { CAR_BY_ID, CARS, type CarConfig } from "../config/cars";
 import { MAKER } from "../config/chain";
@@ -619,7 +620,8 @@ export function settleRace(s: GameState, rec: RaceRecord, seed = rec.id): RaceRe
   const R = s.racing;
   const ev = RACE_EVENT_BY_ID[rec.event];
   const special = rec.special ? SPECIAL_EVENTS.find((e) => e.id === rec.special) : undefined;
-  const mult = special?.mult ?? 1;
+  // the mountain's test hill (a landmark works) adds to prizes and reputation
+  const mult = (special?.mult ?? 1) * raceMult(s);
   const pos = rec.order.indexOf("player");
   const champ = ev.type === "championship";
   const prize = ev.prize * (champ ? ROUND_PRIZE : 1) * (PRIZE_SHARE[pos] ?? 0) * mult;

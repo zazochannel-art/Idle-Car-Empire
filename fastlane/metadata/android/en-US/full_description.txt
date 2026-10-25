@@ -3,13 +3,13 @@ Start with one small workshop and build a car empire of your own.
 Idle Car Empire is a tycoon game about making cars from the ground up. Build body works, engine factories, tire, glass, paint, interior, electronics and battery plants, and an assembly line that turns their parts into finished cars. Trucks carry every part across a living 3D city. Sell the cars through your dealers and watch the money roll in, even while you're away.
 
 BUILD THE WHOLE SUPPLY CHAIN
-• 14 kinds of factories, each one feeding the next
+• 20 kinds of factories, each one feeding the next, and an old landmark works to restore in every territory of the map
 • Buy land, construct buildings and upgrade every plant through 15 levels
 • Step inside your factories: machines, workers and assembly lines at work
 • Trucks, car transporters and logistics upgrades keep the parts flowing
 
 DESIGN AND SELL YOUR CARS
-• 10 car models, from city cars to supercars, hypercars, electric and self-driving cars
+• 16 car models, from city cars, pickups, minivans and 4x4s to supercars, hypercars, electric and self-driving cars
 • Paint and tune them in the garage
 • Dealers with real demand, market events, VIP orders and client contracts
 

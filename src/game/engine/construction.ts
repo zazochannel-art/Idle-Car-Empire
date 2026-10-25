@@ -21,10 +21,12 @@ import { WORLD_MAP, plotOf } from "../city/layout";
 import type { BuildingState, GameEvent, GameState, StructureType, ZoneId } from "../types";
 import { newPlant, plantLock, type PlantLock } from "./chain";
 import { builtInZone, isZoneUnlocked, newGarage, structureCost } from "./city";
+import { isTerritoryOpen } from "./territory";
+import type { TerritoryId } from "../config/city";
 
 export type PlotStatus = "locked" | "available" | "owned" | "construction" | "operational";
 
-export type LandLock = { kind: "zone"; zone: ZoneId } | { kind: "chain"; lock: NonNullable<PlantLock> } | { kind: "onePerZone" } | null;
+export type LandLock = { kind: "zone"; zone: ZoneId } | { kind: "territory"; territory: TerritoryId } | { kind: "chain"; lock: NonNullable<PlantLock> } | { kind: "onePerZone" } | null;
 
 /** The phases a construction goes through (share of the time at which each starts). */
 export const PHASES = [
@@ -78,6 +80,7 @@ export function landLock(s: GameState, plotId: string, type?: StructureType): La
   const use = buildTypeFor(plotId, type);
   if (!plot || !use) return null;
   if (!isZoneUnlocked(s, plot.zone)) return { kind: "zone", zone: plot.zone };
+  if (plot.territory && !isTerritoryOpen(s, plot.territory)) return { kind: "territory", territory: plot.territory };
   if (isPlantType(use)) {
     const lock = plantLock(s, use);
     if (lock) return { kind: "chain", lock };

@@ -56,6 +56,13 @@ export const PLANT_THEMES: Record<string, PlantTheme> = {
   transmissionFactory: { floor: "#98a0a8", bay: ["#97a0a9", "#838c96"], walkway: "rgba(34,197,94,0.3)", stains: ["rgba(30,34,40,0.11)", "rgba(80,60,30,0.07)"], stainCount: 30, decor: ["bar", "block"] },
   wheelFactory: { floor: "#a5a8ab", bay: ["#a3a8ad", "#8f959b"], walkway: "rgba(34,197,94,0.3)", stains: OIL, stainCount: 22, haze: "rgba(255,170,90,0.03)", decor: ["casting", "tire"] },
   brakeFactory: { floor: "#8f9296", bay: ["#8e9297", "#7b8086"], walkway: "rgba(239,68,68,0.22)", stains: ["rgba(90,60,40,0.1)", "rgba(40,40,44,0.1)"], stainCount: 34, haze: "rgba(120,80,60,0.04)", decor: ["casting", "arm"] },
+  // the landmark works (config/landmarks.ts)
+  frameWorks: { floor: "#8a8d90", bay: ["#8b8f94", "#777c82"], walkway: "rgba(120,113,108,0.25)", stains: ["rgba(60,50,40,0.12)", "rgba(40,40,44,0.1)"], stainCount: 38, haze: "rgba(120,100,80,0.05)", decor: ["frame", "arm"] },
+  familyWorks: { floor: "#b9c2c9", bay: ["#c3ccd3", "#aeb8c1"], walkway: "rgba(14,165,233,0.2)", stains: ["rgba(90,80,70,0.06)", "rgba(40,40,44,0.05)"], stainCount: 14, haze: "rgba(200,220,235,0.04)", decor: ["seat", "cover"] },
+  trailWorks: { floor: "#8c9184", bay: ["#8f957f", "#7a8070"], walkway: "rgba(101,163,13,0.22)", stains: ["rgba(90,70,40,0.12)", "rgba(40,40,44,0.1)"], stainCount: 36, haze: "rgba(120,110,80,0.05)", decor: ["block", "casting"] },
+  coachWorks: { floor: "#a99b87", bay: ["#b3a58f", "#9c8e79"], walkway: "rgba(180,83,9,0.2)", stains: ["rgba(90,60,30,0.06)", "rgba(40,40,44,0.05)"], stainCount: 12, haze: "rgba(230,200,160,0.04)", decor: ["panel", "cover"] },
+  harbourWorks: { floor: "#8fa3a0", bay: ["#94aaa6", "#7f9591"], walkway: "rgba(15,118,110,0.22)", stains: ["rgba(40,80,70,0.1)", "rgba(40,40,44,0.08)"], stainCount: 30, haze: "rgba(160,200,195,0.05)", decor: ["can", "strut"] },
+  mobilityHub: { floor: "#c6c3d6", bay: ["#ccc8de", "#b6b1cc"], walkway: "rgba(124,58,237,0.2)", stains: ["rgba(60,50,90,0.05)", "rgba(40,40,44,0.04)"], stainCount: 8, haze: "rgba(210,200,240,0.04)", decor: ["module", "pcb"] },
   assemblyPlant: { floor: "#a7adb3", bay: ["#a1aab3", "#8d969f"], walkway: "rgba(34,197,94,0.3)", stains: OIL, stainCount: 16, decor: ["tire", "engine"] },
 };
 

@@ -99,7 +99,20 @@ npm run ios:open        # Xcode (on a Mac)
    warehouse at once (speed, load, loading time, storage, extra trucks) and
    climbs the transport ladder Trucks → Rail → Port → Export: faster, bigger
    loads, then higher prices abroad for parts and cars.
-9. **Grow the empire.** You can also:
+9. **Landmark works.** Every territory of the map has an old works on its
+   own lot (`config/landmarks.ts`, the lots in `city/landmark-lots.ts`).
+   Open the territory, restore the works, and it makes the part its car line
+   needs: the Workhorse Pickup (Raw Materials, ladder frames), the Family
+   Minivan (Suburbs, modular seats), the Trail 4x4 (Mountain, 4x4
+   drivetrains), the Shooting Brake (Boulevard, coachwork), the Export Hot
+   Hatch (Port, rustproofing) and the Robotaxi Shuttle (Airport, lidar). An
+   assembly plant builds a line car only when it is chosen. The first car of a
+   line pays ten minutes of income and a ⭐ Star; the cars built raise the
+   territory to level 5, each level adding 6% to what the line sells for and
+   to the territory's specialty: cheaper materials, leasing (rent from every
+   minivan sold), race prizes, limited editions sooner, export prices, and a
+   robotaxi fleet earning rides. The **Works** screen shows the steps.
+10. **Grow the empire.** You can also:
    - unlock districts for more plots;
    - hire **managers** (one per plant);
    - **research** with points from every part and car;

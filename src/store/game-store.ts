@@ -76,6 +76,8 @@ import * as Wt from "@/game/engine/winter";
 import * as Fe from "@/game/engine/festival";
 import * as Ps from "@/game/engine/pass";
 import * as Mb from "@/game/engine/map-bonus";
+import * as Lm from "@/game/engine/landmarks";
+import { LANDMARK_BY_TERRITORY } from "@/game/config/landmarks";
 import { RACING } from "@/game/city/layout";
 import { MAP_BONUS_BY_KIND, type MapBonusKind } from "@/game/config/map-bonus";
 import { funnelDue, funnelMinutes } from "@/game/engine/funnel";
@@ -484,6 +486,18 @@ export const useGame = create<GameStore>((set, get) => {
     // the bonuses on the Empire Map come and go only while the map is on screen
     const ui = useUi.getState();
     if (!ui.garage && !ui.floor && !ui.race && !ui.visit) Mb.mapBonusTick(next, dt, now);
+    // the landmark works: the first car of a territory's line, and its levels
+    const lm = Lm.landmarkNews(next);
+    for (const f of lm.firstCar) {
+      const car = CAR_BY_ID[f.car];
+      uiEvents.emit({ type: "toast", tone: "gold", icon: car.emoji, title: tr("landmark.firstCarToast", { car: names().car(car) }), body: tr("landmark.firstCarBody", { money: formatMoney(f.cash), stars: f.stars }), action: { label: tr("toast.open"), view: "landmarks" } });
+      uiEvents.emit({ type: "fireworks", plot: `w:${f.territory}`, big: true });
+    }
+    for (const u of lm.levelUp) {
+      const works = LANDMARK_BY_TERRITORY[u.territory]!.works;
+      uiEvents.emit({ type: "toast", tone: "gold", icon: "🏗️", title: tr("landmark.levelToast", { works: tr(`structure.${works}`), n: u.level }), body: tr("landmark.levelToastBody"), action: { label: tr("toast.open"), view: "landmarks" } });
+      uiEvents.emit({ type: "fireworks", plot: `w:${u.territory}` });
+    }
     const fo = Ex.fleetOrderTick(next, now);
     if (fo === "offer") uiEvents.emit({ type: "toast", tone: "info", icon: "🚌", title: tr("fleet.offerToast") });
     else if (fo === "failed") uiEvents.emit({ type: "toast", tone: "warn", icon: "⌛", title: tr("fleet.failed") });
