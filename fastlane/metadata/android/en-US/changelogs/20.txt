@@ -1,1 +1,7 @@
-First release of Idle Car Empire: build factories, run the car supply chain, race, and grow your empire, online or offline.
+What's new in 1.0.5:
+• Landmark works: restore an old works in each area of the map and build its own car line
+• Stock market: sell part of your company for cash now, buy it back later
+• Maintenance crew: fewer breakdowns, quicker repairs
+• Notifications: a bell with everything that happened; notices now sit at the bottom of the screen
+• Fixed: offline earnings and daily rewards stay in your wallet
+• Better race cameras on phones

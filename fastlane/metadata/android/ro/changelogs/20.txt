@@ -1,1 +1,7 @@
-Prima versiune a jocului Idle Car Empire: construiește fabrici, condu lanțul de producție auto, participă la curse și dezvoltă-ți imperiul, online sau offline.
+Noutăți în 1.0.5:
+• Uzinele zonelor: restaurează o uzină veche în fiecare zonă a hărții și construiește-i propria linie de mașini
+• Bursa: vinde o parte din companie pe bani acum, răscumpăr-o mai târziu
+• Echipa de mentenanță: mai puține defecțiuni, reparații mai rapide
+• Notificări: un clopoțel cu tot ce s-a întâmplat; notificările apar acum jos pe ecran
+• Reparat: banii din offline și recompensele zilnice rămân în cont
+• Camere mai bune la curse pe telefon
