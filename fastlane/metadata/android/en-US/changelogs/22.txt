@@ -1,0 +1,6 @@
+What's new in 1.0.6:
+• Nordheim, a second city: open every territory and found a new city on a big snowy island, with its own districts and wallet (World screen)
+• The city you're not in keeps earning on autopilot
+• Automatic decisions: recalls, VIP and fleet orders and cashing in, without asking (Settings)
+• A "What's new" card after each update
+• Fixes and better stability

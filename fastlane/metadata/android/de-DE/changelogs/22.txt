@@ -1,0 +1,6 @@
+Neu in 1.0.6:
+• Nordheim, eine zweite Stadt: Öffne alle Gebiete und gründe eine neue Stadt auf einer großen verschneiten Insel, mit eigenen Vierteln und eigener Kasse (Bildschirm Welt)
+• Die Stadt, in der du nicht bist, verdient per Autopilot weiter
+• Automatische Entscheidungen: Rückrufe, VIP- und Flottenaufträge und Kassieren, ohne Nachfrage (Einstellungen)
+• Eine „Was ist neu“-Karte nach jedem Update
+• Fehlerbehebungen und mehr Stabilität

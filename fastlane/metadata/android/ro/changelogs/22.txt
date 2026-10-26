@@ -1,0 +1,6 @@
+Noutăți în 1.0.6:
+• Nordheim, al doilea oraș: deschide toate teritoriile și fondează un oraș nou pe o insulă mare și înzăpezită, cu districtele și portofelul lui (ecranul Lumea)
+• Orașul în care nu ești câștigă mai departe pe pilot automat
+• Decizii automate: rechemări, comenzi VIP și de flotă și încasări, fără să fii întrebat (Setări)
+• Un card „Ce e nou” după fiecare actualizare
+• Reparații și stabilitate mai bună
