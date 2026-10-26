@@ -16,12 +16,11 @@ const TIER_ICON: Record<ZoomTier, typeof Globe2> = { region: Globe2, districts: 
 /** The minimap is the island's own picture (3:2). */
 const W = 172;
 const H = 115;
-const [SX, SZ] = WORLD_MAP.size;
 /** Game area ids in the order of the areas raster (id = index + 1). */
 const AREA_IDS = ["town", "industrial", "downtown", "automotive", "luxury", "supercar", "mega", "global", "mountain", "port", "raw", "suburbs", "boulevard", "airport", "campus", "racing"];
 
 /** Map position → minimap pixel. */
-const mm = (x: number, y: number): [number, number] => [(x / SX + 0.5) * W, (y / SZ + 0.5) * H];
+const mm = (x: number, y: number): [number, number] => [(x / WORLD_MAP.size[0] + 0.5) * W, (y / WORLD_MAP.size[1] + 0.5) * H];
 
 function load(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -69,7 +68,7 @@ export function Minimap({ engine }: { engine: RefObject<MapEngine | null> }) {
     canvas.width = W * dpr;
     canvas.height = H * dpr;
     const ctx = canvas.getContext("2d")!;
-    const base = "/world";
+    const base = WORLD_MAP.assets;
     let island: HTMLImageElement | null = null;
     let areas: HTMLImageElement | null = null;
     let fog: { key: string; cv: HTMLCanvasElement } | null = null;
@@ -180,8 +179,8 @@ export function Minimap({ engine }: { engine: RefObject<MapEngine | null> }) {
 
   const onTap = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - r.left) / r.width - 0.5) * SX;
-    const y = ((e.clientY - r.top) / r.height - 0.5) * SZ;
+    const x = ((e.clientX - r.left) / r.width - 0.5) * WORLD_MAP.size[0];
+    const y = ((e.clientY - r.top) / r.height - 0.5) * WORLD_MAP.size[1];
     engine.current?.lookAt(x, y);
   };
 

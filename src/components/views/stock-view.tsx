@@ -5,6 +5,7 @@ import { CostButton } from "@/components/game/cost-button";
 import { Button } from "@/components/ui/button";
 import { passiveIncome } from "@/game/engine/economy";
 import { STOCK, buybackCost, companyValue, sharePrice, stockUnlocked, trancheValue } from "@/game/engine/stock";
+import { cityIncome, ownedCities } from "@/game/engine/cities";
 import { formatMoney } from "@/game/format";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
@@ -41,18 +42,18 @@ export function StockView() {
     );
   }
 
-  const price = sharePrice(snap);
+  const price = sharePrice(state, snap);
   const prices = [...st.history, price];
   const full = Math.round(st.sold / STOCK.tranche) >= Math.round(STOCK.maxSold / STOCK.tranche);
-  const raise = trancheValue(snap);
-  const divPerMin = Math.max(0, passiveIncome(snap)) * st.sold * 60;
+  const raise = trancheValue(state, snap);
+  const divPerMin = ownedCities(state).reduce((a, id) => a + cityIncome(state, id, passiveIncome(snap)), 0) * st.sold * 60;
 
   return (
     <div className="space-y-4">
       {header}
 
       <div className="grid grid-cols-2 gap-1.5">
-        <Figure label={t("stock.value")} value={formatMoney(companyValue(snap))} />
+        <Figure label={t("stock.value")} value={formatMoney(companyValue(state, snap))} />
         <Figure label={t("stock.price")} value={formatMoney(price)} trend={prices.length > 1 ? price / prices[0] - 1 : 0} />
         <Figure label={t("stock.owned")} value={`${pct(1 - st.sold)}%`} gold />
         <Figure label={t("stock.dividendsNow")} value={st.sold > 0 ? `${formatMoney(divPerMin)}/min` : "—"} />

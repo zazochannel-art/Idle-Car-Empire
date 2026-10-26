@@ -314,7 +314,7 @@ describe("market dynamics", () => {
   it("defects pile up into a recall: pay for trust, or risk a scandal", () => {
     const s = createInitialState(T0);
     for (let i = 0; i < 6 / 0.05; i++) Mk.onCarBuilt(s, "city", 0.05, "fast");
-    expect(s.quality.recall).toEqual({ car: "city", cars: 6 });
+    expect(s.quality.recall).toEqual({ car: "city", cars: 6, city: "home" });
     expect(s.quality.rep).toBeLessThan(50);
     const cost = Mk.recallCost(s, 10_000);
     expect(cost).toBe(6 * 10_000 * 0.25);

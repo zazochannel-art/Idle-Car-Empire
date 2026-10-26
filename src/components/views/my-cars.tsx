@@ -18,6 +18,7 @@ import { useContent } from "@/i18n/content";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { useGame } from "@/store/game-store";
+import { walletOf } from "@/game/engine/cities";
 import { useUi } from "@/store/ui-store";
 
 const lapTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;
@@ -171,7 +172,7 @@ function CarCard({ rc, open, onToggle }: { rc: RaceCarState; open: boolean; onTo
           <div className="rounded-xl bg-gradient-to-br from-sky-500/10 to-transparent p-2.5 ring-1 ring-sky-400/25">
             <div className="mb-1 flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-sky-200">⏱️ {t("test.title")}</span>
-              <Button size="sm" variant="gold" disabled={state.cash < fee || state.racing.live?.car === rc.id || rc.location === "transit"} onClick={() => runTest(rc.id)}>
+              <Button size="sm" variant="gold" disabled={walletOf(state, "home") < fee || state.racing.live?.car === rc.id || rc.location === "transit"} onClick={() => runTest(rc.id)}>
                 {t("test.run", { fee: formatMoney(fee) })}
               </Button>
             </div>
@@ -186,12 +187,12 @@ function CarCard({ rc, open, onToggle }: { rc: RaceCarState; open: boolean; onTo
           {state.racing.unlocked && rc.location === "factory" && <p className="text-[11px] text-white/45">{t("mycars.awayHint")}</p>}
           <div className="flex gap-2">
             {toPaddock && (
-              <Button size="sm" variant="gold" className="flex-1" disabled={state.cash < toPaddock.fee} onClick={() => sendCar(rc.id, "racing")}>
+              <Button size="sm" variant="gold" className="flex-1" disabled={walletOf(state, "home") < toPaddock.fee} onClick={() => sendCar(rc.id, "racing")}>
                 {t("mycars.send.racing", { fee: formatMoney(toPaddock.fee) })}
               </Button>
             )}
             {toLot && (
-              <Button size="sm" variant="secondary" className="flex-1" disabled={state.cash < toLot.fee} onClick={() => sendCar(rc.id, "factory")}>
+              <Button size="sm" variant="secondary" className="flex-1" disabled={walletOf(state, "home") < toLot.fee} onClick={() => sendCar(rc.id, "factory")}>
                 {t("mycars.send.factory", { fee: formatMoney(toLot.fee) })}
               </Button>
             )}
@@ -251,7 +252,7 @@ function Showroom({ rc }: { rc: RaceCarState }) {
         ))}
       </div>
       {!rc.listing && trip && (
-        <Button size="sm" variant="gold" className="mt-2 w-full" disabled={state.cash < trip.fee} onClick={() => sendCar(rc.id, "showroom", fair * pct)}>
+        <Button size="sm" variant="gold" className="mt-2 w-full" disabled={walletOf(state, "home") < trip.fee} onClick={() => sendCar(rc.id, "showroom", fair * pct)}>
           {t("mycars.send.showroom", { fee: formatMoney(trip.fee) })}
         </Button>
       )}

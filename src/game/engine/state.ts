@@ -36,6 +36,8 @@ export function createDealers(): Record<DealerId, DealerState> {
   return Object.fromEntries(DEALER_IDS.map((d) => [d, { owned: false, level: 1 }])) as Record<DealerId, DealerState>;
 }
 
+export const createShowroom = (): GameState["showroom"] => ({ campaignUntil: 0, campaigns: 0, sold: 0, revenue: 0 });
+
 export function createManagers(): Record<ManagerId, ManagerState> {
   return Object.fromEntries(
     MANAGER_IDS.map((m) => [m, { hired: false, level: 1, assignedTo: null }]),
@@ -103,7 +105,7 @@ export function createInitialState(now: number): GameState {
     mapVersion: MAP_VERSION,
     eventGoal: { start: 0, base: 0, claimed: false },
     brand: createBrand(),
-    showroom: { campaignUntil: 0, campaigns: 0, sold: 0, revenue: 0 },
+    showroom: createShowroom(),
     ev: { chargers: {} },
     story: createStory(),
     editions: createEditions(),
@@ -136,6 +138,8 @@ export function createInitialState(now: number): GameState {
     quality: { rep: 50, defects: 0, recall: null, scandalUntil: 0, recalls: 0 },
     settings: { buyAmount: 1, lang: "en", lowGraphics: false, sound: true, music: true, haptics: true, notify: false, saver: "auto", stats: true, hidden: [], toastsOff: [], autoRecall: "ask", autoVip: false, autoFleet: false, autoCollect: false, whatsNew: WHATS_NEW.id },
     funnel: [],
+    activeCity: "home",
+    cities: {},
     createdAt: now,
     runStartedAt: now,
     lastActiveAt: now,

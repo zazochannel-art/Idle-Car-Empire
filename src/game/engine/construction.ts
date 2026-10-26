@@ -245,16 +245,18 @@ export function freePlotFor(s: GameState, type: StructureType): string | null {
   return best;
 }
 
-const PLOTS_FOR = new Map<StructureType, string[]>();
-/** Every plot zoned for `type` (or taking it as an alternative), nearest first. */
+const PLOTS_FOR = new WeakMap<object, Map<StructureType, string[]>>();
+/** Every plot of the current map zoned for `type` (or taking it as an alternative), nearest first. */
 export function plotsFor(type: StructureType): string[] {
-  let hit = PLOTS_FOR.get(type);
+  let known = PLOTS_FOR.get(WORLD_MAP);
+  if (!known) PLOTS_FOR.set(WORLD_MAP, (known = new Map()));
+  let hit = known.get(type);
   if (!hit) {
     hit = WORLD_MAP.plots
       .filter((p) => p.use === type || (p.use && ALT_USES[p.use]?.includes(type)))
       .sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0))
       .map((p) => p.id);
-    PLOTS_FOR.set(type, hit);
+    known.set(type, hit);
   }
   return hit;
 }

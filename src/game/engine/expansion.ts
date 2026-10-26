@@ -463,34 +463,6 @@ export function migrateExpansion(raw: Json, s: GameState) {
   const h = isObj(p.hype) ? p.hype : null;
   if (h && isCar(h.car)) s.proto.hype = { car: h.car, until: num(h.until) };
 
-  const e = isObj(raw.export) ? raw.export : {};
-  s.export = createExport();
-  if (Array.isArray(e.open)) s.export.open = [...new Set(e.open.filter(isMarket))];
-  if (isObj(e.dock))
-    for (const [k, v] of Object.entries(e.dock)) if (isMarket(k) && isObj(v) && Array.isArray(v.cars)) s.export.dock[k] = { cars: v.cars.filter(isCar), value: Math.max(0, num(v.value)), wait: Math.max(0, num(v.wait)) };
-  if (Array.isArray(e.ships))
-    s.export.ships = e.ships
-      .filter(isObj)
-      .filter((x) => isMarket(x.market) && Array.isArray(x.cars))
-      .map((x) => ({ id: num(x.id), market: x.market as ExportMarketId, cars: (x.cars as unknown[]).filter(isCar), value: Math.max(0, num(x.value)), t: Math.max(0, num(x.t)), dur: Math.max(1, num(x.dur, 300)) }));
-  s.export.nextShip = Math.max(1, Math.floor(num(e.nextShip, 1)));
-  s.export.sold = Math.max(0, Math.floor(num(e.sold)));
-
-  const f = isObj(raw.fleet) ? raw.fleet : {};
-  s.fleet = createFleet();
-  if (typeof f.product === "string" && f.product in FLEET_BY_ID) s.fleet.product = f.product as FleetProduct;
-  s.fleet.carry = Math.max(0, Math.min(1, num(f.carry)));
-  s.fleet.built = Math.max(0, num(f.built));
-  s.fleet.earned = num(f.earned);
-  s.fleet.nextOrderAt = Math.max(0, num(f.nextOrderAt));
-  s.fleet.done = Math.max(0, Math.floor(num(f.done)));
-  const o = isObj(f.order) ? f.order : null;
-  if (o && typeof o.product === "string" && o.product in FLEET_BY_ID && FLEET.clients.includes(o.client as FleetClient)) {
-    s.fleet.order = { client: o.client as FleetClient, product: o.product as FleetProduct, n: Math.max(1, Math.floor(num(o.n, 1))), minutes: Math.max(1, num(o.minutes, 30)), made: Math.max(0, Math.floor(num(o.made))) };
-    if (o.expires !== undefined) s.fleet.order.expires = num(o.expires);
-    if (o.deadline !== undefined) s.fleet.order.deadline = num(o.deadline);
-  }
-
   const g = isObj(raw.engineers) ? raw.engineers : {};
   s.engineers = createEngineers();
   if (Array.isArray(g.hired))
@@ -503,6 +475,42 @@ export function migrateExpansion(raw: Json, s: GameState) {
   s.engineers.nextCandidate = Math.max(0, num(g.nextCandidate));
   s.engineers.nextPoach = Math.max(0, num(g.nextPoach));
   s.engineers.lost = Math.max(0, Math.floor(num(g.lost)));
+}
+
+/** A city's ports (each city has its own). */
+export function migrateExport(raw: unknown): ExportState {
+  const e = isObj(raw) ? raw : {};
+  const out = createExport();
+  if (Array.isArray(e.open)) out.open = [...new Set(e.open.filter(isMarket))];
+  if (isObj(e.dock))
+    for (const [k, v] of Object.entries(e.dock)) if (isMarket(k) && isObj(v) && Array.isArray(v.cars)) out.dock[k] = { cars: v.cars.filter(isCar), value: Math.max(0, num(v.value)), wait: Math.max(0, num(v.wait)) };
+  if (Array.isArray(e.ships))
+    out.ships = e.ships
+      .filter(isObj)
+      .filter((x) => isMarket(x.market) && Array.isArray(x.cars))
+      .map((x) => ({ id: num(x.id), market: x.market as ExportMarketId, cars: (x.cars as unknown[]).filter(isCar), value: Math.max(0, num(x.value)), t: Math.max(0, num(x.t)), dur: Math.max(1, num(x.dur, 300)) }));
+  out.nextShip = Math.max(1, Math.floor(num(e.nextShip, 1)));
+  out.sold = Math.max(0, Math.floor(num(e.sold)));
+  return out;
+}
+
+/** A city's fleet division. */
+export function migrateFleet(raw: unknown): FleetState {
+  const f = isObj(raw) ? raw : {};
+  const out = createFleet();
+  if (typeof f.product === "string" && f.product in FLEET_BY_ID) out.product = f.product as FleetProduct;
+  out.carry = Math.max(0, Math.min(1, num(f.carry)));
+  out.built = Math.max(0, num(f.built));
+  out.earned = num(f.earned);
+  out.nextOrderAt = Math.max(0, num(f.nextOrderAt));
+  out.done = Math.max(0, Math.floor(num(f.done)));
+  const o = isObj(f.order) ? f.order : null;
+  if (o && typeof o.product === "string" && o.product in FLEET_BY_ID && FLEET.clients.includes(o.client as FleetClient)) {
+    out.order = { client: o.client as FleetClient, product: o.product as FleetProduct, n: Math.max(1, Math.floor(num(o.n, 1))), minutes: Math.max(1, num(o.minutes, 30)), made: Math.max(0, Math.floor(num(o.made))) };
+    if (o.expires !== undefined) out.order.expires = num(o.expires);
+    if (o.deadline !== undefined) out.order.deadline = num(o.deadline);
+  }
+  return out;
 }
 
 /** Components a fleet vehicle needs, for the UI. */

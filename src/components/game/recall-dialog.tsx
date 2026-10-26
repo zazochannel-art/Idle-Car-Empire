@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { CAR_BY_ID } from "@/game/config/cars";
 import { RECALL } from "@/game/config/market";
 import { carValue } from "@/game/engine/chain";
-import { recallCost } from "@/game/engine/market";
+import { recallCity, recallCost, recallWallet } from "@/game/engine/market";
 import { formatMoney, formatPercent } from "@/game/format";
 import { useT } from "@/i18n/use-t";
 import { useGame } from "@/store/game-store";
@@ -49,8 +49,9 @@ function RecallCard() {
                 <div className="text-white/60">{t("recall.ignoreDesc", { chance: formatPercent(RECALL.scandalChance), rep: -RECALL.repScandal })}</div>
               </div>
             </div>
+            {recallCity(state) !== state.activeCity && <p className="mt-3 text-[11px] text-sky-200/80">{t("recall.fromCity", { name: t(`city.${recallCity(state)}`), money: formatMoney(recallWallet(state)) })}</p>}
             <div className="mt-4 grid grid-cols-2 gap-2">
-              <Button variant="gold" disabled={state.cash < cost} onClick={() => pay(cost)}>
+              <Button variant="gold" disabled={recallWallet(state) < cost} onClick={() => pay(cost)}>
                 {t("recall.pay", { cost: formatMoney(cost) })}
               </Button>
               <Button variant="secondary" onClick={() => ignore()}>

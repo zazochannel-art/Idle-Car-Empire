@@ -14,6 +14,23 @@ export const RAIL_LINE: [number, number][] = [
 /** The airport's runway: its two ends (the planes take off toward the second). */
 export const RUNWAY: { a: [number, number]; b: [number, number] } = { a: [33.39, 34.19], b: [58.83, 21.19] };
 
+/** Where the cargo ships moor: off the port's quay, by its cranes. */
+export const QUAYS: [number, number][] = [
+  [-51.5, -27.5],
+  [-55.5, -26.8],
+];
+
+/** A map's railway, runway and berths: from its world.json (the other cities' islands), else the first map's. */
+export interface MapLines {
+  rail: [number, number][];
+  runway: { a: [number, number]; b: [number, number] };
+  quays: [number, number][];
+}
+
+export function mapLines(data: { linie?: [number, number][]; pista?: { a: [number, number]; b: [number, number] }; cheiuri?: [number, number][] }): MapLines {
+  return { rail: data.linie ?? RAIL_LINE, runway: data.pista ?? RUNWAY, quays: data.cheiuri ?? QUAYS };
+}
+
 /** Distance from a point to a polyline. */
 export function distToLine(x: number, z: number, line: [number, number][]): number {
   let best = Infinity;

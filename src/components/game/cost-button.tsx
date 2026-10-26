@@ -7,6 +7,8 @@ import { useT } from "@/i18n/use-t";
 import { cue } from "@/lib/feedback";
 import { cn } from "@/lib/utils";
 import { useGame } from "@/store/game-store";
+import { cityIncome, walletOf } from "@/game/engine/cities";
+import type { CityId } from "@/game/types";
 
 interface CostButtonProps extends Omit<ButtonProps, "onClick"> {
   cost: number | null;
@@ -17,6 +19,8 @@ interface CostButtonProps extends Omit<ButtonProps, "onClick"> {
   locked?: boolean;
   maxedLabel?: string;
   showEta?: boolean;
+  /** Paid from this city's wallet (the racing team pays from the first city's), else the city being played. */
+  wallet?: CityId;
 }
 
 /** A buy button that knows whether you can afford it and how long until you can. */
@@ -28,14 +32,15 @@ export function CostButton({
   locked,
   maxedLabel,
   showEta = true,
+  wallet,
   className,
   variant,
   size,
   ...rest
 }: CostButtonProps) {
   const { t } = useT();
-  const balance = useGame((g) => (currency === "cash" ? g.state.cash : g.state.rp));
-  const rate = useGame((g) => (currency === "cash" ? g.snap.incomePerSec : g.snap.rpPerSec));
+  const balance = useGame((g) => (currency === "cash" ? (wallet ? walletOf(g.state, wallet) : g.state.cash) : g.state.rp));
+  const rate = useGame((g) => (currency === "cash" ? (wallet ? cityIncome(g.state, wallet, g.snap.steadyIncomePerSec) : g.snap.incomePerSec) : g.snap.rpPerSec));
 
   if (cost === null) {
     return (

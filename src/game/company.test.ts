@@ -78,8 +78,8 @@ describe("stock exchange", () => {
     const s = company(10_000);
     const snap = snapshot(s);
     const value = 10_000 * St.STOCK.valueSeconds;
-    expect(St.companyValue(snap)).toBe(value);
-    expect(St.sharePrice(snap)).toBe(value / St.STOCK.shares);
+    expect(St.companyValue(s, snap)).toBe(value);
+    expect(St.sharePrice(s, snap)).toBe(value / St.STOCK.shares);
     const cash = s.cash;
     expect(St.sellShares(s, snap)).toBeCloseTo(value * St.STOCK.tranche);
     expect(s.cash).toBeCloseTo(cash + value * St.STOCK.tranche);

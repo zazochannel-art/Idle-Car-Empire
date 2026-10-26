@@ -1,5 +1,5 @@
 import { OFFLINE } from "../config/offline";
-import type { GameState, OfflineReport } from "../types";
+import type { CityId, GameState, OfflineReport } from "../types";
 import { simulateChain } from "./chain";
 import { offlineRacing } from "./racing";
 import { showroomTick } from "./showroom";
@@ -8,6 +8,11 @@ import { credit } from "./tick";
 import { constructionTick } from "./construction";
 import { book, chainNet, LEDGER_KEYS, settleLedger } from "./materials";
 import { payDividends } from "./stock";
+import { parkedEarnings, withCity, withWallet } from "./cities";
+
+const addTo = (report: OfflineReport, id: CityId, money: number) => {
+  if (money > 0) (report.cities ??= {})[id] = (report.cities[id] ?? 0) + money;
+};
 
 /**
  * Plays out the time between `lastActiveAt` and `now`: plants keep producing
@@ -48,14 +53,32 @@ function absence(s: GameState, now: number): OfflineReport {
   const rp = s.rp;
   const before = { ...s.chain.ledger.run };
   const r = simulateChain(s, capped, snap.chain, (amount) => credit(s, amount));
-  // the racing team keeps racing (automatic racing only)
-  const racing = offlineRacing(s, capped);
+  // the racing team keeps racing (automatic racing only), in the first city: what it
+  // wins there waits for COLLECT too, for that city's wallet
+  const racing =
+    s.activeCity === "home" || !s.cities.home
+      ? offlineRacing(s, capped)
+      : withCity(s, "home", () => {
+          const before = s.cash;
+          const out = offlineRacing(s, capped);
+          if (s.cash > before) {
+            addTo(report, "home", s.cash - before);
+            s.cash = before;
+          }
+          return out;
+        });
   // buyers kept walking into the showroom
   showroomTick(s, capped);
   // Hold the net earnings back for the COLLECT button (they already count as earned).
   const net = s.cash - cash;
   if (net > 0) s.cash = cash;
   report.money = Math.max(0, net);
+  // the other cities kept bringing in their share (counted as earned now, like the rest)
+  for (const [id, got] of Object.entries(parkedEarnings(s, capped, snap.gm.offline)) as [CityId, number][]) {
+    s.run.moneyEarned += got;
+    s.lifetime.moneyEarned += got;
+    addTo(report, id, got);
+  }
   report.cars = r.cars;
   report.components = r.components;
   report.deliveries = r.deliveries;
@@ -88,15 +111,25 @@ function absence(s: GameState, now: number): OfflineReport {
 
 /**
  * Pays out a report computed by computeOffline (earnings were already counted); the
- * shareholders take their part (engine/stock.ts). Returns what reached the wallet.
+ * shareholders take their part (engine/stock.ts). The other cities' money goes to
+ * their own wallets. Returns what reached the wallet of the city being played.
  */
 export function applyOffline(s: GameState, report: OfflineReport): number {
-  s.cash += report.money;
-  s.run.offlineEarned += report.money;
-  s.lifetime.offlineEarned += report.money;
+  const pay = (money: number) => {
+    s.cash += money;
+    s.run.offlineEarned += money;
+    s.lifetime.offlineEarned += money;
+    return money - payDividends(s, money);
+  };
+  let got = pay(report.money);
+  for (const [id, money] of Object.entries(report.cities ?? {}) as [CityId, number][]) {
+    if (!(money > 0)) continue;
+    if (id === s.activeCity) got += pay(money);
+    else withWallet(s, id, () => pay(money));
+  }
   s.rp += report.rp;
   s.city.carsServiced += report.serviced ?? 0;
-  return report.money - payDividends(s, report.money);
+  return got;
 }
 
 /**
@@ -106,7 +139,7 @@ export function applyOffline(s: GameState, report: OfflineReport): number {
 export function settleOffline(s: GameState, now: number): OfflineReport | null {
   const report = computeOffline(s, now);
   s.lastActiveAt = now;
-  if (report.money <= 0 && report.cars <= 0 && !report.components && !report.serviced && !report.built?.length) return null;
+  if (report.money <= 0 && report.cars <= 0 && !report.components && !report.serviced && !report.built?.length && !report.cities) return null;
   if (report.seconds < OFFLINE.minReportSeconds) {
     applyOffline(s, report);
     return null;
@@ -126,6 +159,7 @@ export function settleOffline(s: GameState, now: number): OfflineReport | null {
     p.materialsUsed = (p.materialsUsed ?? 0) + (report.materialsUsed ?? 0);
     if (report.owed) p.owed = (p.owed ?? 0) + report.owed;
     if (report.built?.length) p.built = [...(p.built ?? []), ...report.built];
+    for (const [id, money] of Object.entries(report.cities ?? {}) as [CityId, number][]) addTo(p, id, money);
     if (report.racing) {
       const a = (p.racing ??= { races: 0, wins: 0, podiums: 0, prize: 0, rep: 0, repairs: 0 });
       for (const k of ["races", "wins", "podiums", "prize", "rep", "repairs"] as const) a[k] += report.racing[k];
@@ -147,7 +181,8 @@ export function settleOffline(s: GameState, now: number): OfflineReport | null {
 export function collectOffline(s: GameState, multiplier = 1): number {
   const p = s.pendingOffline;
   if (!p) return 0;
-  const got = applyOffline(s, { ...p, money: p.money * multiplier });
+  const cities = p.cities && (Object.fromEntries(Object.entries(p.cities).map(([id, m]) => [id, (m ?? 0) * multiplier])) as OfflineReport["cities"]);
+  const got = applyOffline(s, { ...p, money: p.money * multiplier, cities });
   s.pendingOffline = null;
   return got;
 }

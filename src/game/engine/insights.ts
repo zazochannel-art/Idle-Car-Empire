@@ -19,6 +19,8 @@ import { bestGrade, carLock, carTrip, gradeCost, hasPlant, levelCost, plantLock,
 import { isPlotUnlocked, nextZone, zoneBlocker } from "./city";
 import { dealerUpgradeCost, type EconomySnapshot } from "./economy";
 import { canImperium, pendingStars } from "./imperium";
+import { cityUnlockStatus } from "./cities";
+import type { CityId } from "../types";
 
 export type Requirement =
   | { kind: "research"; research: string }
@@ -56,6 +58,8 @@ export type Goal =
   | { kind: "worker"; icon: string; plot: string; idle: number }
   | { kind: "zone"; icon: string; cost: number; zone: ZoneId }
   | { kind: "territory"; icon: string; cost: number; territory: TerritoryId }
+  /** A new city: every territory of the first city is open (cost: from its wallet). */
+  | { kind: "city"; icon: string; cost: number; city: CityId }
   | { kind: "made"; icon: string; plant: PlantType; item: ComponentId; n: number; have: number; plot: string | null }
   /** The company's account is over its limit: every plant is suspended until sales pay it down. */
   | { kind: "debt"; icon: string; owed: number; limit: number; resume: number };
@@ -272,8 +276,8 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
     }
   }
 
-  // the Racing District, once there is a car to race
-  if (s.chain.firstCar) {
+  // the Racing District, once there is a car to race (the racing team is in the first city)
+  if (s.chain.firstCar && s.activeCity === "home") {
     const R = s.racing;
     if (!R.unlocked) goals.push({ kind: "racing", icon: "🏁", cost: racingCost(s) });
     else if (!R.cars.length && !R.orders.length && !R.arrivals.length) goals.push({ kind: "raceCar", icon: "🚛" });
@@ -291,6 +295,12 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
   if (terr && s.chain.firstCar) {
     const lock = territoryLock(s, terr.id);
     if (!lock || lock.kind === "cash") goals.push({ kind: "territory", icon: terr.emoji, cost: terr.cost, territory: terr.id });
+  }
+
+  // a new city, once the first one has opened all its land
+  {
+    const north = cityUnlockStatus(s, "north");
+    if (!north.owned && s.activeCity === "home" && north.territories >= north.needed) goals.push({ kind: "city", icon: "🏔️", cost: north.price, city: "north" });
   }
 
   const nextManager = MANAGERS.find((m) => !s.managers[m.id].hired && isManagerUnlocked(s, m.id));

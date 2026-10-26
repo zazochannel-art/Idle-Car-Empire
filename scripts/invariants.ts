@@ -1,6 +1,10 @@
 // Checks a game state for things that must never happen: NaN or infinite
-// numbers, negative stock, money or wear out of range, broken shipments.
-// Returns a list of problems (empty when the state is sound).
+// numbers, negative stock, money or wear out of range, broken shipments,
+// lots that are not on their city's map. Returns a list of problems (empty
+// when the state is sound).
+import { WORLD_MAP, worldOf } from "../src/game/city/layout";
+import { CITY_IDS } from "../src/game/config/cities";
+import { parkedCities, withCity } from "../src/game/engine/cities";
 import type { GameState } from "../src/game/types";
 
 export function checkInvariants(s: GameState): string[] {
@@ -12,6 +16,29 @@ export function checkInvariants(s: GameState): string[] {
     else if (v && typeof v === "object") for (const [k, x] of Object.entries(v)) walk(x, `${path}.${k}`);
   };
   walk(s, "s");
+  // the cities: the one being played is on the map and never parked too; no lot belongs to two
+  if (WORLD_MAP.id !== s.activeCity) out.push(`map ${WORLD_MAP.id} while playing in ${s.activeCity}`);
+  if (s.cities[s.activeCity]) out.push(`${s.activeCity} is played and parked`);
+  for (const id of Object.keys(s.cities)) if (!CITY_IDS.includes(id as never)) out.push(`unknown city ${id}`);
+  const seen = new Set<string>();
+  for (const [id, city] of [[s.activeCity, s.city] as const, ...parkedCities(s).map(([id, c]) => [id, c.city] as const)]) {
+    const map = worldOf(id);
+    for (const plot of [...Object.keys(city.buildings), ...Object.keys(city.sites), ...city.land]) {
+      if (!map.plotById[plot]) out.push(`${id}: lot ${plot} is not on its map`);
+      if (seen.has(`${id}|${plot}`)) continue;
+      seen.add(`${id}|${plot}`);
+      for (const other of CITY_IDS) if (other !== id && seen.has(`${other}|${plot}`)) out.push(`lot ${plot} in ${id} and ${other}`);
+    }
+  }
+  for (const [id] of parkedCities(s)) withCity(s, id, () => out.push(...cityInvariants(s).map((p) => `${id}: ${p}`)));
+  out.push(...cityInvariants(s));
+  out.push(...companyInvariants(s));
+  return out;
+}
+
+/** The city being played (the state's own fields). */
+function cityInvariants(s: GameState): string[] {
+  const out: string[] = [];
   if (s.cash < -1e-6) out.push(`cash ${s.cash}`);
   if (s.chain.owed < -1e-6) out.push(`owed ${s.chain.owed}`);
   // land and construction: a plot is a site or a building, never both; both stand on owned land
@@ -48,6 +75,11 @@ export function checkInvariants(s: GameState): string[] {
     if (sh.qty <= 0) out.push(`shipment ${sh.id} qty ${sh.qty}`);
     if (sh.t > sh.dur * 2 + 1) out.push(`shipment ${sh.id} stuck t ${sh.t} dur ${sh.dur}`);
   }
+  return out;
+}
+
+function companyInvariants(s: GameState): string[] {
+  const out: string[] = [];
   for (const rc of s.racing.cars) for (const [k, w] of Object.entries(rc.wear)) if (w < 0.05 - 1e-9 || w > 1 + 1e-9) out.push(`race car ${rc.id} wear.${k} ${w}`);
   if (s.racing.selected !== null && !s.racing.cars.some((c) => c.id === s.racing.selected)) out.push(`racing.selected ${s.racing.selected} missing`);
   if (s.racing.live && !s.racing.cars.some((c) => c.id === s.racing.live!.car)) out.push("live race without its car");

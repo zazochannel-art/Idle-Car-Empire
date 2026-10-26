@@ -8,6 +8,7 @@ import { racingTick } from "./racing";
 import { showroomTick } from "./showroom";
 import { eventGoalTick } from "./events";
 import { adsTick } from "./ads";
+import { parkedTick, withCity } from "./cities";
 
 /** Adds money to the wallet and to the earnings stats. */
 export function credit(s: GameState, amount: number) {
@@ -40,11 +41,14 @@ export function tick(s: GameState, dt: number, snap?: EconomySnapshot): GameEven
   // building sites and upgrades in progress
   constructionTick(s, dt, events);
 
-  const race = racingTick(s, dt);
+  // the racing team stays in the first city: its prizes and costs go through that city's wallet
+  const race = withCity(s, "home", () => racingTick(s, dt));
   if (race) events.push({ type: "raceFinished", race: race.id });
   showroomTick(s, dt, events);
   eventGoalTick(s, s.lastActiveAt);
   adsTick(s, dt);
+  // the other cities, on autopilot
+  parkedTick(s, dt);
 
   s.run.playTime += dt;
   s.lifetime.playTime += dt;

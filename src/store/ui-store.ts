@@ -44,6 +44,7 @@ export type View =
   | "landmarks"
   | "inbox"
   | "stock"
+  | "world"
   | "menu";
 
 /** Requests for the map camera, consumed by the map component. */

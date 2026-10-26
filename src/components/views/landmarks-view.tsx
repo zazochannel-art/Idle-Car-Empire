@@ -36,9 +36,11 @@ export function LandmarksView() {
           </div>
         </div>
       </div>
-      {LANDMARKS.map((l) => (
-        <LandmarkCard key={l.territory} l={l} state={state} />
-      ))}
+      {state.activeCity === "home" ? (
+        LANDMARKS.map((l) => <LandmarkCard key={l.territory} l={l} state={state} />)
+      ) : (
+        <div className="rounded-2xl bg-sky-500/10 p-3 text-[12px] leading-snug text-sky-100 ring-1 ring-sky-300/30">🏙️ {t("landmark.otherCity", { home: t("city.home") })}</div>
+      )}
     </div>
   );
 }

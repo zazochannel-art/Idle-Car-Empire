@@ -182,6 +182,8 @@ function VisitDialog({ userId, sent, onSent, onClose }: { userId: string | null;
 /** One visit (mounted afresh for every player visited). */
 function Visit({ userId, sent, onSent, onClose }: { userId: string; sent: number | null; onSent: () => void; onClose: () => void }) {
   const saves = useGame((g) => g.saves);
+  // other players' cities are drawn on the first city's map
+  const inHome = useGame((g) => g.state.activeCity === "home");
   const { t } = useT();
   // the card, and when it came (for "last save: … ago")
   const [card, setCard] = useState<{ card: EmpireCard | null; at: number } | "loading" | "error">("loading");
@@ -271,7 +273,7 @@ function Visit({ userId, sent, onSent, onClose }: { userId: string; sent: number
           </div>
 
           {!mine &&
-            (c.map?.buildings.length ? (
+            (c.map?.buildings.length && inHome ? (
               <Button
                 variant="gold"
                 className="w-full"
@@ -283,7 +285,7 @@ function Visit({ userId, sent, onSent, onClose }: { userId: string; sent: number
                 <MapIcon /> {t("visit.see3d")}
               </Button>
             ) : (
-              <p className="text-center text-[11px] text-white/50">{t("visit.noMap")}</p>
+              <p className="text-center text-[11px] text-white/50">{c.map?.buildings.length ? t("visit.homeOnly", { home: t("city.home") }) : t("visit.noMap")}</p>
             ))}
 
           {c.ghost && !mine && <GhostDuel rival={c.userId} ghost={c.ghost} />}

@@ -71,7 +71,7 @@ import {
 } from "./materials";
 import { MANAGERS } from "../config/managers";
 import { OFFLINE } from "../config/offline";
-import { DEPOT, MARKET, RACING, plotOf, roadRoute } from "../city/layout";
+import { DEPOT, MARKET, RACING, WORLD_MAP, plotOf, roadRoute } from "../city/layout";
 import type {
   BuildingState,
   CarId,
@@ -662,17 +662,19 @@ export function chainSnapshot(s: GameState, gm: GlobalMods): ChainSnapshot {
 
 // ───────────────────────────── travel ─────────────────────────────
 
+/** Road distances between lots on each city's map (a map never changes: each pair is worked out once). */
+const DISTANCES = new WeakMap<object, Map<string, number>>();
 /** Road distance between two lots, in tiles: the route the trucks drive on the map. */
-/** Road distances between lots (the map never changes: each pair is worked out once). */
-const DISTANCES = new Map<string, number>();
 export function distance(from: string, to: string): number {
+  let known = DISTANCES.get(WORLD_MAP);
+  if (!known) DISTANCES.set(WORLD_MAP, (known = new Map()));
   const key = `${from}>${to}`;
-  let d = DISTANCES.get(key);
+  let d = known.get(key);
   if (d === undefined) {
     const a = plotOf(from)?.entry;
     const b = plotOf(to)?.entry;
     d = !a || !b ? 20 : roadRoute(a, b).length;
-    DISTANCES.set(key, d);
+    known.set(key, d);
   }
   return d;
 }

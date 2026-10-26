@@ -10,6 +10,7 @@ import { PLANT_BY_ID, isPlantType } from "@/game/config/chain";
 import { DEALER_BY_ID } from "@/game/config/dealerships";
 import { WORLD_MAP, plotOf } from "@/game/city/layout";
 import { levelCost, plantLock } from "@/game/engine/chain";
+import { cityUnlockStatus } from "@/game/engine/cities";
 import { buildingUpgradeCost, builtInZone, garagePlots, structureCost, zoneBlocker } from "@/game/engine/city";
 import { formatMoney, formatNumber, formatPercent } from "@/game/format";
 import type { StructureType, ZoneId } from "@/game/types";
@@ -452,6 +453,8 @@ export function MenuPanel({ onSettings }: { onSettings: () => void }) {
   const festival = useGame((g) => festivalNow(g.state.lastActiveAt)?.season ?? null);
   const festivalBadge = useGame((g) => festivalWaiting(g.state, g.state.lastActiveAt));
   const pass = useGame((g) => passWaiting(g.state) > 0);
+  // a new city waiting to be opened
+  const city = useGame((g) => cityUnlockStatus(g.state, "north").ready);
   const tiles: { icon: string; label: string; go: () => void; gold?: boolean; badge?: boolean }[] = [
     { icon: "👤", label: t("account.title"), go: () => setView("profile"), gold: true },
     { icon: "📖", label: t("nav.story"), go: () => setView("story"), gold: true, badge: waiting },
@@ -460,6 +463,7 @@ export function MenuPanel({ onSettings }: { onSettings: () => void }) {
     { icon: "👑", label: t("imperium.title"), go: () => setView("imperium"), gold: true },
     { icon: "🏗️", label: t("nav.landmarks"), go: () => setView("landmarks"), gold: true },
     { icon: "📈", label: t("nav.stock"), go: () => setView("stock"), gold: true },
+    { icon: "🌍", label: t("nav.world"), go: () => setView("world"), gold: true, badge: city },
     ...(winter !== null ? [{ icon: "🎄", label: t("nav.winter"), go: () => setView("winter"), gold: true, badge: winter }] : []),
     ...(festival ? [{ icon: SEASON_ICON[festival], label: t(`festival.${festival}`), go: () => setView("festival"), gold: true, badge: festivalBadge }] : []),
     { icon: "🎟️", label: t("nav.pass"), go: () => setView("pass"), gold: true, badge: pass },

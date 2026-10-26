@@ -26,6 +26,10 @@ export interface WorldJson {
     muchii: RoadData[];
     parcari: { c: [number, number]; t: [number, number]; L: number; W: number; o: number }[];
   };
+  /** The railway, the runway's ends and the ships' berths, on maps made after the first (rail-line.ts holds the first map's). */
+  linie?: [number, number][];
+  pista?: { a: [number, number]; b: [number, number] };
+  cheiuri?: [number, number][];
 }
 
 export interface Building {

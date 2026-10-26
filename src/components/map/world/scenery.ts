@@ -8,7 +8,7 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { ALB, C, NEGRU, beam, box, cone, cylinder, facade, gableRoof, hipRoof, paint, plainUv, rnd, sphere, tiledGable, tiledHip, type FacadeKind, type MapMaterials } from "./kit";
 import { EXAG, NTX, NTY, type Building, type Ground, type RoadData, type WorldJson } from "./terrain";
-import { RAIL_LINE, RUNWAY, distToLine } from "./rail-line";
+import { distToLine, mapLines, type MapLines } from "./rail-line";
 
 /** Buildings are drawn a little taller than to scale, so they read from above. */
 const VH = 1.3;
@@ -166,11 +166,11 @@ export function planeParts(livery = "#2463b8"): THREE.BufferGeometry[] {
 }
 
 /** A box round the railway (a quick test before the distance to it). */
-const RAIL_BOX = (() => {
-  const xs = RAIL_LINE.map((p) => p[0]);
-  const zs = RAIL_LINE.map((p) => p[1]);
+function railBox(rail: [number, number][]) {
+  const xs = rail.map((p) => p[0]);
+  const zs = rail.map((p) => p[1]);
   return { x: (Math.min(...xs) + Math.max(...xs)) / 2, z: (Math.min(...zs) + Math.max(...zs)) / 2, w: (Math.max(...xs) - Math.min(...xs)) / 2 + 2, d: (Math.max(...zs) - Math.min(...zs)) / 2 + 2 };
-})();
+}
 
 /** Side of the cells the big instanced sets are cut into for close-up views (world units). */
 const CELL = 25;
@@ -192,6 +192,9 @@ export class Scenery {
   readonly animated: Animated = { rotors: [], pumps: [], cabins: [] };
   /** Lamp posts along town streets and on bridges, [x, z, yaw, y]. */
   readonly lamps: [number, number, number, number][] = [];
+  /** This map's railway (and a box round it), runway and berths. */
+  readonly lines: MapLines;
+  private railBox: ReturnType<typeof railBox>;
 
   constructor(
     private data: WorldJson,
@@ -199,6 +202,8 @@ export class Scenery {
     private mats: MapMaterials,
     private opt: SceneryOptions,
   ) {
+    this.lines = mapLines(data);
+    this.railBox = railBox(this.lines.rail);
     this.roads = mapRoads(data, ground);
     this.buildings();
     this.bridges();
@@ -910,7 +915,8 @@ export class Scenery {
 
   /** On a lot (a tree or bush there would come up through its building), or on the railway's track. */
   private onLot(x: number, z: number) {
-    if (Math.abs(x - RAIL_BOX.x) < RAIL_BOX.w && Math.abs(z - RAIL_BOX.z) < RAIL_BOX.d && distToLine(x, z, RAIL_LINE) < 1.1) return true;
+    const rb = this.railBox;
+    if (Math.abs(x - rb.x) < rb.w && Math.abs(z - rb.z) < rb.d && distToLine(x, z, this.lines.rail) < 1.1) return true;
     for (const l of this.opt.lots ?? []) {
       const dx = x - l.x, dz = z - l.y, r = (l.w + l.d) / 2;
       if (dx > r || dx < -r || dz > r || dz < -r) continue;
@@ -1239,7 +1245,7 @@ export class Scenery {
       this.root.add(m);
     }
     // the planes parked on the runway make way for the one that takes off and lands (movers.ts)
-    for (const [x, z, rot] of list("avioane").filter(([x, z]) => distToLine(x, z, [RUNWAY.a, RUNWAY.b]) > 2.5)) {
+    for (const [x, z, rot] of list("avioane").filter(([x, z]) => distToLine(x, z, [this.lines.runway.a, this.lines.runway.b]) > 2.5)) {
       const parts = planeParts();
       const m = this.place(this.object(parts), x, z);
       m.rotation.y = rot;

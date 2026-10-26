@@ -35,8 +35,8 @@ import { tick as engineTick } from "@/game/engine/tick";
 import { formatDuration, formatMoney, formatNumber, formatPercent } from "@/game/format";
 import { decodeSave, encodeSave, SaveManager, type CupPlace, type CupSubmitResult, type RedeemInviteResult, type SaveWhere } from "@/game/save";
 import { askStartChoice, askWelcome, useCloud } from "./cloud-store";
-import type { BuyAmount, CarId, CarRoute, DealerId, FacilityType, GameState, Lang, ManagerId, NoticeKind, PlantType, QualityMode, Specialization, StructureType, ZoneId } from "@/game/types";
-import { applyLanguage, detectLanguage, loadLanguage, translate, type MessageKey, type Vars } from "@/i18n";
+import type { BuyAmount, CarId, CarRoute, CityId, DealerId, FacilityType, GameState, Lang, ManagerId, NoticeKind, PlantType, QualityMode, Specialization, StructureType, ZoneId } from "@/game/types";
+import { applyLanguage, detectLanguage, loadLanguage, translate, type MessageKey, type Vars, setPlaceNames } from "@/i18n";
 import { contentFor } from "@/i18n/content";
 import { uiEvents } from "./events";
 import type { AwayNote } from "@/lib/notify";
@@ -81,7 +81,9 @@ import * as Ps from "@/game/engine/pass";
 import * as Mb from "@/game/engine/map-bonus";
 import * as Lm from "@/game/engine/landmarks";
 import { LANDMARK_BY_TERRITORY } from "@/game/config/landmarks";
-import { RACING } from "@/game/city/layout";
+import { RACING, setWorld } from "@/game/city/layout";
+import { CITIES } from "@/game/config/cities";
+import * as Cy from "@/game/engine/cities";
 import { MAP_BONUS_BY_KIND, type MapBonusKind } from "@/game/config/map-bonus";
 import { funnelDue, funnelMinutes } from "@/game/engine/funnel";
 import { browserOptOut, sendStep } from "@/game/save/funnel";
@@ -100,6 +102,7 @@ const AWAY_GAP_S = 30;
 
 /** Settles time away; an absence too short for the report is told in a toast. */
 function settleAway(s: GameState, now: number) {
+  setWorld(s.activeCity);
   const away = (now - s.lastActiveAt) / 1000;
   const cash = s.cash;
   if (settleOffline(s, now) || away < OFFLINE.minToastSeconds || s.cash <= cash) return;
@@ -289,6 +292,9 @@ interface GameStore {
   /** Takes the bonus on the Empire Map (engine/map-bonus.ts): its money, or null when it is gone. */
   claimMapBonus: (id: number) => number | null;
   unlockTerritory: (id: import("@/game/config/city").TerritoryId) => boolean;
+  /** Move the company to another of its cities, or open a new one (engine/cities.ts). */
+  switchCity: (id: CityId) => boolean;
+  unlockCity: (id: CityId) => boolean;
   setBrand: (patch: Parameters<typeof Br.setBrand>[1]) => boolean;
   cancelRaceOrder: (car: CarId) => boolean;
   selectRaceCar: (id: number) => void;
@@ -339,6 +345,9 @@ export const useGame = create<GameStore>((set, get) => {
 
   /** Recomputes derived data, unlocks achievements and publishes the new state. */
   function commit(next: GameState, prevSnap?: EconomySnapshot, fromTick = false) {
+    // the engine reads the map of the city being played; its districts' names follow
+    setWorld(next.activeCity);
+    setPlaceNames(next.activeCity);
     let snap = snapshot(next);
     const fresh = checkAchievements(next, snap);
     if (fresh.length) {
@@ -349,9 +358,10 @@ export const useGame = create<GameStore>((set, get) => {
       }
     }
     const prev = get().state;
-    // unlock moments (not across a new run: everything "unlocks" again then); what was open
-    // before is usually what the last commit found, so each tick works it out once
-    if (prevSnap && prev.runStartedAt === next.runStartedAt) {
+    // unlock moments (not across a new run or a move to another city: everything "unlocks"
+    // again then); what was open before is usually what the last commit found, so each tick
+    // works it out once
+    if (prevSnap && prev.runStartedAt === next.runStartedAt && prev.activeCity === next.activeCity) {
       const before = opened?.state === prev ? opened : { cars: unlockedCarIds(prev, prevSnap.gm), plants: openPlantTypes(prev) };
       const cars = unlockedCarIds(next, snap.gm);
       const plants = openPlantTypes(next);
@@ -501,6 +511,11 @@ export const useGame = create<GameStore>((set, get) => {
       uiEvents.emit({ type: "toast", kind: "progress", tone: "gold", icon: "🏗️", title: tr("landmark.levelToast", { works: tr(`structure.${works}`), n: u.level }), body: tr("landmark.levelToastBody"), action: { label: tr("toast.open"), view: "landmarks" } });
       uiEvents.emit({ type: "fireworks", plot: `w:${u.territory}` });
     }
+    // a new city can be opened (once)
+    if (!next.unlocks.includes("notice:city:north") && Cy.cityUnlockStatus(next, "north").ready) {
+      next.unlocks.push("notice:city:north");
+      uiEvents.emit({ type: "toast", kind: "progress", tone: "gold", icon: "🏔️", title: tr("toast.cityReady", { name: tr("city.north") }), body: tr("toast.cityReadyBody"), action: { label: tr("toast.open"), view: "world" } });
+    }
     const fo = Ex.fleetOrderTick(next, now);
     if (Ap.autoFleet(next, now)) uiEvents.emit({ type: "toast", kind: "clients", tone: "info", icon: "🚌", title: tr("autoDecide.fleetAccepted") });
     else if (fo === "offer") uiEvents.emit({ type: "toast", kind: "clients", tone: "info", icon: "🚌", title: tr("fleet.offerToast") });
@@ -556,6 +571,12 @@ export const useGame = create<GameStore>((set, get) => {
       funnelBusy = false;
     }
   }
+
+  /** The racing team is in the first city: what it pays and earns goes through that city (engine/cities.ts). */
+  const inFirstCity =
+    <T,>(fn: (s: GameState) => T) =>
+    (s: GameState): T =>
+      Cy.withCity(s, "home", () => fn(s));
 
   const act = <T,>(fn: (s: GameState) => T): T => {
     const { state, snap } = get();
@@ -856,6 +877,7 @@ export const useGame = create<GameStore>((set, get) => {
       } else {
         settleAway(state, now);
       }
+      setWorld(state.activeCity);
       refreshDaily(state, now);
       // the player's language before the first screen (English if it cannot load)
       await loadLanguage(state.settings.lang).catch(() => {});
@@ -1008,13 +1030,13 @@ export const useGame = create<GameStore>((set, get) => {
     },
     upgradeCarModel: (id) => act((s) => A.upgradeCarModel(s, id)),
     buyLogistics: (id) => act((s) => L.buyLogistics(s, id, get().snap.gm.costMult)),
-    unlockRacing: () => act((s) => Rc.unlockRacing(s)),
-    orderRaceCar: (car) => act((s) => Rc.orderRaceCar(s, car)),
+    unlockRacing: () => act(inFirstCity((s) => Rc.unlockRacing(s))),
+    orderRaceCar: (car) => act(inFirstCity((s) => Rc.orderRaceCar(s, car))),
     runTest: (id) => {
-      const r = act((s) => Dn.runTest(s, id));
+      const r = act(inFirstCity((s) => Dn.runTest(s, id)));
       if (r) uiEvents.emit({ type: "toast", tone: "success", icon: "⏱️", title: tr("test.done", { t: r.zeroTo100.toFixed(1), v: r.topSpeed }) });
     },
-    sendCar: (id, to, price) => act((s) => Ch.sendCar(s, id, to, price)),
+    sendCar: (id, to, price) => act(inFirstCity((s) => Ch.sendCar(s, id, to, price))),
     setShowroomPrice: (id, price) => act((s) => Sh.setPrice(s, id, price)),
     startCampaign: () => act((s) => Sh.startCampaign(s)),
     claimMapBonus: (id) => {
@@ -1041,26 +1063,43 @@ export const useGame = create<GameStore>((set, get) => {
       }
       return ok;
     },
-    cancelRaceOrder: (car) => act((s) => Rc.cancelOrder(s, car)),
+    switchCity: (id) => {
+      const ok = act((s) => Cy.switchCity(s, id, Date.now()));
+      if (ok) {
+        persist(true);
+        uiEvents.emit({ type: "toast", tone: "gold", icon: CITIES[id].emoji, title: tr("toast.cityArrived", { name: tr(`city.${id}`) }), body: tr("toast.cityWallet", { money: formatMoney(get().state.cash) }) });
+      }
+      return ok;
+    },
+    unlockCity: (id) => {
+      const ok = act((s) => Cy.unlockCity(s, id, Date.now()));
+      if (ok) {
+        persist(true);
+        uiEvents.emit({ type: "toast", kind: "progress", tone: "gold", icon: CITIES[id].emoji, title: tr("toast.cityOpened", { name: tr(`city.${id}`) }), body: tr("toast.cityOpenedBody", { money: formatMoney(get().state.cities[id]?.cash ?? 0) }) });
+        uiEvents.emit({ type: "fireworks" });
+      }
+      return ok;
+    },
+    cancelRaceOrder: (car) => act(inFirstCity((s) => Rc.cancelOrder(s, car))),
     selectRaceCar: (id) =>
       act((s) => {
         if (!Rc.raceCar(s, id)) return false;
         s.racing.selected = id;
         return true;
       }),
-    enterRace: (event, special) => act((s) => !!Rc.enterRace(s, event, special)),
-    repairRaceCar: (id) => act((s) => Rc.repairCar(s, id)),
-    upgradeRaceCar: (id, u, racingParts) => act((s) => Rc.upgradeRaceCar(s, id, u, racingParts)),
+    enterRace: (event, special) => act(inFirstCity((s) => !!Rc.enterRace(s, event, special))),
+    repairRaceCar: (id) => act(inFirstCity((s) => Rc.repairCar(s, id))),
+    upgradeRaceCar: (id, u, racingParts) => act(inFirstCity((s) => Rc.upgradeRaceCar(s, id, u, racingParts))),
     setRaceSkin: (id, skin) => act((s) => Rc.setSkin(s, id, skin)),
     tuneCar: (id, choice) => {
-      const ok = act((s) => Tu.tune(s, id, choice));
+      const ok = act(inFirstCity((s) => Tu.tune(s, id, choice)));
       if (ok) persist(true);
       return ok;
     },
-    retireRaceCar: (id) => act((s) => Rc.retireRaceCar(s, id) > 0),
-    upgradeRacingGarage: () => act((s) => Rc.upgradeGarage(s)),
-    signSponsor: (id) => act((s) => Rc.signSponsor(s, id)),
-    setAutoRacing: (on) => act((s) => Rc.setAutoRacing(s, on)),
+    retireRaceCar: (id) => act(inFirstCity((s) => Rc.retireRaceCar(s, id) > 0)),
+    upgradeRacingGarage: () => act(inFirstCity((s) => Rc.upgradeGarage(s))),
+    signSponsor: (id) => act(inFirstCity((s) => Rc.signSponsor(s, id))),
+    setAutoRacing: (on) => act(inFirstCity((s) => Rc.setAutoRacing(s, on))),
     setAutoRepair: (on) =>
       act((s) => {
         s.racing.auto.repair = on;
@@ -1421,11 +1460,18 @@ export const useGame = create<GameStore>((set, get) => {
       state.funnel = [...old.funnel];
       state.settings.stats = old.settings.stats;
       refreshDaily(state, Date.now());
+      setWorld(state.activeCity);
       const snap = snapshot(state);
       set({ state, snap, view: { state, snap } });
       persist(true);
     },
   };
+});
+
+// the engine reads the map of the city being played (and its names), whichever way the state changed
+useGame.subscribe((s) => {
+  setWorld(s.state.activeCity);
+  setPlaceNames(s.state.activeCity);
 });
 
 // the battery saver follows the setting, whichever way the state changed (a load, a reset)

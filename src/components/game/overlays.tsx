@@ -9,6 +9,8 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { formatDuration, formatHours, formatMoney, formatNumber } from "@/game/format";
 import { STRUCTURE_BY_ID } from "@/game/config/city";
 import { LANGS } from "@/i18n";
+import { CITIES } from "@/game/config/cities";
+import type { CityId } from "@/game/types";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { batteryState, isSaving, powerVersion, watchPower, type SaverSetting } from "@/lib/power";
@@ -144,6 +146,13 @@ function OfflineReport() {
           {report.rp > 0 && <div className="text-xs text-violet-300">{t("offline.rp", { n: formatNumber(report.rp) })}</div>}
           {dividends > 0 && <div className="text-xs text-rose-300">📈 {t("offline.dividends", { pct: Math.round(sold * 100), money: formatMoney(dividends) })}</div>}
         </div>
+        {(Object.entries(report.cities ?? {}) as [CityId, number][])
+          .filter(([, m]) => m > 0)
+          .map(([id, m]) => (
+            <div key={id} className="mt-2 rounded-2xl bg-sky-500/10 p-2.5 text-left text-xs text-sky-100 ring-1 ring-sky-300/25">
+              {CITIES[id].emoji} {t("offline.city", { name: t(`city.${id}`), money: formatMoney(m) })}
+            </div>
+          ))}
         {capped && <p className="mt-2 text-[11px] text-white/40">{t("offline.capped", { hours: formatHours(offlineCap) })}</p>}
 
         <Button variant="gold" size="lg" className="mt-5 w-full text-base" onClick={collect}>

@@ -7,7 +7,7 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { C, box, freezeStatic, paint, plainUv, type MapMaterials } from "./kit";
-import { RAIL_LINE, RUNWAY } from "./rail-line";
+import type { MapLines } from "./rail-line";
 import { planeParts, shipParts } from "./scenery";
 import type { Ground } from "./terrain";
 
@@ -206,21 +206,23 @@ export class Movers {
   /** The company's transport tier (0 trucks, 1 trains, 2 port, 3 export). */
   private tier = -1;
   private low: boolean;
+  private lines: MapLines;
 
   constructor(
     private ground: Ground,
     private mats: MapMaterials,
     private half: [number, number],
-    opt: { low: boolean },
+    opt: { low: boolean; lines: MapLines },
   ) {
     this.root.name = "movers";
     this.low = opt.low;
+    this.lines = opt.lines;
     this.plane = this.planeObject("#2463b8");
     this.cargo = this.planeObject("#e57c2f");
     this.cargo.visible = false;
     this.root.add(this.plane, this.cargo);
     // the railway: its track is always there, the train comes with the Train tier
-    this.trainPath = new Path(smoothLine(RAIL_LINE, 0.3));
+    this.trainPath = new Path(smoothLine(this.lines.rail, 0.3));
     const heights = this.trainPath.pts.map(([x, z]) => ground.at(x, z));
     // an even bed: the ground's heights averaged over a few units
     const bed = heights.map((_, i) => {
@@ -275,7 +277,8 @@ export class Movers {
     const sea = this.sea;
     if (!this.exits.length) {
       // a berth to start from: the quay by the port's first crane
-      const quay = sea.nearest(-51.5, -26.5);
+      const q0 = this.lines.quays[0];
+      const quay = sea.nearest(q0[0], q0[1] + 1);
       if (!quay) return;
       const d = sea.flood(quay);
       // open water at the map's edge, reachable from the port
@@ -286,10 +289,7 @@ export class Movers {
       if (!this.exits.length) return;
     }
     // berths off the quay (by the cranes), away from the ships moored there
-    const quays: [number, number][] = [
-      [-51.5, -27.5],
-      [-55.5, -26.8],
-    ];
+    const quays = this.lines.quays;
     while (this.ships.length < n && this.ships.length < quays.length) {
       const q = quays[this.ships.length];
       const cell = sea.nearest(q[0], q[1]);
@@ -369,8 +369,8 @@ export class Movers {
     let leg = 0;
     while (t >= T[leg]) t -= T[leg++];
     const k = t / T[leg];
-    const [ax, az] = RUNWAY.a;
-    const [bx, bz] = RUNWAY.b;
+    const [ax, az] = this.lines.runway.a;
+    const [bx, bz] = this.lines.runway.b;
     const L = Math.hypot(bx - ax, bz - az);
     const ux = (bx - ax) / L;
     const uz = (bz - az) / L;

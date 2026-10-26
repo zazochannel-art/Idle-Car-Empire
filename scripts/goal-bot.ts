@@ -1,5 +1,6 @@
 // A "new player" that only does what the What's-next goals suggest.
-// Run: npx tsx scripts/goal-bot.ts [hours] [q = quiet] [race] [full] [sessions] [audit] [save.json]
+// Run: npx tsx scripts/goal-bot.ts [hours] [q = quiet] [race] [full] [sessions] [audit] [north] [save.json]
+//   north: the company starts over in Nordheim, the second city (its own map and wallet)
 //   full: also uses every system a player would (research, sponsors, event
 //         objectives, marketing, Reset Imperium) and lives on the real clock (events)
 //   sessions: plays 1 h, then is away 7 h (offline simulation), repeatedly
@@ -26,6 +27,8 @@ import { campaignCost, startCampaign } from "../src/game/engine/showroom";
 import { canImperium, imperium, pendingStars } from "../src/game/engine/imperium";
 import { collectOffline, settleOffline } from "../src/game/engine/offline";
 import { brandScore } from "../src/game/engine/brand";
+import { switchCity, unlockCity } from "../src/game/engine/cities";
+import { BUYABLE_TERRITORIES } from "../src/game/config/city";
 
 const hours = Number(process.argv[2] ?? 3);
 const quiet = ["q", "race", "full", "sessions"].includes(process.argv[3]);
@@ -33,11 +36,20 @@ const full = process.argv.includes("full");
 const sessions = process.argv.includes("sessions");
 const racing = process.argv.includes("race") || full;
 const audit = process.argv.includes("audit");
+const north = process.argv.includes("north");
 /** Where to write the final save: the first argument after the hours that is a file name, not a flag. */
-const savePath = process.argv.slice(4).find((a) => !["q", "race", "audit", "full", "sessions"].includes(a));
+const savePath = process.argv.slice(4).find((a) => !["q", "race", "audit", "full", "sessions", "north"].includes(a));
 const problems = new Map<string, string>();
 const s = createInitialState(0);
 s.tips = ["start", "engine", "market", "dealers"];
+if (north) {
+  // the first city opened everything and paid for Nordheim; it earns nothing meanwhile
+  s.city.territories = BUYABLE_TERRITORIES.map((t) => t.id);
+  s.cash = 10e9;
+  unlockCity(s, "north", 0);
+  switchCity(s, "north", 0);
+  s.cities.home!.steady = 0;
+}
 const fmtT = (t: number) => `${Math.floor(t / 3600)}h${String(Math.floor((t % 3600) / 60)).padStart(2, "0")}m${String(t % 60).padStart(2, "0")}`;
 let snap = snapshot(s);
 let lastKey = "";

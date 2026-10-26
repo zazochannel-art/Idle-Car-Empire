@@ -295,7 +295,7 @@ export class MapEngine {
   // ───────────────────────── loading ─────────────────────────
 
   private async load() {
-    const base = "/world";
+    const base = WORLD_MAP.assets;
     const [data, heights, areas] = await Promise.all([
       fetch(`${base}/world.json`).then((r) => r.json() as Promise<WorldJson>),
       fetch(`${base}/heights.bin`).then((r) => r.arrayBuffer()),
@@ -366,7 +366,7 @@ export class MapEngine {
     this.fx.setViewHeight(this.h * this.dpr);
     this.weather = new WeatherFx(this.low);
     this.bonus = new BonusLayer(ground, this.trafficLayer, this.mats, this.fx);
-    this.movers = new Movers(ground, this.mats, [WORLD_MAP.size[0] / 2, WORLD_MAP.size[1] / 2], { low: this.low });
+    this.movers = new Movers(ground, this.mats, [WORLD_MAP.size[0] / 2, WORLD_MAP.size[1] / 2], { low: this.low, lines: this.scenery.lines });
     this.scene.add(this.fx.root, this.weather.root, this.bonus.root, this.movers.root);
     this.traffic.flush();
     this.applyState();

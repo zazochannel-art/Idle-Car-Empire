@@ -9,6 +9,7 @@ import { CATEGORY_ICON, MANAGERS, RARITY_COLOR, type ManagerConfig } from "@/gam
 import type { MessageKey } from "@/i18n";
 import { isManagerUnlocked } from "@/game/engine/actions";
 import { plantsOf } from "@/game/engine/chain";
+import { cityOfPlot } from "@/game/engine/cities";
 import { managerUpgradeCost } from "@/game/engine/economy";
 import { formatMoney } from "@/game/format";
 import { useContent } from "@/i18n/content";
@@ -105,7 +106,12 @@ export function ManagersView() {
                 <CostButton className="self-end" cost={managerUpgradeCost(state, m.id)} onBuy={() => upgradeManager(m.id)} label={t("managers.train")} />
               </div>
               {!st.assignedTo && <p className="mt-2 text-[11px] text-amber-300/80">{t("managers.idle")}</p>}
-              {st.assignedTo && <p className="mt-2 text-[11px] text-white/40">{t("managers.workingAt", { name: plantName(state, st.assignedTo, t) })}</p>}
+              {st.assignedTo &&
+                (state.city.buildings[st.assignedTo] ? (
+                  <p className="mt-2 text-[11px] text-white/40">{t("managers.workingAt", { name: plantName(state, st.assignedTo, t) })}</p>
+                ) : (
+                  <p className="mt-2 text-[11px] text-sky-200/70">{t("managers.inCity", { name: t(`city.${cityOfPlot(state, st.assignedTo) ?? "home"}`) })}</p>
+                ))}
             </div>
           );
         })}

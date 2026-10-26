@@ -1,7 +1,8 @@
 // The company on the stock exchange. Once it is big enough it can sell its
 // shares, a tenth at a time and never control: the buyers pay what the
-// company is worth now (its income over STOCK.valueSeconds), and from then on
-// take their part of every dollar of profit as dividends, in play and away.
+// company is worth now (the income of all its cities over STOCK.valueSeconds),
+// and from then on take their part of every dollar of profit as dividends, in
+// play and away, from each city's wallet.
 // A tenth bought back costs what the company is worth then (and a premium):
 // more if it has grown meanwhile, and never less than that tenth brought when
 // it was sold (else a company could sell high, let its income sink a while
@@ -44,20 +45,21 @@ export const STOCK = {
 export const createStock = (): StockState => ({ sold: 0, sales: [], raised: 0, boughtBack: 0, dividends: 0, history: [], sampledAt: 0 });
 
 export const stockUnlocked = (s: GameState) => s.lifetime.moneyEarned >= STOCK.unlockEarned;
-/** What the whole company is worth now. */
-export const companyValue = (snap: EconomySnapshot) => Math.max(0, passiveIncome(snap)) * STOCK.valueSeconds;
-export const sharePrice = (snap: EconomySnapshot) => companyValue(snap) / STOCK.shares;
+/** What the whole company is worth now: the city being played (`snap`) and the parked ones, at the steady income they were left with. */
+export const companyValue = (s: GameState, snap: EconomySnapshot) =>
+  Object.values(s.cities).reduce((a, c) => a + Math.max(0, c?.steady ?? 0), Math.max(0, passiveIncome(snap))) * STOCK.valueSeconds;
+export const sharePrice = (s: GameState, snap: EconomySnapshot) => companyValue(s, snap) / STOCK.shares;
 /** What a tenth of the company brings when sold. */
-export const trancheValue = (snap: EconomySnapshot) => companyValue(snap) * STOCK.tranche;
+export const trancheValue = (s: GameState, snap: EconomySnapshot) => companyValue(s, snap) * STOCK.tranche;
 /** What buying a tenth back costs: its value now or what it brought, the higher, and the premium. */
-export const buybackCost = (s: GameState, snap: EconomySnapshot) => Math.max(trancheValue(snap), s.stock.sales[s.stock.sales.length - 1] ?? 0) * (1 + STOCK.buyPremium);
+export const buybackCost = (s: GameState, snap: EconomySnapshot) => Math.max(trancheValue(s, snap), s.stock.sales[s.stock.sales.length - 1] ?? 0) * (1 + STOCK.buyPremium);
 
 const tranches = (x: number) => Math.round(x / STOCK.tranche);
 const canSell = (s: GameState) => stockUnlocked(s) && tranches(s.stock.sold) + 1 <= tranches(STOCK.maxSold);
 
 /** Sells a tenth of the company: the money it raised (0 when it can't). */
 export function sellShares(s: GameState, snap: EconomySnapshot): number {
-  const cash = trancheValue(snap);
+  const cash = trancheValue(s, snap);
   if (!canSell(s) || !(cash > 0) || !Number.isFinite(cash)) return 0;
   s.cash += cash;
   s.stock.sold = (tranches(s.stock.sold) + 1) * STOCK.tranche;
@@ -90,7 +92,7 @@ export function payDividends(s: GameState, earned: number): number {
 export function stockTick(s: GameState, snap: EconomySnapshot, now: number) {
   if (!stockUnlocked(s) || now - s.stock.sampledAt < STOCK.sampleEvery) return;
   s.stock.sampledAt = now;
-  s.stock.history = [...s.stock.history, sharePrice(snap)].slice(-STOCK.historyLen);
+  s.stock.history = [...s.stock.history, sharePrice(s, snap)].slice(-STOCK.historyLen);
 }
 
 export function migrateStock(raw: unknown): StockState {

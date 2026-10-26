@@ -9,6 +9,8 @@ import { LANGS } from "@/i18n";
 import { useT } from "@/i18n/use-t";
 import { plantsOf } from "@/game/engine/chain";
 import { crateWait } from "@/game/engine/shop";
+import { cityUnlockStatus, ownedCities } from "@/game/engine/cities";
+import { CITIES } from "@/game/config/cities";
 import { useGame } from "@/store/game-store";
 import { useInbox } from "@/store/inbox";
 import { EventChip } from "./event-chip";
@@ -23,6 +25,8 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
   // each number has its own small component, so a tick re-renders only the figures that changed
   // (the bar, its buttons and icons stay as they are)
   const setView = useUi((u) => u.setView);
+  // each city has its own profit: a move starts the figure afresh
+  const city = useGame((g) => g.state.activeCity);
   const { t } = useT();
 
   return (
@@ -31,13 +35,14 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
         <div className="flex shrink-0 flex-col gap-1.5">
           <ShopButton />
           <InboxButton />
+          <CityButton />
         </div>
         <div className="pointer-events-auto flex min-w-0 flex-1 flex-wrap items-center gap-1.5 rounded-2xl bg-[rgba(36,104,214,0.82)] p-1.5 shadow-[0_3px_0_0_rgba(10,40,110,0.35)] md:flex-nowrap md:gap-2 md:bg-[rgba(36,104,214,0.62)] md:p-2 md:hud-bar">
           {/* the cash never gives way to the other figures */}
           <div className="relative flex shrink-0 items-center gap-2 pl-1 pr-2">
             <CashCounter label={t("hud.cash")} />
           </div>
-          <IncomePill />
+          <IncomePill key={city} />
           <RatePill />
           <AdBoostChip />
           <div className="hidden md:block">
@@ -85,6 +90,25 @@ function InboxButton() {
           {unread > 9 ? "9+" : unread}
         </span>
       )}
+    </button>
+  );
+}
+
+/** The city being played (once the company has two, or can open the second): the World screen. */
+function CityButton() {
+  const city = useGame((g) => (ownedCities(g.state).length > 1 || cityUnlockStatus(g.state, "north").ready ? g.state.activeCity : null));
+  const ready = useGame((g) => cityUnlockStatus(g.state, "north").ready);
+  const setView = useUi((u) => u.setView);
+  const { t } = useT();
+  if (!city) return null;
+  return (
+    <button
+      onClick={() => setView("world")}
+      className="pointer-events-auto relative flex size-10 shrink-0 items-center justify-center rounded-full bg-[#5b5b60]/85 text-xl shadow-[0_3px_0_0_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:brightness-110 md:size-12 md:text-2xl"
+      aria-label={`${t("nav.world")}: ${t(`city.${city}`)}`}
+    >
+      {CITIES[city].emoji}
+      {ready && <span className="absolute -right-0.5 -top-0.5 size-3 animate-pulse rounded-full bg-red-500 ring-2 ring-white" />}
     </button>
   );
 }
