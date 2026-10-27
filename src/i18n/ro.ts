@@ -2589,6 +2589,8 @@ export const ro: Record<MessageKey, string> = {
   "iap.thanks": "Mulțumim! Ai primit: {name}",
   "iap.adFreeBody": "Recompensele pentru reclame vin acum fără reclame.",
   "iap.pending": "Plată în așteptare",
+  "iap.refundedTitle": "Cumpărătură rambursată",
+  "iap.refundedBody": "Google Play a rambursat cumpărătura „{name}”, așa că nu mai este activă.",
   "iap.pendingBody": "Cumpărătura ajunge imediat ce Google Play confirmă plata.",
   "iap.failed": "Cumpărătura nu a reușit",
   "iap.failedBody": "Încearcă din nou peste puțin timp. Dacă ți s-au luat banii, cumpărătura ajunge la următoarea pornire a jocului.",

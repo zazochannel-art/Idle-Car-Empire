@@ -119,12 +119,15 @@ function pemBytes(pem: string): Uint8Array<ArrayBuffer> {
   return Uint8Array.from(raw, (c) => c.charCodeAt(0));
 }
 
+/** Firebase Cloud Messaging's scope (the default); the purchases check (functions/iap) asks for Google Play's. */
+export const FCM_SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
+
 /** The signed request for an access token (RS256, an hour). */
-export async function signedAssertion(sa: ServiceAccount, now: number): Promise<string> {
+export async function signedAssertion(sa: ServiceAccount, now: number, scope = FCM_SCOPE): Promise<string> {
   const iat = Math.floor(now / 1000);
   const head = b64urlText(JSON.stringify({ alg: "RS256", typ: "JWT" }));
   const claims = b64urlText(
-    JSON.stringify({ iss: sa.client_email, scope: "https://www.googleapis.com/auth/firebase.messaging", aud: sa.token_uri ?? "https://oauth2.googleapis.com/token", iat, exp: iat + 3600 }),
+    JSON.stringify({ iss: sa.client_email, scope, aud: sa.token_uri ?? "https://oauth2.googleapis.com/token", iat, exp: iat + 3600 }),
   );
   const key = await crypto.subtle.importKey("pkcs8", pemBytes(sa.private_key), { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
   const sig = new Uint8Array(await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(`${head}.${claims}`)));

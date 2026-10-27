@@ -124,19 +124,118 @@ These steps need your accounts and payment details, so only you can do them.
    - **Privacy policy**: already covers it (`site/privacy/`, section *In-app
      purchases*).
 
+## Checking purchases on the server
+
+**Status: ready, but off.** Until you do the steps below, the game trusts what Google Play
+Billing tells the app, as before.
+
+Why turn it on: tools such as Lucky Patcher answer the app's purchase requests with fake
+"paid" purchases. Google Play never saw them, so only a server that asks Google can tell.
+
+### How it works
+
+- **The phone** ([src/lib/native-iap.ts](../../src/lib/native-iap.ts)). In a build with
+  `NEXT_PUBLIC_IAP_VERIFY=1`, a purchase the game hasn't given yet goes to the server first.
+  The game gives it, then acknowledges it, only when the server answers **valid**.
+  - **No answer** (no network, Google slow): the purchase waits. It is checked again at the
+    next start or return to the app. The player sees "Payment pending", not an error.
+  - **Refused** (forged, another account's, refunded): never given and never acknowledged, so
+    a real payment among them is refunded by Google after 3 days.
+  - A purchase the game gave already is only acknowledged, without asking again.
+- **The server** ([supabase/functions/iap](../../supabase/functions/iap)), an Edge Function.
+  It asks the Google Play Developer API about the purchase and checks that:
+  - Google knows it, for this app and this product, and it is paid (or still pending);
+  - it was bought by this game account (the account's hash Google keeps with it);
+  - no other game account received it before.
+- **The ledger** ([0019_purchases.sql](../../supabase/migrations/0019_purchases.sql)):
+  `ops.purchases`, out of the API's reach. One row per purchase:
+  - a hash of Google's token (never the token);
+  - the account, the product, Google's order id (GPA.…);
+  - `purchased`, `pending` or `refunded`, and whether it was a license tester's purchase.
+
+  Rows go with the account when it is deleted.
+- **Refunds.** Every hour the database calls the function, which reads Google's
+  *voided purchases* (refunds, chargebacks, cancellations) and marks them `refunded`. At the
+  player's next start, the game removes **Ad-free rewards** if they were refunded, with a
+  short notice. The **starter pack** was paid out when it was bought and stays given.
+
+### Turning it on (your steps)
+
+Do them in this order. Turning on the build switch (step 6) before the server is ready
+would hold back every purchase until Google refunds it.
+
+1. **Run the migration.** Supabase dashboard → SQL Editor: paste
+   `supabase/migrations/0019_purchases.sql` and run it. To check it,
+   `supabase/tests/purchase_rules.sql` should end with "purchase rules: all checks passed".
+2. **Deploy the function.** With the Supabase CLI, from the repository:
+   `supabase functions deploy iap`. (It shares a file with the push sender, so deploy it
+   from the repository, not by pasting it in the dashboard.)
+3. **Create a service account for Google Play.**
+   - Google Cloud console → pick (or create) a project → APIs & Services → **Enable**
+     *Google Play Android Developer API*.
+   - IAM & Admin → Service accounts → **Create service account** (any name, no role).
+     Open it → Keys → Add key → **JSON**. A file downloads.
+   - Play Console → **Users and permissions** → Invite new users → the service account's
+     email. Under App permissions add Idle Car Empire, with **View financial data, orders
+     and cancellation survey responses** and **Manage orders and subscriptions**. Send the
+     invitation.
+   - Google can take up to a day before the new account's calls work.
+4. **Give the function its key.** Supabase → Edge Functions → **Secrets** → add
+   `PLAY_SERVICE_ACCOUNT`, with the whole JSON file as the value. Then delete the file.
+   Never put it in the repository or in a chat.
+   - If your product ids are not `starter_pack` and `ad_free_rewards`, also add
+     `IAP_STARTER_ID` and `IAP_ADFREE_ID` with yours.
+   - Check it:
+     `curl -H "Authorization: Bearer ANON-KEY" https://orffhhsogoymalyogfzl.supabase.co/functions/v1/iap`
+     answers `{"configured":true}`.
+5. **Schedule the refunds check** (pg_cron and pg_net, as for push). In the SQL Editor:
+
+   ```sql
+   select cron.schedule('iap-voided', '17 * * * *', $$
+     select net.http_post(
+       url := 'https://orffhhsogoymalyogfzl.supabase.co/functions/v1/iap',
+       headers := '{"Authorization": "Bearer ANON-KEY", "Content-Type": "application/json"}'::jsonb,
+       body := '{"action": "voided"}'::jsonb,
+       timeout_milliseconds := 30000
+     )
+   $$);
+   ```
+
+   `ANON-KEY` is the project's **legacy anon key**, as for push.
+6. **Turn it on in the builds.** GitHub → Settings → Secrets and variables → Actions →
+   Variables → add `IAP_VERIFY` = `1`. The next `Android` and `Play publish` builds check
+   every purchase.
+7. **Test it** with a license tester (step 5 above): buy, then look for the row:
+
+   ```sql
+   select product, state, test, order_id, bought_at from ops.purchases order by checked_at desc limit 5;
+   ```
+
+   Then refund the test order in Play Console (Order management) and wait for the next
+   hourly run: the row turns `refunded`, and Ad-free rewards disappear at the next start.
+
+### Sales at a glance
+
+```sql
+select product, state, count(*) from ops.purchases where not test group by product, state order by 1, 2;
+```
+
+### Turning it off
+
+Remove the `IAP_VERIFY` variable and release a build: the game trusts Google Play Billing
+again. Stop the schedule with `select cron.unschedule('iap-voided');`.
+
 ## Choices to know about
 
-- **No server check.** The game trusts what Google Play Billing tells the
-  app. A modified app could pretend to have bought something. That only
-  changes that player's own save, and the leaderboard already limits how fast
-  totals can grow (`supabase/migrations/0004`).
-  - Verifying each purchase on a server would need a Supabase Edge Function and
-    the Google Play Developer API. That API needs a Google Cloud service
-    account linked in Play Console (*Setup* → *API access*). It costs nothing,
-    but it is your account and your key: say so if you want it.
-- **Refunds are not taken back.** If Google refunds a purchase, the game keeps
-  what it gave. Taking it back would need the server check above, plus Google's
-  *Voided Purchases API*.
+- **The server check is optional** (above). Without it, the game trusts what Google Play
+  Billing tells the app, and a modified app could pretend to have bought something. That only
+  changes that player's own save, and the leaderboard already limits how fast totals can grow
+  (`supabase/migrations/0004`).
+- **A player's own save is still theirs.** The server decides what the game gives, but a
+  player who edits their own save on a rooted phone can still change it. Only a server that
+  runs the whole game could prevent that.
+- **Refunds take back what they can.** Ad-free rewards stop. The starter pack's Stars, income
+  and research were already spent into the company, so they stay.
 - **iOS sells nothing.** The App Store would need its own products and
   agreements in App Store Connect. Products bought on Android still apply in
   the iOS app.

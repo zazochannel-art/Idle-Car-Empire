@@ -42,6 +42,16 @@ export function grantPurchase(s: GameState, p: IapProduct, token: string, snap: 
 }
 
 /**
+ * A purchase the server says was refunded (supabase/functions/iap): the ad-free rewards stop.
+ * The starter pack was paid out when it was bought and stays given. True if something changed.
+ */
+export function revokePurchase(s: GameState, p: IapProduct): boolean {
+  if (p !== "adFree" || !owns(s, p)) return false;
+  s.iap.owned = s.iap.owned.filter((o) => o !== p);
+  return true;
+}
+
+/**
  * A short key for a Play purchase token (FNV-1a, 64 bits as hex): enough to know a
  * purchase again, without keeping the token itself in the save.
  */

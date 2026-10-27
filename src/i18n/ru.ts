@@ -2589,6 +2589,8 @@ export const ru: Record<MessageKey, string> = {
   "iap.thanks": "Спасибо! Получено: {name}",
   "iap.adFreeBody": "Награды за рекламу теперь приходят без рекламы.",
   "iap.pending": "Ожидание оплаты",
+  "iap.refundedTitle": "Покупка возвращена",
+  "iap.refundedBody": "Google Play вернул деньги за покупку «{name}», поэтому она больше не действует.",
   "iap.pendingBody": "Покупка придёт, как только Google Play подтвердит оплату.",
   "iap.failed": "Покупка не прошла",
   "iap.failedBody": "Попробуйте ещё раз чуть позже. Если деньги списаны, покупка придёт при следующем запуске игры.",
