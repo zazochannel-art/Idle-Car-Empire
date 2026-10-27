@@ -175,9 +175,10 @@
         <h3 style="margin-top: 0">Trimite în jocul lui</h3>
         <p class="muted" style="margin-top: 0">Jocul jucătorului o face singur data viitoare când pornește sau în cel mult 10 minute dacă e deschis (de la versiunea 1.0.7). Până atunci o poți anula.</p>
         <div class="row">
-          <label>Ce <select id="cmdKind"><option value="cash">💰 Bani</option><option value="stars">⭐ Stele</option><option value="company">🏷️ Numele companiei</option><option value="message">📨 Doar un mesaj</option></select></label>
-          <label data-for="cash stars">Cum <select id="cmdMode"><option value="add">adaugă (minus: scade)</option><option value="set">pune exact</option></select></label>
-          <label data-for="cash stars">Cât <input id="cmdAmount" inputmode="decimal" placeholder="1.5M" style="width: 130px"></label>
+          <label>Ce <select id="cmdKind"><option value="cash">💰 Bani</option><option value="stars">⭐ Stele</option><option value="rep">🏅 Reputație</option><option value="company">🏷️ Numele companiei</option><option value="message">📨 Doar un mesaj</option></select></label>
+          <label data-for="rep">Care <select id="cmdWhich"><option value="company">a companiei (0–100, prețurile mașinilor)</option><option value="racing">de curse (circuite, sponsori)</option></select></label>
+          <label data-for="cash stars rep">Cum <select id="cmdMode"><option value="add">adaugă (minus: scade)</option><option value="set">pune exact</option></select></label>
+          <label data-for="cash stars rep">Cât <input id="cmdAmount" inputmode="decimal" placeholder="1.5M" style="width: 130px"></label>
           <label data-for="cash">În <select id="cmdCity"><option value="here">orașul în care joacă</option><option value="home">orașul natal</option><option value="north">Nordheim</option></select></label>
           <label data-for="company">Numele <input id="cmdName" maxlength="24"></label>
         </div>
@@ -326,7 +327,7 @@ const LANGS = [["ro", "Română"], ["en", "English"], ["de", "Deutsch"], ["es", 
 const ACTIONS = {
   "event.schedule": "Eveniment programat", "event.cancel": "Eveniment anulat", "season.schedule": "Anotimp programat", "season.cancel": "Anotimp anulat",
   "news.schedule": "Anunț publicat", "news.cancel": "Anunț anulat", "player.name": "Nume schimbat", "player.ban": "Ascuns din clasamente",
-  "player.unban": "Lăsat înapoi în clasamente", "command.cash": "Bani trimiși", "command.stars": "Stele trimise", "command.company": "Numele companiei trimis",
+  "player.unban": "Lăsat înapoi în clasamente", "command.cash": "Bani trimiși", "command.stars": "Stele trimise", "command.rep": "Reputație trimisă", "command.company": "Numele companiei trimis",
   "command.restore": "Restaurare trimisă", "command.message": "Mesaj trimis", "command.cancel": "Trimitere anulată", "report.done": "Raportare rezolvată",
   "report.dismissed": "Raportare respinsă", "report.open": "Raportare redeschisă", "error.resolve": "Eroare marcată rezolvată", "error.reopen": "Eroare redeschisă",
 };
@@ -553,6 +554,8 @@ async function openPlayer(id) {
     ["Câștigați", money(s.earned)],
     ["Mașini făcute", num(s.cars)],
     ["⭐ Stele", num(s.stars)],
+    ["Reputația companiei", s.rep != null ? `${num(Math.round(s.rep))} din 100 (50: neutră)` : "—"],
+    ["Reputație la curse", s.racingRep != null ? num(s.racingRep) : "—"],
     ["Puncte de cercetare", num(Math.round(s.rp))],
     ["Reset Imperium", num(s.resets)],
     ["Curse", s.racing ? "da" : "nu"],
@@ -584,6 +587,10 @@ function commandText(kind, p) {
   p = p || {};
   if (kind === "cash") return p.mode === "set" ? `💰 bani: exact ${money(p.amount)} (${CITIES[p.city] || p.city})` : `💰 bani: ${Number(p.amount) >= 0 ? "+" : ""}${money(p.amount)} (${CITIES[p.city] || p.city})`;
   if (kind === "stars") return p.mode === "set" ? `⭐ Stele: exact ${num(p.amount)}` : `⭐ Stele: ${Number(p.amount) >= 0 ? "+" : ""}${num(p.amount)}`;
+  if (kind === "rep") {
+    const what = p.which === "racing" ? "🏁 reputația la curse" : "🏅 reputația companiei";
+    return p.mode === "set" ? `${what}: exact ${num(p.amount)}` : `${what}: ${Number(p.amount) >= 0 ? "+" : ""}${num(p.amount)}`;
+  }
   if (kind === "company") return `🏷️ compania: ${p.name}`;
   if (kind === "restore") return `♻️ copia din ${when(p.made_at)}`;
   if (kind === "message") return "📨 mesaj";
@@ -618,31 +625,39 @@ async function toggleBan() {
   try { const r = await rpc("admin_set_banned", { p_user: current, p_banned: ban }); $("pcMsg").textContent = r === "ok" ? (ban ? "Ascuns din clasamente." : "Se poate lista din nou (din Profil, în joc).") : "Jucătorul nu are profil."; } catch (e) { $("pcMsg").textContent = e.message; }
   await Promise.all([openPlayer(current), loadLog()]);
 }
+/** What the form would send for an amount (stars and racing reputation are whole numbers). */
+function amountPayload(kind, a) {
+  const whole = kind === "stars" || (kind === "rep" && $("cmdWhich").value === "racing");
+  const p = { mode: $("cmdMode").value, amount: whole ? Math.round(a) : a };
+  if (kind === "cash") p.city = $("cmdCity").value;
+  if (kind === "rep") p.which = $("cmdWhich").value;
+  return p;
+}
 function commandForm() {
   const kind = $("cmdKind").value;
   for (const l of document.querySelectorAll("[data-for]")) l.hidden = !l.dataset.for.split(" ").includes(kind);
   const a = parseAmount($("cmdAmount").value);
-  $("cmdPreview").textContent = (kind === "cash" || kind === "stars") && $("cmdAmount").value.trim()
-    ? (Number.isFinite(a) ? `= ${commandText(kind, { mode: $("cmdMode").value, amount: kind === "stars" ? Math.round(a) : a, city: $("cmdCity").value })}` : "Suma nu se înțelege (ex.: 1.5M, 250k, -1000).")
-    : "";
+  const companyRep = kind === "rep" && $("cmdWhich").value === "company";
+  $("cmdPreview").textContent = (kind === "cash" || kind === "stars" || kind === "rep") && $("cmdAmount").value.trim()
+    ? (Number.isFinite(a) ? `= ${commandText(kind, amountPayload(kind, a))}${companyRep ? " (rămâne între 0 și 100 și revine încet spre 50: cam 3 puncte pe oră)" : ""}` : "Suma nu se înțelege (ex.: 1.5M, 250k, -1000).")
+    : companyRep ? "Reputația companiei: 0–100, 50 e neutră; fiecare punct peste sau sub 50 mută prețul mașinilor cu 0,2%." : "";
 }
 async function sendCommand() {
   if (!current) return;
   const kind = $("cmdKind").value;
   const note = $("cmdNote").value.trim();
   let payload = {};
-  if (kind === "cash" || kind === "stars") {
+  if (kind === "cash" || kind === "stars" || kind === "rep") {
     const a = parseAmount($("cmdAmount").value);
     if (!Number.isFinite(a)) { $("pcMsg").textContent = "Scrie suma (ex.: 1.5M, 250k, -1000)."; return; }
-    payload = { mode: $("cmdMode").value, amount: kind === "stars" ? Math.round(a) : a };
-    if (kind === "cash") payload.city = $("cmdCity").value;
+    payload = amountPayload(kind, a);
   }
   if (kind === "company") payload = { name: $("cmdName").value.trim() };
   if (!confirm(`Trimiți în jocul lui: ${commandText(kind, payload)}${note ? ` cu mesajul „${note}”` : ""}?`)) return;
   $("cmdSend").disabled = true;
   try {
     const r = await rpc("admin_send_command", { p_user: current, p_kind: kind, p_payload: payload, p_note: note || null });
-    $("pcMsg").textContent = { ok: "Trimis. Jocul lui o face când pornește sau în cel mult 10 minute.", invalid: "Ceva nu e bine: suma, numele (1–24 de caractere) sau mesajul (cel mult 200; obligatoriu pentru un mesaj).", blocked: "Filtrul de nume nu primește numele companiei.", limit: "Sunt deja 20 care așteaptă jocul lui.", unknown: "Jucătorul nu mai există." }[r] || String(r);
+    $("pcMsg").textContent = { ok: "Trimis. Jocul lui o face când pornește sau în cel mult 10 minute.", invalid: "Ceva nu e bine: suma (reputația companiei: cel mult 100; la curse: număr întreg), numele (1–24 de caractere) sau mesajul (cel mult 200; obligatoriu pentru un mesaj).", blocked: "Filtrul de nume nu primește numele companiei.", limit: "Sunt deja 20 care așteaptă jocul lui.", unknown: "Jucătorul nu mai există." }[r] || String(r);
     if (r === "ok") { $("cmdNote").value = ""; $("cmdAmount").value = ""; commandForm(); }
   } catch (e) { $("pcMsg").textContent = e.message; }
   $("cmdSend").disabled = false;
@@ -952,7 +967,7 @@ $("pcNameSet").addEventListener("click", () => setName(false));
 $("pcNameNeutral").addEventListener("click", () => setName(true));
 $("pcBan").addEventListener("click", toggleBan);
 $("cmdSend").addEventListener("click", sendCommand);
-for (const id of ["cmdKind", "cmdMode", "cmdAmount", "cmdCity"]) $(id).addEventListener("input", commandForm);
+for (const id of ["cmdKind", "cmdMode", "cmdAmount", "cmdCity", "cmdWhich"]) $(id).addEventListener("input", commandForm);
 commandForm();
 for (const b of document.querySelectorAll("[data-tab]")) b.addEventListener("click", () => showTab(b.dataset.tab));
 show();

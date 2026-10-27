@@ -15,9 +15,9 @@ const H = 3600_000;
 const cash = (c: Partial<Extract<TeamCommand, { kind: "cash" }>>): TeamCommand => ({ id: 1, kind: "cash", mode: "add", amount: 0, city: "here", note: "", ...c });
 
 describe("commands from the game's team", () => {
-  it("knows the kinds the server queues", () => {
-    const sql = fs.readFileSync("supabase/migrations/0020_dashboard_tools.sql", "utf8");
-    const list = /kind text not null check \(kind in \(([^)]+)\)\)/.exec(sql)?.[1] ?? "";
+  it("knows the kinds the server queues (the latest migration's list)", () => {
+    const sql = ["0020_dashboard_tools.sql", "0021_command_reputation.sql"].map((f) => fs.readFileSync(`supabase/migrations/${f}`, "utf8")).join("\n");
+    const list = [...sql.matchAll(/check \(kind in \(([^)]+)\)\)/g)].at(-1)?.[1] ?? "";
     expect(list.split(",").map((s) => s.trim().replace(/'/g, ""))).toEqual([...TEAM_KINDS]);
   });
 
@@ -83,6 +83,36 @@ describe("commands from the game's team", () => {
     expect(s.brand.name).toBe("Fine Cars");
     expect(applyTeamCommand(s, { id: 5, kind: "message", note: "Hi" })).toBe(true);
     expect(applyTeamCommand(s, { id: 6, kind: "restore", backup: 1, madeAt: 0, note: "" })).toBe(false);
+  });
+
+  it("changes the company's reputation within 0–100, and the racing team's in whole points from 0", () => {
+    expect(
+      parseTeamCommands([
+        { id: 1, kind: "rep", payload: { which: "company", mode: "set", amount: 80 } },
+        { id: 2, kind: "rep", payload: { which: "company", mode: "add", amount: 120 } },
+        { id: 3, kind: "rep", payload: { which: "racing", mode: "add", amount: 1.5 } },
+        { id: 4, kind: "rep", payload: { which: "racing", mode: "add", amount: 500 } },
+        { id: 5, kind: "rep", payload: { which: "fame", mode: "add", amount: 5 } },
+      ]).map((c) => c.id),
+    ).toEqual([1, 4]);
+    const s = createInitialState(T0);
+    expect(s.quality.rep).toBe(50);
+    const rep = (which: "company" | "racing", mode: "add" | "set", amount: number): TeamCommand => ({ id: 1, kind: "rep", which, mode, amount, note: "" });
+    applyTeamCommand(s, rep("company", "add", 30));
+    expect(s.quality.rep).toBe(80);
+    applyTeamCommand(s, rep("company", "add", 30));
+    expect(s.quality.rep).toBe(100);
+    applyTeamCommand(s, rep("company", "set", 12.5));
+    expect(s.quality.rep).toBe(12.5);
+    applyTeamCommand(s, rep("company", "add", -50));
+    expect(s.quality.rep).toBe(0);
+    const racing = s.racing.rep;
+    applyTeamCommand(s, rep("racing", "add", 600));
+    expect(s.racing.rep).toBe(racing + 600);
+    applyTeamCommand(s, rep("racing", "add", -1e6));
+    expect(s.racing.rep).toBe(0);
+    applyTeamCommand(s, rep("racing", "set", 2500));
+    expect(s.racing.rep).toBe(2500);
   });
 });
 

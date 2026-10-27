@@ -68,14 +68,15 @@ The page is in Romanian. You stay signed in until you close the tab or press **I
 Found from **Players**, a report or the log. It shows:
 
 - The account: email (or guest), when it was made, the last sign-in, the days played in the last 30, the boards, the alliance, invites and reports.
-- The game as last saved to the cloud: when, from which device and app version, the city being played, money and plants in each city, territories, money earned, cars, ⭐ Stars, research points, resets.
+- The game as last saved to the cloud: when, from which device and app version, the city being played, money and plants in each city, territories, money earned, cars, ⭐ Stars, both reputations, research points, resets.
 - Its cloud backups, what was sent to its game, the reports about the player, and the log about them.
 
 What you can do:
 
 - **The player name:** give one of your choosing (the name check and the 3–20 characters apply), or a neutral one.
 - **Off the boards:** hide the player from the leaderboards, or let them back (they then list themselves again from their Profile).
-- **Send to their game:** money (add, take or set exactly, in the city they play in or in a city of your choosing), ⭐ Stars (add, take or set), the company's name, or just a message. A message of up to 200 characters can go with any of them; the player sees it with the change.
+- **Send to their game:** money (add, take or set exactly, in the city they play in or in a city of your choosing), ⭐ Stars (add, take or set), reputation, the company's name, or just a message. A message of up to 200 characters can go with any of them; the player sees it with the change.
+  - **Reputation** is one of two (migration `0021_command_reputation.sql`). The company's goes from 0 to 100, with 50 neutral: each point above or below moves car prices by 0.2%, and it drifts back towards 50 by about 3 points an hour, so a change wears off. The racing team's is whole points and only grows by racing: it opens circuits, sponsors and cars. The card shows both as last saved.
 - **Restore a cloud backup:** their game opens it in place of what it plays, and keeps that as a new backup, so it can be undone.
 
 ### How a command reaches the game
