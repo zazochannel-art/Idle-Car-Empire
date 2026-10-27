@@ -291,6 +291,11 @@ Migrations in `supabase/migrations/`, in order:
 8. `0013_weekly_cup.sql` — the weekly cup (see "Weekly cup"): the
    `ops.cup_entries` table (not reachable from the API), `cup_submit()`,
    `cup_board()` and `claim_cup_prizes()`.
+9. `0019_purchases.sql` — the server's check of in-app purchases
+   ([android/iap.md](android/iap.md)): the `ops.purchases` ledger (not
+   reachable from the API), `my_purchases()` for players, and three functions
+   for the service key only (`iap_record()`, `iap_refunded()`,
+   `iap_voided_mark()`).
 
 `profiles`: `id` (= the auth user, deleted with it), `username` (unique on
 `lower(username)`, 3–20 characters, no control characters), `avatar`,
@@ -440,6 +445,9 @@ Level Security. The game doesn't need it.
 - `supabase/tests/social_rules.sql` — the same for the leaderboard, visits
   and gifts (plausibility limits, leaving the board, the gift limits, a new
   week, a deleted save). Ends with "all social checks passed".
+- `supabase/tests/purchase_rules.sql` — the purchases ledger (a purchase kept
+  for one account, refunds, what a player can and can't reach). Ends with
+  "purchase rules: all checks passed".
 - `supabase/tests/alliance_rules.sql` — ghosts and alliances (cleaned
   ghosts, names and tags, joining, the week's points, who may take which
   reward, removing a member, the leader leaving, an empty alliance closed).

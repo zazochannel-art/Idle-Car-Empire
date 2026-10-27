@@ -2694,6 +2694,8 @@ export const en = {
   "iap.thanks": "Thank you! You got: {name}",
   "iap.adFreeBody": "Ad rewards now come without ads.",
   "iap.pending": "Payment pending",
+  "iap.refundedTitle": "Purchase refunded",
+  "iap.refundedBody": "Google Play refunded the purchase “{name}”, so it is no longer active.",
   "iap.pendingBody": "Your purchase arrives as soon as Google Play confirms the payment.",
   "iap.failed": "The purchase didn't go through",
   "iap.failedBody": "Try again in a moment. If you were charged, the purchase arrives the next time the game starts.",

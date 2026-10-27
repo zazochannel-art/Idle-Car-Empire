@@ -237,6 +237,8 @@ interface GameStore {
   shopBuy: (id: ShopItemId) => boolean;
   /** A purchase from Google Play (`token`: its iapTokenKey), given once and saved at once; acknowledge it only if not "duplicate". */
   iapGrant: (p: IapProduct, token: string) => Iap.GrantResult;
+  /** The server says a purchase was refunded (docs/android/iap.md): the ad-free rewards stop. */
+  iapRevoke: (p: IapProduct) => boolean;
   upgradeBuilding: (plot: string) => boolean;
   placeFacility: (plot: string, type: FacilityType, x: number, y: number, rot: 0 | 1) => boolean;
   moveFacility: (plot: string, uid: number, x: number, y: number, rot: 0 | 1) => boolean;
@@ -1230,6 +1232,12 @@ export const useGame = create<GameStore>((set, get) => {
       // saved before the store hears it was given: a purchase is never acknowledged and then lost
       persist(true);
       return result;
+    },
+    iapRevoke: (p) => {
+      if (!act((s) => Iap.revokePurchase(s, p))) return false;
+      uiEvents.emit({ type: "toast", tone: "info", icon: IAP_ICON[p], title: tr("iap.refundedTitle"), body: tr("iap.refundedBody", { name: tr(`iap.item.${p}` as MessageKey) }) });
+      persist(true);
+      return true;
     },
     upgradeBuilding: (plot) => act((s) => C.upgradeBuilding(s, plot)),
     placeFacility: (plot, type, x, y, rot) => act((s) => C.placeFacility(s, plot, type, x, y, rot)),

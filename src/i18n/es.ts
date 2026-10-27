@@ -2691,6 +2691,8 @@ export const es: Record<MessageKey, string> = {
   "iap.thanks": "¡Gracias! Has recibido: {name}",
   "iap.adFreeBody": "Las recompensas por anuncios llegan ahora sin anuncios.",
   "iap.pending": "Pago pendiente",
+  "iap.refundedTitle": "Compra reembolsada",
+  "iap.refundedBody": "Google Play ha reembolsado la compra «{name}», así que ya no está activa.",
   "iap.pendingBody": "Tu compra llegará en cuanto Google Play confirme el pago.",
   "iap.failed": "La compra no se ha completado",
   "iap.failedBody": "Inténtalo de nuevo en un momento. Si se te ha cobrado, la compra llegará la próxima vez que se inicie el juego.",

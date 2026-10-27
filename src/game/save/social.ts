@@ -142,6 +142,12 @@ export type ReportResult = "ok" | "limit" | "unknown";
 export const GIFTS_PER_DAY = 5;
 
 type Call = (fn: string, args?: Record<string, unknown>) => Promise<unknown>;
+/** Calls one of the project's Edge Functions with the player's session (throws on an error answer). */
+type Invoke = (fn: string, body: Record<string, unknown>) => Promise<unknown>;
+
+/** The server's word on a purchase (supabase/functions/iap); "error": no answer now (try again later). */
+export type PurchaseVerdict = "valid" | "pending" | "refunded" | "invalid" | "taken" | "other_account" | "error";
+const VERDICTS: PurchaseVerdict[] = ["valid", "pending", "refunded", "invalid", "taken", "other_account"];
 
 const num = (v: unknown) => {
   const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
@@ -151,7 +157,10 @@ const str = (v: unknown) => (typeof v === "string" ? v : "");
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
 
 export class Social {
-  constructor(private call: Call) {}
+  constructor(
+    private call: Call,
+    private invoke?: Invoke,
+  ) {}
 
   async leaderboard(kind: BoardKind): Promise<BoardRow[]> {
     const rows = (await this.call("leaderboard", { p_kind: kind })) as unknown[] | null;
@@ -342,5 +351,27 @@ export class Social {
   async claimCupPrizes(): Promise<CupPlace[]> {
     const rows = (await this.call("claim_cup_prizes")) as unknown[] | null;
     return (rows ?? []).map(obj).map((r) => ({ week: num(r.week), rank: Math.max(1, num(r.rank)), entrants: Math.max(1, num(r.entrants)), best: num(r.best_ms) / 1000 }));
+  }
+
+  // ───────────────────────── purchases (0019, functions/iap) ─────────────────────────
+
+  /** Asks the server to check a Google Play purchase for this account before the game gives it. */
+  async verifyPurchase(productId: string, token: string): Promise<PurchaseVerdict> {
+    if (!this.invoke) return "error";
+    try {
+      const v = obj(await this.invoke("iap", { productId, token })).verdict;
+      return VERDICTS.includes(v as PurchaseVerdict) ? (v as PurchaseVerdict) : "error";
+    } catch {
+      return "error";
+    }
+  }
+
+  /** The products this account owns as the server checked them: "owned", or "refunded" since. */
+  async myPurchases(): Promise<{ product: string; state: "owned" | "refunded" }[]> {
+    const rows = (await this.call("my_purchases")) as unknown[] | null;
+    return (Array.isArray(rows) ? rows : []).map(obj).flatMap((r) => {
+      const state = r.state;
+      return state === "owned" || state === "refunded" ? [{ product: str(r.product), state }] : [];
+    });
   }
 }
