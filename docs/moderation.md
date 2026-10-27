@@ -71,7 +71,8 @@ delete from public.alliances where id = '00000000-0000-0000-0000-000000000000';
 
 **Ban a player** from the leaderboards: they can still play their own game, but
 nobody sees them on the boards or visits them, and they can't list themselves
-again:
+again. On the dashboard: **Hide** on the report, or the player's card (which
+also lifts it, and gives a player name of your choosing). In SQL:
 
 ```sql
 update public.profiles set banned = true where id = '00000000-0000-0000-0000-000000000000';

@@ -6,7 +6,8 @@ import { CAR_BY_ID, type CarClass } from "../config/cars";
 import { MATERIAL_IDS, type MaterialId } from "../config/economy";
 import { CAMPAIGN } from "../config/showroom";
 import { HOT_CLASS, MATERIAL_SWING, QUALITY_MODES, RECALL, REP_DRIFT_PER_MIN, REP_PRICE_PER_POINT, TREND_CLASSES, TREND_SEC } from "../config/market";
-import type { CarId, GameState, PlantData, QualityMode, QualityState } from "../types";
+import { CITY_IDS } from "../config/cities";
+import type { CarId, CityId, GameState, PlantData, QualityMode, QualityState } from "../types";
 
 export interface Trend {
   /** Index of the trend (changes every TREND_SEC of market time). */
@@ -95,7 +96,7 @@ export function onCarBuilt(s: GameState, car: CarId, defectRate: number, mode: Q
   if (!q.recall && q.defects >= RECALL.threshold - 1e-9) {
     const cars = Math.floor(q.defects + 1e-9);
     q.defects = Math.max(0, q.defects - cars);
-    q.recall = { car, cars };
+    q.recall = { car, cars, city: s.activeCity };
   }
 }
 
@@ -112,11 +113,25 @@ export function recallCost(s: GameState, carValue: number): number {
   return r ? r.cars * carValue * RECALL.costShare : 0;
 }
 
-/** Recall the cars: pay for the repairs, earn trust. */
+/** The city whose wallet pays for a recall: the one that built the cars (the one being played for older saves). */
+export const recallCity = (s: GameState): CityId => {
+  const c = s.quality.recall?.city;
+  return c && (c === s.activeCity || s.cities[c]) ? c : s.activeCity;
+};
+
+/** What that city's wallet holds. */
+export const recallWallet = (s: GameState) => {
+  const c = recallCity(s);
+  return c === s.activeCity ? s.cash : (s.cities[c]?.cash ?? 0);
+};
+
+/** Recall the cars: pay for the repairs (from the city that built them), earn trust. */
 export function payRecall(s: GameState, cost: number): boolean {
   const q = s.quality;
-  if (!q.recall || s.cash < cost) return false;
-  s.cash -= cost;
+  if (!q.recall || recallWallet(s) < cost) return false;
+  const city = recallCity(s);
+  if (city === s.activeCity) s.cash -= cost;
+  else s.cities[city]!.cash -= cost;
   q.rep = clampRep(q.rep + RECALL.repPaid);
   q.recall = null;
   q.recalls += 1;
@@ -148,6 +163,9 @@ export function migrateQuality(raw: unknown): QualityState {
   q.scandalUntil = Math.max(0, num(r.scandalUntil, 0));
   q.recalls = Math.max(0, Math.floor(num(r.recalls, 0)));
   const rc = r.recall as Record<string, unknown> | null;
-  if (rc && typeof rc === "object" && typeof rc.car === "string" && rc.car in CAR_BY_ID) q.recall = { car: rc.car as CarId, cars: Math.max(1, Math.floor(num(rc.cars, 1))) };
+  if (rc && typeof rc === "object" && typeof rc.car === "string" && rc.car in CAR_BY_ID) {
+    q.recall = { car: rc.car as CarId, cars: Math.max(1, Math.floor(num(rc.cars, 1))) };
+    if (CITY_IDS.includes(rc.city as CityId)) q.recall.city = rc.city as CityId;
+  }
   return q;
 }

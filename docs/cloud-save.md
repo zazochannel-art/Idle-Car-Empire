@@ -110,6 +110,8 @@ account's save (`0011_cloud_backups.sql`), shown in the Profile under
 - before a restore, the cloud save it is about to replace.
 
 Each player keeps the newest 12; they go with the account when it is deleted.
+A player can also delete one of their own from the Profile
+(`delete_my_backup`, `0017_delete_backups.sql`).
 A restore works like a device backup's: the server hands the backup to the
 game (`take_my_backup`, after keeping the current cloud save), the game it
 replaces is kept on the device too, and the game saves the restored one
@@ -150,8 +152,11 @@ a **gift** once a day.
 - **What others can see**: only a public card the server builds from each
   save after it is written (`public.empires`): the profile's name and avatar,
   the company name, money earned, cars built, Stars, and the plants with
-  their levels, number of districts, racing totals and resets. Nothing else
-  of a save is ever readable by another player.
+  their levels, number of districts, racing totals and resets, and (from
+  `0018_visit_map.sql`) the map of their island for visits in 3D: which
+  building stands on which lot at what level, the districts and territories
+  open, the dealerships owned and whether the Racing District is built.
+  Nothing else of a save is ever readable by another player.
 - **Plausible totals**: the card's money earned can't grow faster than the
   game allows on the server's clock: at most doubling every 30 minutes, plus
   $20K a second and $1M (for the early game); a first card starts at no more
@@ -271,12 +276,15 @@ Migrations in `supabase/migrations/`, in order:
 4. `0004_leaderboard_visits_gifts.sql` — the public empire cards, the
    leaderboard, visits and gifts (see "Leaderboard, visits and gifts").
    Independent of 0003. Players who saved before it get their card at their
-   next save.
+   next save. `0018_visit_map.sql` adds the island's map to the cards (visits
+   in 3D) and draws the cards already published again from their saves. Until it
+   runs, cards have no map and the visit only offers the card itself.
 5. `0005_ghosts_and_alliances.sql` — ghosts on the cards, and alliances (see
    "Ghost duels and alliances"). Safe to run again.
 6. `0011_cloud_backups.sql` — cloud backups (see "Cloud backups"): the
    `ops.save_backups` table (not reachable from the API), the trigger on
    `game_saves` that keeps them, `list_my_backups()` and `take_my_backup()`.
+   `0017_delete_backups.sql` adds `delete_my_backup()`.
 7. `0012_invites.sql` — invite codes (see "Invite codes"): the
    `ops.invite_codes` and `ops.invites` tables (not reachable from the API),
    `my_invite()`, `redeem_invite()` and `claim_invite_rewards()`.
@@ -311,6 +319,8 @@ Functions (all for signed-in players only, `search_path` pinned):
 - `take_my_backup(p_id)` → `data, save_version` of one of the caller's own
   backups (nothing for anyone else's), after keeping the caller's current
   cloud save as a `restore` backup.
+- `delete_my_backup(p_id)` → `true` when one of the caller's own backups was
+  deleted, `false` for anyone else's or one already gone (0017).
 - `leaderboard(p_kind)` (`'week'` or `'all'`) → the top 50 listed players
   plus the caller's own row: `rank, user_id, username, avatar, company,
   value, me`.

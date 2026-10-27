@@ -1,0 +1,8 @@
+Novedades en 1.0.3:
+• Las Estrellas ahora son permanentes: recoge ⭐ a medida que crecen tus ganancias totales y conserva fábricas, dinero e investigación
+• Economía reequilibrada
+• Copias en la nube: elimina las que no necesites
+• Beneficio más estable en la barra superior
+• Isla 3D más fluida en móviles
+• Ponle nombre a tu empresa tras tu primer coche
+• En dos dispositivos ya no se pregunta qué partida conservar si son iguales

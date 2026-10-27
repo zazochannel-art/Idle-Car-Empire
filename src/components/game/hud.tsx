@@ -1,7 +1,7 @@
 "use client";
 
 import { ProfileButton } from "./account";
-import { Car, Factory, Moon, Settings, Star, Store, Sun, Sunset, SunMoon, TrendingDown, TrendingUp } from "lucide-react";
+import { Bell, Car, Factory, Moon, Settings, Star, Store, Sun, Sunset, SunMoon, TrendingUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { TIME_MODES } from "@/components/map/lighting";
 import { formatMoney, formatNumber } from "@/game/format";
@@ -9,7 +9,10 @@ import { LANGS } from "@/i18n";
 import { useT } from "@/i18n/use-t";
 import { plantsOf } from "@/game/engine/chain";
 import { crateWait } from "@/game/engine/shop";
+import { cityUnlockStatus, ownedCities } from "@/game/engine/cities";
+import { CITIES } from "@/game/config/cities";
 import { useGame } from "@/store/game-store";
+import { useInbox } from "@/store/inbox";
 import { EventChip } from "./event-chip";
 import { AdBoostChip } from "./ad-buttons";
 import { useUi } from "@/store/ui-store";
@@ -22,18 +25,24 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
   // each number has its own small component, so a tick re-renders only the figures that changed
   // (the bar, its buttons and icons stay as they are)
   const setView = useUi((u) => u.setView);
+  // each city has its own profit: a move starts the figure afresh
+  const city = useGame((g) => g.state.activeCity);
   const { t } = useT();
 
   return (
     <header className="pointer-events-none absolute inset-x-0 top-0 z-30 pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       <div className="flex items-start gap-2 p-2 sm:p-3">
-        <ShopButton />
+        <div className="flex shrink-0 flex-col gap-1.5">
+          <ShopButton />
+          <InboxButton />
+          <CityButton />
+        </div>
         <div className="pointer-events-auto flex min-w-0 flex-1 flex-wrap items-center gap-1.5 rounded-2xl bg-[rgba(36,104,214,0.82)] p-1.5 shadow-[0_3px_0_0_rgba(10,40,110,0.35)] md:flex-nowrap md:gap-2 md:bg-[rgba(36,104,214,0.62)] md:p-2 md:hud-bar">
           {/* the cash never gives way to the other figures */}
           <div className="relative flex shrink-0 items-center gap-2 pl-1 pr-2">
             <CashCounter label={t("hud.cash")} />
           </div>
-          <IncomePill />
+          <IncomePill key={city} />
           <RatePill />
           <AdBoostChip />
           <div className="hidden md:block">
@@ -64,6 +73,46 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
   );
 }
 
+/** The notification center, under the shop: how many notices did not show on screen. */
+function InboxButton() {
+  const unread = useInbox((i) => i.unread);
+  const setView = useUi((u) => u.setView);
+  const { t } = useT();
+  return (
+    <button
+      onClick={() => setView("inbox")}
+      className="pointer-events-auto relative flex size-10 shrink-0 items-center justify-center rounded-full bg-[#5b5b60]/85 text-white shadow-[0_3px_0_0_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:brightness-110 md:size-12"
+      aria-label={t("nav.inbox")}
+    >
+      <Bell className="size-5 md:size-6" />
+      {unread > 0 && (
+        <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-black leading-none ring-2 ring-white">
+          {unread > 9 ? "9+" : unread}
+        </span>
+      )}
+    </button>
+  );
+}
+
+/** The city being played (once the company has two, or can open the second): the World screen. */
+function CityButton() {
+  const city = useGame((g) => (ownedCities(g.state).length > 1 || cityUnlockStatus(g.state, "north").ready ? g.state.activeCity : null));
+  const ready = useGame((g) => cityUnlockStatus(g.state, "north").ready);
+  const setView = useUi((u) => u.setView);
+  const { t } = useT();
+  if (!city) return null;
+  return (
+    <button
+      onClick={() => setView("world")}
+      className="pointer-events-auto relative flex size-10 shrink-0 items-center justify-center rounded-full bg-[#5b5b60]/85 text-xl shadow-[0_3px_0_0_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:brightness-110 md:size-12 md:text-2xl"
+      aria-label={`${t("nav.world")}: ${t(`city.${city}`)}`}
+    >
+      {CITIES[city].emoji}
+      {ready && <span className="absolute -right-0.5 -top-0.5 size-3 animate-pulse rounded-full bg-red-500 ring-2 ring-white" />}
+    </button>
+  );
+}
+
 /** The shop, top left: a red dot when the free crate is ready. */
 function ShopButton() {
   const crate = useGame((g) => crateWait(g.state, g.state.lastActiveAt) === 0);
@@ -82,20 +131,19 @@ function ShopButton() {
 }
 
 function IncomePill() {
-  const losing = useGame((g) => g.snap.incomePerSec < 0);
-  // a new company's first seconds: only wages so far, before the first unit comes off the line,
-  // read as "nothing yet" rather than as a loss
-  const starting = useGame((g) => g.snap.incomePerSec <= 0 && g.state.lifetime.moneyEarned <= 0);
-  const income = useGame((g) => formatMoney(starting ? 0 : g.snap.incomePerSec));
+  const steady = useGame((g) => g.snap.steadyIncomePerSec);
+  // the profit shown is sampled once a minute, so it reads steadily
+  const [sampled, setSampled] = useState(steady);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSampled(useGame.getState().snap.steadyIncomePerSec);
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
+  // until there is a sample (the game still loading at the first render), the live value
+  const income = formatMoney(sampled > 0 ? sampled : steady);
   const { t } = useT();
-  // a loss (costs running ahead of sales for a while) reads as one: arrow down, in red
-  const icon = starting ? (
-    <TrendingUp className="size-4 stroke-[3] text-white/50" />
-  ) : losing ? (
-    <TrendingDown className="size-4 stroke-[3] text-rose-300" />
-  ) : (
-    <TrendingUp className="size-4 stroke-[3] text-lime" />
-  );
+  const icon = <TrendingUp className="size-4 stroke-[3] text-lime" />;
   return <Pill icon={icon} label={t("hud.profit")} value={`${income}${t("unit.perSec")}`} />;
 }
 

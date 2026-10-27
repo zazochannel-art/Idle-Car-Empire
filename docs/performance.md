@@ -25,6 +25,25 @@ What keeps the game light, and how to measure it.
   income as it comes and glides only on jumps; the minimap checks the camera 20 times a second
   on a timer and redraws only when its picture changes. The map's name tags are drawn once and
   copied; trucks are built once per kind and repainted per copy.
+- **The 3D map's draws** (`map/world/kit.ts`): three.js checks a material's shader program again
+  whenever the object drawing it needs a different one, so a material is never shared between
+  kinds of objects (instanced or not, with instance colours or not): `splitSharedMaterials`
+  gives each kind its own copy, and each kind of shadow caster its own depth material (three.js
+  draws them all with one). See-through two-sided materials (the cars' glass) draw in one pass
+  (`forceSinglePass`); in two, three.js rebuilds their program twice per car per frame. The
+  island, its scenery and roads, and the parts of every vehicle keep fixed matrices
+  (`freezeStatic`); only what moves is worked out again each frame. The district cards are
+  placed again only when the view moves, with every size read before any style is written.
+  A vehicle's shadow comes from its big parts only (`shadowFromLargest`): wheels, glass and
+  lights cast none, which takes about a third of the draws out of the shadow pass.
+- **Life on the map**: rain, snow and petals are one draw each, their drops moved by the
+  graphics card in a box that wraps round the view (nothing per drop on the main thread);
+  snow on the roofs and wet ground are a few lines in the map's shared shader, skipped while
+  the weather is dry. Fireworks, sparkles, coins and smoke are two batches of points (glowing
+  and solid), hidden when empty. The ships' sea lanes are found once, when the first ship
+  sails; the railway is planned beforehand (`rail-line.ts`) and its track is built once and
+  frozen. The flow view's arcs are worked out only while it is on. Low graphics draws fewer
+  drops and particles.
 - **Absence**: the offline settlement simulates the chain step by step; recipes, unit materials
   and road distances are worked out once, so it runs about a third faster with the same results.
 - The battery saver (`docs/battery-saver.md`) lowers frames and ticks further.
@@ -35,6 +54,26 @@ What keeps the game light, and how to measure it.
 - `npx tsx scripts/bench-offline.ts <save.json>`: the settlement of 1, 8 and 20 hours away.
 - Bundled like the browser (no module getters):
   `npx esbuild scripts/bench-tick.ts --bundle --platform=node --format=esm --outfile=/tmp/b.mjs && node /tmp/b.mjs <save.json>`.
+
+### The 3D map's draws (24 October 2026)
+
+Production build (`next build --no-mangling`), headless Chrome with the GPU on, a phone profile
+(390×844 at 3×, CPU slowed 4×), 15 s on the map. Main-thread CPU per frame:
+
+| | before | after |
+| --- | --- | --- |
+| Starting map | 14.3 ms | 6.4 ms |
+| Late game (8 plants, $11M) | 16.6 ms | 12.1 ms |
+| Program checks (`getParameters`) per 16 s | ~1 s | ~0 |
+
+With the vehicles' smaller parts out of the shadow pass, a frame that redraws the shadows went
+from 1,119 draw calls to 846 on the late-game map. Measured again with every change in, on a
+busier machine (an Android emulator running beside it), the median of three runs: 28.1 ms per
+frame before any of this, 22.0 ms after.
+
+What is left is the cost of each draw call, most of them in the shadow pass (about 720 trees and
+other scenery cells cast shadows): merging the lots' and the traffic's meshes, or cheaper
+shadows for the scenery, would be the next step.
 
 ### Measured (October 2026)
 

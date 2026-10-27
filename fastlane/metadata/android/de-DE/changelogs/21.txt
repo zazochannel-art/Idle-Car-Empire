@@ -1,0 +1,7 @@
+Neu in 1.0.5:
+• Werke der Gebiete: Restauriere in jedem Gebiet der Karte ein altes Werk und baue seine eigene Autolinie
+• Börse: Verkaufe einen Teil deiner Firma für Geld jetzt, kaufe ihn später zurück
+• Wartungsteam: weniger Ausfälle, schnellere Reparaturen
+• Mitteilungen: eine Glocke mit allem, was passiert ist; Hinweise erscheinen jetzt unten
+• Behoben: Offline-Einnahmen und Tagesbelohnungen bleiben auf deinem Konto
+• Bessere Rennkameras auf dem Handy

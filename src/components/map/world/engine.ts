@@ -10,14 +10,19 @@ import { DEPOT, MARKET, RACING_AREA, STARTER_PLOT, WORLD_MAP, type Plot } from "
 import { SPEC_BY_ID, STRUCTURE_BY_ID, ZONES, type TerritoryId } from "@/game/config/city";
 import { COMPONENT_BY_ID } from "@/game/config/chain";
 import { DEALER_BY_ID } from "@/game/config/dealerships";
+import { MAP_BONUS_BY_KIND } from "@/game/config/map-bonus";
+import { levelCost } from "@/game/engine/chain";
+import { flowLinks, type FlowState } from "@/game/engine/flow";
+import { seasonAt } from "@/game/engine/season";
 import { plotStatus, type PlotStatus } from "@/game/engine/construction";
 import type { EconomySnapshot } from "@/game/engine/economy";
 import { unlockedAreas } from "@/game/engine/territory";
 import type { ComponentId, GameState, StructureType, ZoneId } from "@/game/types";
-import { skyAt, worldClock, type TimeMode } from "../lighting";
+import { dawnMist, skyAt, worldClock, type TimeMode } from "../lighting";
+import { weatherAt, type Weather } from "../weather";
 import type { MapArea, MapNames, MapTarget, ShipView, Site, ZoomTier } from "../map-types";
 import type { CarModel } from "../vehicles";
-import { LOCK, mapMaterials, type MapMaterials } from "./kit";
+import { LOCK, freezeStatic, mapMaterials, splitSharedMaterials, type MapMaterials } from "./kit";
 import { banner, pop, tag } from "./labels";
 import { PlotLayer, plotViews, type PlotView } from "./plots";
 import { RaceCars } from "./race";
@@ -26,6 +31,10 @@ import { Scenery, type BillboardAd } from "./scenery";
 import type { CityLife } from "./city-life";
 import { Ground, NTX, NTY, buildTerrain, type TerrainParts, type WorldJson } from "./terrain";
 import { Traffic3D } from "./traffic";
+import { BonusLayer } from "./bonus";
+import { Fx } from "./fx";
+import { Movers } from "./movers";
+import { WeatherFx } from "./weather-fx";
 
 export { ZOOM_TIERS, type ZoomTier } from "../map-types";
 
@@ -190,11 +199,31 @@ export class MapEngine {
   /** Shadows are drawn (close enough), and the frame parity for redrawing them. */
   private shadowLive = false;
   private shadowTick = 0;
+  /** Frames since shared materials were last split (splitSharedMaterials). */
+  private splitTick = 0;
+  /** Bumped whenever the camera moves; the HTML cards are placed again only then (or now and then). */
+  private viewVersion = 0;
+  private cardsAt = { version: -1, frame: 0 };
+  private cardStyle = new WeakMap<HTMLElement, { vis: string; tf: string }>();
   private plots: PlotLayer | null = null;
   readonly traffic: TrafficFacade;
   private trafficLayer: Traffic3D | null = null;
   private race: RaceCars | null = null;
   private mats: MapMaterials | null = null;
+  private fx: Fx | null = null;
+  private weather: WeatherFx | null = null;
+  private bonus: BonusLayer | null = null;
+  private movers: Movers | null = null;
+  /** The weather to show instead of the forecast (tests and screenshots). */
+  weatherOverride: Weather | null = null;
+  /** The flow view: lines from every plant to where its loads go, coloured by how they run. */
+  flow = false;
+  /** Another player's empire is on the map (engine/visit.ts): no hints meant for the player. */
+  visiting = false;
+  /** Dealerships with no car to sell, and since when (s): "out of stock" after a while. */
+  private emptySince = new Map<string, number>();
+  /** Where the arrow to an off-screen bonus is drawn (CSS px), to tap it. */
+  private bonusArrow: [number, number] | null = null;
   private glows: THREE.Points | null = null;
   private roadMarks: THREE.Group | null = null;
   private areaIds: Uint8Array | null = null;
@@ -261,13 +290,12 @@ export class MapEngine {
     this.home(0);
     this.detach = this.attachControls();
     this.ready = this.load();
-    this.ready.catch((e) => console.error("map: could not load the world", e));
-  }
+    this.ready.catch((e) => console.error("map: could not load the world", e));  }
 
   // ───────────────────────── loading ─────────────────────────
 
   private async load() {
-    const base = "/world";
+    const base = WORLD_MAP.assets;
     const [data, heights, areas] = await Promise.all([
       fetch(`${base}/world.json`).then((r) => r.json() as Promise<WorldJson>),
       fetch(`${base}/heights.bin`).then((r) => r.arrayBuffer()),
@@ -308,12 +336,14 @@ export class MapEngine {
     this.areaSize = [cv.width, cv.height];
 
     const ground = new Ground(data, heights);
+    // the landmark works' lots came after the map: their ground is levelled here
+    ground.level(WORLD_MAP.plots.filter((p) => p.territory));
     this.ground = ground;
     this.ty = ground.at(this.cam.x, this.cam.z);
     this.mats = mapMaterials(aniso);
     this.terrain = buildTerrain(ground, tiles);
     this.scene.add(...this.terrain.tiles, this.terrain.sea, this.terrain.floor);
-    this.scenery = new Scenery(data, ground, this.mats, { low: this.low, lots: WORLD_MAP.plots.map((p) => ({ x: p.x, y: p.y, w: p.w, d: p.d, rot: p.rot })) });
+    this.scenery = new Scenery(data, ground, this.mats, { low: this.low, lots: WORLD_MAP.plots.map((p) => ({ x: p.x, y: p.y, w: p.w, d: p.d, rot: p.rot, clear: !!p.territory })) });
     this.scene.add(this.scenery.root);
     this.scenery.setClose(this.cam.dist < CLOSE_VIEW);
     const roads = buildRoads(data, ground, this.scenery.roads, aniso);
@@ -331,12 +361,25 @@ export class MapEngine {
     this.trafficLayer.setFar(this.cam.dist >= CLOSE_VIEW);
     this.race = new RaceCars(ground, this.mats.car);
     this.scene.add(this.race.mesh);
+    this.fx = new Fx();
+    this.fx.low = this.low;
+    this.fx.setViewHeight(this.h * this.dpr);
+    this.weather = new WeatherFx(this.low);
+    this.bonus = new BonusLayer(ground, this.trafficLayer, this.mats, this.fx);
+    this.movers = new Movers(ground, this.mats, [WORLD_MAP.size[0] / 2, WORLD_MAP.size[1] / 2], { low: this.low, lines: this.scenery.lines });
+    this.scene.add(this.fx.root, this.weather.root, this.bonus.root, this.movers.root);
     this.traffic.flush();
     this.applyState();
     this.applyLife();
     this.plots.setSelected(this._selected);
     this.plots.setBuildInfo(this._buildInfo);
     this.plots.setPreview(this._preview);
+    // the island, its scenery and roads never move (but the rotors, pumps and cable cars)
+    for (const t of [...this.terrain.tiles, this.terrain.sea, this.terrain.floor]) freezeStatic(t);
+    freezeStatic(this.scenery.root, this.scenery.movingParts());
+    freezeStatic(roads.root);
+    freezeStatic(this.movers.root, this.movers.movingParts());
+    splitSharedMaterials(this.scene);
     // compile everything once, before the first frame
     this.place(0);
     if (this.renderer.compileAsync) await this.renderer.compileAsync(this.scene, this.camera);
@@ -510,6 +553,9 @@ export class MapEngine {
     this.trafficLayer = null;
     this.race?.dispose();
     this.race = null;
+    this.fx?.dispose();
+    this.weather?.dispose();
+    this.bonus?.dispose();
     this.renderer.dispose();
   }
 
@@ -522,6 +568,7 @@ export class MapEngine {
     this.renderer.setSize(this.w, this.h, false);
     this.labels.width = Math.round(this.w * this.dpr);
     this.labels.height = Math.round(this.h * this.dpr);
+    this.fx?.setViewHeight(this.h * this.dpr);
     this.camera.aspect = this.w / this.h;
     // far out, the whole island fits on the screen
     const span = 2 * Math.tan(((FOV / 2) * Math.PI) / 180);
@@ -612,6 +659,7 @@ export class MapEngine {
     this.lastCamera.az = c.az;
     this.lastCamera.ty = this.ty;
     this.cameraDirty = false;
+    this.viewVersion++;
   }
 
   private render(dt: number) {
@@ -661,13 +709,27 @@ export class MapEngine {
       for (let left = dt; left > 1e-6; left -= 0.1) this.trafficLayer!.update(Math.min(0.1, left));
       this.race!.update(live.state, this.t);
       this.scenery!.animate(dt, this.t);
+      this.bonus!.set(live.state.mapBonus.active);
+      this.bonus!.update(dt, this.t);
+      this.movers!.setTier(live.state.logistics.tier);
+      this.movers!.update(dt);
       const waves = this.terrain!.waves;
       waves.offset.x = (waves.offset.x + dt * 0.004) % 1;
       waves.offset.y = (waves.offset.y + dt * 0.0025) % 1;
     }
+    if (this.fx && this.weather) {
+      this.fx.update(dt);
+      const now = Date.now();
+      this.weather.update(this.weatherOverride ?? weatherAt(now, seasonAt(now)), dt, this.t, cam.x, this.ty, cam.z, cam.dist, this.h * this.dpr);
+    }
     // the shadows of moving cars and trucks follow at 30 FPS: the shadow pass
     // (about half the draw calls up close) runs every other frame
     if (this.shadowLive && (this.shadowTick ^= 1)) this.renderer.shadowMap.needsUpdate = true;
+    // lots and traffic add meshes as the game goes: give them their own materials too (kit.ts)
+    if (++this.splitTick >= 60) {
+      this.splitTick = 0;
+      splitSharedMaterials(this.scene);
+    }
     this.renderer.render(this.scene, this.camera);
     // HTML cards remain frame-accurate; the heavier canvas labels only need ~30 FPS.
     const labelDt = this.t - this.lastLabelsAt;
@@ -682,6 +744,8 @@ export class MapEngine {
   private readonly skyDay = new THREE.Color("#bfe3f7");
   private readonly skyDusk = new THREE.Color("#f3c39b");
   private readonly skyNight = new THREE.Color("#0d1a33");
+  private readonly skyGrey = new THREE.Color("#b7c0c9");
+  private readonly fogGrey = new THREE.Color("#dfe4e8");
   private readonly sunWarm = new THREE.Color("#fff3df");
   private readonly sunNight = new THREE.Color("#ffb070");
   private readonly hemiDay = new THREE.Color("#d6ecff");
@@ -693,13 +757,19 @@ export class MapEngine {
     const c = this.skyCol;
     if (dark <= 0.5) c.copy(day).lerp(dusk, dark / 0.5);
     else c.copy(dusk).lerp(night, (dark - 0.5) / 0.5);
+    // rain or snow clouds grey the sky; fog and the morning mist close in round the view
+    const over = this.weather?.overcast ?? 0;
+    const mist = Math.max(this.weather?.fog ?? 0, dawnMist(this.timeMode, worldClock.t) * 0.55);
+    c.lerp(this.skyGrey, Math.min(0.7, over * 0.45 + mist * 0.4) * (1 - dark * 0.7));
     (this.scene.background as THREE.Color).copy(c);
     const fog = this.scene.fog as THREE.Fog;
     fog.color.copy(c);
     const d = this.cam.dist;
-    fog.near = d * 2.2 + 60;
-    fog.far = d * 6 + 400;
-    this.sun.intensity = 2.6 * (1 - dark * 0.9);
+    fog.near = d * 2.2 + 60 + (d * 0.15 - (d * 2.2 + 60)) * mist;
+    fog.far = d * 6 + 400 + (d * 1.5 - (d * 6 + 400)) * mist;
+    // the fog itself is a pale grey (by night it takes the sky's colour)
+    fog.color.lerp(this.fogGrey, mist * 0.8 * (1 - dark));
+    this.sun.intensity = 2.6 * (1 - dark * 0.9) * (1 - 0.45 * over - 0.2 * mist);
     this.sun.color.copy(this.sunWarm).lerp(this.sunNight, Math.min(1, dark * 1.4) * 0.6);
     this.hemi.intensity = 1.15 - dark * 0.8;
     this.hemi.color.copy(this.hemiDay).lerp(this.hemiNight, dark);
@@ -735,6 +805,7 @@ export class MapEngine {
     const s = live.state;
     const zoom = this.cam.zoom;
     const anyCar = s.chain.firstCar || s.lifetime.carsProduced > 0;
+    if (this.flow) this.drawFlow(c, live);
     for (const lot of plots.lots.values()) {
       const plot = lot.plot;
       const isOpen = this.unlocked.has(plot.zone);
@@ -761,7 +832,14 @@ export class MapEngine {
           if (zoom < 0.75) break;
           const id = plot.dealer!;
           const dl = s.dealers[id];
-          if (dl?.owned) tag(c, `${names.dealer(id)} · ${names.level(dl.level)}`, x, y, { icon: DEALER_BY_ID[id].emoji });
+          if (dl?.owned) {
+            tag(c, `${names.dealer(id)} · ${names.level(dl.level)}`, x, y, { icon: DEALER_BY_ID[id].emoji });
+            // no car to sell for a while: build more (or send them here)
+            const empty = (s.chain.dealers[id]?.cars ?? 0) < 1;
+            if (!empty) this.emptySince.delete(id);
+            else if (!this.emptySince.has(id)) this.emptySince.set(id, this.t);
+            if (empty && anyCar && !this.visiting && this.t - this.emptySince.get(id)! > 20) tag(c, "📭", x + 26, y - 22, { bg: "rgba(245,158,11,0.95)", size: 11 });
+          }
           else if (anyCar) tag(c, names.money(DEALER_BY_ID[id].cost), x, y, { icon: "🏪", bg: "rgba(120,53,15,0.85)", fg: "#fde68a" });
           else if (zoom >= 0.9) tag(c, "🔒", x, y, { bg: "rgba(15,23,42,0.75)", size: 10 });
           break;
@@ -772,7 +850,7 @@ export class MapEngine {
           break;
         }
         case "empty": {
-          if (zoom < 0.38 || !plot.use) break;
+          if (zoom < 0.38 || !plot.use || this.visiting) break;
           const st = plotStatus(s, plot.id);
           const bob = st === "available" ? Math.sin(this.t * 2.4 + lot.seed * 6) * 2 : 0;
           const bg = sel ? "rgba(245,158,11,0.95)" : st === "owned" ? "rgba(37,99,235,0.9)" : st === "available" ? "rgba(21,128,61,0.88)" : "rgba(30,41,59,0.75)";
@@ -794,6 +872,9 @@ export class MapEngine {
             const icon = pl.status === "noParts" && pl.missing ? COMPONENT_BY_ID[pl.missing as ComponentId].emoji : pl.status === "noRaw" ? "🪨" : pl.status === "full" ? "📦" : "⚠️";
             tag(c, zoom < 0.6 ? "!" : `⚠️ ${icon}`, x + 22, y - 22 + Math.sin(this.t * 4) * 2, { bg: "rgba(245,158,11,0.95)", fg: "#111", size: 11 });
           }
+          // the next level is affordable: a green arrow over the plant
+          const up = zoom >= 0.45 && !this.visiting ? levelCost(b, live.snap.gm) : null;
+          if (up !== null && s.cash >= up) tag(c, "⬆️", x, y - 24 + Math.sin(this.t * 3 + lot.seed * 5) * 1.5, { bg: "rgba(22,163,74,0.95)", size: 11 });
           break;
         }
         case "garage": {
@@ -803,7 +884,7 @@ export class MapEngine {
           const active = (live.snap.city.garages[plot.id]?.incomePerSec ?? 0) > 0;
           const no = b.garage?.no ?? 1;
           tag(c, zoom < 0.9 ? `#${String(no).padStart(2, "0")} · ${names.level(b.level)}` : `${names.garage(no)} · ${names.level(b.level)}`, x, y, { icon: SPEC_BY_ID[b.garage?.spec ?? "repair"].emoji, bg: active ? "rgba(29,78,216,0.9)" : "rgba(8,12,20,0.8)" });
-          if (!active && zoom >= 0.5) tag(c, "!", x + 26, y - 22, { bg: "rgba(245,158,11,0.95)", fg: "#111", size: 11 });
+          if (!active && zoom >= 0.5 && !this.visiting) tag(c, "!", x + 26, y - 22, { bg: "rgba(245,158,11,0.95)", fg: "#111", size: 11 });
           break;
         }
         case "structure":
@@ -814,6 +895,8 @@ export class MapEngine {
       const w = v.works ? s.city.buildings[plot.id]?.works : undefined;
       if (w && zoom >= 0.3) tag(c, `${Math.floor((w.t / w.dur) * 100)}%`, x, y - 24, { icon: "⬆️", bg: "rgba(120,53,15,0.88)", fg: "#fde68a", size: 10 });
     }
+
+    this.drawBonus(c, names);
 
     for (const p of this.pops) {
       p.age += dt;
@@ -835,6 +918,154 @@ export class MapEngine {
     this.banners = this.banners.filter((b) => b.age < 2.6);
   }
 
+  private static FLOW_COLOR: Record<FlowState, string> = { ok: "#22c55e", slow: "#f59e0b", stuck: "#ef4444" };
+
+  /** The flow view: an arc from each plant to where its loads go, dashes running along it. */
+  private drawFlow(c: CanvasRenderingContext2D, live: Live) {
+    const plots = this.plots!;
+    const top = (id: string): [number, number, number] | null => {
+      const lot = plots.lots.get(id);
+      if (!lot) return null;
+      const p = lot.root.position;
+      return [p.x, p.y + lot.top * 0.6, p.z];
+    };
+    c.save();
+    c.lineCap = "round";
+    c.lineJoin = "round";
+    for (const link of flowLinks(live.state, live.snap.chain)) {
+      const a = top(link.from);
+      const b = top(link.to);
+      if (!a || !b) continue;
+      const len = Math.hypot(b[0] - a[0], b[2] - a[2]);
+      const lift = 1.5 + len * 0.22;
+      const pts: [number, number][] = [];
+      for (let i = 0; i <= 24; i++) {
+        const k = i / 24;
+        const q = this.project(a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k + Math.sin(Math.PI * k) * lift, a[2] + (b[2] - a[2]) * k);
+        if (q) pts.push(q);
+      }
+      if (pts.length < 2) continue;
+      const col = MapEngine.FLOW_COLOR[link.state];
+      const path = () => {
+        c.beginPath();
+        c.moveTo(pts[0][0], pts[0][1]);
+        for (const q of pts.slice(1)) c.lineTo(q[0], q[1]);
+      };
+      c.setLineDash([]);
+      c.strokeStyle = "rgba(8,12,20,0.55)";
+      c.lineWidth = 6;
+      path();
+      c.stroke();
+      c.strokeStyle = col;
+      c.lineWidth = 3;
+      path();
+      c.stroke();
+      // goods running toward the destination (still when the link is stuck)
+      c.setLineDash([2, 12]);
+      c.lineDashOffset = link.state === "stuck" ? 0 : -this.t * (link.state === "ok" ? 36 : 12);
+      c.strokeStyle = "rgba(255,255,255,0.95)";
+      c.lineWidth = 3;
+      path();
+      c.stroke();
+      // an arrowhead at the destination
+      const [ex, ey] = pts[pts.length - 1];
+      const [fx, fy] = pts[Math.max(0, pts.length - 3)];
+      const ang = Math.atan2(ey - fy, ex - fx);
+      c.setLineDash([]);
+      c.fillStyle = col;
+      c.beginPath();
+      c.moveTo(ex, ey);
+      c.lineTo(ex - 11 * Math.cos(ang - 0.45), ey - 11 * Math.sin(ang - 0.45));
+      c.lineTo(ex - 11 * Math.cos(ang + 0.45), ey - 11 * Math.sin(ang + 0.45));
+      c.closePath();
+      c.fill();
+    }
+    c.restore();
+  }
+
+  /** The bonus's label over it; off screen, a bubble at the screen's edge pointing to it. */
+  private drawBonus(c: CanvasRenderingContext2D, names: MapNames) {
+    this.bonusArrow = null;
+    const b = this.bonus;
+    const p = b?.position();
+    const kind = b?.kind;
+    if (!p || !kind) return;
+    const emoji = MAP_BONUS_BY_KIND[kind].emoji;
+    const bob = Math.sin(this.t * 4) * 2;
+    const bg = kind === "golden" ? "rgba(202,138,4,0.97)" : kind === "vip" ? "rgba(109,40,217,0.95)" : kind === "drone" ? "rgba(21,128,61,0.95)" : "rgba(220,38,38,0.95)";
+    const at = this.project(p.x, p.y + 0.5, p.z);
+    if (at && at[0] > 24 && at[1] > 24 && at[0] < this.w - 24 && at[1] < this.h - 24) {
+      tag(c, kind === "breakdown" ? names.bonusSlowed : names.bonusTap, at[0], at[1] + bob, { icon: emoji, bg, fg: "#fff", size: 11 });
+      return;
+    }
+    // where it is, seen from the middle of the screen (behind the camera: the other way)
+    const v = this.v3.set(p.x, p.y, p.z).project(this.camera);
+    let dx = v.x;
+    let dy = -v.y;
+    if (v.z > 1) {
+      dx = -dx;
+      dy = -dy;
+    }
+    const n = Math.hypot(dx, dy) || 1;
+    dx /= n;
+    dy /= n;
+    // inside the edges, clear of the top bar, the side menu and the bottom bar
+    const l = this.w > 700 ? 110 : 34;
+    const r = this.w - 34;
+    const t = Math.min(130, this.h * 0.3);
+    const bt = Math.max(t + 40, this.h - 110);
+    const cx = (l + r) / 2;
+    const cy = (t + bt) / 2;
+    const k = Math.min(Math.abs(dx) > 1e-6 ? (dx > 0 ? r - cx : cx - l) / Math.abs(dx) : Infinity, Math.abs(dy) > 1e-6 ? (dy > 0 ? bt - cy : cy - t) / Math.abs(dy) : Infinity);
+    const ax = cx + dx * k;
+    const ay = cy + dy * k;
+    c.save();
+    c.fillStyle = bg;
+    c.beginPath();
+    c.arc(ax, ay, 19, 0, Math.PI * 2);
+    c.fill();
+    c.beginPath();
+    c.moveTo(ax + dx * 29, ay + dy * 29);
+    c.lineTo(ax + dx * 15 - dy * 9, ay + dy * 15 + dx * 9);
+    c.lineTo(ax + dx * 15 + dy * 9, ay + dy * 15 - dx * 9);
+    c.closePath();
+    c.fill();
+    c.font = "18px system-ui, sans-serif";
+    c.textAlign = "center";
+    c.textBaseline = "middle";
+    c.fillText(emoji, ax, ay + 1 + bob * 0.5);
+    c.restore();
+    this.bonusArrow = [ax, ay];
+  }
+
+  /** The bonus was taken (its money): coins over it, and it leaves. */
+  bonusTaken(cash: number) {
+    const p = this.bonus?.position();
+    if (p) {
+      this.pops.push({ x: p.x, y: p.y + 0.9, z: p.z, text: `+${this.money(cash)}`, color: "#fde047", age: 0 });
+      this.bonus!.taken();
+    }
+  }
+
+  /** Fireworks over a plot, a district or territory ("t:port"), or what the camera looks at. */
+  fireworks(target: { plot?: string; area?: string; big?: boolean }) {
+    const g = this.ground;
+    if (!this.fx || !g) return;
+    let x = this.cam.x;
+    let z = this.cam.z;
+    if (target.plot) {
+      const p = WORLD_MAP.plotById[target.plot];
+      if (!p) return;
+      x = p.x;
+      z = p.y;
+    } else if (target.area) {
+      const c = this.areaCenter(target.area as MapArea);
+      x = c.x;
+      z = c.y;
+    }
+    this.fx.fireworks(x, g.at(x, z), z, target.big ? 7 : 4, !!target.big, this.cam.dist / 30);
+  }
+
   /**
    * HTML over the areas follows the camera: names (data-far: only from far
    * away, shrinking with the zoom), padlocks (data-fixed: always the same
@@ -842,8 +1073,21 @@ export class MapEngine {
    * padlock, kept on the screen).
    */
   private placeCards() {
-    const cards = this.overlay?.children ?? [];
+    const cards = this.overlay?.children;
+    if (!cards) return;
+    // only when the view moved, a card came or went, or now and then (a card's size can change)
+    const at = this.cardsAt;
+    const n = cards.length;
+    if (at.version === this.viewVersion && at.frame < 10 && n === this.cardCount) {
+      at.frame++;
+      return;
+    }
+    at.version = this.viewVersion;
+    at.frame = 0;
+    this.cardCount = n;
     const k = Math.max(0.5, Math.min(1, this.cam.zoom * 2.4));
+    // every size is read before any style is written: one layout, not one per card
+    const plan: { el: HTMLElement; vis: string; tf: string }[] = [];
     for (const node of cards) {
       const el = node as HTMLElement;
       const id = el.dataset.zone as MapArea | undefined;
@@ -853,20 +1097,29 @@ export class MapEngine {
       const far = el.dataset.far !== undefined;
       const above = el.dataset.anchor === "above";
       const off = !this.onScreen(p, above ? 0 : 200) || (far && this.cam.zoom > LABEL_ZOOM);
-      el.style.visibility = off ? "hidden" : "visible";
-      if (!p || off) continue;
-      if (above) {
-        // the card sits over its padlock, or under it when there is no room above
-        const hw = el.offsetWidth / 2;
-        const x = Math.max(hw + 8, Math.min(this.w - hw - 8, p[0]));
-        const up = p[1] - el.offsetHeight - 26 > 8;
-        el.style.transform = `translate(${Math.round(x)}px, ${Math.round(p[1])}px) translate(-50%, ${up ? "calc(-100% - 22px)" : "22px"})`;
-      } else {
-        const s = el.dataset.fixed !== undefined ? 1 : k;
-        el.style.transform = `translate(${Math.round(p[0])}px, ${Math.round(p[1])}px) translate(-50%, -50%) scale(${s.toFixed(2)})`;
+      let tf = "";
+      if (p && !off) {
+        if (above) {
+          // the card sits over its padlock, or under it when there is no room above
+          const hw = el.offsetWidth / 2;
+          const x = Math.max(hw + 8, Math.min(this.w - hw - 8, p[0]));
+          const up = p[1] - el.offsetHeight - 26 > 8;
+          tf = `translate(${Math.round(x)}px, ${Math.round(p[1])}px) translate(-50%, ${up ? "calc(-100% - 22px)" : "22px"})`;
+        } else {
+          const s = el.dataset.fixed !== undefined ? 1 : k;
+          tf = `translate(${Math.round(p[0])}px, ${Math.round(p[1])}px) translate(-50%, -50%) scale(${s.toFixed(2)})`;
+        }
       }
+      plan.push({ el, vis: off ? "hidden" : "visible", tf });
+    }
+    for (const { el, vis, tf } of plan) {
+      const was = this.cardStyle.get(el);
+      if (was?.vis !== vis) el.style.visibility = vis;
+      if (tf && was?.tf !== tf) el.style.transform = tf;
+      this.cardStyle.set(el, { vis, tf: tf || was?.tf || "" });
     }
   }
+  private cardCount = -1;
 
   private areaCenter(id: MapArea): { x: number; y: number } {
     if (id === "racing") {
@@ -1053,6 +1306,13 @@ export class MapEngine {
 
   private pick(px: number, py: number): MapTarget {
     if (!this.plots) return null;
+    // the bonus first: it is what the player is after
+    const bp = this.bonus?.position();
+    const bid = this.bonus?.id;
+    if (bp && bid) {
+      const at = this.project(bp.x, bp.y + 0.2, bp.z);
+      if (at && Math.hypot(at[0] - px, at[1] - py) < Math.max(36, 42 * this.cam.zoom)) return { kind: "bonus", id: bid };
+    }
     // vehicles first: they drive in front of the buildings
     const tl = this.trafficLayer;
     if (tl) {
@@ -1189,7 +1449,13 @@ export class MapEngine {
       const was = pts.size;
       pts.delete(e.pointerId);
       if (pts.size < 2) prevPair = null;
-      if (was === 1 && down && !down.moved && performance.now() - down.t < 600 && down.button !== 2) this.onTap(this.pick(p.x, p.y));
+      if (was === 1 && down && !down.moved && performance.now() - down.t < 600 && down.button !== 2) {
+        // the arrow to a bonus off screen: fly there
+        const arrow = this.bonusArrow;
+        const bp = this.bonus?.position();
+        if (arrow && bp && Math.hypot(arrow[0] - p.x, arrow[1] - p.y) < 30) this.cam.flyTo(bp.x, bp.z, Math.max(this.cam.zoom, 1.2), 0.8);
+        else this.onTap(this.pick(p.x, p.y));
+      }
       if (performance.now() - lastMove > 80) this.cam.vx = this.cam.vz = 0;
       if (pts.size === 0) down = null;
     };

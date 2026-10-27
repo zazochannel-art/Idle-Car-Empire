@@ -1,6 +1,9 @@
-// World geometry of the Empire Map, read once from world-data.json.
+// World geometry of the Empire Map: one island map for each city
+// (config/cities.ts), built once each from its data. WORLD_MAP is the map of
+// the city being played; setWorld switches it (the engine and the renderer
+// read it), withWorld runs something on another city's map.
 //
-// The world is the island map: a main island (the first districts) and five
+// The first world is the island map: a main island (the first districts) and five
 // regions round it, joined by bridges. Its roads are a graph of junctions and
 // curved road sections; the lots stand along those roads, each with its front
 // (and driveway) on one road section. Every district (ZONES) and territory
@@ -10,8 +13,11 @@
 // one unit is about 10 m. Pure data — shared by the engine (plot rules,
 // delivery times) and the renderer.
 import DATA from "./world-data.json";
+import NORTH from "./world-north.json";
+import { LANDMARK_LOTS } from "./landmark-lots";
 import { PLOT_USES, ZONES, plotSizeOf, type PlotSize, type TerritoryId } from "../config/city";
-import type { DealerId, StructureType, ZoneId } from "../types";
+import { CITIES } from "../config/cities";
+import type { CityId, DealerId, StructureType, ZoneId } from "../types";
 
 /** Plot ids of the Parts Market, the Materials Depot and the Racing District's paddock. */
 export const MARKET = "m:market";
@@ -57,6 +63,8 @@ export interface Plot {
   size?: PlotSize;
   /** Order in which plots are offered: earlier districts first, nearest first. */
   rank?: number;
+  /** A landmark works' lot: the territory that must be open first (config/landmarks.ts). */
+  territory?: TerritoryId;
   entry: Entry;
 }
 
@@ -91,6 +99,9 @@ export interface AreaInfo {
 }
 
 export interface World {
+  /** The city this is the map of, and the folder its 3D map's files are in. */
+  id: CityId;
+  assets: string;
   /** Width and depth of the map. */
   size: Pt;
   nodes: Pt[];
@@ -118,6 +129,15 @@ interface RawPlot {
   dealer?: string;
   starter?: boolean;
   big?: boolean;
+}
+
+interface RawWorld {
+  size: number[];
+  nodes: number[][];
+  edges: RawRoad[];
+  plots: RawPlot[];
+  areas: Record<string, { c: number[]; min: number[]; max: number[] }>;
+  circuit: number[][];
 }
 
 interface RawRoad {
@@ -159,8 +179,19 @@ function cumulative(pts: Pt[]): number[] {
   return acc;
 }
 
-function build(): World {
-  const raw = DATA as unknown as { size: number[]; nodes: number[][]; edges: RawRoad[]; plots: RawPlot[]; areas: Record<string, { c: number[]; min: number[]; max: number[] }>; circuit: number[][] };
+/** Each city's island (Nordheim's made by scripts/island-gen). */
+const RAW: Record<CityId, RawWorld> = { home: DATA as unknown as RawWorld, north: NORTH as unknown as RawWorld };
+
+/** A city's map data: its lots carry the city's prefix. */
+function rawWorld(id: CityId): RawWorld {
+  const raw = RAW[id];
+  const prefix = CITIES[id].lotPrefix;
+  if (!prefix) return raw;
+  return { ...raw, plots: raw.plots.map((p) => (p.kind === "plot" ? { ...p, id: prefix + p.id } : p)) };
+}
+
+function build(id: CityId): World {
+  const raw = rawWorld(id);
   const nodes = raw.nodes.map((p) => [p[0], p[1]] as Pt);
   const roads: Road[] = raw.edges.map((e) => {
     const pts = e.pts.map((p) => [p[0], p[1]] as Pt);
@@ -212,13 +243,54 @@ function build(): World {
     }
   }
 
+  // the landmark works: one lot in each territory, zoned for its works
+  for (const l of CITIES[id].landmarks ? LANDMARK_LOTS : []) {
+    const road = roads[l.edge];
+    const at = along(road.pts, road.acc, l.s);
+    plots.push({ id: l.id, zone: l.zone, kind: "plot", x: l.x, y: l.y, w: l.w, d: l.d, rot: l.rot, h: l.h, territory: l.territory, use: l.use, size: "large", rank: rank++, entry: { edge: l.edge, s: Math.min(l.s, road.len), x: at.x, y: at.y, drive: l.drive } });
+  }
+
   const plotById = Object.fromEntries(plots.map((p) => [p.id, p]));
-  return { size: [raw.size[0], raw.size[1]], nodes, roads, plots, plotById, areas, circuit: raw.circuit.map((p) => [p[0], p[1]] as Pt) };
+  return { id, assets: CITIES[id].assets, size: [raw.size[0], raw.size[1]], nodes, roads, plots, plotById, areas, circuit: raw.circuit.map((p) => [p[0], p[1]] as Pt) };
 }
 
-export const WORLD_MAP: World = build();
+const WORLDS: Partial<Record<CityId, World>> = {};
 
-export const STARTER_PLOT = WORLD_MAP.plots.find((p) => p.starter)!.id;
+/** A city's map (built the first time it is asked for). */
+export function worldOf(id: CityId): World {
+  return (WORLDS[id] ??= build(id));
+}
+
+const starterOf = (w: World) => w.plots.find((p) => p.starter)!.id;
+const racingAreaOf = (w: World) => ({ paddock: w.plotById[RACING], circuit: w.circuit });
+
+/** The map of the city being played. */
+export let WORLD_MAP: World = worldOf("home");
+
+/** Its first plant's lot. */
+export let STARTER_PLOT = starterOf(WORLD_MAP);
+
+/** The Racing District: its paddock lot and the circuit. */
+export let RACING_AREA = racingAreaOf(WORLD_MAP);
+
+/** Switch to a city's map: everything that reads the map from now on reads that one. */
+export function setWorld(id: CityId): void {
+  if (WORLD_MAP.id === id) return;
+  WORLD_MAP = worldOf(id);
+  STARTER_PLOT = starterOf(WORLD_MAP);
+  RACING_AREA = racingAreaOf(WORLD_MAP);
+}
+
+/** Run `fn` on a city's map, then go back to the one being played. */
+export function withWorld<T>(id: CityId, fn: () => T): T {
+  const was = WORLD_MAP.id;
+  setWorld(id);
+  try {
+    return fn();
+  } finally {
+    setWorld(was);
+  }
+}
 
 export function plotOf(id: string): Plot | undefined {
   return WORLD_MAP.plotById[id];
@@ -257,18 +329,33 @@ export function roadOpen(i: number, unlocked: ReadonlySet<string>): boolean {
 export const UNITS_PER_TILE = 2;
 export const FAST_ROAD = 0.4;
 /** Time-weighted length of part of a road. */
-const cost = (i: number, units: number) => (WORLD_MAP.roads[i].fast ? units * FAST_ROAD : units);
+const cost = (i: number, units: number, w = WORLD_MAP) => (w.roads[i].fast ? units * FAST_ROAD : units);
 /** Length of a driveway in tiles, counted at both ends of a trip. */
 export const DRIVEWAY = 0.6;
 
-const N = WORLD_MAP.nodes.length;
-/** Shortest distances between junctions (respecting one-way roads) and the road taken first. */
-const DIST: Float64Array = new Float64Array(N * N).fill(Infinity);
-const NEXT: Int32Array = new Int32Array(N * N).fill(-1);
-{
+interface Routes {
+  /** Junctions on the map. */
+  n: number;
+  /** Shortest distances between junctions (respecting one-way roads) and the road taken first. */
+  dist: Float64Array;
+  next: Int32Array;
+}
+
+const ROUTES = new WeakMap<World, Routes>();
+/** The current map's routing tables (worked out once for each map). */
+function routes(): Routes {
+  let r = ROUTES.get(WORLD_MAP);
+  if (!r) ROUTES.set(WORLD_MAP, (r = buildRoutes(WORLD_MAP)));
+  return r;
+}
+
+function buildRoutes(w: World): Routes {
+  const N = w.nodes.length;
+  const DIST = new Float64Array(N * N).fill(Infinity);
+  const NEXT = new Int32Array(N * N).fill(-1);
   for (let i = 0; i < N; i++) DIST[i * N + i] = 0;
-  WORLD_MAP.roads.forEach((r, i) => {
-    const c = cost(i, r.len);
+  w.roads.forEach((r, i) => {
+    const c = cost(i, r.len, w);
     if (c < DIST[r.a * N + r.b]) {
       DIST[r.a * N + r.b] = c;
       NEXT[r.a * N + r.b] = i;
@@ -291,6 +378,7 @@ const NEXT: Int32Array = new Int32Array(N * N).fill(-1);
         }
       }
     }
+  return { n: N, dist: DIST, next: NEXT };
 }
 
 /** Ways to leave a lot's road: [junction, weighted distance to it]; the way toward `a` only on two-way roads. */
@@ -319,6 +407,7 @@ export interface RoadRoute {
 
 function bestRoute(a: Entry, b: Entry): { units: number; from: number | null; to: number | null } {
   const ra = WORLD_MAP.roads[a.edge];
+  const { n: N, dist: DIST } = routes();
   let best = { units: Infinity, from: null as number | null, to: null as number | null };
   if (a.edge === b.edge && (!ra.oneway || b.s >= a.s)) best = { units: cost(a.edge, Math.abs(b.s - a.s)), from: null, to: null };
   for (const [n1, d1] of exits(a))
@@ -343,6 +432,7 @@ export function roadRoute(a: Entry, b: Entry): RoadRoute {
 /** The roads between two junctions, in order (empty when they are the same). */
 export function roadsBetween(from: number, to: number): { road: number; forward: boolean }[] {
   const out: { road: number; forward: boolean }[] = [];
+  const { n: N, next: NEXT } = routes();
   let at = from;
   for (let guard = 0; at !== to && guard < N + 2; guard++) {
     const i = NEXT[at * N + to];
@@ -381,9 +471,3 @@ export function routeLine(a: Entry, b: Entry): Pt[] {
   line.push(...slice(b.edge, r.to === rb.a ? 0 : rb.len, b.s).slice(1));
   return line;
 }
-
-/** The Racing District: its paddock lot and the circuit. */
-export const RACING_AREA = {
-  paddock: WORLD_MAP.plotById[RACING],
-  circuit: WORLD_MAP.circuit,
-};

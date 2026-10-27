@@ -63,8 +63,10 @@ describe("world layout", () => {
     expect(WORLD_MAP.plotById[STARTER_PLOT].zone).toBe("town");
     expect(WORLD_MAP.plotById[STARTER_PLOT].use).toBe("bodyWorks");
     for (const z of ZONES) expect(WORLD_MAP.plots.filter((p) => p.zone === z.id && p.kind === "plot").length).toBeGreaterThanOrEqual(6);
-    // ranks run through the districts in stage order
-    const ranked = WORLD_MAP.plots.filter((p) => p.kind === "plot").sort((a, b) => a.rank! - b.rank!);
+    // ranks run through the districts in stage order (the landmark works' lots come after them all)
+    const ranked = WORLD_MAP.plots.filter((p) => p.kind === "plot" && !p.territory).sort((a, b) => a.rank! - b.rank!);
+    const last = Math.max(...ranked.map((p) => p.rank!));
+    expect(WORLD_MAP.plots.filter((p) => p.territory).every((p) => p.rank! > last)).toBe(true);
     const stage = (z: string) => ZONES.find((x) => x.id === z)!.stage;
     for (let i = 1; i < ranked.length; i++) expect(stage(ranked[i].zone)).toBeGreaterThanOrEqual(stage(ranked[i - 1].zone));
   });
@@ -72,7 +74,9 @@ describe("world layout", () => {
   it("keeps every lot of this map version where it was, zoned as it was (saves name their buildings by lot)", () => {
     // a lot taken away or rezoned loses what players built there: that needs a new MAP_VERSION and a migration
     expect(MAP_VERSION).toBe(3);
-    expect(Object.fromEntries(WORLD_MAP.plots.filter((p) => p.kind === "plot").map((p) => [p.id, p.use]))).toEqual(MAP_V3_LOTS);
+    expect(Object.fromEntries(WORLD_MAP.plots.filter((p) => p.kind === "plot" && !p.territory).map((p) => [p.id, p.use]))).toEqual(MAP_V3_LOTS);
+    // lots added since (the landmark works) are new ids: no save names a building there yet
+    for (const p of WORLD_MAP.plots.filter((x) => x.territory)) expect(MAP_V3_LOTS).not.toHaveProperty(p.id);
   });
 
   it("a save with the Car Assembly Plant on the big industrial lot keeps it", () => {

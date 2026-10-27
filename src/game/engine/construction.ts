@@ -21,10 +21,12 @@ import { WORLD_MAP, plotOf } from "../city/layout";
 import type { BuildingState, GameEvent, GameState, StructureType, ZoneId } from "../types";
 import { newPlant, plantLock, type PlantLock } from "./chain";
 import { builtInZone, isZoneUnlocked, newGarage, structureCost } from "./city";
+import { isTerritoryOpen } from "./territory";
+import type { TerritoryId } from "../config/city";
 
 export type PlotStatus = "locked" | "available" | "owned" | "construction" | "operational";
 
-export type LandLock = { kind: "zone"; zone: ZoneId } | { kind: "chain"; lock: NonNullable<PlantLock> } | { kind: "onePerZone" } | null;
+export type LandLock = { kind: "zone"; zone: ZoneId } | { kind: "territory"; territory: TerritoryId } | { kind: "chain"; lock: NonNullable<PlantLock> } | { kind: "onePerZone" } | null;
 
 /** The phases a construction goes through (share of the time at which each starts). */
 export const PHASES = [
@@ -78,6 +80,7 @@ export function landLock(s: GameState, plotId: string, type?: StructureType): La
   const use = buildTypeFor(plotId, type);
   if (!plot || !use) return null;
   if (!isZoneUnlocked(s, plot.zone)) return { kind: "zone", zone: plot.zone };
+  if (plot.territory && !isTerritoryOpen(s, plot.territory)) return { kind: "territory", territory: plot.territory };
   if (isPlantType(use)) {
     const lock = plantLock(s, use);
     if (lock) return { kind: "chain", lock };
@@ -242,16 +245,18 @@ export function freePlotFor(s: GameState, type: StructureType): string | null {
   return best;
 }
 
-const PLOTS_FOR = new Map<StructureType, string[]>();
-/** Every plot zoned for `type` (or taking it as an alternative), nearest first. */
+const PLOTS_FOR = new WeakMap<object, Map<StructureType, string[]>>();
+/** Every plot of the current map zoned for `type` (or taking it as an alternative), nearest first. */
 export function plotsFor(type: StructureType): string[] {
-  let hit = PLOTS_FOR.get(type);
+  let known = PLOTS_FOR.get(WORLD_MAP);
+  if (!known) PLOTS_FOR.set(WORLD_MAP, (known = new Map()));
+  let hit = known.get(type);
   if (!hit) {
     hit = WORLD_MAP.plots
       .filter((p) => p.use === type || (p.use && ALT_USES[p.use]?.includes(type)))
       .sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0))
       .map((p) => p.id);
-    PLOTS_FOR.set(type, hit);
+    known.set(type, hit);
   }
   return hit;
 }

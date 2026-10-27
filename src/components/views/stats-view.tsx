@@ -2,7 +2,8 @@
 
 import { CARS, CAR_BY_ID } from "@/game/config/cars";
 import { DEALERS } from "@/game/config/dealerships";
-import { carValue, plantsOf } from "@/game/engine/chain";
+import { carValue } from "@/game/engine/chain";
+import { plantsEverywhere } from "@/game/engine/cities";
 import { formatDuration, formatHours, formatMoney, formatNumber, formatPercent } from "@/game/format";
 import type { CarId } from "@/game/types";
 import { useContent } from "@/i18n/content";
@@ -39,7 +40,7 @@ export function StatsView() {
     [t("stats.serviced"), formatNumber(Math.floor(state.city.carsServiced))],
     [t("stats.money"), formatMoney(L.moneyEarned)],
     [t("stats.run"), formatMoney(state.run.moneyEarned)],
-    [t("stats.factories"), formatNumber(plantsOf(state).length)],
+    [t("stats.factories"), formatNumber(plantsEverywhere(state))],
     [t("stats.dealers"), `${DEALERS.filter((d) => state.dealers[d.id].owned).length} / ${DEALERS.length}`],
     [t("stats.profit"), `${formatMoney(snap.incomePerSec)}${t("unit.perSec")}`],
     [t("stats.highest"), `${formatMoney(L.highestIncome)}${t("unit.perSec")}`],

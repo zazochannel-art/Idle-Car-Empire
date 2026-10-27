@@ -79,6 +79,8 @@ export function goalText(g: Goal, t: (k: MessageKey, v?: Vars) => string, n: Con
       return { title: t("goal.zone", { name: t(`zone.${g.zone}`) }), detail: t("goal.zoneDetail") };
     case "territory":
       return { title: t("goal.territory", { name: t(`territory.${g.territory}`) }), detail: t(`territoryDesc.${g.territory}`) };
+    case "city":
+      return { title: t("goal.city", { name: t(`city.${g.city}`) }), detail: t("goal.cityDetail") };
     case "made":
       return { title: t("goal.made", { n: g.n, item: t(`item.${g.item}`) }), detail: t("goal.madeDetail", { have: Math.min(g.have, g.n), n: g.n, name: t(`structure.${g.plant}`) }) };
     case "debt":
@@ -147,6 +149,9 @@ export function runGoal(g: Goal) {
     }
     case "debt":
       ui.setView("economy");
+      break;
+    case "city":
+      ui.setView("world");
       break;
   }
 }

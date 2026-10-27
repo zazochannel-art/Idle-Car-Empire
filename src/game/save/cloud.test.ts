@@ -6,7 +6,7 @@ import { SAVE_VERSION, createInitialState } from "../engine/state";
 import type { GameState } from "../types";
 import { SIGNED_OUT_KEY, SaveManager, type StartHooks } from "./index";
 import { LocalStore, LOCAL_SAVE_KEY, memoryStorage, type KeyValue } from "./local";
-import { decideStart, summarize, trustedLastActive } from "./policy";
+import { decideStart, nearlySame, summarize, trustedLastActive } from "./policy";
 import { CloudSync, type SyncInfo } from "./sync";
 import { storedAccount } from "./supabase";
 import type { Account, AuthResult, CloudBackend, CloudBackup, CloudCopy, LocalCopy, Profile } from "./types";
@@ -165,6 +165,12 @@ class FakeCloud implements CloudBackend {
     if (row) this.keep(row, "restore", id);
     return { state: JSON.parse(JSON.stringify(b.data)), version: b.version };
   }
+  async deleteBackup(id: number) {
+    if (this.offline) throw new Error("network");
+    const before = this.server.backups.length;
+    this.server.backups = this.server.backups.filter((b) => !(b.id === id && b.user === this.user));
+    return this.server.backups.length < before;
+  }
 }
 
 /** A browser: its own storage and its own session on the shared server. */
@@ -226,7 +232,37 @@ describe("choosing the save at the start", () => {
   });
 
   it("asks when both moved on, instead of overwriting either", () => {
-    expect(decideStart(copy(50, { owner: "a", base: 3, dirty: true }), null, cloud(90, 5), SAVE_VERSION)).toMatchObject({ use: "ask", reason: "both-changed" });
+    const mine = copy(50, { owner: "a", base: 3, dirty: true });
+    mine.state.lifetime.moneyEarned = 40_000;
+    const theirs = cloud(90, 5);
+    (theirs.state as GameState).lifetime.moneyEarned = 90_000;
+    expect(decideStart(mine, null, theirs, SAVE_VERSION)).toMatchObject({ use: "ask", reason: "both-changed" });
+  });
+
+  it("keeps the copy ahead without asking when both are the same game, a moment apart", () => {
+    const mine = copy(50, { owner: "a", base: 3, dirty: true });
+    mine.state.lifetime.moneyEarned = 1_000_400;
+    const theirs = cloud(90, 5);
+    (theirs.state as GameState).lifetime.moneyEarned = 1_000_000;
+    expect(decideStart(mine, null, theirs, SAVE_VERSION)).toMatchObject({ use: "local", upload: true, base: 5 });
+    mine.state.lifetime.moneyEarned = 999_000;
+    expect(decideStart(mine, null, theirs, SAVE_VERSION).use).toBe("cloud");
+    // played an hour apart: the player chooses
+    mine.state.lastActiveAt = T0 + 3_600_000;
+    expect(decideStart(mine, null, theirs, SAVE_VERSION).use).toBe("ask");
+  });
+
+  it("tells copies of one game that are nearly the same from ones that differ", () => {
+    const a = game(10);
+    const b = game(10);
+    a.lifetime.moneyEarned = 2e9;
+    b.lifetime.moneyEarned = 2.004e9;
+    expect(nearlySame(a, b)).toBe("cloud");
+    expect(nearlySame(b, a)).toBe("local");
+    b.lifetime.moneyEarned = 2.2e9;
+    expect(nearlySame(a, b)).toBeNull();
+    // another company is never "the same"
+    expect(nearlySame(a, game(10, T0 + 1))).toBeNull();
   });
 
   it("moves a save from before accounts into an empty account", () => {
@@ -663,6 +699,28 @@ describe("players and devices", () => {
     expect(await b.saves.cloudBackups()).toEqual([]);
     expect(await b.saves.restoreCloudBackup(mine.id, game(5), T0)).toBeNull();
     expect(await b.cloud.takeBackup(mine.id)).toBeNull();
+    expect((server.rows.get(a.cloud.user!)!.data as GameState).cash).toBe(2_000);
+  });
+
+  it("a player deletes only their own cloud backups", async () => {
+    const server = new Server();
+    const a = device(server);
+    await a.saves.start(T0, registers(a));
+    a.saves.save(game(1_000), true);
+    await vi.advanceTimersByTimeAsync(2_100);
+    a.saves.save(game(2_000), true);
+    await vi.advanceTimersByTimeAsync(2_100);
+    const [mine] = (await a.saves.cloudBackups())!;
+
+    const b = device(server);
+    await b.saves.start(T0, registers(b));
+    expect(await b.saves.deleteCloudBackup(mine.id)).toBe(false);
+    expect(await a.saves.cloudBackups()).toHaveLength(1);
+
+    expect(await a.saves.deleteCloudBackup(mine.id)).toBe(true);
+    expect(await a.saves.cloudBackups()).toEqual([]);
+    expect(await a.saves.deleteCloudBackup(mine.id)).toBe(false);
+    // the save itself stays
     expect((server.rows.get(a.cloud.user!)!.data as GameState).cash).toBe(2_000);
   });
 

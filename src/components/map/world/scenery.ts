@@ -8,6 +8,7 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { ALB, C, NEGRU, beam, box, cone, cylinder, facade, gableRoof, hipRoof, paint, plainUv, rnd, sphere, tiledGable, tiledHip, type FacadeKind, type MapMaterials } from "./kit";
 import { EXAG, NTX, NTY, type Building, type Ground, type RoadData, type WorldJson } from "./terrain";
+import { distToLine, mapLines, type MapLines } from "./rail-line";
 
 /** Buildings are drawn a little taller than to scale, so they read from above. */
 const VH = 1.3;
@@ -107,8 +108,68 @@ export interface Animated {
 export interface SceneryOptions {
   /** Phones: thinner forests in the new regions, fewer shadows. */
   low: boolean;
-  /** Skip parked cars and scenery standing on these lots (world rectangles). */
-  lots?: { x: number; y: number; w: number; d: number; rot: number }[];
+  /** Skip parked cars and scenery standing on these lots (world rectangles); `clear`: the buildings on it too (lots placed after the map was made). */
+  lots?: { x: number; y: number; w: number; d: number; rot: number; clear?: boolean }[];
+}
+
+/** A container ship (length along x, about 3.6 × 1 units), as merged parts. */
+export function shipParts(): THREE.BufferGeometry[] {
+  const R = C("#d8423a"), A = C("#f4f6f8"), G = C("#5d6672"), GOLD = C("#f2b134");
+  const parts = [box(3.6, 0.55, 1.0, C("#a8382e"), 0, -0.25, 0, 0), box(3.5, 0.12, 0.95, G, 0, 0.3, 0, 0), box(0.6, 0.9, 0.8, A, -1.45, 0.42, 0, 0)];
+  const cols = [R, C("#2f7fd1"), GOLD, C("#3aa76d")];
+  for (let i = 0; i < 5; i++) parts.push(box(0.42, 0.34, 0.8, cols[i % 4], -0.75 + i * 0.5, 0.42, 0, 0));
+  parts.push(paint(new THREE.ConeGeometry(0.5, 0.9, 4).rotateZ(-Math.PI / 2).rotateX(Math.PI / 4).scale(1, 0.55, 1).translate(2.2, 0.03, 0), C("#a8382e")));
+  return parts;
+}
+
+/** An airliner (nose toward +x, standing on its wheels at y 0), as merged parts; `livery` paints its tail and stripe. */
+export function planeParts(livery = "#2463b8"): THREE.BufferGeometry[] {
+  const A = C("#f4f6f8"), BLUE = C(livery);
+  const wing = (span: number, root: number, tip: number, sweep: number, thick: number, c: THREE.Color, y: number, xOff: number) => {
+    const s = new THREE.Shape();
+    s.moveTo(root / 2, 0);
+    s.lineTo(-root / 2, 0);
+    s.lineTo(-root / 2 - sweep - tip / 2, span);
+    s.lineTo(-root / 2 - sweep + tip / 2, span);
+    s.closePath();
+    return [1, -1].map((sg) => {
+      const g = new THREE.ExtrudeGeometry(s, { depth: thick, bevelEnabled: false });
+      g.rotateX(Math.PI / 2);
+      g.scale(1, 1, sg);
+      g.translate(xOff, y + thick / 2, 0);
+      return paint(g, c);
+    });
+  };
+  const parts: THREE.BufferGeometry[] = [
+    paint(new THREE.CylinderGeometry(0.15, 0.15, 2.2, 14).rotateZ(Math.PI / 2).translate(0, 0.42, 0), A),
+    paint(new THREE.SphereGeometry(0.15, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2).rotateZ(-Math.PI / 2).scale(1.9, 1, 1).translate(1.1, 0.42, 0), A),
+    paint(new THREE.ConeGeometry(0.15, 0.6, 14).rotateZ(Math.PI / 2).translate(-1.4, 0.45, 0), A),
+    paint(new THREE.CylinderGeometry(0.152, 0.152, 1.9, 14, 1, true, Math.PI * 0.62, Math.PI * 0.26).rotateZ(Math.PI / 2).translate(-0.05, 0.42, 0), BLUE),
+    box(0.16, 0.04, 0.3, C("#203040"), 1.18, 0.5, 0, 0),
+    ...wing(1.25, 0.62, 0.18, 0.55, 0.05, A, 0.33, 0.12),
+    ...wing(0.48, 0.32, 0.12, 0.22, 0.04, A, 0.47, -1.32),
+  ];
+  const fin = new THREE.Shape();
+  fin.moveTo(0, 0);
+  fin.lineTo(-0.42, 0);
+  fin.lineTo(-0.62, 0.62);
+  fin.lineTo(-0.42, 0.62);
+  fin.closePath();
+  parts.push(paint(new THREE.ExtrudeGeometry(fin, { depth: 0.04, bevelEnabled: false }).translate(-1.05, 0.52, -0.02), BLUE));
+  for (const sz of [0.55, -0.55]) {
+    parts.push(paint(new THREE.CylinderGeometry(0.085, 0.075, 0.42, 12).rotateZ(Math.PI / 2).translate(0.05, 0.24, sz), C("#c9d0d8")));
+    parts.push(paint(new THREE.CylinderGeometry(0.06, 0.06, 0.02, 12).rotateZ(Math.PI / 2).translate(0.27, 0.24, sz), C("#2b3138")));
+  }
+  for (let i = 0; i < 11; i++) parts.push(box(0.05, 0.035, 0.302, C("#2a3a4c"), 0.8 - i * 0.17, 0.47, 0, 0));
+  for (const [gx, gz] of [[0.9, 0], [-0.05, 0.14], [-0.05, -0.14]]) parts.push(cylinder(0.05, 0.27, C("#2b3138"), gx, 0.0, gz, 8));
+  return parts;
+}
+
+/** A box round the railway (a quick test before the distance to it). */
+function railBox(rail: [number, number][]) {
+  const xs = rail.map((p) => p[0]);
+  const zs = rail.map((p) => p[1]);
+  return { x: (Math.min(...xs) + Math.max(...xs)) / 2, z: (Math.min(...zs) + Math.max(...zs)) / 2, w: (Math.max(...xs) - Math.min(...xs)) / 2 + 2, d: (Math.max(...zs) - Math.min(...zs)) / 2 + 2 };
 }
 
 /** Side of the cells the big instanced sets are cut into for close-up views (world units). */
@@ -131,6 +192,9 @@ export class Scenery {
   readonly animated: Animated = { rotors: [], pumps: [], cabins: [] };
   /** Lamp posts along town streets and on bridges, [x, z, yaw, y]. */
   readonly lamps: [number, number, number, number][] = [];
+  /** This map's railway (and a box round it), runway and berths. */
+  readonly lines: MapLines;
+  private railBox: ReturnType<typeof railBox>;
 
   constructor(
     private data: WorldJson,
@@ -138,6 +202,8 @@ export class Scenery {
     private mats: MapMaterials,
     private opt: SceneryOptions,
   ) {
+    this.lines = mapLines(data);
+    this.railBox = railBox(this.lines.rail);
     this.roads = mapRoads(data, ground);
     this.buildings();
     this.bridges();
@@ -228,7 +294,9 @@ export class Scenery {
 
   private add(geos: Pieces, mat: THREE.Material, shadow = true) {
     if (!geos.length) return null;
-    const m = new THREE.Mesh(mergeGeometries(geos), mat);
+    const merged = mergeGeometries(geos);
+    geos.forEach((g) => g.dispose());
+    const m = new THREE.Mesh(merged, mat);
     m.castShadow = shadow;
     m.receiveShadow = true;
     this.root.add(m);
@@ -242,6 +310,8 @@ export class Scenery {
     const g = this.ground;
     const trucks: [number, number, number][] = [];
     for (const b of this.data.cladiri) {
+      // a landmark works stands here now
+      if (this.cleared(b)) continue;
       const tile = this.tileOf(b.x, b.z);
       const put = (mat: FacadeKind | "plain" | "metal" | "roof", geo: THREE.BufferGeometry | null) => {
         if (geo) (B[`${tile}|${mat}`] ||= []).push(geo);
@@ -831,8 +901,22 @@ export class Scenery {
     return false;
   }
 
-  /** On a lot: a tree or bush there would come up through its building. */
+  /** A building standing (partly) on a lot that clears its ground. */
+  private cleared(b: Building) {
+    for (const l of this.opt.lots ?? []) {
+      if (!l.clear) continue;
+      const c = Math.cos(l.rot), s = Math.sin(l.rot);
+      const dx = b.x - l.x, dz = b.z - l.y;
+      const u = Math.abs(dx * c - dz * s), v = Math.abs(dx * s + dz * c);
+      if (u < l.w / 2 + Math.max(b.w, b.d) / 2 + 0.3 && v < l.d / 2 + Math.max(b.w, b.d) / 2 + 0.3) return true;
+    }
+    return false;
+  }
+
+  /** On a lot (a tree or bush there would come up through its building), or on the railway's track. */
   private onLot(x: number, z: number) {
+    const rb = this.railBox;
+    if (Math.abs(x - rb.x) < rb.w && Math.abs(z - rb.z) < rb.d && distToLine(x, z, this.lines.rail) < 1.1) return true;
     for (const l of this.opt.lots ?? []) {
       const dx = x - l.x, dz = z - l.y, r = (l.w + l.d) / 2;
       if (dx > r || dx < -r || dz > r || dz < -r) continue;
@@ -1140,7 +1224,7 @@ export class Scenery {
   private landmarks() {
     const P = this.data.props as Record<string, number[][]>;
     const list = (k: string) => (P[k] ?? []).filter((p) => Array.isArray(p)) as number[][];
-    const R = C("#d8423a"), A = C("#f4f6f8"), G = C("#5d6672"), GOLD = C("#f2b134"), BLUE = C("#2463b8");
+    const R = C("#d8423a"), A = C("#f4f6f8"), G = C("#5d6672");
     const lighthouse = () => {
       const parts: THREE.BufferGeometry[] = [];
       for (let i = 0; i < 6; i++) {
@@ -1154,54 +1238,15 @@ export class Scenery {
     for (const [x, z] of list("far")) this.place(lighthouse(), x, z);
     for (const [x, z] of list("faruri")) this.place(lighthouse(), x, z).scale.setScalar(0.85);
     for (const [x, z, rot, s] of list("nave")) {
-      const parts = [box(3.6, 0.55, 1.0, C("#a8382e"), 0, -0.25, 0, 0), box(3.5, 0.12, 0.95, G, 0, 0.3, 0, 0), box(0.6, 0.9, 0.8, A, -1.45, 0.42, 0, 0)];
-      const cols = [R, C("#2f7fd1"), GOLD, C("#3aa76d")];
-      for (let i = 0; i < 5; i++) parts.push(box(0.42, 0.34, 0.8, cols[i % 4], -0.75 + i * 0.5, 0.42, 0, 0));
-      parts.push(paint(new THREE.ConeGeometry(0.5, 0.9, 4).rotateZ(-Math.PI / 2).rotateX(Math.PI / 4).scale(1, 0.55, 1).translate(2.2, 0.03, 0), C("#a8382e")));
-      const m = this.object(parts);
+      const m = this.object(shipParts());
       m.position.set(x, 0.05, z);
       m.rotation.y = rot;
       m.scale.setScalar(s);
       this.root.add(m);
     }
-    const wing = (span: number, root: number, tip: number, sweep: number, thick: number, c: THREE.Color, y: number, xOff: number) => {
-      const s = new THREE.Shape();
-      s.moveTo(root / 2, 0);
-      s.lineTo(-root / 2, 0);
-      s.lineTo(-root / 2 - sweep - tip / 2, span);
-      s.lineTo(-root / 2 - sweep + tip / 2, span);
-      s.closePath();
-      return [1, -1].map((sg) => {
-        const g = new THREE.ExtrudeGeometry(s, { depth: thick, bevelEnabled: false });
-        g.rotateX(Math.PI / 2);
-        g.scale(1, 1, sg);
-        g.translate(xOff, y + thick / 2, 0);
-        return paint(g, c);
-      });
-    };
-    for (const [x, z, rot] of list("avioane")) {
-      const parts: THREE.BufferGeometry[] = [
-        paint(new THREE.CylinderGeometry(0.15, 0.15, 2.2, 14).rotateZ(Math.PI / 2).translate(0, 0.42, 0), A),
-        paint(new THREE.SphereGeometry(0.15, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2).rotateZ(-Math.PI / 2).scale(1.9, 1, 1).translate(1.1, 0.42, 0), A),
-        paint(new THREE.ConeGeometry(0.15, 0.6, 14).rotateZ(Math.PI / 2).translate(-1.4, 0.45, 0), A),
-        paint(new THREE.CylinderGeometry(0.152, 0.152, 1.9, 14, 1, true, Math.PI * 0.62, Math.PI * 0.26).rotateZ(Math.PI / 2).translate(-0.05, 0.42, 0), BLUE),
-        box(0.16, 0.04, 0.3, C("#203040"), 1.18, 0.5, 0, 0),
-        ...wing(1.25, 0.62, 0.18, 0.55, 0.05, A, 0.33, 0.12),
-        ...wing(0.48, 0.32, 0.12, 0.22, 0.04, A, 0.47, -1.32),
-      ];
-      const fin = new THREE.Shape();
-      fin.moveTo(0, 0);
-      fin.lineTo(-0.42, 0);
-      fin.lineTo(-0.62, 0.62);
-      fin.lineTo(-0.42, 0.62);
-      fin.closePath();
-      parts.push(paint(new THREE.ExtrudeGeometry(fin, { depth: 0.04, bevelEnabled: false }).translate(-1.05, 0.52, -0.02), BLUE));
-      for (const sz of [0.55, -0.55]) {
-        parts.push(paint(new THREE.CylinderGeometry(0.085, 0.075, 0.42, 12).rotateZ(Math.PI / 2).translate(0.05, 0.24, sz), C("#c9d0d8")));
-        parts.push(paint(new THREE.CylinderGeometry(0.06, 0.06, 0.02, 12).rotateZ(Math.PI / 2).translate(0.27, 0.24, sz), C("#2b3138")));
-      }
-      for (let i = 0; i < 11; i++) parts.push(box(0.05, 0.035, 0.302, C("#2a3a4c"), 0.8 - i * 0.17, 0.47, 0, 0));
-      for (const [gx, gz] of [[0.9, 0], [-0.05, 0.14], [-0.05, -0.14]]) parts.push(cylinder(0.05, 0.27, C("#2b3138"), gx, 0.0, gz, 8));
+    // the planes parked on the runway make way for the one that takes off and lands (movers.ts)
+    for (const [x, z, rot] of list("avioane").filter(([x, z]) => distToLine(x, z, [this.lines.runway.a, this.lines.runway.b]) > 2.5)) {
+      const parts = planeParts();
       const m = this.place(this.object(parts), x, z);
       m.rotation.y = rot;
       m.scale.setScalar(1.15);
@@ -1398,6 +1443,12 @@ export class Scenery {
         }
       });
     }
+  }
+
+  /** The parts animate() moves (everything else stands still). */
+  movingParts(): THREE.Object3D[] {
+    const a = this.animated;
+    return [...a.rotors.map(([o]) => o), ...a.pumps.map(([o]) => o), ...a.cabins.map((c) => c.c)];
   }
 
   /** Moves the rotors, the pumps and the cable cars. */

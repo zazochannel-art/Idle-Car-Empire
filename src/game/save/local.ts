@@ -89,6 +89,16 @@ export class LocalStore {
     return key;
   }
 
+  /** Deletes one backup (only a backup's key: never a save). */
+  removeBackup(key: string) {
+    if (!key.startsWith(BACKUP_PREFIX)) return;
+    try {
+      this.store?.removeItem(key);
+    } catch {
+      // blocked: nothing to remove
+    }
+  }
+
   /** The backups that can still be read, newest first. */
   backups(): Backup[] {
     const s = this.store;

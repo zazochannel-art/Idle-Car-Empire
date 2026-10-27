@@ -4,6 +4,7 @@
 import { CAR_BY_ID, type CarClass } from "../config/cars";
 import { BRAND, BRAND_COLORS, BRAND_LOGOS, BRAND_STYLES, CLASS_ATTR, type BrandAttr, type BrandStyle } from "../config/brand";
 import type { BrandState, CarId, GameState } from "../types";
+import { isCleanName } from "./names";
 
 export const createBrand = (): BrandState => ({ name: "", logo: BRAND_LOGOS[0], color: BRAND_COLORS[0], accent: "#0f172a", style: "value", renames: 0 });
 
@@ -67,7 +68,8 @@ export function setBrand(s: GameState, patch: Partial<Pick<BrandState, "name" | 
   const b = s.brand;
   if (patch.name !== undefined) {
     const name = patch.name.replace(/\s+/g, " ").trim().slice(0, 24);
-    if (!name || name === b.name) return false;
+    // the company's name is shown to other players (cards, leaderboard): the usual word checks
+    if (!name || name === b.name || !isCleanName(name)) return false;
     const cost = b.renames > 0 ? BRAND.rebrand : 0;
     if (s.cash < cost) return false;
     s.cash -= cost;

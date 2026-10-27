@@ -58,6 +58,7 @@ import { cn } from "@/lib/utils";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { CostButton } from "../game/cost-button";
+import { walletOf } from "@/game/engine/cities";
 import { StatBars, lockText, raceName, trackName } from "../racing/race-viewer";
 import { ViewHeader } from "./section-title";
 
@@ -73,6 +74,11 @@ export function RacingView() {
   const next = nextRepTier(R.rep);
   return (
     <div className="space-y-3 pb-2">
+      {state.activeCity !== "home" && (
+        <div className="rounded-2xl bg-sky-500/10 p-2.5 text-[12px] leading-snug text-sky-100 ring-1 ring-sky-300/30">
+          🏁 {t("racing.wallet", { home: t("city.home"), money: formatMoney(walletOf(state, "home")) })}
+        </div>
+      )}
       <ViewHeader icon="🏁" title={t("racing.district")} subtitle={t("racing.subtitle")}>
         <div className="grid grid-cols-3 gap-2 text-center">
           <Metric label={t("racing.reputation")} value={`${tier.emoji} ${formatNumber(Math.floor(R.rep))}`} sub={t(`race.tier.${tier.id}` as MessageKey)} />
@@ -139,7 +145,7 @@ function Locked() {
       </div>
       {blocker === "firstCar" && <p className="text-center text-xs text-amber-300">{t("racing.blocker.firstCar")}</p>}
       {!state.city.zones.includes("industrial") && <p className="text-center text-[11px] text-white/50">{t("racing.withIndustrial")}</p>}
-      <CostButton className="w-full" cost={blocker === "firstCar" ? null : racingCost(state)} onBuy={unlock} label={`🏁 ${t("racing.build")}`} />
+      <CostButton wallet="home" className="w-full" cost={blocker === "firstCar" ? null : racingCost(state)} onBuy={unlock} label={`🏁 ${t("racing.build")}`} />
     </div>
   );
 }
@@ -231,7 +237,7 @@ function NoCarHint() {
     <div className="flex items-center gap-2 rounded-2xl bg-amber-500/10 p-3 text-xs text-amber-100 ring-1 ring-amber-400/30">
       <span className="flex-1">{eta ? t("mycars.eta", { to: t("mycars.loc.paddock"), time: `${Math.ceil(eta.left)}s` }) : t("mycars.awayHint")}</span>
       {rc && trip && (
-        <button disabled={state.cash < trip.fee} onClick={() => sendCar(rc.id, "racing")} className="shrink-0 rounded-lg bg-gold/20 px-2 py-1 text-[11px] font-bold text-gold ring-1 ring-gold/40 disabled:opacity-40">
+        <button disabled={walletOf(state, "home") < trip.fee} onClick={() => sendCar(rc.id, "racing")} className="shrink-0 rounded-lg bg-gold/20 px-2 py-1 text-[11px] font-bold text-gold ring-1 ring-gold/40 disabled:opacity-40">
           {t("mycars.send.racing", { fee: formatMoney(trip.fee) })}
         </button>
       )}
@@ -362,6 +368,7 @@ function Garage() {
         </div>
         {next && (
           <CostButton
+            wallet="home"
             className="mt-2 w-full"
             cost={cost}
             onBuy={upgradeRacingGarage}
@@ -390,7 +397,7 @@ function Garage() {
                       : t(c.location === "showroom" ? "mycars.loc.showroom" : "mycars.loc.factory")}
                   </span>
                   {trip && (
-                    <button disabled={state.cash < trip.fee} onClick={() => sendCar(c.id, "racing")} className="shrink-0 rounded-lg bg-gold/20 px-2 py-1 text-[11px] font-bold text-gold ring-1 ring-gold/40 disabled:opacity-40">
+                    <button disabled={walletOf(state, "home") < trip.fee} onClick={() => sendCar(c.id, "racing")} className="shrink-0 rounded-lg bg-gold/20 px-2 py-1 text-[11px] font-bold text-gold ring-1 ring-gold/40 disabled:opacity-40">
                       {t("mycars.send.racing", { fee: formatMoney(trip.fee) })}
                     </button>
                   )}
@@ -479,7 +486,7 @@ function RaceCarCard({ id }: { id: number }) {
         </button>
       </div>
       {condition(car) < 1 && (
-        <CostButton className="w-full" cost={racing ? null : cost} onBuy={() => repairRaceCar(id)} label={`🔧 ${t("racing.repair")} · ${formatPercent(condition(car))}`} />
+        <CostButton wallet="home" className="w-full" cost={racing ? null : cost} onBuy={() => repairRaceCar(id)} label={`🔧 ${t("racing.repair")} · ${formatPercent(condition(car))}`} />
       )}
       {state.racing.skins.length > 1 && (
         <div className="flex flex-wrap gap-1 px-1">
@@ -545,7 +552,7 @@ function Development() {
             {cost ? (
               <div className="mt-2 grid grid-cols-2 gap-1.5">
                 <button
-                  disabled={state.cash < cost.money || have < cost.parts || state.racing.live?.car === car.id || !!car.install}
+                  disabled={walletOf(state, "home") < cost.money || have < cost.parts || state.racing.live?.car === car.id || !!car.install}
                   onClick={() => upgradeRaceCar(car.id, u)}
                   className="rounded-xl bg-gold px-2 py-2 text-[11px] font-black text-black disabled:bg-white/10 disabled:text-white/40"
                 >
@@ -555,7 +562,7 @@ function Development() {
                   </div>
                 </button>
                 <button
-                  disabled={state.cash < cost.money || state.racing.parts < cost.racingParts || state.racing.live?.car === car.id || !!car.install}
+                  disabled={walletOf(state, "home") < cost.money || state.racing.parts < cost.racingParts || state.racing.live?.car === car.id || !!car.install}
                   onClick={() => upgradeRaceCar(car.id, u, true)}
                   className="rounded-xl bg-white/10 px-2 py-2 text-[11px] font-black ring-1 ring-white/15 disabled:opacity-40"
                 >
@@ -596,7 +603,7 @@ function Tuning() {
   };
   const can = (c: TuneChoice) => {
     const cost = tuneCost(car, c);
-    return !racing && cost !== null && state.cash >= cost;
+    return !racing && cost !== null && walletOf(state, "home") >= cost;
   };
   return (
     <div className="space-y-2">

@@ -495,13 +495,22 @@ export const LOCK = {
     uLockOn: { value: 0 },
     uLockSize: { value: new THREE.Vector2(1, 1) },
     uLockCol: { value: new THREE.Color("#a9b8c6") },
+    /** Snow lying on what faces up (0–1), and rain on it (0–1): the weather (weather-fx.ts). */
+    uSnow: { value: 0 },
+    uWet: { value: 0 },
   },
 };
 
-/** Lets a material fade under the locked-land haze (programs are shared between materials of a kind). */
+/**
+ * Lets a material fade under the locked-land haze, and take snow and rain
+ * from the weather (programs are shared between materials of a kind; a
+ * material's userData.snowK, 0–1, says how much snow stays on it: less on
+ * the roads).
+ */
 export function hazed<M extends THREE.Material>(m: M): M {
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, LOCK.uniforms);
+    sh.uniforms.uSnowK = { value: typeof m.userData.snowK === "number" ? m.userData.snowK : 1 };
     sh.vertexShader = sh.vertexShader
       .replace("#include <common>", "#include <common>\nvarying vec2 vLockUv;\nuniform vec2 uLockSize;")
       .replace(
@@ -515,7 +524,30 @@ lkW = modelMatrix * lkW;
 vLockUv = vec2(lkW.x / uLockSize.x + 0.5, lkW.z / uLockSize.y + 0.5);`,
       );
     sh.fragmentShader = sh.fragmentShader
-      .replace("#include <common>", "#include <common>\nvarying vec2 vLockUv;\nuniform sampler2D uLockMap;\nuniform float uLockOn;\nuniform vec3 uLockCol;")
+      .replace("#include <common>", "#include <common>\nvarying vec2 vLockUv;\nuniform sampler2D uLockMap;\nuniform float uLockOn;\nuniform vec3 uLockCol;\nuniform vec2 uLockSize;\nuniform float uSnow;\nuniform float uWet;\nuniform float uSnowK;")
+      .replace(
+        "#include <normal_fragment_maps>",
+        `#include <normal_fragment_maps>
+if (uSnow > 0.001 || uWet > 0.001) {
+  float up = dot(normal, normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz));
+  if (uSnow > 0.001) {
+    vec2 wp = floor(vLockUv * uLockSize * 3.0);
+    float nz = fract(sin(dot(wp, vec2(12.9898, 78.233))) * 43758.5453);
+    float cover = smoothstep(0.35, 0.75, up + (nz - 0.5) * 0.3) * uSnow * uSnowK;
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.92, 0.95, 1.0), cover);
+#ifdef STANDARD
+    roughnessFactor = mix(roughnessFactor, 0.9, cover);
+#endif
+  }
+  if (uWet > 0.001) {
+    float wet = smoothstep(0.3, 0.8, up) * uWet;
+    diffuseColor.rgb *= 1.0 - 0.22 * wet;
+#ifdef STANDARD
+    roughnessFactor = mix(roughnessFactor, roughnessFactor * 0.45, wet);
+#endif
+  }
+}`,
+      )
       .replace(
         "#include <opaque_fragment>",
         `#include <opaque_fragment>
@@ -544,6 +576,106 @@ export function hazeAll(o: THREE.Object3D) {
       hazed(m);
       m.userData.hazed = true;
     }
+  });
+}
+
+/**
+ * What makes three.js build a different shader program for the same material: instancing,
+ * instance colours, receiving shadows, the geometry's vertex colours, tangents, morphs, skins.
+ */
+function programKind(mesh: THREE.Mesh): string {
+  const g = mesh.geometry;
+  const inst = mesh as THREE.InstancedMesh;
+  return [inst.isInstancedMesh ? (inst.instanceColor ? "ic" : "i") : "m", mesh.receiveShadow ? "r" : "", g.attributes.color?.itemSize ?? 0, g.attributes.tangent ? "t" : "", g.morphAttributes.position ? "p" : "", (mesh as THREE.SkinnedMesh).isSkinnedMesh ? "s" : ""].join("");
+}
+
+/** The copies made of a material, by kind of object; and the kind each original stays with. */
+const variants = new WeakMap<THREE.Material, Map<string, THREE.Material>>();
+const originOf = new WeakMap<THREE.Material, THREE.Material>();
+const ownKind = new WeakMap<THREE.Material, string>();
+
+/** The shadow pass's depth material for each kind of caster (see splitSharedMaterials). */
+const depthByKind = new Map<string, THREE.MeshDepthMaterial>();
+
+/**
+ * Gives every kind of object (see programKind) its own copy of a material it shares with
+ * other kinds. three.js checks a material's program again each time the object drawing it
+ * needs another one, and the map's few shared materials are drawn by hundreds of instanced
+ * and plain meshes, with and without shadows: one material per kind keeps the programs
+ * steady from draw to draw. The copies look the same (same textures and haze), and the
+ * map's materials never change after they are made. The shadow pass gets the same: three.js
+ * draws every plain caster with one depth material, so each kind of caster gets its own.
+ * Cheap enough to run again as lots and traffic add meshes.
+ */
+export function splitSharedMaterials(root: THREE.Object3D) {
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh || Array.isArray(mesh.material)) return;
+    const m = mesh.material as THREE.Material;
+    // see-through and two-sided: one pass (two would rebuild the program twice per draw)
+    if (m.transparent && m.side === THREE.DoubleSide) m.forceSinglePass = true;
+    // the casters three.js would draw with its one shared depth material
+    if (mesh.castShadow && !mesh.customDepthMaterial && !m.alphaTest && !m.alphaToCoverage && !(m as THREE.MeshStandardMaterial).displacementMap && !m.clippingPlanes?.length) {
+      const inst = mesh as THREE.InstancedMesh;
+      const key = `${inst.isInstancedMesh ? (inst.instanceColor ? "ic" : "i") : "m"}${mesh.geometry.morphAttributes.position ? "p" : ""}${(mesh as THREE.SkinnedMesh).isSkinnedMesh ? "s" : ""}`;
+      let d = depthByKind.get(key);
+      if (!d) depthByKind.set(key, (d = new THREE.MeshDepthMaterial()));
+      mesh.customDepthMaterial = d;
+    }
+    if ((m as THREE.ShaderMaterial).isShaderMaterial) return;
+    const base = originOf.get(m) ?? m;
+    const kind = programKind(mesh);
+    const own = ownKind.get(base);
+    if (own === undefined) ownKind.set(base, kind);
+    if (own === undefined || own === kind) {
+      if (m !== base) mesh.material = base;
+      return;
+    }
+    let byKind = variants.get(base);
+    if (!byKind) variants.set(base, (byKind = new Map()));
+    let v = byKind.get(kind);
+    if (!v) {
+      v = base.clone();
+      v.onBeforeCompile = base.onBeforeCompile;
+      v.customProgramCacheKey = base.customProgramCacheKey;
+      originOf.set(v, base);
+      byKind.set(kind, v);
+    }
+    if (mesh.material !== v) mesh.material = v;
+  });
+}
+
+/**
+ * A vehicle's shadow comes from its big parts (body, cab, cargo): its wheels, glass and lights
+ * add nothing seen from above, but each would be one more draw in the shadow pass, for every
+ * car on the road. Parts smaller than `share` of the biggest stop casting.
+ */
+export function shadowFromLargest(root: THREE.Object3D, share = 0.5) {
+  const parts: [THREE.Mesh, number][] = [];
+  root.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh || !m.castShadow) return;
+    if (!m.geometry.boundingSphere) m.geometry.computeBoundingSphere();
+    const s = m.getWorldScale(V3);
+    parts.push([m, m.geometry.boundingSphere!.radius * Math.max(s.x, s.y, s.z)]);
+  });
+  const top = Math.max(0, ...parts.map(([, r]) => r));
+  for (const [m, r] of parts) {
+    const mats = Array.isArray(m.material) ? m.material : [m.material];
+    if (r < top * share || mats.every((x) => x.transparent)) m.castShadow = false;
+  }
+}
+const V3 = new THREE.Vector3();
+
+/**
+ * Parts of the map that never move keep the matrices they were built with: three.js
+ * otherwise works out every object's matrix again on every frame. `moving` stay as they are.
+ */
+export function freezeStatic(root: THREE.Object3D, moving: Iterable<THREE.Object3D> = []) {
+  const keep = new Set(moving);
+  root.updateMatrixWorld(true);
+  root.traverse((o) => {
+    if (!keep.has(o)) o.matrixAutoUpdate = false;
   });
 }
 

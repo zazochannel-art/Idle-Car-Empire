@@ -71,7 +71,7 @@ import {
 } from "./materials";
 import { MANAGERS } from "../config/managers";
 import { OFFLINE } from "../config/offline";
-import { DEPOT, MARKET, RACING, plotOf, roadRoute } from "../city/layout";
+import { DEPOT, MARKET, RACING, WORLD_MAP, plotOf, roadRoute } from "../city/layout";
 import type {
   BuildingState,
   CarId,
@@ -97,6 +97,8 @@ import { dockCars, exportTick, fleetTick, isExportRoute, portPlot, protoValueMul
 import { EXPORT_BY_ID, type ExportMarketId } from "../config/expansion";
 import { designStats } from "./design";
 import { logisticsMods } from "./logistics";
+import { deliverySlowdown } from "./map-bonus";
+import { landmarkSale, landmarkTick, localValueMult } from "./landmarks";
 import { starMods } from "./imperium";
 import { managerMult, type GlobalMods } from "./modifiers";
 import { floorPace, floorTick, MORALE } from "./floor";
@@ -442,7 +444,8 @@ export function carPartsValue(car: CarConfig): number {
 
 /** Sale value of one car before dealer markup (bonuses widen its margin). */
 export function carValue(s: GameState, car: CarConfig, gm: GlobalMods, extra = 1): number {
-  return carListPrice(car, recipe(car), carMarginMult(s, car, gm) * modelStats(s, car).valueMult * protoValueMult(s, car.id) * extra);
+  // a landmark works' line sells for more to its territory's buyers
+  return carListPrice(car, recipe(car), carMarginMult(s, car, gm) * modelStats(s, car).valueMult * protoValueMult(s, car.id) * extra) * localValueMult(s, car);
 }
 
 /** Sale value before the Design studio options (what R&D prices are based on). */
@@ -548,7 +551,8 @@ export function activeCar(s: GameState, p: PlantData, cars: CarConfig[]): CarCon
     const chosen = cars.find((c) => c.id === p.car);
     if (chosen) return chosen;
   }
-  return cars[cars.length - 1] ?? null;
+  // a landmark works' line only when chosen: a plant never switches to one on its own
+  return [...cars].reverse().find((c) => !c.line) ?? cars[cars.length - 1] ?? null;
 }
 
 export function plantStats(s: GameState, plotId: string, gm: GlobalMods, cars: CarConfig[]): PlantStats | null {
@@ -658,17 +662,19 @@ export function chainSnapshot(s: GameState, gm: GlobalMods): ChainSnapshot {
 
 // ───────────────────────────── travel ─────────────────────────────
 
+/** Road distances between lots on each city's map (a map never changes: each pair is worked out once). */
+const DISTANCES = new WeakMap<object, Map<string, number>>();
 /** Road distance between two lots, in tiles: the route the trucks drive on the map. */
-/** Road distances between lots (the map never changes: each pair is worked out once). */
-const DISTANCES = new Map<string, number>();
 export function distance(from: string, to: string): number {
+  let known = DISTANCES.get(WORLD_MAP);
+  if (!known) DISTANCES.set(WORLD_MAP, (known = new Map()));
   const key = `${from}>${to}`;
-  let d = DISTANCES.get(key);
+  let d = known.get(key);
   if (d === undefined) {
     const a = plotOf(from)?.entry;
     const b = plotOf(to)?.entry;
     d = !a || !b ? 20 : roadRoute(a, b).length;
-    DISTANCES.set(key, d);
+    known.set(key, d);
   }
   return d;
 }
@@ -912,7 +918,7 @@ export function chainTick(
     let can = canMake();
     // the floor: a boost, a broken machine, the crew's morale
     const managed = managedPlots.has(id);
-    if (floorTick(id, p, dt, { running: p.status === "ok", offline, managed })) events?.push({ type: "breakdown", plot: id });
+    if (floorTick(id, p, dt, { running: p.status === "ok", offline, managed, crew: s.maintenance?.level ?? 0 })) events?.push({ type: "breakdown", plot: id });
     const speed = (offline ? st.offline : 1) * floorPace(p);
     // running the plant costs wages, energy and maintenance for every second it works
     // (whatever pace the floor keeps)
@@ -1033,10 +1039,11 @@ export function chainTick(
     }
   }
 
-  // 4. trucks on the road
+  // 4. trucks on the road (slower while a truck is broken down on the map; never while away)
   const keep: Shipment[] = [];
+  const pace = offline ? 1 : deliverySlowdown(s);
   for (const sh of s.chain.shipments) {
-    sh.t += dt;
+    sh.t += dt * pace;
     if (sh.t < sh.dur) {
       keep.push(sh);
       continue;
@@ -1057,6 +1064,8 @@ export function chainTick(
 
   // 4b. ships to the export markets, and the truck & bus division's line
   out.earned += exportTick(s, dt);
+  // rent from leased minivans and rides of the robotaxi fleet (the landmark works)
+  out.earned += landmarkTick(s, dt, credit);
   out.earned += fleetTick(s, dt, offline ? snap.plants[Object.keys(snap.plants)[0]]?.offline ?? 0.5 : 1);
 
   // 5. customers at the dealerships
@@ -1083,6 +1092,8 @@ export function chainTick(
       s.lifetime.carRevenue += price;
       earn(price);
       book(s, "carSales", price);
+      // a minivan starts a lease, a shuttle joins the robotaxi fleet (the landmark works)
+      landmarkSale(s, model, price);
       // the dealer keeps its fee and the state its tax
       const fee = price * DEALER_FEE;
       const tax = price * SALES_TAX;
@@ -1637,22 +1648,41 @@ export function migrateChain(raw: unknown, s: GameState): ChainState {
 
 /** Plants this automated can upgrade themselves. */
 export const AUTO_UPGRADE_FROM = 2;
+/**
+ * The share of what the company earns in play that auto-upgrades may invest. The rest, and
+ * money that is collected or given (time away, daily rewards, gifts), stays in the wallet.
+ */
+export const AUTO_UPGRADE_SHARE = 0.5;
+
+/** What auto-upgrades may spend after a tick that earned `earned` (never more than the share of the cash). */
+export function autoBudget(budget: number, earned: number, cash: number): number {
+  return Math.max(0, Math.min(budget + Math.max(0, earned) * AUTO_UPGRADE_SHARE, cash * AUTO_UPGRADE_SHARE));
+}
 
 /**
  * Auto-upgrade: each switched-on plant buys its cheapest speed or level
  * upgrade, but only when it costs at most a quarter of the cash, so the
- * player can still save for new plants. One purchase per plant per call.
+ * player can still save for new plants. One purchase per plant per call,
+ * all of them together within `budget` (see autoBudget: before it, a
+ * company with many plants spent a whole windfall in one tick).
+ * `log` gets each purchase (the plant and what it paid), so the player can be told.
  */
-export function autoUpgrade(s: GameState, gm: GlobalMods): number {
+export function autoUpgrade(s: GameState, gm: GlobalMods, log?: { plot: string; cost: number }[], budget = Infinity): number {
   let bought = 0;
+  let left = budget;
   for (const [id, b] of plantsOf(s)) {
     if (!b.plant.auto || b.plant.automation < AUTO_UPGRADE_FROM) continue;
     const sp = speedCost(b, gm);
     const lv = levelCost(b, gm);
     const pickLevel = lv !== null && (sp === null || lv <= sp);
     const cost = pickLevel ? lv : sp;
-    if (cost === null || cost > s.cash * 0.25) continue;
-    if (pickLevel ? upgradePlantLevel(s, id, gm) : upgradePlantSpeed(s, id, gm)) bought++;
+    if (cost === null || cost > s.cash * 0.25 || cost > left) continue;
+    const cash = s.cash;
+    if (pickLevel ? upgradePlantLevel(s, id, gm) : upgradePlantSpeed(s, id, gm)) {
+      bought++;
+      left -= cash - s.cash;
+      log?.push({ plot: id, cost: cash - s.cash });
+    }
   }
   return bought;
 }

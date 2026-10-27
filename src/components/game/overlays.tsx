@@ -9,15 +9,19 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { formatDuration, formatHours, formatMoney, formatNumber } from "@/game/format";
 import { STRUCTURE_BY_ID } from "@/game/config/city";
 import { LANGS } from "@/i18n";
+import { CITIES } from "@/game/config/cities";
+import type { CityId } from "@/game/types";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { batteryState, isSaving, powerVersion, watchPower, type SaverSetting } from "@/lib/power";
 import { legalUrl, PRIVACY_URL, TERMS_URL } from "@/lib/platform";
 import { uiEvents, type UiEvent, type UiToastAction } from "@/store/events";
 import { useGame } from "@/store/game-store";
+import { useInbox } from "@/store/inbox";
 import { useUi } from "@/store/ui-store";
 import { LedgerTable } from "../views/ledger-table";
 import { AdPrivacyButton, OfflineAdButton } from "./ad-buttons";
+import { AutoDecideSection } from "./auto-decide";
 
 /** "Welcome Back!" — shown while an offline report is waiting to be collected. */
 export function OfflineDialog() {
@@ -32,8 +36,11 @@ function OfflineReport() {
   const collect = useGame((g) => g.collectOffline);
   const { t } = useT();
   const offlineCap = useGame((g) => g.snap.gm.offlineCapHours);
+  // the shareholders' part (engine/stock.ts): the button says what reaches the wallet
+  const sold = useGame((g) => g.state.stock.sold);
   if (!report) return null;
   const capped = report.seconds > report.cappedSeconds + 1;
+  const dividends = report.money * sold;
 
   return (
     <Dialog open onOpenChange={(o) => !o && collect()}>
@@ -137,13 +144,21 @@ function OfflineReport() {
           <div className="text-[11px] uppercase tracking-wider text-gold/70">{t("offline.money")}</div>
           <div className="text-3xl font-black tabular-nums text-gradient-gold">{formatMoney(report.money)}</div>
           {report.rp > 0 && <div className="text-xs text-violet-300">{t("offline.rp", { n: formatNumber(report.rp) })}</div>}
+          {dividends > 0 && <div className="text-xs text-rose-300">📈 {t("offline.dividends", { pct: Math.round(sold * 100), money: formatMoney(dividends) })}</div>}
         </div>
+        {(Object.entries(report.cities ?? {}) as [CityId, number][])
+          .filter(([, m]) => m > 0)
+          .map(([id, m]) => (
+            <div key={id} className="mt-2 rounded-2xl bg-sky-500/10 p-2.5 text-left text-xs text-sky-100 ring-1 ring-sky-300/25">
+              {CITIES[id].emoji} {t("offline.city", { name: t(`city.${id}`), money: formatMoney(m) })}
+            </div>
+          ))}
         {capped && <p className="mt-2 text-[11px] text-white/40">{t("offline.capped", { hours: formatHours(offlineCap) })}</p>}
 
         <Button variant="gold" size="lg" className="mt-5 w-full text-base" onClick={collect}>
-          {t("offline.collect", { amount: formatMoney(report.money) })}
+          {t("offline.collect", { amount: formatMoney(report.money - dividends) })}
         </Button>
-        <OfflineAdButton amount={report.money} />
+        <OfflineAdButton amount={report.money - dividends} />
       </DialogContent>
     </Dialog>
   );
@@ -163,29 +178,51 @@ export function Toasts() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   // the first-car title takes this spot on phones while it plays
   const celebrating = useUi((u) => !!u.celebrate);
+  // a panel open over the map (game.tsx opens the sheet for any of these)
+  const sheet = useUi((u) => !!(u.view || u.plot || u.zone));
+  // the garage, a plant's floor and a race have their own controls along the bottom
+  const fullScreen = useUi((u) => !!(u.garage || u.floor || u.race));
   useEffect(
     () =>
       uiEvents.on((e: UiEvent) => {
         if (e.type !== "toast") return;
         const t = { id: ++toastId, tone: e.tone, title: e.title, body: e.body, icon: e.icon, action: e.action };
-        setToasts((list) => [...list.slice(-3), t]);
+        // a notice that came on its own goes to the notification center; on screen too unless
+        // the player keeps its kind off (the answer to a tap always shows)
+        const shown = !e.kind || !useGame.getState().state.settings.toastsOff.includes(e.kind);
+        if (e.kind) useInbox.getState().add({ kind: e.kind, tone: e.tone, title: e.title, body: e.body, icon: e.icon, action: e.action }, shown && !useUi.getState().celebrate);
+        if (!shown) return;
+        // two at a time, so they never cover much
+        setToasts((list) => [...list.slice(-1), t]);
         setTimeout(() => setToasts((list) => list.filter((x) => x.id !== t.id)), e.action ? 7000 : 3800);
       }),
     [],
   );
+  const low = !fullScreen;
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top)+8.75rem)] z-[45] flex flex-col items-center gap-1.5 px-5 md:top-20 md:items-end md:pr-6">
+    // phones: along the bottom, out of the map's way (it is the player's view): over the map in
+    // the goal tracker's place, just above the dock; with a sheet open, over the sheet's foot.
+    // The garage, a plant's floor and a race keep them high, clear of their own bottom controls.
+    // Wider screens: top right, as before.
+    <div
+      className={cn(
+        "pointer-events-none fixed inset-x-0 z-[45] flex items-center gap-1.5 px-3 md:bottom-auto md:top-20 md:flex-col md:items-end md:pr-6",
+        !low ? "top-[calc(env(safe-area-inset-top)+8.75rem)] flex-col" : sheet ? "bottom-[calc(env(safe-area-inset-bottom)+8.5rem)] flex-col-reverse" : "bottom-[calc(env(safe-area-inset-bottom)+7.5rem)] flex-col-reverse",
+      )}
+    >
       <AnimatePresence initial={false}>
         {(celebrating ? [] : toasts).map((t) => (
           <motion.div
             key={t.id}
             layout
-            initial={{ opacity: 0, y: -12, scale: 0.95 }}
+            initial={{ opacity: 0, y: low ? 12 : -12, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, x: 40, transition: { duration: 0.18 } }}
+            // a tap puts it away
+            onClick={() => setToasts((list) => list.filter((x) => x.id !== t.id))}
             className={cn(
-              "glass-strong pointer-events-auto flex w-full max-w-[320px] items-center gap-2.5 rounded-xl p-2.5 md:max-w-sm md:gap-3 md:rounded-2xl md:p-3",
+              "glass-strong pointer-events-auto flex w-full max-w-md items-center gap-2.5 rounded-xl p-2.5 md:max-w-sm md:gap-3 md:rounded-2xl md:p-3",
               t.tone === "gold" && "ring-1 ring-gold/40",
               t.tone === "success" && "ring-1 ring-emerald-400/30",
               t.tone === "info" && "ring-1 ring-electric/30",
@@ -327,6 +364,8 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
           <NotifyToggle />
           <Toggle label={t("settings.stats")} hint={t("settings.statsHint")} k="stats" />
         </div>
+
+        <AutoDecideSection />
 
         <div className="mt-4">
           <CloudSection onOpen={() => onOpenChange(false)} />

@@ -327,6 +327,9 @@ export function buildRoads(data: WorldJson, ground: Ground, roads: MapRoad[], an
   );
   const markMat = hazed(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0, envMapIntensity: 0.4, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
   const walkMat = hazed(new THREE.MeshStandardMaterial({ map: pavingTexture(aniso), vertexColors: true, roughness: 0.88, metalness: 0, envMapIntensity: 0.4, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
+  // in winter the roads are ploughed: a little snow on them, more on the pavements
+  asphaltMat.userData.snowK = markMat.userData.snowK = 0.25;
+  walkMat.userData.snowK = 0.55;
 
   const root = new THREE.Group();
   root.name = "roads";

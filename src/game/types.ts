@@ -12,10 +12,37 @@ export type CarId =
   | "supercar"
   | "hypercar"
   | "electric"
-  | "autonomous";
+  | "autonomous"
+  // the lines of the map's landmark works (config/landmarks.ts): one in each territory
+  | "pickup"
+  | "minivan"
+  | "offroad"
+  | "estate"
+  | "hotHatch"
+  | "shuttle";
 
 /** Parts that plants make and the Car Assembly Plant puts together. */
-export type ComponentId = "body" | "engine" | "interior" | "suspension" | "glass" | "tires" | "paint" | "electronics" | "battery" | "software" | "transmission" | "wheels" | "brakes";
+export type ComponentId =
+  | "body"
+  | "engine"
+  | "interior"
+  | "suspension"
+  | "glass"
+  | "tires"
+  | "paint"
+  | "electronics"
+  | "battery"
+  | "software"
+  | "transmission"
+  | "wheels"
+  | "brakes"
+  // the landmark works' signature parts (config/landmarks.ts)
+  | "frame"
+  | "seats"
+  | "drive4x4"
+  | "coachwork"
+  | "rustproof"
+  | "lidar";
 /** What trucks carry: a component, a motorized chassis (body + engine) or a car. */
 export type ItemId = ComponentId | "car" | "chassis";
 
@@ -34,7 +61,14 @@ export type PlantType =
   | "electronicsFactory"
   | "batteryFactory"
   | "softwareStudio"
-  | "assemblyPlant";
+  | "assemblyPlant"
+  // the landmark works, one in each territory (config/landmarks.ts)
+  | "frameWorks"
+  | "familyWorks"
+  | "trailWorks"
+  | "coachWorks"
+  | "harbourWorks"
+  | "mobilityHub";
 
 export type DealerId = "local" | "city" | "premium" | "luxury" | "supercar" | "global";
 
@@ -187,6 +221,8 @@ export interface OfflineReport {
   built?: string[];
   /** How the company's account changed while away (+ owed more, − paid back). */
   owed?: number;
+  /** What the other cities brought in while away: it goes to their own wallets at COLLECT. */
+  cities?: Partial<Record<CityId, number>>;
 }
 
 export interface OfflineRacing {
@@ -205,6 +241,9 @@ export type BuyAmount = 1 | 10 | 100 | "max";
 export type Lang = "en" | "ro" | "ru" | "es" | "pt" | "de";
 
 // ───────────────────────────── city (Empire Map) ─────────────────────────────
+
+/** The company's cities, each on its own island map (config/cities.ts): the first one and Nordheim. */
+export type CityId = "home" | "north";
 
 export type ZoneId = "town" | "industrial" | "downtown" | "automotive" | "luxury" | "supercar" | "mega" | "global";
 
@@ -369,8 +408,8 @@ export interface QualityState {
   rep: number;
   /** Defective cars sold since the last recall (fractional). */
   defects: number;
-  /** A recall waiting for the player's decision. */
-  recall: { car: CarId; cars: number } | null;
+  /** A recall waiting for the player's decision, and the city that built those cars (it pays for the repairs). */
+  recall: { car: CarId; cars: number; city?: CityId } | null;
   /** Market clock (s) until which a scandal cuts car prices. */
   scandalUntil: number;
   /** Recalls handled (paid or ignored). */
@@ -520,6 +559,9 @@ export interface HiddenPlayer {
   name: string;
 }
 
+/** What a notice that comes on its own is about, for the notification center's filters (config/notices.ts). */
+export type NoticeKind = "clients" | "problems" | "racing" | "progress" | "events";
+
 export interface GameState {
   version: number;
   cash: number;
@@ -621,6 +663,14 @@ export interface GameState {
   pass: import("./engine/pass").PassState;
   /** Rewarded ads (engine/ads.ts): today's count, the sales boost, the instant-build pause. */
   ads: import("./engine/ads").AdsState;
+  /** The landmark works (engine/landmarks.ts): leasing, the robotaxi fleet, first-car rewards paid, levels announced. */
+  landmarks: import("./engine/landmarks").LandmarksState;
+  /** Bonuses on the Empire Map (engine/map-bonus.ts): the one on the map now, the wait for the next, today's count. */
+  mapBonus: import("./engine/map-bonus").MapBonusState;
+  /** The maintenance crew for every plant (engine/maintenance.ts). */
+  maintenance: import("./engine/maintenance").MaintenanceState;
+  /** The company on the stock exchange (engine/stock.ts): shares sold, money raised, dividends paid, the price's history. */
+  stock: import("./engine/stock").StockState;
   /** The shop (engine/shop.ts): the free crate's timer and today's ad packs. */
   shop: import("./engine/shop").ShopState;
   /** In-app purchases (engine/iap.ts): the products owned and the purchases already given. */
@@ -628,9 +678,12 @@ export interface GameState {
   /** Unlock bonuses already claimed this run ("car:sedan", "plant:engineFactory"). */
   unlocks: string[];
   /** stats: send the anonymous new-player funnel steps (engine/funnel.ts). hidden: players hidden from the boards and visits (Profile lists them). */
-  settings: { buyAmount: BuyAmount; lang: Lang; lowGraphics: boolean; sound: boolean; /** The background music (separate from the game's sounds). */ music: boolean; haptics: boolean; notify: boolean; /** Battery saver: "auto" (on when the battery is low), "on" or "off". */ saver: "auto" | "on" | "off"; stats: boolean; hidden: HiddenPlayer[] };
+  settings: { buyAmount: BuyAmount; lang: Lang; lowGraphics: boolean; sound: boolean; /** The background music (separate from the game's sounds). */ music: boolean; haptics: boolean; notify: boolean; /** Battery saver: "auto" (on when the battery is low), "on" or "off". */ saver: "auto" | "on" | "off"; stats: boolean; hidden: HiddenPlayer[]; /** Kinds of notices kept off the screen (the notification center still lists them). */ toastsOff: NoticeKind[]; /** Standing orders (engine/autopilot.ts): a recall asked about, paid or ignored; VIP orders the plants can already make and fleet orders taken on; finished orders and contracts cashed in. */ autoRecall: "ask" | "pay" | "ignore"; autoVip: boolean; autoFleet: boolean; autoCollect: boolean; /** The "what's new" card last seen (config/whats-new.ts). */ whatsNew: string };
   /** Funnel steps already sent for this company ("legacy": a company from before the funnel, never counted). */
   funnel: string[];
+  /** The city being played (its parts are the fields above: the wallet, the city, the chain, …) and the others, parked (engine/cities.ts). */
+  activeCity: CityId;
+  cities: Partial<Record<CityId, import("./engine/cities").ParkedCity>>;
   createdAt: number;
   runStartedAt: number;
   lastActiveAt: number;

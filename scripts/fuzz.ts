@@ -1,6 +1,7 @@
 // Chaos test: thousands of random player actions across every system, the
-// clock jumping forward, offline gaps, saves reloaded — checking after each
-// step that nothing throws and the state stays sound.
+// clock jumping forward, offline gaps, saves reloaded, the company opening
+// Nordheim and moving between its cities — checking after each step that
+// nothing throws and the state stays sound.
 // Run: npx tsx scripts/fuzz.ts [steps] [seed]
 import * as Co from "../src/game/engine/construction";
 import { CARS } from "../src/game/config/cars";
@@ -15,6 +16,9 @@ import { RACE_EVENTS, RACE_UPGRADES, SPECIAL_EVENTS, SPONSORS } from "../src/gam
 import { DESIGN_OPTIONS } from "../src/game/config/cars";
 import { MATERIAL_IDS } from "../src/game/config/economy";
 import { WORLD_MAP } from "../src/game/city/layout";
+import { CITY_IDS, CITY_RULES } from "../src/game/config/cities";
+import { BUYABLE_TERRITORIES } from "../src/game/config/city";
+import * as Cy from "../src/game/engine/cities";
 import * as A from "../src/game/engine/actions";
 import * as Ch from "../src/game/engine/chain";
 import * as Sh from "../src/game/engine/showroom";
@@ -153,7 +157,7 @@ const actions: [string, () => unknown][] = [
     Rt.updateLogin(s, now);
     return Rt.claimLogin(s, snapshot(s));
   }],
-  ["imperium", () => rnd() < 0.01 && I.imperium(s, now)],
+  ["imperium", () => rnd() < 0.01 && I.imperium(s)],
   ["star", () => {
     s.stars += rnd() < 0.1 ? 50 : 0;
     return I.buyStarUpgrade(s, pick(STAR_UPGRADES).id);
@@ -210,8 +214,25 @@ const actions: [string, () => unknown][] = [
   ["market", () => Ex.openMarket(s, pick(["europe", "northAmerica", "asia", "middleEast"] as const))],
   ["exportRoute", () => plantPlots().length && Ch.setCarRoute(s, pick(plantPlots()), pick(["export:europe", "export:asia"] as const))],
   ["fleet", () => (rnd() < 0.3 ? Ex.setFleetProduct(s, pick(["van", "truck", "bus"] as const)) : rnd() < 0.5 ? Ex.fleetOrderTick(s, now) : Ex.acceptFleetOrder(s, now) || Ex.finishFleetOrder(s, now))],
+  // the cities
+  ["unlockCity", () => {
+    const first = s.activeCity === "home" ? s : s.cities.home;
+    if (first && rnd() < 0.5) {
+      first.city.territories = BUYABLE_TERRITORIES.map((t) => t.id);
+      first.cash += CITY_RULES.unlockCash;
+    }
+    return Cy.unlockCity(s, "north", now);
+  }],
+  ["switchCity", () => Cy.switchCity(s, pick(CITY_IDS), now)],
   ["engineers", () => (rnd() < 0.4 ? Ex.engineersTick(s, now, 1) : rnd() < 0.5 ? Ex.hireEngineer(s) : rnd() < 0.5 ? Ex.counterOffer(s) : s.engineers.hired.length && Ex.setEngineerPay(s, pick(s.engineers.hired).id, pick(["low", "fair", "generous"] as const)))],
 ];
+
+// the racing team is in the first city: the game runs its actions there (as the store does)
+const RACING_ACTIONS = new Set(["racingUnlock", "raceOrder", "raceCancel", "raceArrive", "raceEnter", "raceRepair", "raceUpgrade", "raceSkin", "raceRetire", "raceGarage", "sponsor", "auto", "select", "keepCar", "testTrack", "sendCar", "showroom", "showroomPrice"]);
+for (const a of actions) {
+  const fn = a[1];
+  if (RACING_ACTIONS.has(a[0])) a[1] = () => Cy.withCity(s, "home", fn);
+}
 
 for (let step = 0; step < steps; step++) {
   const [name, fn] = pick(actions);
@@ -257,6 +278,16 @@ for (let step = 0; step < steps; step++) {
       if (back.chain.shipments.length !== s.chain.shipments.length) diffs.push(`shipments ${s.chain.shipments.length} → ${back.chain.shipments.length}`);
       if (JSON.stringify(back.racing.live?.id) !== JSON.stringify(s.racing.live?.id)) diffs.push("live race");
       if (back.research.length !== s.research.length) diffs.push("research");
+      if (back.activeCity !== s.activeCity) diffs.push(`active city ${s.activeCity} → ${back.activeCity}`);
+      for (const [id, c] of Cy.parkedCities(s)) {
+        const b = back.cities[id];
+        if (!b) diffs.push(`city ${id} lost`);
+        else {
+          if (Math.abs(b.cash - c.cash) > 1e-6 * Math.max(1, c.cash)) diffs.push(`${id} cash ${c.cash} → ${b.cash}`);
+          if (Object.keys(b.city.buildings).length !== Object.keys(c.city.buildings).length) diffs.push(`${id} buildings`);
+          if (b.chain.shipments.length !== c.chain.shipments.length) diffs.push(`${id} shipments`);
+        }
+      }
       if (diffs.length) report("SAVE", diffs.join(", "), step);
       s = back;
     } catch (e) {
@@ -264,4 +295,4 @@ for (let step = 0; step < steps; step++) {
     }
   }
 }
-console.log(`\n${steps} steps, ${issues.size} distinct issues. cash ${s.cash.toExponential(2)} buildings ${Object.keys(s.city.buildings).length} resets ${s.imperiumCount} race cars ${s.racing.cars.length} races ${s.racing.stats.races}`);
+console.log(`\n${steps} steps, ${issues.size} distinct issues. city ${s.activeCity} of ${Cy.ownedCities(s).join("+")}, cash ${s.cash.toExponential(2)} buildings ${Object.keys(s.city.buildings).length} resets ${s.imperiumCount} race cars ${s.racing.cars.length} races ${s.racing.stats.races}`);

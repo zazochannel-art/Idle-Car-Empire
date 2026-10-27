@@ -42,6 +42,7 @@ import { TestUpdate } from "./test-update";
 import { PlayUpdate } from "./play-update";
 import { retry, ScreenBoundary } from "./screen-boundary";
 import { LoginDialog } from "./login-dialog";
+import { WhatsNewDialog } from "./whats-new";
 import { goalText, runGoal } from "./goals";
 import { Hud } from "./hud";
 import { ImperiumOverlay, OfflineDialog, SettingsDialog, Toasts } from "./overlays";
@@ -49,6 +50,7 @@ import { FirstCarOverlay } from "./first-car";
 import { Onboarding } from "./onboarding";
 import { UnlockCard } from "./unlock-card";
 import { RecallDialog } from "./recall-dialog";
+import { CompanyNameDialog } from "./company-name";
 import { PoachDialog } from "../views/expansion-cards";
 import { HAS_INTERIOR } from "../plant/interior/layout";
 
@@ -67,6 +69,11 @@ const SCREENS = {
   managers: () => import("../views/managers-view"),
   missions: () => import("../views/missions-view"),
   imperium: () => import("../views/imperium-view"),
+  landmarks: () => import("../views/landmarks-view"),
+  inbox: () => import("../views/inbox-view"),
+  stock: () => import("../views/stock-view"),
+  world: () => import("../views/world-view"),
+  maintenance: () => import("../views/maintenance-card"),
   leaderboard: () => import("../views/leaderboard-view"),
   alliance: () => import("../views/alliance-view"),
   winter: () => import("../views/winter-view"),
@@ -91,6 +98,11 @@ const ProductionView = lazy(() => retry(SCREENS.production).then((m) => ({ defau
 const ManagersView = lazy(() => retry(SCREENS.managers).then((m) => ({ default: m.ManagersView })));
 const MissionsView = lazy(() => retry(SCREENS.missions).then((m) => ({ default: m.MissionsView })));
 const ImperiumView = lazy(() => retry(SCREENS.imperium).then((m) => ({ default: m.ImperiumView })));
+const LandmarksView = lazy(() => retry(SCREENS.landmarks).then((m) => ({ default: m.LandmarksView })));
+const InboxView = lazy(() => retry(SCREENS.inbox).then((m) => ({ default: m.InboxView })));
+const StockView = lazy(() => retry(SCREENS.stock).then((m) => ({ default: m.StockView })));
+const WorldView = lazy(() => retry(SCREENS.world).then((m) => ({ default: m.WorldView })));
+const MaintenanceCard = lazy(() => retry(SCREENS.maintenance).then((m) => ({ default: m.MaintenanceCard })));
 const LeaderboardView = lazy(() => retry(SCREENS.leaderboard).then((m) => ({ default: m.LeaderboardView })));
 const AllianceView = lazy(() => retry(SCREENS.alliance).then((m) => ({ default: m.AllianceView })));
 const WinterView = lazy(() => retry(SCREENS.winter).then((m) => ({ default: m.WinterView })));
@@ -241,9 +253,13 @@ function Shell() {
   const zone = useUi((u) => u.zone);
   const garage = useUi((u) => u.garage);
   const floor = useUi((u) => u.floor);
+  // the race viewer covers the map with its own 3D scene: the map rests meanwhile
+  const racing = useUi((u) => !!u.race);
   const showcase = useUi((u) => !!u.showcase);
   const tutorial = useUi((u) => u.tutorial);
   const closeAll = useUi((u) => u.closeAll);
+  // each city has its own map: switching builds the 3D map afresh
+  const city = useGame((g) => g.state.activeCity);
   // Subscribe only to the selected plot's title-relevant structure. This keeps the
   // shell off the 100ms tick while still updating a title after a build/upgrade.
   const plotTitleKey = useGame((g) => {
@@ -314,7 +330,7 @@ function Shell() {
 
   return (
     <div className="game-shell fixed inset-0 overflow-hidden bg-ink">
-      <EmpireMap active={!garage && !floor} panelOffset={panelOffset} />
+      <EmpireMap key={city} active={!garage && !floor && !racing} panelOffset={panelOffset} />
       <Hud onSettings={() => setSettings(true)} />
       <LeftRail />
       {/* on phones the showroom card sits where the goal tracker is */}
@@ -350,6 +366,7 @@ function Shell() {
       <Onboarding />
       <UnlockCard />
       <RecallDialog />
+      <CompanyNameDialog />
       <PoachDialog />
 
       <Toasts />
@@ -357,6 +374,7 @@ function Shell() {
       <MusicBridge />
       <LiveEvents />
       <LoginDialog />
+      <WhatsNewDialog onSettings={() => setSettings(true)} />
       <OfflineDialog />
       <ImperiumOverlay />
       <RaceViewer />
@@ -410,6 +428,7 @@ const ViewSwitch = memo(function ViewSwitch({ view, onSettings }: { view: View; 
     case "managers":
       return (
         <>
+          <MaintenanceCard />
           <MechanicsSummary />
           <ManagersView />
         </>
@@ -442,6 +461,14 @@ const ViewSwitch = memo(function ViewSwitch({ view, onSettings }: { view: View; 
       return <PassView />;
     case "shop":
       return <ShopView />;
+    case "landmarks":
+      return <LandmarksView />;
+    case "inbox":
+      return <InboxView />;
+    case "stock":
+      return <StockView />;
+    case "world":
+      return <WorldView />;
   }
 });
 
@@ -452,13 +479,14 @@ const ViewSwitch = memo(function ViewSwitch({ view, onSettings }: { view: View; 
  */
 export type PillarId = "empire" | "cars" | "racing" | "business";
 export const PILLARS: { id: PillarId; icon: Icon; views: View[] }[] = [
-  { id: "empire", icon: Factory, views: ["empire", "garages", "logistics", "research", "managers", "imperium"] },
+  { id: "empire", icon: Factory, views: ["empire", "garages", "logistics", "research", "managers", "imperium", "landmarks", "world"] },
   { id: "cars", icon: Car, views: ["cars"] },
   { id: "racing", icon: Flag, views: ["racing"] },
-  { id: "business", icon: Briefcase, views: ["dealers", "economy", "missions", "stats", "achievements", "story", "leaderboard", "alliance", "winter", "festival", "pass"] },
+  { id: "business", icon: Briefcase, views: ["dealers", "economy", "missions", "stats", "achievements", "story", "leaderboard", "alliance", "winter", "festival", "pass", "stock"] },
 ];
 export const pillarOf = (v: View | null) => (v ? (PILLARS.find((p) => p.views.includes(v))?.id ?? null) : null);
 
+/** The desktop rail: below the shop, notification and city buttons on the left. */
 function LeftRail() {
   const view = useUi((u) => u.view);
   const plot = useUi((u) => u.plot);
@@ -474,7 +502,7 @@ function LeftRail() {
     ...PILLARS.map((p) => ({ id: p.id, icon: p.icon, badge: p.id === "empire" ? badges.research : p.id === "business" ? badges.missions : 0 })),
   ];
   return (
-    <nav className="hidden absolute left-[calc(env(safe-area-inset-left)+0.5rem)] top-[calc(env(safe-area-inset-top)+6.75rem)] md:flex z-20 flex flex-col gap-1 rounded-xl hud-bar p-1 md:left-[calc(env(safe-area-inset-left)+0.75rem)] md:top-[calc(env(safe-area-inset-top)+5.5rem)]">
+    <nav className="hidden absolute left-[calc(env(safe-area-inset-left)+0.5rem)] top-[calc(env(safe-area-inset-top)+6.75rem)] md:flex z-20 flex flex-col gap-1 rounded-xl hud-bar p-1 md:left-[calc(env(safe-area-inset-left)+0.75rem)] md:top-[calc(env(safe-area-inset-top)+11rem)]">
       {items.map((r) => {
         const active = r.id === "map" ? nothing : current === r.id;
         const label = r.id === "map" ? t("map.nav.map") : t(`pillar.${r.id}`);

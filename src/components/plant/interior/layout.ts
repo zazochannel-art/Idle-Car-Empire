@@ -281,6 +281,67 @@ export const RECIPES: Record<string, StationDef[]> = {
     qc("strut", "testBench"),
     store("goods", "goodsRack", "strut"),
   ]),
+  // the landmark works (config/landmarks.ts), on stations the other lines already have
+  // steel coils → cut rails → welded ladder frame → coated frame
+  frameWorks: line7([
+    store("rawStore", "sheetRack", "coil", undefined, ["sheetPallet", "sheetPallet"]),
+    { id: "cutting", machine: "laserCutter", unlock: 1, upgrade: "speed", icon: "⚙️", robotsFrom: 3, part: "blank", staff: 1, tool: "suction", robot: "embedded", fx: "laser", props: ["sheetPallet", "binRack"] },
+    { id: "forging", machine: "press", unlock: 2, upgrade: "speed", icon: "🔨", robotsFrom: 2, part: "arm", staff: 2, tool: "gripper", robot: "embedded", fx: "heat", props: ["dieBlock", "dieBlock"] },
+    { id: "welding", machine: "welder", unlock: 1, upgrade: "automation", icon: "🤖", robotsFrom: 1, part: "frame", staff: 2, role: "welder", tool: "torch", robot: "reach", fx: "sparks", props: ["partsCage", "partsCage"] },
+    { id: "coating", machine: "sprayBooth", unlock: 3, upgrade: "automation", icon: "🎨", robotsFrom: 2, part: "frame", staff: 1, tool: "spray", robot: "embedded", fx: "spray", props: ["drumPallet", "toolCabinet"] },
+    qc("frame"),
+    store("goods", "goodsRack", "frame"),
+  ]),
+  // fabric rolls → cut covers → foam → modular seats on their rails
+  familyWorks: line7([
+    store("rawStore", "rawRack", "roll", "reel", ["boxPallet", "boxPallet"]),
+    { id: "fabricCut", machine: "laserCutter", unlock: 1, upgrade: "speed", icon: "✂️", robotsFrom: 3, part: "fabricCut", staff: 1, tool: "suction", robot: "embedded", fx: "laser", props: ["boxPallet", "binRack"] },
+    { id: "sewing", machine: "sewing", unlock: 2, upgrade: "speed", icon: "🧵", robotsFrom: 2, part: "cover", staff: 2, tool: "gripper", robot: "floor", props: ["binRack", "boxPallet"] },
+    { id: "foaming", machine: "press", unlock: 1, upgrade: "automation", icon: "🧽", robotsFrom: 1, part: "cushion", staff: 1, tool: "gripper", robot: "embedded", fx: "heat", props: ["drumPallet", "drumPallet"] },
+    { id: "seatAsm", machine: "assemblyStand", variant: "seat", unlock: 3, upgrade: "automation", icon: "🪑", robotsFrom: 2, part: "seat", staff: 2, tool: "gripper", robot: "reach", props: ["partsCage", "toolCabinet"] },
+    qc("seat"),
+    store("goods", "goodsRack", "seat"),
+  ]),
+  // alloy → cast cases → cut gears → hardened → transfer cases and differentials
+  trailWorks: line7([
+    store("rawStore", "rawRack", "ingot", "ingot", ["drumPallet", "boxPallet"]),
+    { id: "casting", machine: "furnace", unlock: 1, upgrade: "speed", icon: "🔥", robotsFrom: 3, part: "casting", staff: 1, tool: "gripper", robot: "floor", fx: "heat", props: ["dieBlock", "drumPallet"] },
+    { id: "gearCut", machine: "cnc", unlock: 2, upgrade: "speed", icon: "⚙️", robotsFrom: 2, part: "spring", staff: 1, tool: "gripper", robot: "floor", props: ["binRack", "toolCabinet"] },
+    { id: "hardening", machine: "furnace", variant: "tunnel", unlock: 1, upgrade: "automation", icon: "🔥", robotsFrom: 1, part: "arm", staff: 1, tool: "gripper", robot: "floor", fx: "heat", props: ["drumPallet", "binRack"] },
+    { id: "gearboxAsm", machine: "assemblyStand", variant: "engine", unlock: 3, upgrade: "automation", icon: "🧭", robotsFrom: 2, part: "block", staff: 2, tool: "gripper", robot: "reach", props: ["partsCage", "toolCabinet"] },
+    qc("block", "testBench"),
+    store("goods", "goodsRack", "block"),
+  ]),
+  // aluminium sheet → hand-shaped panels → leather → fitted coachwork, painted
+  coachWorks: line7([
+    store("rawStore", "sheetRack", "coil", undefined, ["sheetPallet", "boxPallet"]),
+    { id: "press", machine: "press", unlock: 1, upgrade: "speed", icon: "🔨", robotsFrom: 3, part: "panel", staff: 2, tool: "gripper", robot: "embedded", props: ["dieBlock", "sheetPallet"] },
+    { id: "sewing", machine: "sewing", unlock: 2, upgrade: "speed", icon: "🧵", robotsFrom: 2, part: "cover", staff: 2, tool: "gripper", robot: "floor", props: ["binRack", "boxPallet"] },
+    { id: "trim", machine: "assemblyStand", variant: "trim", unlock: 1, upgrade: "automation", icon: "✂️", robotsFrom: 1, part: "panel", staff: 2, tool: "gripper", robot: "reach", props: ["partsCage", "toolCabinet"] },
+    { id: "finish", machine: "sprayBooth", unlock: 3, upgrade: "automation", icon: "🎨", robotsFrom: 2, part: "panel", staff: 1, tool: "spray", robot: "embedded", fx: "spray", props: ["drumPallet", "toolCabinet"] },
+    qc("panel"),
+    store("goods", "goodsRack", "panel"),
+  ]),
+  // pigments → mixed coatings → sprayed, cured and salt-tested protection kits
+  harbourWorks: line7([
+    store("rawStore", "rawRack", "tote", "drum", ["drumPallet", "drumPallet"]),
+    { id: "mixing", machine: "mixer", unlock: 1, upgrade: "speed", icon: "🌀", robotsFrom: 3, part: "tote", staff: 1, tool: "gripper", robot: "floor", props: ["drumPallet", "binRack"] },
+    { id: "coating", machine: "sprayBooth", unlock: 2, upgrade: "speed", icon: "🛡️", robotsFrom: 2, part: "strut", staff: 1, tool: "spray", robot: "embedded", fx: "spray", props: ["drumPallet", "toolCabinet"] },
+    { id: "curing", machine: "curing", unlock: 1, upgrade: "automation", icon: "🔥", robotsFrom: 1, part: "strut", staff: 1, tool: "gripper", robot: "floor", fx: "heat", props: ["binRack", "drumPallet"] },
+    { id: "filling", machine: "filler", unlock: 3, upgrade: "automation", icon: "🧴", robotsFrom: 2, part: "can", staff: 1, tool: "gripper", robot: "reach", props: ["partsCage", "boxPallet"] },
+    qc("can"),
+    store("goods", "goodsRack", "can"),
+  ]),
+  // chips → boards → optics → lidar units calibrated and flashed
+  mobilityHub: line7([
+    store("rawStore", "rawRack", "reel", "chips", ["binRack", "boxPallet"]),
+    { id: "placement", machine: "smt", unlock: 1, upgrade: "speed", icon: "📟", robotsFrom: 3, part: "pcb", staff: 1, tool: "suction", robot: "floor", props: ["binRack", "binRack"] },
+    { id: "reflow", machine: "furnace", variant: "tunnel", unlock: 2, upgrade: "speed", icon: "🔥", robotsFrom: 2, part: "pcb", staff: 1, tool: "gripper", robot: "floor", fx: "heat", props: ["binRack", "drumPallet"] },
+    { id: "moduleAsm", machine: "assemblyStand", variant: "bench", unlock: 1, upgrade: "automation", icon: "📡", robotsFrom: 1, part: "module", staff: 2, tool: "suction", robot: "reach", props: ["partsCage", "toolCabinet"] },
+    { id: "simulation", machine: "testBench", unlock: 3, upgrade: "automation", icon: "🖥️", robotsFrom: 2, part: "module", staff: 1, role: "inspector", tool: "suction", robot: "floor", fx: "scan", props: ["toolCabinet", "boxPallet"] },
+    qc("module"),
+    store("goods", "goodsRack", "module"),
+  ]),
   // the car takes shape: body → powertrain → interior and glass → wheels → paint and finish
   assemblyPlant: line7([
     store("bodyStore", "bodyRack", "car", undefined, ["partsCage", "partsCage"], 0),

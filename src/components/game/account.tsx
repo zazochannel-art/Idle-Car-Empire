@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { plantsOf } from "@/game/engine/chain";
 import { isCleanName } from "@/game/engine/names";
 import { formatDuration, formatMoney, formatNumber } from "@/game/format";
-import { summarize, type AuthResult, type CloudBackup, type MyInvite, type SaveSummary } from "@/game/save";
+import { nearlySame, summarize, type AuthResult, type CloudBackup, type MyInvite, type SaveSummary } from "@/game/save";
 import { INVITE } from "@/game/engine/invites";
 import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
@@ -54,6 +54,7 @@ export function useSaveStatus(): { text: string; tone: "ok" | "busy" | "warn" | 
   const { t } = useT();
   const enabled = useCloud((c) => c.enabled);
   const mode = useCloud((c) => c.mode);
+
   const status = useCloud((c) => c.sync.status);
   if (!enabled || mode === "local") return { text: t("account.status.local"), tone: "local" };
   switch (status) {
@@ -416,7 +417,11 @@ export function ProfileView() {
             <div className="text-[11px] text-white/55">
               {t("account.lastSaved")}: <span className="font-semibold text-white/80">{ago(t, sync.lastSaved)}</span> · {t("account.revision", { n: sync.revision })}
             </div>
-            <Button size="sm" variant="secondary" className="w-full" disabled={sync.status === "saving" || sync.status === "conflict"} onClick={() => void syncNow()}>
+            <Button size="sm" variant="gold" className="w-full" disabled={sync.status === "saving" || sync.status === "conflict"} onClick={async () => {
+              await syncNow().catch(() => {});
+              // only once the server has it (otherwise the status above says what went wrong)
+              if (useCloud.getState().sync.status === "saved") uiEvents.emit({ type: "toast", tone: "success", icon: "☁️", title: t("account.savedNow") });
+            }}>
               <RefreshCw /> {t("account.saveNow")}
             </Button>
           </>
@@ -534,9 +539,16 @@ function BackupsCard() {
   const restore = useGame((g) => g.restoreBackup);
   const { t } = useT();
   const [asking, setAsking] = useState<string | null>(null);
-  // read once (they are large): again only after a restore
+  const [deleting, setDeleting] = useState<string | null>(null);
+  // read once (they are large): again only after a change
   const [list, setList] = useState(() => saves?.backups() ?? []);
-  if (!list.length) return null;
+
+  const createBackup = () => {
+    if (!saves) return;
+    const ok = saves.local.backup({ state: useGame.getState().state, savedAt: Date.now() }, "device") !== null;
+    setList(saves.backups());
+    uiEvents.emit({ type: "toast", tone: ok ? "success" : "warn", icon: ok ? "💾" : "⚠️", title: t(ok ? "account.backupCreated" : "account.err.unknown") });
+  };
   const from = (reason: string) => t(reason === "cloud" ? "account.backup.cloud" : reason === "replaced" ? "account.backup.replaced" : "account.backup.device");
   return (
     <div className="space-y-2 rounded-2xl bg-[#2b2b2e] p-3 ring-1 ring-white/10">
@@ -544,7 +556,10 @@ function BackupsCard() {
         <History className="size-4 text-white/60" /> {t("account.backups")}
       </div>
       <p className="text-[11px] text-white/55">{t("account.backupsHint")}</p>
-      {list.map((b) => (
+      <Button size="sm" variant="gold" className="w-full" onClick={createBackup}>
+        ➕ {t("account.backupCreate")}
+      </Button>
+      {!list.length ? (<p className="text-center text-xs text-white/40 py-2">{t("account.backupsNone")}</p>) : list.map((b) => (
         <div key={b.key} className="space-y-2 rounded-xl bg-white/[0.04] p-2.5 ring-1 ring-white/10">
           <div className="flex items-center gap-2">
             <div className="min-w-0 flex-1">
@@ -581,10 +596,36 @@ function BackupsCard() {
                 </Button>
               </div>
             </>
+          ) : deleting === b.key ? (
+            <>
+              <p className="text-[11px] text-rose-300">{t("account.backupDeleteConfirm")}</p>
+              <div className="grid grid-cols-2 gap-1.5">
+                <Button size="sm" variant="secondary" onClick={() => setDeleting(null)}>
+                  {t("common.cancel")}
+                </Button>
+                <Button
+                  size="sm"
+                  className="bg-none bg-rose-600 shadow-none text-white"
+                  onClick={() => {
+                    saves?.deleteBackup(b.key);
+                    setDeleting(null);
+                    setList(saves?.backups() ?? []);
+                    uiEvents.emit({ type: "toast", tone: "success", icon: "🗑️", title: t("account.backupDeleted") });
+                  }}
+                >
+                  <Trash2 className="size-3.5" /> {t("account.backupDelete")}
+                </Button>
+              </div>
+            </>
           ) : (
-            <Button size="sm" variant="secondary" className="w-full" onClick={() => setAsking(b.key)}>
-              <History /> {t("account.restore")}
-            </Button>
+            <div className="grid grid-cols-2 gap-1.5">
+              <Button size="sm" variant="secondary" onClick={() => setAsking(b.key)}>
+                <History /> {t("account.restore")}
+              </Button>
+              <Button size="sm" variant="ghost" className="text-rose-300 hover:bg-rose-500/10" onClick={() => setDeleting(b.key)}>
+                <Trash2 className="size-3.5" /> {t("account.backupDelete")}
+              </Button>
+            </div>
           )}
         </div>
       ))}
@@ -705,6 +746,7 @@ function InviteCard() {
 
 /** The older copies of the account's save the server keeps: any of them can be played again. */
 function CloudBackupsCard() {
+  const lastSaved = useCloud((c) => c.sync.lastSaved);
   const saves = useGame((g) => g.saves);
   const restore = useGame((g) => g.restoreCloudBackup);
   const mode = useCloud((c) => c.mode);
@@ -712,9 +754,10 @@ function CloudBackupsCard() {
   const [list, setList] = useState<CloudBackup[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [asking, setAsking] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
-  // read when the Profile opens, and again after a restore or a retry
   const [reads, setReads] = useState(0);
+
   useEffect(() => {
     let live = true;
     saves
@@ -724,19 +767,23 @@ function CloudBackupsCard() {
     return () => {
       live = false;
     };
-  }, [saves, reads]);
+  }, [saves, reads, lastSaved]);
+
   const load = () => {
     setFailed(false);
     setReads((n) => n + 1);
   };
+
   if (mode !== "cloud") return null;
   const from = (r: CloudBackup["reason"]) => t(r === "drop" ? "account.cloudBackup.drop" : r === "restore" ? "account.cloudBackup.restore" : "account.cloudBackup.auto");
+
   return (
     <div className="space-y-2 rounded-2xl bg-[#2b2b2e] p-3 ring-1 ring-white/10">
       <div className="flex items-center gap-2 text-sm font-bold">
         <Cloud className="size-4 text-sky-300" /> {t("account.cloudBackups")}
       </div>
       <p className="text-[11px] text-white/55">{t("account.cloudBackupsHint")}</p>
+      
       {failed ? (
         <Button size="sm" variant="secondary" className="w-full" onClick={load}>
           <RefreshCw /> {t("account.cloudBackupsRetry")}
@@ -788,10 +835,40 @@ function CloudBackupsCard() {
                   </Button>
                 </div>
               </>
+            ) : deleting === b.id ? (
+              <>
+                <p className="text-[11px] text-rose-300">{t("account.cloudBackupDeleteConfirm")}</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <Button size="sm" variant="secondary" disabled={busy} onClick={() => setDeleting(null)}>
+                    {t("common.cancel")}
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-none bg-rose-600 shadow-none text-white"
+                    disabled={busy}
+                    onClick={async () => {
+                      setBusy(true);
+                      const ok = (await saves?.deleteCloudBackup(b.id).catch(() => false)) ?? false;
+                      setBusy(false);
+                      setDeleting(null);
+                      // read again from the server: what it shows is what is kept
+                      load();
+                      uiEvents.emit({ type: "toast", tone: ok ? "success" : "warn", icon: ok ? "🗑️" : "⚠️", title: t(ok ? "account.cloudBackupDeleted" : "account.cloudBackupDeleteFailed") });
+                    }}
+                  >
+                    <Trash2 className="size-3.5" /> {t("account.backupDelete")}
+                  </Button>
+                </div>
+              </>
             ) : (
-              <Button size="sm" variant="secondary" className="w-full" onClick={() => setAsking(b.id)}>
-                <History /> {t("account.restore")}
-              </Button>
+              <div className="grid grid-cols-2 gap-1.5">
+                <Button size="sm" variant="secondary" onClick={() => setAsking(b.id)}>
+                  <History /> {t("account.restore")}
+                </Button>
+                <Button size="sm" variant="ghost" className="text-rose-300 hover:bg-rose-500/10" onClick={() => setDeleting(b.id)}>
+                  <Trash2 className="size-3.5" /> {t("account.backupDelete")}
+                </Button>
+              </div>
             )}
           </div>
         ))
@@ -1004,12 +1081,29 @@ function ConflictChoice() {
   const state = useGame((g) => g.state);
   const [cloud, setCloud] = useState<SaveSummary | null>(null);
   const [busy, setBusy] = useState(false);
+  // the cloud's copy is looked at first: the same game open on two devices needs no choice
+  const [checked, setChecked] = useState(false);
   const open = true;
   const { t } = useT();
   useEffect(() => {
     if (!open || !saves) return;
-    void saves.peekCloud().then((c) => setCloud(c?.state ? summarize(c.state) : null));
-  }, [open, saves]);
+    let live = true;
+    void saves.peekCloud().then(async (c) => {
+      if (!live) return;
+      const ahead = c?.state ? nearlySame(useGame.getState().state, c.state) : null;
+      if (ahead) {
+        await resolve(ahead);
+        uiEvents.emit({ type: "toast", tone: "info", icon: "☁️", title: t("account.conflictAuto") });
+        return;
+      }
+      setCloud(c?.state ? summarize(c.state) : null);
+      setChecked(true);
+    });
+    return () => {
+      live = false;
+    };
+  }, [open, saves, resolve, t]);
+  if (!checked) return null;
   return (
     <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent>

@@ -99,15 +99,28 @@ npm run ios:open        # Xcode (on a Mac)
    warehouse at once (speed, load, loading time, storage, extra trucks) and
    climbs the transport ladder Trucks → Rail → Port → Export: faster, bigger
    loads, then higher prices abroad for parts and cars.
-9. **Grow the empire.** You can also:
+9. **Landmark works.** Every territory of the map has an old works on its
+   own lot (`config/landmarks.ts`, the lots in `city/landmark-lots.ts`).
+   Open the territory, restore the works, and it makes the part its car line
+   needs: the Workhorse Pickup (Raw Materials, ladder frames), the Family
+   Minivan (Suburbs, modular seats), the Trail 4x4 (Mountain, 4x4
+   drivetrains), the Shooting Brake (Boulevard, coachwork), the Export Hot
+   Hatch (Port, rustproofing) and the Robotaxi Shuttle (Airport, lidar). An
+   assembly plant builds a line car only when it is chosen. The first car of a
+   line pays ten minutes of income and a ⭐ Star; the cars built raise the
+   territory to level 5, each level adding 6% to what the line sells for and
+   to the territory's specialty: cheaper materials, leasing (rent from every
+   minivan sold), race prizes, limited editions sooner, export prices, and a
+   robotaxi fleet earning rides. The **Works** screen shows the steps.
+10. **Grow the empire.** You can also:
    - unlock districts for more plots;
    - hire **managers** (one per plant);
    - **research** with points from every part and car;
    - follow the objectives (Produce 100 car bodies → Build your second
      factory → … → Build your automotive empire);
    - open plant levels 11–15 as your total earnings grow ($50M → $25B);
-   - run **Reset Imperium** after earning $5B in a run, for ⭐ **Stars** and
-     permanent upgrades.
+   - collect ⭐ **Stars** for permanent upgrades as total earnings grow (the
+     first at $20B, then 3 more for every tenfold); nothing is reset.
    - Garages, car washes and other city buildings are a side business.
 
 Drag to pan, pinch or scroll to zoom, tap buildings; the minimap jumps the
@@ -135,8 +148,9 @@ src/game/
     tick.ts       advances time in small steps
     actions.ts    player actions (buy, hire, research…)
     offline.ts    plays out the time away, report + collect
-    reset.ts      clears a run (used by Reset Imperium)
-    imperium.ts   Reset Imperium, ⭐ Stars and their upgrades
+    reset.ts      clears a run (the old Reset Imperium; collecting Stars no
+                  longer resets anything)
+    imperium.ts   collecting ⭐ Stars from total earnings, and their upgrades
     progress.ts   achievements, daily & milestone missions
     insights.ts   "next goal" hints and lock reasons for the UI
     city.ts       districts, plot buildings, garages: placement rules,
@@ -152,11 +166,21 @@ src/components/
               loaded on demand): terrain and sea (terrain.ts), the island's
               buildings, trees, bridges and landmarks (scenery.ts), the
               player's lots (plots.ts, structures.ts), traffic and
-              shipments (traffic.ts), race cars (race.ts), labels, and the
-              engine with its camera and picking (engine.ts). iso.ts,
+              shipments (traffic.ts), race cars (race.ts), labels, the
+              bonuses on the map (bonus.ts), fireworks and sparkles (fx.ts),
+              rain, snow and petals (weather-fx.ts; the forecast is
+              ../weather.ts), ships, planes and the freight train
+              (movers.ts, rail-line.ts), and the engine with its camera and
+              picking (engine.ts). iso.ts,
               camera.ts, props.ts and vehicles.ts are the 2D painter still
-              used by the garage interior, the factory floor and the race
-              viewer
+              used by the garage interior, the factory floor and, without
+              WebGL, the race viewer
+  racing/     the race viewer: preparation, the race with its timing tower
+              and three cameras, the results; race3d/ draws it in 3D (the
+              circuit with kerbs, gravel, barriers and the start gantry, the
+              scenery of each theme, the real car models, the podium), and
+              race-canvas.ts is the 2D fallback. The circuits' shapes are in
+              game/racing/tracks.ts (tracks.test.ts checks them)
   three/      the 3D models (Three.js, loaded lazily): cars, trucks and
               transporters (car-models), plant buildings (building-models),
               factory machines and robots (industrial-models), and the sprite
@@ -186,6 +210,38 @@ the streets. Locked districts and territories fade into a grey haze. On
 phones the map keeps to a few hundred draw calls; the battery-saver setting
 turns off shadows, halves the traffic and the ground textures, and draws at
 30 FPS.
+
+Life on the island:
+
+- **Bonuses** (`engine/map-bonus.ts`, `config/map-bonus.ts`): every few
+  minutes on the map, one of a golden car in the traffic, a drone dropping a
+  crate on a plant, a VIP's limousine, or a truck broken down by the road
+  (every delivery runs at 65% until someone helps). Tap it for seconds of
+  steady income; off screen, an arrow at the screen's edge points to it (tap
+  the arrow to fly there). At most 30 a day; none is waiting when the game
+  is opened again.
+- **Weather** (`components/map/weather.ts`): the same for every player at the
+  same time, in spells of 12 minutes, with the season: rain, fog and the
+  morning mist; snow lying on roofs and fields all through the winter
+  festival; petals in spring. Looks only.
+- **Ships, planes and trains**: container ships sail in from the open sea to
+  the port's quay and out again (routes found over the water), an airliner
+  lands, taxis and takes off from the runway, and the company's transport
+  tier adds a freight train on the railway (Train), a second ship (Port) and
+  cargo flights (Export).
+- **Fireworks** for the first car, a race won, a district or territory
+  opened, a building's level 5, 10 and 15, and the Stars.
+- **Labels over the lots**: a broken machine, a boost, what a plant is
+  waiting for, a green ⬆️ when its next level is affordable, and 📭 over a
+  dealership with nothing to sell for a while.
+- **The flow view** (the button under the minimap, `engine/flow.ts`): an arc
+  from every plant to where its loads go, green when it runs, amber when its
+  loads pile up, red when the plant can't make anything.
+- **Visits in 3D**: from another player's card, *See their empire in 3D*
+  shows their island on the map (what stands on each lot, their districts,
+  territories, dealerships and racing district; `engine/visit.ts`, from the
+  card's `map`: supabase/migrations/0018). Nothing of theirs can be tapped or
+  changed, and the player's own trucks, sales and bonuses wait meanwhile.
 
 ### 3D graphics
 

@@ -1,0 +1,8 @@
+Novidades na 1.0.2:
+• As Estrelas agora são permanentes: colete ⭐ conforme seus ganhos totais crescem e mantenha fábricas, dinheiro e pesquisa
+• Economia rebalanceada
+• Backups na nuvem: exclua os que não precisar
+• Lucro mais estável na barra superior
+• Ilha 3D mais fluida nos celulares
+• Dê um nome à sua empresa após o primeiro carro
+• Em dois dispositivos não pergunta mais qual jogo manter quando são iguais

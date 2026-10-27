@@ -1,0 +1,7 @@
+Novidades na 1.0.5:
+• Fábricas das zonas: restaure uma fábrica antiga em cada zona do mapa e crie a própria linha de carros
+• Bolsa: venda parte da sua empresa por dinheiro agora e recompre depois
+• Equipe de manutenção: menos quebras, consertos mais rápidos
+• Notificações: um sino com tudo o que aconteceu; os avisos agora aparecem embaixo
+• Corrigido: os ganhos offline e as recompensas diárias ficam na sua conta
+• Câmeras melhores nas corridas no celular

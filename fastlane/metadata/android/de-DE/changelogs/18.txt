@@ -1,0 +1,7 @@
+Neu in 1.0.4:
+• Boni auf der Karte: ein goldenes Auto, die Kiste einer Drohne, eine VIP-Limousine und ein liegengebliebener Lkw (antippen für Geld)
+• Wetter: Regen, Nebel, Schnee im Winter, Blüten im Frühling
+• Schiffe im Hafen, startende Flugzeuge, ein Güterzug
+• Feuerwerk für die großen Momente
+• Ansicht des Lieferflusses und neue Symbole über den Werken
+• Besuche das Imperium eines Freundes in 3D

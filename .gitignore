@@ -47,5 +47,14 @@ next-env.d.ts
 *.jks
 *.keystore
 keystore.properties
+keystore.properties.txt
 # a build's source maps (SOURCE_MAPS=1, scripts/build-app.mjs)
 /source-maps
+
+# the Android project is its own repository (github.com/zazochannel-art/android)
+/android/
+# Android Studio's files when it opens this folder
+/.gradle/
+/.idea/
+/.kotlin/
+/local.properties

@@ -29,6 +29,31 @@ export function sameGame(a: unknown, b: unknown): boolean {
 
 const lastPlayed = (s: unknown) => num((s as Stamped | null)?.lastActiveAt) ?? 0;
 
+/** How close two copies of one company must be for the game to keep the one ahead without asking. */
+export const NEARLY_SAME = {
+  /** Total earnings differ by at most this share of the larger. */
+  earned: 0.005,
+  /** Both were played within this long of each other (ms). */
+  played: 10 * 60_000,
+};
+
+/**
+ * Two copies of the same company, played at about the same time and about as far along (the
+ * same game open on two devices, a few seconds apart): which one is ahead, or null when the
+ * player should choose. Nothing of note is lost either way, and the other is kept as a backup.
+ */
+export function nearlySame(local: unknown, cloud: unknown): "local" | "cloud" | null {
+  if (!sameGame(local, cloud)) return null;
+  const a = summarize(local);
+  const b = summarize(cloud);
+  if (a.plants !== b.plants) return null;
+  if (Math.abs(a.lastPlayed - b.lastPlayed) > NEARLY_SAME.played) return null;
+  const top = Math.max(a.earned, b.earned);
+  if (Math.abs(a.earned - b.earned) > top * NEARLY_SAME.earned) return null;
+  if (a.earned !== b.earned) return a.earned > b.earned ? "local" : "cloud";
+  return a.lastPlayed > b.lastPlayed ? "local" : "cloud";
+}
+
 /**
  * @param own this account's copy on this device
  * @param legacy the save from before accounts (or from playing without the cloud)
@@ -52,7 +77,12 @@ export function decideStart(own: LocalCopy | null, legacy: LocalCopy | null, clo
     // the cloud is where this copy left it: this copy is the newer (or the same)
     if (own.base === cloud.revision) return { use: "local", copy: own, upload: !!own.dirty, base: cloud.revision };
     // the cloud moved on (another device): take it, unless this device has unsaved progress too
-    return own.dirty ? { use: "ask", copy: own, reason: "both-changed" } : { use: "cloud" };
+    if (!own.dirty) return { use: "cloud" };
+    // both moved on, but only just (the same game open on two devices): the one ahead continues
+    const ahead = nearlySame(own.state, cloud.state);
+    if (ahead === "local") return { use: "local", copy: own, upload: true, base: cloud.revision };
+    if (ahead === "cloud") return { use: "cloud" };
+    return { use: "ask", copy: own, reason: "both-changed" };
   }
 
   if (legacy) {

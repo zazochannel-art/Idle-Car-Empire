@@ -523,6 +523,41 @@ export function emptyDealerModel(W: number, D: number) {
   });
 }
 
+/**
+ * An old works waiting to be restored (a landmark works' lot): a cracked yard,
+ * a weathered hall with broken windows and a roof half gone, a rusty chimney,
+ * a fence and a sign.
+ */
+export function ruinModel(W: number, D: number, roofHex: string) {
+  return cached(`ruin|${W}|${D}|${roofHex}`, () => {
+    const r = rnd(Math.round(W * 31 + D * 17));
+    const P: THREE.BufferGeometry[] = [slab(W, D, "#8d8a80")];
+    const M: THREE.BufferGeometry[] = [];
+    const hw = W * 0.62;
+    const hd = D * 0.5;
+    const wall = C("#a8a39a");
+    const dark = C("#3b3a37");
+    const rust = C("#8a4b2a");
+    // the hall's walls, one gable end fallen in
+    P.push(box(hw, 0.9, 0.12, wall, 0, 0, -hd / 2, 0), box(hw, 0.55, 0.12, wall, -0.1, 0, hd / 2, 0));
+    P.push(box(0.12, 0.9, hd, wall, -hw / 2, 0, 0, 0), box(0.12, 0.42, hd * 0.6, wall, hw / 2, 0, -hd * 0.2, 0));
+    // broken windows along the long wall
+    for (let i = 0; i < 5; i++) P.push(box(0.26, 0.2, 0.02, dark, -hw / 2 + 0.3 + i * ((hw - 0.6) / 4), 0.45, -hd / 2 + 0.07, 0));
+    // what is left of the roof: a few faded sheets and bare trusses
+    const roof = C(roofHex).lerp(C("#7c7468"), 0.55);
+    P.push(box(hw * 0.45, 0.06, hd * 0.95, roof, -hw * 0.27, 0.92, 0, 0));
+    for (let i = 0; i < 4; i++) M.push(box(0.05, 0.05, hd, rust, hw * 0.05 + i * (hw * 0.12), 0.9, 0, 0));
+    // the chimney and a pile of rubble
+    M.push(cylinder(0.14, 1.9, rust, hw / 2 + 0.25, 0, -hd / 2 + 0.2, 10, 0.11));
+    for (let i = 0; i < 6; i++) P.push(box(0.12 + r() * 0.15, 0.06 + r() * 0.08, 0.1 + r() * 0.12, i % 2 ? wall : dark, hw / 2 - 0.2 + r() * 0.5, 0, hd / 2 - 0.2 + r() * 0.4, r() * 3));
+    // a sagging fence along the road and the old sign
+    for (let i = 0; i < 6; i++) M.push(box(0.04, 0.24 - (i % 3) * 0.04, 0.04, C("#6b6560"), -W / 2 + 0.35 + (i * (W - 0.7)) / 5, 0, D / 2 - 0.25, 0));
+    M.push(box(W - 0.9, 0.03, 0.02, C("#6b6560"), -0.15, 0.15, D / 2 - 0.25, 0.04));
+    P.push(box(0.7, 0.32, 0.05, C("#d6cdb8"), 0.7, 0.3, D / 2 - 0.3, 0), box(0.04, 0.32, 0.04, rust, 0.4, 0, D / 2 - 0.3, 0), box(0.04, 0.32, 0.04, rust, 1.0, 0, D / 2 - 0.3, 0));
+    return parts({ plain: P, metal: M });
+  });
+}
+
 // ───────────────────────────── building sites ─────────────────────────────
 
 export interface SiteModel {

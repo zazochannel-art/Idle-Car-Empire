@@ -4,8 +4,11 @@ import { COMPONENTS } from "../config/chain";
 import { DEALER_IDS } from "../config/dealerships";
 import { MANAGER_IDS } from "../config/managers";
 import { START_CASH } from "../config/economy";
+import { WHATS_NEW } from "../config/whats-new";
 import { createChain } from "./chain";
 import { createCity } from "./city";
+import { createMaintenance } from "./maintenance";
+import { createStock } from "./stock";
 import { createLogistics } from "./logistics";
 import { createRacing } from "./racing";
 import { createSeason, createShow, createVip } from "./live";
@@ -15,6 +18,8 @@ import { createStory } from "./story";
 import { createEditions } from "./collection";
 import { createPass } from "./pass";
 import { createAds } from "./ads";
+import { createMapBonus } from "./map-bonus";
+import { createLandmarks } from "./landmarks";
 import { createIap } from "./iap";
 import { createShop } from "./shop";
 import type { CarDesign, CarId, ComponentId, DealerId, DealerState, GameState, ManagerId, ManagerState, Stats } from "../types";
@@ -30,6 +35,8 @@ export const MAP_VERSION = 3;
 export function createDealers(): Record<DealerId, DealerState> {
   return Object.fromEntries(DEALER_IDS.map((d) => [d, { owned: false, level: 1 }])) as Record<DealerId, DealerState>;
 }
+
+export const createShowroom = (): GameState["showroom"] => ({ campaignUntil: 0, campaigns: 0, sold: 0, revenue: 0 });
 
 export function createManagers(): Record<ManagerId, ManagerState> {
   return Object.fromEntries(
@@ -98,12 +105,16 @@ export function createInitialState(now: number): GameState {
     mapVersion: MAP_VERSION,
     eventGoal: { start: 0, base: 0, claimed: false },
     brand: createBrand(),
-    showroom: { campaignUntil: 0, campaigns: 0, sold: 0, revenue: 0 },
+    showroom: createShowroom(),
     ev: { chargers: {} },
     story: createStory(),
     editions: createEditions(),
     pass: createPass(),
     ads: createAds(),
+    mapBonus: createMapBonus(),
+    landmarks: createLandmarks(),
+    maintenance: createMaintenance(),
+    stock: createStock(),
     shop: createShop(),
     iap: createIap(),
     research: [],
@@ -125,8 +136,10 @@ export function createInitialState(now: number): GameState {
     season: createSeason(),
     show: createShow(),
     quality: { rep: 50, defects: 0, recall: null, scandalUntil: 0, recalls: 0 },
-    settings: { buyAmount: 1, lang: "en", lowGraphics: false, sound: true, music: true, haptics: true, notify: false, saver: "auto", stats: true, hidden: [] },
+    settings: { buyAmount: 1, lang: "en", lowGraphics: false, sound: true, music: true, haptics: true, notify: false, saver: "auto", stats: true, hidden: [], toastsOff: [], autoRecall: "ask", autoVip: false, autoFleet: false, autoCollect: false, whatsNew: WHATS_NEW.id },
     funnel: [],
+    activeCity: "home",
+    cities: {},
     createdAt: now,
     runStartedAt: now,
     lastActiveAt: now,

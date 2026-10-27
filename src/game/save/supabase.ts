@@ -31,6 +31,9 @@ export function authError(e: Pick<SbAuthError, "message"> & { code?: string; sta
 
 const fail = (e: Parameters<typeof authError>[0]): AuthResult => ({ ok: false, error: authError(e), detail: e.message });
 
+/** The app's version without the commit (next.config.ts): "1.0.7 (23)". */
+const APP_VERSION = (process.env.NEXT_PUBLIC_APP_VERSION ?? "").replace(/\)\s.*$/, ")").slice(0, 40);
+
 /** How long the start waits for supabase-js to restore the session before trusting the one stored here (ms). */
 const SESSION_WAIT = 3_000;
 
@@ -246,9 +249,19 @@ export class SupabaseBackend implements CloudBackend {
     return row ? { state: row.data, version: row.save_version } : null;
   }
 
+  async deleteBackup(id: number): Promise<boolean> {
+    const c = await this.client;
+    const { data, error } = await c.rpc("delete_my_backup", { p_id: id });
+    if (error) throw error;
+    return data === true;
+  }
+
+  // the server keeps the backups itself, when a save replaces the one before it (0011); the cloud
+  // copy also says which app wrote it, for the dashboard's count of versions in use (0020)
   async save(state: GameState, version: number, baseRevision: number, device: string) {
     const c = await this.client;
-    const { data, error } = await c.rpc("save_game", { p_data: state, p_save_version: version, p_base_revision: baseRevision, p_device: device });
+    const copy = APP_VERSION ? { ...state, appVersion: APP_VERSION } : state;
+    const { data, error } = await c.rpc("save_game", { p_data: copy, p_save_version: version, p_base_revision: baseRevision, p_device: device });
     if (error) throw error;
     const row = (data as { ok: boolean; revision: number | string; updated_at: string | null }[] | null)?.[0];
     if (!row) throw new Error("no answer from save_game");

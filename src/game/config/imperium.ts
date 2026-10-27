@@ -20,9 +20,12 @@ export const STAR_UPGRADES: StarUpgradeConfig[] = [
 export const STAR_UPGRADE_BY_ID = Object.fromEntries(STAR_UPGRADES.map((u) => [u.id, u])) as Record<StarUpgradeId, StarUpgradeConfig>;
 
 export const IMPERIUM = {
-  /** Run earnings needed for the reset. */
-  minRunEarnings: 5e9,
-  /** Stars = max(1, floor(perDecade × log10(earned since last reset / base))): 2 at $5B, 3 at $10B, 6 at $100B. */
+  /** Total earnings at which the first Stars can be collected. */
+  minRunEarnings: 20e9,
+  /**
+   * Stars earned in all = max(1, floor(perDecade × log10(total earnings / base))), counted from
+   * minRunEarnings (engine/imperium.ts starsAt): 3 at $20B, 6 at $100B, 9 at $1T, +3 per tenfold.
+   */
   perDecade: 3,
   base: 1e9,
 };

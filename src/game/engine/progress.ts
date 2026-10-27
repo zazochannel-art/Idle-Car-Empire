@@ -16,6 +16,7 @@ import { ledgerNet, payReward } from "./materials";
 import { isMoneyMetric } from "../config/missions";
 import { PASS } from "../config/pass";
 import { addPassXp, passTick } from "./pass";
+import { plantsEverywhere } from "./cities";
 
 export { isMoneyMetric };
 
@@ -34,7 +35,8 @@ export function metric(s: GameState, id: MetricId, snap?: EconomySnapshot): numb
     case "managersHired":
       return s.lifetime.managersHired;
     case "factoriesOwned":
-      return plantsOf(s).length;
+      // the plants of every city
+      return plantsEverywhere(s);
     case "dealersOwned":
       return Object.values(s.dealers).filter((d) => d.owned).length;
     case "maxFactoryLevel":

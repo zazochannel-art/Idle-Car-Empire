@@ -26,6 +26,10 @@ export interface WorldJson {
     muchii: RoadData[];
     parcari: { c: [number, number]; t: [number, number]; L: number; W: number; o: number }[];
   };
+  /** The railway, the runway's ends and the ships' berths, on maps made after the first (rail-line.ts holds the first map's). */
+  linie?: [number, number][];
+  pista?: { a: [number, number]; b: [number, number] };
+  cheiuri?: [number, number][];
 }
 
 export interface Building {
@@ -73,11 +77,15 @@ export class Ground {
     const u16 = new Uint16Array(raw);
     this.m = new Float32Array(this.GW * this.GH);
     for (let i = 0; i < this.m.length; i++) this.m[i] = u16[i] / 10 - 40;
-    // normals from the whole grid, so the tiles meet without seams
+    this.normals = new Float32Array(this.GW * this.GH * 3);
+    this.computeNormals();
+  }
+
+  /** Normals from the whole grid, so the tiles meet without seams. */
+  private computeNormals() {
     const { GW, GH, m } = this;
     const du = this.SX / (GW - 1);
     const dv = this.SZ / (GH - 1);
-    this.normals = new Float32Array(GW * GH * 3);
     for (let j = 0; j < GH; j++)
       for (let i = 0; i < GW; i++) {
         const il = Math.max(0, i - 1), ir = Math.min(GW - 1, i + 1), ju = Math.max(0, j - 1), jd = Math.min(GH - 1, j + 1);
@@ -89,6 +97,38 @@ export class Ground {
         this.normals[k + 1] = 1 / n;
         this.normals[k + 2] = -dz / n;
       }
+  }
+
+  /**
+   * Levels the ground under lots that were placed after the map was made (the
+   * landmark works): flat at `h` metres over each, easing back to the land
+   * within `margin` units round it. Call before the terrain is built.
+   */
+  level(lots: { x: number; y: number; w: number; d: number; rot: number; h: number }[], margin = 1.5) {
+    const { GW, GH, m } = this;
+    for (const l of lots) {
+      const c = Math.cos(l.rot);
+      const s = Math.sin(l.rot);
+      const R = Math.hypot(l.w, l.d) / 2 + margin;
+      const i0 = Math.max(0, Math.floor(((l.x - R) / this.SX + 0.5) * (GW - 1)));
+      const i1 = Math.min(GW - 1, Math.ceil(((l.x + R) / this.SX + 0.5) * (GW - 1)));
+      const j0 = Math.max(0, Math.floor(((l.y - R) / this.SZ + 0.5) * (GH - 1)));
+      const j1 = Math.min(GH - 1, Math.ceil(((l.y + R) / this.SZ + 0.5) * (GH - 1)));
+      for (let j = j0; j <= j1; j++)
+        for (let i = i0; i <= i1; i++) {
+          const x = (i / (GW - 1) - 0.5) * this.SX;
+          const z = (j / (GH - 1) - 0.5) * this.SZ;
+          // how far outside the lot (0 inside), in its own frame
+          const u = Math.abs((x - l.x) * c - (z - l.y) * s) - l.w / 2;
+          const v = Math.abs((x - l.x) * s + (z - l.y) * c) - l.d / 2;
+          const out = Math.hypot(Math.max(0, u), Math.max(0, v));
+          if (out >= margin) continue;
+          const k = out <= 0 ? 1 : 1 - out / margin;
+          const e = k * k * (3 - 2 * k);
+          m[j * GW + i] += (l.h - m[j * GW + i]) * e;
+        }
+    }
+    this.computeNormals();
   }
 
   /** Metres at a world point (bilinear). */

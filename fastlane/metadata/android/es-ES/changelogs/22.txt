@@ -1,0 +1,6 @@
+Novedades en 1.0.6:
+• Nordheim, una segunda ciudad: abre todos los territorios y funda una ciudad nueva en una gran isla nevada, con sus propios distritos y cartera (pantalla Mundo)
+• La ciudad en la que no estás sigue ganando en piloto automático
+• Decisiones automáticas: revisiones, pedidos VIP y de flota y cobros, sin preguntarte (Ajustes)
+• Una tarjeta «Novedades» tras cada actualización
+• Correcciones y más estabilidad

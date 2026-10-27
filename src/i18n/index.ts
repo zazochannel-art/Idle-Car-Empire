@@ -71,7 +71,24 @@ function fill(text: string, vars?: Vars) {
   return text.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m));
 }
 
+/**
+ * The city being played: Nordheim's districts and territories have names of their
+ * own ("north.zone.town", …), used for "zone.…" and "territory.…" while it is played.
+ */
+let place = "home";
+export function setPlaceNames(city: string) {
+  if (city === place) return;
+  place = city;
+  version++;
+  listeners.forEach((fn) => fn());
+}
+
 export function translate(lang: Lang, key: MessageKey, vars?: Vars): string {
+  if (place !== "home" && (key.startsWith("zone.") || key.startsWith("territory."))) {
+    const own = `${place}.${key}` as MessageKey;
+    const text = MESSAGES[lang]?.[own] ?? en[own];
+    if (text) return fill(text, vars);
+  }
   return fill(MESSAGES[lang]?.[key] ?? en[key] ?? key, vars);
 }
 

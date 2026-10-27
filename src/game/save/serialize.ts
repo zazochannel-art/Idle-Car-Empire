@@ -1,20 +1,29 @@
 import { migrateChain } from "../engine/chain";
+import { migrateMaintenance } from "../engine/maintenance";
+import { migrateStock } from "../engine/stock";
+import { NOTICE_KINDS } from "../config/notices";
+import { RECALL_POLICIES } from "../engine/autopilot";
 import { migrateBrand } from "../engine/brand";
 import { migrateRacing } from "../engine/racing";
 import { migrateQuality } from "../engine/market";
 import { migrateLive } from "../engine/live";
 import { migrateClassics } from "../engine/classics";
-import { migrateExpansion } from "../engine/expansion";
+import { migrateExpansion, migrateExport, migrateFleet } from "../engine/expansion";
 import { migrateFunnel } from "../engine/funnel";
 import { migrateEv } from "../engine/ev";
 import { migratePass } from "../engine/pass";
 import { migrateAds } from "../engine/ads";
+import { migrateMapBonus } from "../engine/map-bonus";
+import { migrateLandmarks } from "../engine/landmarks";
 import { migrateIap } from "../engine/iap";
 import { migrateShop } from "../engine/shop";
 import { migrateCity, unlockOwnedZones } from "../engine/city";
+import { bundleOf, createCityBundle, withCity, type ParkedCity } from "../engine/cities";
+import { withWorld } from "../city/layout";
+import { CITY_IDS } from "../config/cities";
 import { createInitialState, MAP_VERSION, SAVE_VERSION } from "../engine/state";
 import { ACHIEVEMENTS } from "../config/achievements";
-import type { GameState, Lang } from "../types";
+import type { CityId, GameState, Lang } from "../types";
 
 type Json = Record<string, unknown>;
 
@@ -39,7 +48,41 @@ function cleanSettings(state: GameState, saved: unknown): GameState {
     .filter((h): h is { id: string; name: unknown } => isObject(h) && typeof h.id === "string" && h.id.length > 0 && h.id.length <= 64)
     .map((h) => ({ id: h.id, name: typeof h.name === "string" ? h.name.slice(0, 40) : "" }))
     .slice(-200);
+  // the kinds of notices kept off the screen: known ones, each once
+  const off: unknown[] = Array.isArray(state.settings.toastsOff) ? state.settings.toastsOff : [];
+  state.settings.toastsOff = NOTICE_KINDS.filter((k) => off.includes(k));
+  if (!RECALL_POLICIES.includes(state.settings.autoRecall)) state.settings.autoRecall = "ask";
+  // a save from before the "what's new" card has not seen it
+  if (isObject(saved) && typeof saved.whatsNew !== "string") state.settings.whatsNew = "";
   return state;
+}
+
+/**
+ * One city's own parts (its lots and buildings, chain, chargers, map bonus,
+ * landmark works, ports and fleet division), checked on its map: `state`
+ * holds that city's fields as merged from the save.
+ */
+function migrateCityParts(state: GameState, raw: Json) {
+  state.city = migrateCity(raw.city);
+  state.chain = migrateChain(raw.chain, state);
+  // the charging stations are keyed by dealer (an open-ended record)
+  state.ev = migrateEv(raw.ev);
+  state.mapBonus = migrateMapBonus(state.mapBonus);
+  state.landmarks = migrateLandmarks(raw.landmarks);
+  state.export = migrateExport(raw.export);
+  state.fleet = migrateFleet(raw.fleet);
+  unlockOwnedZones(state);
+}
+
+const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : 0);
+
+/** A city the company is not playing in, on its own map. */
+function migrateParked(state: GameState, id: CityId, raw: Json): ParkedCity {
+  return withWorld(id, () => {
+    const parked = { ...state, ...mergeDefaults(createCityBundle(), raw) };
+    migrateCityParts(parked, raw);
+    return { ...bundleOf(parked), at: num(raw.at), steady: num(raw.steady) };
+  });
 }
 
 function mergeDefaults<T>(defaults: T, saved: unknown): T {
@@ -104,35 +147,53 @@ export function migrate(raw: unknown, now: number): GameState {
   state.achievements = state.achievements.filter((id) => typeof id === "string" && known.has(id));
   // Nullable fields have no typed default to merge against.
   state.pendingOffline = isObject(raw.pendingOffline) ? (raw.pendingOffline as unknown as GameState["pendingOffline"]) : null;
-  // The city has open-ended keys (plot ids), so it is validated on its own.
-  state.city = migrateCity(raw.city);
+  if (state.pendingOffline?.cities) {
+    const cities = Object.fromEntries(CITY_IDS.flatMap((id) => (num(state.pendingOffline?.cities?.[id]) > 0 ? [[id, num(state.pendingOffline?.cities?.[id])]] : [])));
+    if (Object.keys(cities).length) state.pendingOffline.cities = cities;
+    else delete state.pendingOffline.cities;
+  }
+  // The cities have open-ended keys (plot ids), so each is validated on its own
+  // map: the one being played (in the state's own fields) and the parked ones.
+  // A save from before the cities is all the first city's.
+  state.activeCity = CITY_IDS.includes(raw.activeCity as CityId) ? (raw.activeCity as CityId) : "home";
+  withWorld(state.activeCity, () => migrateCityParts(state, raw));
+  state.cities = {};
+  const parked = isObject(raw.cities) ? raw.cities : {};
+  for (const id of CITY_IDS) {
+    const c = parked[id];
+    if (id !== state.activeCity && isObject(c)) state.cities[id] = migrateParked(state, id, c);
+  }
+  // a manager runs a plant in any of the cities (lot ids are never shared between them)
+  const plants = new Set([state.city, ...Object.values(state.cities).map((c) => c!.city)].flatMap((c) => Object.keys(c.buildings).filter((id) => c.buildings[id].plant)));
   for (const [id, m] of Object.entries(state.managers)) {
     const saved = (raw.managers as Json | undefined)?.[id];
     const plot = isObject(saved) && typeof saved.assignedTo === "string" ? saved.assignedTo : null;
-    m.assignedTo = plot && state.city.buildings[plot]?.plant ? plot : null;
+    m.assignedTo = plot && plants.has(plot) ? plot : null;
   }
-  state.chain = migrateChain(raw.chain, state);
   state.racing = migrateRacing(raw.racing);
-  // a car on a transporter that didn't survive the save is back at its factory lot
-  for (const rc of state.racing.cars) {
-    if (rc.location === "transit" && !state.chain.shipments.some((sh) => !sh.back && sh.fleet?.includes(rc.id))) {
-      rc.location = "factory";
-      delete rc.listing;
+  // the racing team is in the first city: its transporters and showrooms are there
+  withCity(state, "home", () => {
+    for (const rc of state.racing.cars) {
+      // a car on a transporter that didn't survive the save is back at its factory lot
+      if (rc.location === "transit" && !state.chain.shipments.some((sh) => !sh.back && sh.fleet?.includes(rc.id))) {
+        rc.location = "factory";
+        delete rc.listing;
+      }
+      // a showroom car needs its listing and its dealer
+      if (rc.location === "showroom" && (!rc.listing || !state.dealers[rc.listing.dealer]?.owned)) {
+        rc.location = "factory";
+        delete rc.listing;
+      }
     }
-    // a showroom car needs its listing and its dealer
-    if (rc.location === "showroom" && (!rc.listing || !state.dealers[rc.listing.dealer]?.owned)) {
-      rc.location = "factory";
-      delete rc.listing;
-    }
-  }
+  });
   state.quality = migrateQuality(raw.quality);
   // a save from before the funnel is not a new player: it is never counted
   state.funnel = migrateFunnel(raw.funnel);
-  // the charging stations are keyed by dealer (an open-ended record)
-  state.ev = migrateEv(raw.ev);
   // the season pass has open-ended lists (tiers taken, challenges, hall styles)
   state.pass = migratePass(raw.pass);
   state.ads = migrateAds(state.ads, now);
+  state.maintenance = migrateMaintenance(raw.maintenance);
+  state.stock = migrateStock(raw.stock);
   state.shop = migrateShop(state.shop, now);
   state.iap = migrateIap(raw.iap);
   migrateLive(raw, state);
@@ -142,7 +203,6 @@ export function migrate(raw: unknown, now: number): GameState {
   state.unlocks = state.unlocks.filter((u) => typeof u === "string");
   // a missing or future start date would skew rivals, contracts and stats
   if (!(state.createdAt > 0 && state.createdAt <= now)) state.createdAt = Math.min(now, state.lastActiveAt > 0 ? state.lastActiveAt : now);
-  unlockOwnedZones(state);
   state.version = SAVE_VERSION;
   return cleanSettings(state, raw.settings);
 }

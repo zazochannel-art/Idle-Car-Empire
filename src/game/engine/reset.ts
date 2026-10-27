@@ -1,17 +1,24 @@
 import { createExport, createFleet } from "./expansion";
 import type { GameState } from "../types";
+import { setWorld } from "../city/layout";
 import { createChain } from "./chain";
 import { createCity } from "./city";
 import { resetDesignLevels } from "./design";
 import { createLogistics } from "./logistics";
+import { createStock } from "./stock";
 import { createDealers, createStats, emptyCarCounts } from "./state";
 
 /**
- * Clears the current run (Reset Imperium): cash, plants, the map, dealers,
- * car models, ports and the fleet division. The racing team, managers
+ * Clears the current run (the old Reset Imperium; collecting ⭐ Stars no longer
+ * calls it, see imperium.ts): cash, plants, the map, dealers,
+ * car models, ports, the fleet division and the cities beyond the first. The racing team, managers
  * (unassigned), launched models, engineers and lifetime stats stay.
  */
 export function resetRun(s: GameState, now: number) {
+  // the first city again, alone
+  s.activeCity = "home";
+  s.cities = {};
+  setWorld("home");
   s.cash = 0;
   s.dealers = createDealers();
   // the charging stations stood at the old dealers
@@ -39,4 +46,6 @@ export function resetRun(s: GameState, now: number) {
   s.fleet = createFleet();
   s.proto.active = null;
   for (const m of Object.values(s.managers)) m.assignedTo = null;
+  // a new company, with all its shares (the maintenance crew stays)
+  s.stock = createStock();
 }

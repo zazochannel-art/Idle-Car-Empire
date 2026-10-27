@@ -87,6 +87,8 @@ export interface CloudBackend {
   backups?(): Promise<CloudBackup[]>;
   /** One of them to play again (the server first keeps the cloud save it will replace); null if it's gone. */
   takeBackup?(id: number): Promise<{ state: unknown; version: number } | null>;
+  /** Deletes one of them (supabase/migrations/0017); false if it was already gone. */
+  deleteBackup?(id: number): Promise<boolean>;
 }
 
 /**

@@ -8,10 +8,12 @@ import { GRID_GAP, RACE_COUNTDOWN, RACE_TIME_SCALE, type TrackId } from "../conf
 import type { RaceEntrant, RaceRecord } from "../types";
 
 export interface TrackLayout {
-  /** Corner points of the racing line (closed). */
-  points: [number, number][];
-  /** How far before a corner its curve starts (tiles). */
+  /** Corner points of the racing line (closed), each with its own curve size when given (tiles). */
+  points: ([number, number] | [number, number, number])[];
+  /** How far before a corner its curve starts (tiles), for corners without their own. */
   radius: number;
+  /** Height of the rolling ground the circuit runs over, in metres (the 3D viewer; 0: flat). */
+  hills?: number;
   /** Asphalt width (tiles). */
   width: number;
   /** Where the start/finish line is, as a share of the lap from the first point. */
@@ -22,78 +24,125 @@ export interface TrackLayout {
 }
 
 /**
- * The home circuit fills the Racing District's track blocks on the map
- * (13 × 20 tiles): a long main straight with the pits, a sweeping first
- * corner, a chicane on the back straight, a hairpin, a tight infield and a
- * second hairpin onto the straight.
+ * The circuits. Each one starts on its main straight: the first point sits on it (the corners
+ * before and after are the last and first of the lap), so the grid behind the start line, the
+ * line itself and the pit lane on the infield side all lie on the straight. Corners carry their
+ * own curve size where they differ from the circuit's; the race viewer draws the ground rolling
+ * by `hills` metres. tracks.test.ts checks that every lap stays clear of itself and that the grid,
+ * the start and the pit lane sit on the straight.
  */
 export const TRACK_LAYOUTS: Record<TrackId, TrackLayout> = {
+  // The home circuit: a club track with a long pit straight, a fast first corner into a pair of
+  // esses, a tight hairpin, a flowing infield and a last corner onto the straight.
   small: {
     points: [
-      [1.5, 15.5], [1.5, 3.4], [2.2, 1.5], [4.5, 1.2], [10.4, 1.3], [11.8, 2.8], [11.8, 7.2], [10.4, 8.5], [11.8, 9.8],
-      [11.8, 17.6], [11.0, 19.0], [9.0, 19.1], [8.0, 17.8], [8.0, 13.2], [7.0, 11.6], [5.2, 11.6], [4.2, 12.8], [4.2, 16.6], [3.3, 18.8], [2.0, 18.8],
+      [7, 2.5], [20.5, 2.5, 2], [22.5, 5, 1.4], [20.5, 7.5, 1.4], [22, 10, 1.4], [21, 12.8, 1],
+      [17.5, 13, 1], [16, 10, 1.6], [12.5, 8.5, 1.8], [9.5, 11.5, 1.6], [6.5, 13, 1.6], [3.5, 11.5, 1.4],
+      [2.5, 7.5, 1.6], [4.5, 5, 1.2], [2.5, 2.5, 1.2],
+    ],
+    radius: 1.4,
+    width: 1.1,
+    start: 0.0929,
+    w: 25,
+    d: 15.5,
+  },
+  // Between warehouses: square corners, a loop round a loading bay and a chicane on the back
+  // straight.
+  industrial: {
+    points: [
+      [7, 2.5], [23.5, 2.5, 1.2], [23.5, 8.5, 1.2], [18.5, 8.5, 1], [18.5, 11.5, 1], [23.5, 11.5, 1.2],
+      [23.5, 15.5, 1.2], [14, 15.5, 1], [12.5, 14, 0.8], [10, 14, 0.8], [8.5, 15.5, 1], [3, 15.5, 1.2],
+      [3, 10, 1.2], [6.5, 8.5, 1], [3, 6, 1.2], [2.5, 2.5, 1.2],
     ],
     radius: 1.2,
-    width: 0.95,
-    start: 0.07,
-    w: 13,
-    d: 20,
-  },
-  industrial: {
-    points: [[2, 2], [18, 2], [20, 4], [20, 7], [17, 8], [15, 9.5], [17, 11], [20, 12], [20, 15], [18, 16.5], [10, 16.5], [8, 14], [8, 11.5], [6, 10], [3, 10], [2, 8]],
-    radius: 1.6,
-    width: 1.3,
-    start: 0.05,
-    w: 22,
-    d: 18.5,
-  },
-  mountain: {
-    points: [[2, 14], [5, 15.5], [8, 13.5], [9, 11], [11, 9.5], [14, 10.5], [15, 13], [17, 14.5], [20, 13], [21, 10], [19, 7.5], [16, 7], [14, 5], [15, 3], [13, 1.5], [9, 2], [7, 4], [8, 6.5], [6, 8.5], [3, 8.5], [1.5, 11]],
-    radius: 1.4,
-    width: 1.2,
-    start: 0.02,
-    w: 23,
-    d: 17,
-  },
-  coastal: {
-    points: [[2, 10], [4, 4], [9, 2], [15, 2.5], [20, 1.8], [24, 4], [24.5, 8], [22, 11], [18, 12], [15, 14.5], [10, 16], [5, 15]],
-    radius: 3,
-    width: 1.3,
-    start: 0.18,
-    w: 27,
+    width: 1.25,
+    start: 0.0667,
+    w: 26.5,
     d: 18,
   },
+  // Over the hills: sweeping bends, switchbacks down into the valley and a climb back to the start.
+  mountain: {
+    points: [
+      [7.5, 2.5], [20, 2.5, 2.4], [24, 5, 2], [24, 8.5, 2], [21, 10.5, 1.6], [23.5, 14, 1.4],
+      [21, 17, 1.6], [16, 16, 2], [14, 12.5, 1.2], [11, 13.5, 1], [12.5, 17, 1.2], [8, 17.5, 1.6],
+      [4, 15, 2], [5.5, 11, 1.6], [2.5, 7.5, 2], [3.5, 3, 1.6],
+    ],
+    radius: 1.8,
+    width: 1.2,
+    start: 0.0821,
+    w: 26.5,
+    d: 20,
+    hills: 9,
+  },
+  // Along the shore: fast sweepers by the sea and a tight harbour hairpin.
+  coastal: {
+    points: [
+      [9, 2.5], [22, 2.5, 3], [27, 4.5, 2.4], [27.5, 8, 2], [24, 10.5, 2.4], [18, 11, 2.4], [15, 8.5, 1.2],
+      [12.5, 9, 1], [11, 11.5, 1.4], [6, 12, 2.4], [2.5, 9, 2.4], [2.5, 5, 2], [4.5, 2.5, 1.6],
+    ],
+    radius: 2.4,
+    width: 1.3,
+    start: 0.1014,
+    w: 30,
+    d: 18,
+    hills: 3,
+  },
+  // Long flat-out straights through the dunes, fast bends and a twisty section at the far end.
   desert: {
-    points: [[2, 3], [24, 3], [26, 5], [26, 9], [22, 11], [16, 10], [12, 12], [10, 15], [6, 16], [2, 14], [1, 8]],
+    points: [
+      [9, 2.5], [27, 2.5, 3], [30, 6, 2.6], [28, 10, 2], [22, 10.5, 2], [19, 13, 1.6], [22, 15.5, 1.6],
+      [13, 16, 2.4], [8, 13.5, 2], [4, 15, 1.6], [2, 11, 2.4], [3, 6, 2.4], [4.5, 2.5, 1.8],
+    ],
     radius: 2.4,
     width: 1.4,
-    start: 0.08,
-    w: 28,
-    d: 18,
+    start: 0.0843,
+    w: 32.5,
+    d: 18.5,
+    hills: 4,
   },
+  // Through the city blocks at night: right-angle turns round the blocks, two loops and a long back
+  // straight.
   nightCity: {
-    points: [[2, 2], [10, 2], [10, 5], [15, 5], [15, 2], [22, 2], [22, 9], [18, 9], [18, 13], [22, 13], [22, 16], [8, 16], [8, 12], [4, 12], [4, 8], [2, 8]],
+    points: [
+      [6, 2.5], [18, 2.5, 1], [18, 6, 0.9], [21.5, 6, 0.9], [21.5, 2.5, 1], [25.5, 2.5, 1.2],
+      [25.5, 10, 1], [21, 10, 0.9], [21, 13.5, 0.9], [25.5, 13.5, 1], [25.5, 17.5, 1.2], [13, 17.5, 1],
+      [13, 13, 0.9], [8.5, 13, 0.9], [8.5, 17.5, 1], [2.5, 17.5, 1.2], [2.5, 2.5, 1.2],
+    ],
     radius: 1,
     width: 1.2,
-    start: 0.04,
-    w: 24,
-    d: 18,
+    start: 0.0531,
+    w: 28,
+    d: 20,
   },
+  // The classic: a long straight into a hairpin, a chicane, a sweeping right-hander, a run of esses
+  // and a stadium section.
   grandPrix: {
-    points: [[3, 3], [16, 3], [19, 2.5], [21, 4], [20, 6], [17, 6.5], [16, 8], [19, 9.5], [24, 9], [26, 11], [25, 14], [21, 15.5], [15, 15], [12, 13], [9, 15], [5, 15.5], [3, 13], [4, 10], [2, 7]],
+    points: [
+      [8, 2.5], [25, 2.5, 1.4], [27, 5.5, 1.4], [24, 7, 1.2], [26, 9.5, 1.6], [29, 11, 2.2], [28.5, 16, 2],
+      [24, 17.5, 2], [20, 15.5, 1.6], [16, 17.5, 1.6], [12, 15.5, 1.6], [8.5, 17.5, 1.4], [4, 16.5, 1.8],
+      [2.5, 12, 2], [6, 9.5, 1], [6.5, 6.5, 1], [3, 5, 1.4], [2.5, 2.5, 1.2],
+    ],
     radius: 1.6,
     width: 1.35,
-    start: 0.06,
-    w: 28,
-    d: 18,
+    start: 0.0691,
+    w: 31.5,
+    d: 20,
   },
+  // The longest: a straight of a kilometre and more, fast bends, a slow infield and every kind of
+  // corner.
   international: {
-    points: [[2, 4], [10, 2], [20, 2], [28, 3], [31, 6], [29, 10], [24, 11], [22, 14], [25, 17], [22, 20], [14, 20], [8, 18], [6, 14], [9, 11], [5, 9], [2, 8]],
-    radius: 2.2,
+    points: [
+      [8, 2.5], [30, 2.5, 2.4], [33.5, 5.5, 2], [31, 9, 1.6], [33.5, 13, 2], [32, 18, 2.4],
+      [27, 21.5, 2.4], [22, 19, 1.6], [22, 14.5, 1.2], [18, 13, 1.2], [14, 16, 1.6], [15.5, 20, 1.4],
+      [11, 21.5, 2], [6, 19.5, 2], [3.5, 15, 2], [7, 11.5, 1.6], [11, 10, 1.2], [10, 6.5, 1.4],
+      [5, 6, 1.4], [2.5, 3.5, 1.2],
+    ],
+    radius: 2,
     width: 1.4,
-    start: 0.08,
-    w: 33,
-    d: 22,
+    start: 0.0563,
+    w: 36,
+    d: 24,
+    hills: 3,
   },
 };
 
@@ -131,11 +180,11 @@ function sampleLayout(L: TrackLayout): { x: number; y: number }[] {
   const out: { x: number; y: number }[] = [];
   const corner = (i: number) => {
     const [px, py] = pts[(i - 1 + n) % n];
-    const [cx, cy] = pts[i];
+    const [cx, cy, own] = pts[i];
     const [nx, ny] = pts[(i + 1) % n];
     const lin = Math.hypot(cx - px, cy - py);
     const lout = Math.hypot(nx - cx, ny - cy);
-    const r = Math.min(L.radius, lin * 0.48, lout * 0.48);
+    const r = Math.min(own ?? L.radius, lin * 0.48, lout * 0.48);
     return {
       a: [cx + ((px - cx) / lin) * r, cy + ((py - cy) / lin) * r] as [number, number],
       c: [cx, cy] as [number, number],

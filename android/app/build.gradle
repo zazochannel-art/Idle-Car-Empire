@@ -3,16 +3,27 @@ apply plugin: 'com.android.application'
 // The version Google Play sees: versionCode must go up by at least 1 for every upload,
 // versionName is what players read. Both live in android/version.properties; a build
 // can override them with -PversionCode=… -PversionName=…
+def findFile = { String filename ->
+    def f = rootProject.file("android/${filename}")
+    if (!f.exists()) {
+        f = rootProject.file(filename)
+    }
+    return f
+}
+
 def versionProps = new Properties()
-rootProject.file('version.properties').withInputStream { versionProps.load(it) }
+def versionPropsFile = findFile('version.properties')
+if (versionPropsFile.exists()) {
+    versionPropsFile.withInputStream { versionProps.load(it) }
+}
 def appVersionCode = (project.findProperty('versionCode') ?: versionProps.getProperty('versionCode')) as Integer
 def appVersionName = (project.findProperty('versionName') ?: versionProps.getProperty('versionName')) as String
 
-// The upload key that signs release builds. Never in the repository: either
-// android/keystore.properties on your computer (gitignored, see docs/android/signing.md)
-// or environment variables in CI. Without it, release builds come out unsigned.
 def keystoreProps = new Properties()
-def keystorePropsFile = rootProject.file('keystore.properties')
+def keystorePropsFile = findFile('keystore.properties')
+if (!keystorePropsFile.exists()) {
+    keystorePropsFile = findFile('keystore.properties.txt')
+}
 if (keystorePropsFile.exists()) {
     keystorePropsFile.withInputStream { keystoreProps.load(it) }
 }
@@ -61,7 +72,11 @@ android {
         }
         if (canSignRelease) {
             release {
-                storeFile rootProject.file(releaseStoreFile)
+                def storeFileObj = rootProject.file("android/${releaseStoreFile}")
+                if (!storeFileObj.exists()) {
+                    storeFileObj = rootProject.file(releaseStoreFile)
+                }
+                storeFile storeFileObj
                 storePassword signingValue('storePassword', 'ANDROID_KEYSTORE_PASSWORD')
                 keyAlias signingValue('keyAlias', 'ANDROID_KEY_ALIAS')
                 keyPassword signingValue('keyPassword', 'ANDROID_KEY_PASSWORD')
@@ -76,8 +91,14 @@ android {
             versionNameSuffix "-debug"
         }
         release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // R8 shrinks and obfuscates the Java/Kotlin code; the bundle carries its mapping file, so Play
+            // Console shows readable crashes and ANRs (Android vitals). Native debug symbols go in too where a
+            // library has them (androidx.datastore's tiny one comes stripped: Play's note about it is harmless)
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            ndk {
+                debugSymbolLevel 'FULL'
+            }
             if (canSignRelease) {
                 signingConfig signingConfigs.release
             }

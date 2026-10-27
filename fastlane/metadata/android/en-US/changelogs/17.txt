@@ -1,0 +1,8 @@
+What's new in 1.0.3:
+• Stars are now permanent: collect ⭐ as your total earnings grow and keep every plant, your cash and research
+• Rebalanced economy
+• Cloud backups: delete the ones you don't need
+• Steadier profit display in the top bar
+• Smoother 3D island on phones
+• Name your company after your first car
+• Playing on two devices no longer asks which save to keep when both are the same
