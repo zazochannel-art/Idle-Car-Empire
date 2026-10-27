@@ -3,6 +3,7 @@
 // and alliances. Everything goes through the server's functions: another
 // player's save is never read, only the public card the server builds from it.
 import { parseGhost, type Ghost } from "../engine/ghost";
+import { parseTeamCommands, TEAM_KINDS, type TeamCommand } from "../engine/team";
 import { parseVisitMap, type VisitMap } from "../engine/visit";
 
 export type BoardKind = "all" | "week";
@@ -278,6 +279,13 @@ export class Social {
 
   async giftsSentToday(): Promise<number> {
     return Math.max(0, Math.floor(num(await this.call("gifts_sent_today"))));
+  }
+
+  // ───────────────────────── from the game's team (0020) ─────────────────────────
+
+  /** The commands the team sent this player, of the kinds this game knows: handed out once (engine/team.ts). */
+  async claimCommands(): Promise<TeamCommand[]> {
+    return parseTeamCommands(await this.call("claim_my_commands", { p_kinds: [...TEAM_KINDS] }));
   }
 
   // ───────────────────────── invite codes (0012) ─────────────────────────

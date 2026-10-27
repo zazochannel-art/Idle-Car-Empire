@@ -375,6 +375,35 @@ check(retention.error?.code === "42501", "the retention figures are refused to a
 const playDays = await a.client.schema("analytics").from("play_days").select("day");
 check(!!playDays.error, "the days played aren't reachable from the API", playDays.error?.code ?? "readable");
 
+// ── the dashboard's tools (0020): a player's game takes only its own commands; announcements are
+// read with the public key alone; every admin tool and table is out of a player's reach ──
+const mine = await a.client.rpc("claim_my_commands", { p_kinds: ["cash", "stars", "company", "restore", "message"] });
+check(!mine.error && Array.isArray(mine.data) && mine.data.length === 0, "a player's game asks for its commands (none here)", mine.error?.message ?? JSON.stringify(mine.data));
+const newsAnon = await fetch(`${url}/rest/v1/rpc/live_announcements`, { method: "POST", headers: { apikey: key, "Content-Type": "application/json" }, body: "{}" });
+const newsList = await newsAnon.json().catch(() => null);
+check(newsAnon.status === 200 && Array.isArray(newsList), "the announcements answer with the public key alone", `${newsAnon.status} ${JSON.stringify(newsList)?.slice(0, 80)}`);
+const commandsAnon = await fetch(`${url}/rest/v1/rpc/claim_my_commands`, { method: "POST", headers: { apikey: key, "Content-Type": "application/json" }, body: JSON.stringify({ p_kinds: ["cash"] }) });
+check(commandsAnon.status >= 400, "commands aren't handed out without a session", String(commandsAnon.status));
+for (const [fn, args] of [
+  ["admin_progress", { p_days: 30 }],
+  ["admin_social", {}],
+  ["admin_error_list", { p_version: null }],
+  ["admin_find_players", { p_query: "e2e" }],
+  ["admin_player", { p_user: idB }],
+  ["admin_set_banned", { p_user: idB, p_banned: true }],
+  ["admin_set_name", { p_user: idB, p_name: "Hijacked" }],
+  ["admin_send_command", { p_user: idA, p_kind: "cash", p_payload: { mode: "add", amount: 1e12 }, p_note: null }],
+  ["admin_post_announcement", { p_icon: "x", p_texts: { en: { title: "x" } }, p_starts: new Date().toISOString(), p_hours: 1 }],
+  ["admin_log_list", { p_user: null }],
+]) {
+  const r = await a.client.rpc(fn, args);
+  check(r.error?.code === "42501", `a player can't call ${fn}`, r.error?.code ?? JSON.stringify(r.data)?.slice(0, 80));
+}
+for (const t of ["player_commands", "announcements", "admin_log", "error_marks"]) {
+  const r = await a.client.schema("ops").from(t).select("*").limit(1);
+  check(!!r.error, `ops.${t} isn't reachable from the API`, r.error?.code ?? "readable");
+}
+
 // ── notifications from the server (0016): a player registers and forgets only their own phone;
 // the sender's functions and the tables are out of reach ──
 const phone = `e2e-${crypto.randomUUID()}`;

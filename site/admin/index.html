@@ -13,43 +13,62 @@
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
   body { margin: 0; background: radial-gradient(900px 420px at 50% -160px, #15284f 0%, rgba(6, 7, 10, 0) 70%) no-repeat, #06070a; color: #e7e9ee; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  main { max-width: 960px; margin: 0 auto; padding: 24px 16px 64px; }
+  main { max-width: 1040px; margin: 0 auto; padding: 24px 16px 64px; }
   h1 { font-size: 1.5rem; margin: 0 0 4px; }
   h2 { font-size: 1.1rem; margin: 0 0 10px; color: #fcd34d; }
+  h3 { font-size: .95rem; margin: 14px 0 8px; color: #c9ccd4; }
   a { color: #7dd3fc; }
   .muted { color: #8b8f99; font-size: .9rem; }
   .brand { display: inline-flex; align-items: center; gap: 10px; margin: 0 0 16px; color: #e7e9ee; font-weight: 800; text-decoration: none; }
   .brand img { width: 36px; height: 36px; border-radius: 10px; }
   .card { background: #0f1117; border: 1px solid #23262e; border-radius: 14px; padding: 16px; margin: 0 0 16px; }
+  .box { background: #12151c; border: 1px solid #23262e; border-radius: 12px; padding: 12px; }
+  .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 12px; }
   /* only a table scrolls sideways on a phone, never the card around it */
   .scroll { overflow-x: auto; margin: 0 -4px; padding: 0 4px; }
   .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
   label { display: grid; gap: 4px; font-size: .85rem; color: #c9ccd4; }
-  input, select, button { font: inherit; border-radius: 10px; border: 1px solid #2c303a; background: #161922; color: #e7e9ee; padding: 9px 12px; }
-  input:focus, select:focus { outline: 2px solid #3b82f6; outline-offset: 1px; }
+  label.check { display: inline-flex; align-items: center; gap: 6px; }
+  input, select, button, textarea { font: inherit; border-radius: 10px; border: 1px solid #2c303a; background: #161922; color: #e7e9ee; padding: 9px 12px; }
+  input[type="checkbox"] { padding: 0; width: 16px; height: 16px; }
+  textarea { width: 100%; min-height: 64px; resize: vertical; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid #3b82f6; outline-offset: 1px; }
   button { cursor: pointer; background: #1d4ed8; border-color: #1d4ed8; font-weight: 700; }
   button.ghost { background: #161922; border-color: #2c303a; font-weight: 600; }
+  button.danger { background: #7f1d1d; border-color: #991b1b; }
   button.small { padding: 4px 10px; font-size: .85rem; }
   button:disabled { opacity: .5; cursor: default; }
-  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
   .tile { background: #161922; border: 1px solid #23262e; border-radius: 12px; padding: 10px 12px; }
   .tile b { display: block; font-size: 1.4rem; font-variant-numeric: tabular-nums; }
   .tile span { color: #8b8f99; font-size: .8rem; }
+  .tile em { font-style: normal; font-size: .78rem; font-weight: 700; margin-left: 6px; }
+  .good { color: #86efac; }
+  .bad { color: #fca5a5; }
   table { width: 100%; border-collapse: collapse; font-size: .88rem; }
   th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid #1d2028; vertical-align: top; }
   th { color: #8b8f99; font-weight: 600; white-space: nowrap; }
   td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
   td.wrap { word-break: break-word; min-width: 220px; }
+  dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; font-size: .88rem; }
+  dt { color: #8b8f99; }
+  dd { margin: 0; word-break: break-word; font-variant-numeric: tabular-nums; }
   code { font-size: .8rem; color: #c4b5fd; word-break: break-all; }
   .tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: .78rem; background: #23262e; color: #c9ccd4; white-space: nowrap; }
   .tag.on { background: #14532d; color: #bbf7d0; }
   .tag.soon { background: #1e3a8a; color: #bfdbfe; }
   .tag.off { background: #3f1d1d; color: #fecaca; }
+  .tag.gold { background: #713f12; color: #fde68a; }
   .msg { margin: 8px 0 0; min-height: 1.2em; color: #fcd34d; }
   .bar { height: 8px; border-radius: 999px; background: #3b82f6; min-width: 2px; }
+  .chart { display: flex; align-items: flex-end; gap: 3px; height: 90px; padding: 6px 0 0; border-bottom: 1px solid #23262e; }
+  .chart div { flex: 1; background: #3b82f6; border-radius: 3px 3px 0 0; min-height: 2px; }
+  .chart div:last-child { background: #fcd34d; }
+  .axis { display: flex; justify-content: space-between; color: #8b8f99; font-size: .75rem; margin-top: 4px; }
   nav.tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px; }
   nav.tabs button { background: #161922; border-color: #2c303a; font-weight: 600; }
   nav.tabs button[aria-pressed="true"] { background: #1d4ed8; border-color: #1d4ed8; }
+  .langs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 10px; margin: 10px 0; }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -84,16 +103,104 @@
   </div>
   <nav class="tabs" aria-label="Secțiuni">
     <button data-tab="overview" aria-pressed="true">Pe scurt</button>
+    <button data-tab="progress" aria-pressed="false">Progres</button>
+    <button data-tab="players" aria-pressed="false">Jucători</button>
     <button data-tab="events" aria-pressed="false">Evenimente</button>
     <button data-tab="reports" aria-pressed="false">Raportări</button>
     <button data-tab="errors" aria-pressed="false">Erori</button>
     <button data-tab="funnel" aria-pressed="false">Jucători noi</button>
     <button data-tab="retention" aria-pressed="false">Revin</button>
+    <button data-tab="social" aria-pressed="false">Social</button>
+    <button data-tab="log" aria-pressed="false">Jurnal</button>
   </nav>
 
   <section data-panel="overview" class="card">
     <h2>Pe scurt</h2>
+    <p class="muted">Cifrele pe 7 zile au lângă ele schimbarea față de cele 7 zile dinainte.</p>
     <div id="tiles" class="tiles"></div>
+    <h3>Au jucat în fiecare zi (ultimele 30, UTC)</h3>
+    <div id="dauChart"></div>
+  </section>
+
+  <section data-panel="progress" class="card" hidden>
+    <h2>Cât de departe au ajuns jucătorii</h2>
+    <p class="muted">Din salvările din cloud, doar totaluri. Versiunea aplicației o spun salvările făcute de la 1.0.7 încolo.</p>
+    <div class="row" style="margin: 0 0 12px">
+      <label>Jucători care au salvat <select id="progDays"><option value="7">în ultimele 7 zile</option><option value="30" selected>în ultimele 30 de zile</option><option value="0">oricând</option></select></label>
+    </div>
+    <div id="progTiles" class="tiles"></div>
+    <div class="cols" style="margin-top: 12px">
+      <div class="box"><h3 style="margin-top: 0">Bani câștigați în total</h3><div id="progEarned"></div></div>
+      <div class="box"><h3 style="margin-top: 0">Teritorii deschise în primul oraș</h3><div id="progTerritories"></div></div>
+      <div class="box"><h3 style="margin-top: 0">Reset Imperium</h3><div id="progResets"></div></div>
+      <div class="box"><h3 style="margin-top: 0">Versiunile aplicației</h3><div id="progVersions"></div></div>
+    </div>
+  </section>
+
+  <section data-panel="players" class="card" hidden>
+    <h2>Caută un jucător</h2>
+    <p class="muted">După numele de jucător, numele companiei, email sau id (cel puțin 2 caractere).</p>
+    <div class="row">
+      <label style="flex: 1; min-width: 220px">Caută <input id="findQ" type="search" autocomplete="off"></label>
+      <button id="findGo">Caută</button>
+    </div>
+    <p id="findMsg" class="msg" role="status"></p>
+    <div id="findList"></div>
+  </section>
+
+  <section id="playerCard" data-panel="players" class="card" hidden>
+    <div class="row" style="justify-content: space-between; align-items: center">
+      <h2 id="pcTitle" style="margin: 0"></h2>
+      <span class="row"><button class="ghost small" id="pcReload">Reîncarcă fișa</button><button class="ghost small" id="pcClose">Închide</button></span>
+    </div>
+    <p id="pcMsg" class="msg" role="status"></p>
+    <div class="cols">
+      <div class="box"><h3 style="margin-top: 0">Contul</h3><dl id="pcAccount"></dl></div>
+      <div class="box"><h3 style="margin-top: 0">Jocul (ultima salvare în cloud)</h3><dl id="pcSave"></dl></div>
+    </div>
+    <div class="cols" style="margin-top: 12px">
+      <div class="box">
+        <h3 style="margin-top: 0">Profilul</h3>
+        <div class="row">
+          <label style="flex: 1; min-width: 160px">Nume de jucător <input id="pcName" maxlength="20"></label>
+          <button class="small" id="pcNameSet">Schimbă</button>
+          <button class="ghost small" id="pcNameNeutral">Nume neutru</button>
+        </div>
+        <div class="row" style="margin-top: 10px; align-items: center">
+          <span id="pcBanState" class="muted"></span>
+          <button class="ghost small" id="pcBan"></button>
+        </div>
+      </div>
+      <div class="box">
+        <h3 style="margin-top: 0">Trimite în jocul lui</h3>
+        <p class="muted" style="margin-top: 0">Jocul jucătorului o face singur data viitoare când pornește sau în cel mult 10 minute dacă e deschis (de la versiunea 1.0.7). Până atunci o poți anula.</p>
+        <div class="row">
+          <label>Ce <select id="cmdKind"><option value="cash">💰 Bani</option><option value="stars">⭐ Stele</option><option value="company">🏷️ Numele companiei</option><option value="message">📨 Doar un mesaj</option></select></label>
+          <label data-for="cash stars">Cum <select id="cmdMode"><option value="add">adaugă (minus: scade)</option><option value="set">pune exact</option></select></label>
+          <label data-for="cash stars">Cât <input id="cmdAmount" inputmode="decimal" placeholder="1.5M" style="width: 130px"></label>
+          <label data-for="cash">În <select id="cmdCity"><option value="here">orașul în care joacă</option><option value="home">orașul natal</option><option value="north">Nordheim</option></select></label>
+          <label data-for="company">Numele <input id="cmdName" maxlength="24"></label>
+        </div>
+        <p id="cmdPreview" class="muted" style="margin: 6px 0 0"></p>
+        <label style="margin-top: 8px">Mesaj pentru jucător (îl vede cu ea; obligatoriu pentru „Doar un mesaj”) <textarea id="cmdNote" maxlength="200"></textarea></label>
+        <div class="row" style="margin-top: 8px"><button id="cmdSend">Trimite</button></div>
+      </div>
+    </div>
+    <h3>Copiile din cloud</h3>
+    <p class="muted" style="margin-top: 0">„Restaurează” îi trimite jocului copia: jocul o deschide și păstrează ce juca până atunci ca o copie nouă (se poate întoarce).</p>
+    <div id="pcBackups"></div>
+    <h3>Trimise în jocul lui</h3>
+    <div id="pcCommands"></div>
+    <h3>Raportări despre el</h3>
+    <div id="pcReports"></div>
+    <h3>Ce s-a făcut pentru el</h3>
+    <div id="pcLog"></div>
+  </section>
+
+  <section data-panel="events" class="card" hidden>
+    <h2>Calendarul (următoarele 4 săptămâni)</h2>
+    <p class="muted">Ce rulează în fiecare zi: evenimentele și anotimpurile programate de aici, anotimpurile din calendar și anunțurile. Evenimentele obișnuite ale jocului (la câteva ore) nu apar: ele merg mereu.</p>
+    <div id="calendar"></div>
   </section>
 
   <section data-panel="events" class="card" hidden>
@@ -124,16 +231,36 @@
     <div id="seasons"></div>
   </section>
 
+  <section data-panel="events" class="card" hidden>
+    <h2>Un anunț în joc</h2>
+    <p class="muted">Un titlu (până la 60 de caractere) și un text (până la 300) în limbile pe care le vrei. Fiecare joc îl arată o dată, în limba jucătorului, altfel în engleză, altfel în română; rămâne în centrul de notificări. Ajunge la jucători în cel mult o jumătate de oră (de la versiunea 1.0.7). Între 1 oră și 14 zile.</p>
+    <div class="row">
+      <label>Semn <input id="anIcon" value="📣" maxlength="8" style="width: 70px"></label>
+      <label>Începe <input id="anStart" type="datetime-local"></label>
+      <label>Ore <input id="anHours" type="number" min="1" max="336" step="1" value="48" style="width: 90px"></label>
+    </div>
+    <div id="anLangs" class="langs"></div>
+    <div class="row"><button id="anAdd">Publică</button></div>
+    <p id="anMsg" class="msg" role="status"></p>
+    <h2 style="margin-top: 18px">Anunțuri</h2>
+    <div id="announcements"></div>
+  </section>
+
   <section data-panel="reports" class="card" hidden>
     <h2>Raportări deschise</h2>
-    <p class="muted">Ce au raportat jucătorii. „Redenumește” dă jucătorului un nume neutru (își poate alege altul, verificat de filtru). Detalii: <code>docs/moderation.md</code>.</p>
+    <p class="muted">Ce au raportat jucătorii. „Redenumește” dă jucătorului un nume neutru (își poate alege altul, verificat de filtru); „Ascunde” îl scoate din clasamente (își joacă jocul mai departe). Detalii: <code>docs/moderation.md</code>.</p>
     <p id="repMsg" class="msg" role="status"></p>
     <div id="reports"></div>
   </section>
 
   <section data-panel="errors" class="card" hidden>
     <h2>Erori din joc (ultimele 30 de zile)</h2>
-    <p class="muted">Cele mai dese întâi. Locul se citește cu hărțile build-ului (<code>docs/errors.md</code>).</p>
+    <p class="muted">Cele mai dese întâi. „Rezolvat” o ascunde până o trimite o versiune din care nu venise; atunci apare cu „a revenit”. Locul se citește cu hărțile build-ului (<code>docs/errors.md</code>).</p>
+    <div class="row" style="margin: 0 0 10px; align-items: center">
+      <label>Versiunea <select id="errVersion"><option value="">toate</option></select></label>
+      <label class="check"><input id="errAll" type="checkbox"> arată și cele rezolvate</label>
+    </div>
+    <p id="errMsg" class="msg" role="status"></p>
     <div id="errors"></div>
   </section>
 
@@ -150,15 +277,28 @@
     <p class="muted">Anonim: câți jucători noi au atins fiecare pas și după câte minute de joc (mediana).</p>
     <div id="funnel"></div>
   </section>
+
+  <section data-panel="social" class="card" hidden>
+    <h2>Invitații, cadouri, alianțe</h2>
+    <div id="socTiles" class="tiles"></div>
+    <h3>Cupa săptămânală</h3>
+    <div id="socCup"></div>
+  </section>
+
+  <section data-panel="log" class="card" hidden>
+    <h2>Jurnalul administratorilor</h2>
+    <p class="muted">Ce a făcut fiecare administrator, cele mai noi întâi (ultimele 200). Ce privește un jucător pleacă odată cu contul lui.</p>
+    <div id="log"></div>
+  </section>
 </div>
 </main>
 
 <script>
 "use strict";
 // The owner's dashboard. It signs in through Supabase Auth's public API with the owner's game
-// account and calls the admin_* functions (migration 0010), which check on the server that the
-// account is an admin. The session lives in this tab only (sessionStorage). Everything the
-// server returns is shown as text, never as HTML: reports and errors carry players' words.
+// account and calls the admin_* functions (migrations 0010 to 0020), which check on the server that
+// the account is an admin. The session lives in this tab only (sessionStorage). Everything the
+// server returns is shown as text, never as HTML: reports, errors and names carry players' words.
 const URL_ = "https://orffhhsogoymalyogfzl.supabase.co";
 const KEY = "sb_publishable_hqGfNt6uaNbq0AgGyp0I8g_QLjjFaJ-";
 const STORE = "ice-admin-session";
@@ -179,6 +319,17 @@ const STEPS = {
   firstCar: "prima mașină", firstSale: "prima vânzare", min30: "30 min de joc", zone2: "al doilea district", research: "prima cercetare",
   hour3: "3 ore de joc", racing: "curse", day1: "a revenit a doua zi", day7: "după 7 zile", imperium: "primul Imperium",
 };
+const CITIES = { home: "orașul natal", north: "Nordheim", here: "orașul în care joacă" };
+const BACKUP_REASONS = { auto: "automată", drop: "înainte de o pierdere mare", restore: "înainte de o restaurare" };
+const REPORT_STATUS = { open: "deschisă", done: "rezolvată", dismissed: "respinsă" };
+const LANGS = [["ro", "Română"], ["en", "English"], ["de", "Deutsch"], ["es", "Español"], ["pt", "Português"], ["ru", "Русский"]];
+const ACTIONS = {
+  "event.schedule": "Eveniment programat", "event.cancel": "Eveniment anulat", "season.schedule": "Anotimp programat", "season.cancel": "Anotimp anulat",
+  "news.schedule": "Anunț publicat", "news.cancel": "Anunț anulat", "player.name": "Nume schimbat", "player.ban": "Ascuns din clasamente",
+  "player.unban": "Lăsat înapoi în clasamente", "command.cash": "Bani trimiși", "command.stars": "Stele trimise", "command.company": "Numele companiei trimis",
+  "command.restore": "Restaurare trimisă", "command.message": "Mesaj trimis", "command.cancel": "Trimitere anulată", "report.done": "Raportare rezolvată",
+  "report.dismissed": "Raportare respinsă", "report.open": "Raportare redeschisă", "error.resolve": "Eroare marcată rezolvată", "error.reopen": "Eroare redeschisă",
+};
 
 const $ = (id) => document.getElementById(id);
 /** An element with text (never HTML) and attributes. */
@@ -194,6 +345,37 @@ function el(tag, attrs, ...kids) {
 }
 const when = (t) => (t ? new Date(t).toLocaleString("ro-RO", { dateStyle: "short", timeStyle: "short" }) : "");
 const num = (n) => Number(n || 0).toLocaleString("ro-RO");
+const SUFFIXES = ["", "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc"];
+/** Money as the game writes it: $1.50M. */
+function money(n) {
+  const v = Number(n) || 0;
+  let a = Math.abs(v);
+  const sign = v < 0 ? "−" : "";
+  if (a < 1000) return `${sign}$${Math.round(a).toLocaleString("ro-RO")}`;
+  let i = 0;
+  while (a >= 1000 && i < SUFFIXES.length - 1) { a /= 1000; i++; }
+  return `${sign}$${a.toFixed(a < 10 ? 2 : a < 100 ? 1 : 0)}${SUFFIXES[i]}`;
+}
+/** "1.5M", "250k", "-3,2B", "1000000": the number, or NaN. */
+function parseAmount(text) {
+  const m = /^\s*([-−]?)\s*\$?\s*(\d+(?:[.,]\d+)?)\s*([a-z]{0,2})\s*$/i.exec(text || "");
+  if (!m) return NaN;
+  const i = m[3] ? SUFFIXES.findIndex((s) => s.toLowerCase() === m[3].toLowerCase()) : 0;
+  if (i < 0) return NaN;
+  const v = Number(m[2].replace(",", ".")) * 1000 ** i;
+  return m[1] ? -v : v;
+}
+/** "+12%" against the week before (green when it is the good way). */
+function delta(now, before, lowerIsBetter) {
+  const a = Number(now) || 0, b = Number(before) || 0;
+  if (!b) return a ? el("em", { class: lowerIsBetter ? "bad" : "good", text: "nou" }) : null;
+  const p = Math.round(((a - b) / b) * 100);
+  if (!p) return el("em", { class: "muted", text: "±0%" });
+  const good = lowerIsBetter ? p < 0 : p > 0;
+  return el("em", { class: good ? "good" : "bad", text: `${p > 0 ? "+" : "−"}${Math.abs(p)}%`, title: `săptămâna dinainte: ${num(b)}` });
+}
+const tile = (value, label, extra) => el("div", { class: "tile" }, el("b", {}, value, extra || null), el("span", { text: label }));
+const dd = (pairs) => pairs.filter(Boolean).flatMap(([k, v]) => [el("dt", { text: k }), el("dd", {}, v instanceof Node ? v : document.createTextNode(String(v ?? "—")))]);
 
 // ── session ──
 let session = null;
@@ -259,38 +441,285 @@ async function show() {
   await loadAll();
 }
 async function loadAll() {
-  await Promise.all([loadOverview(), loadEvents(), loadSeasons(), loadReports(), loadErrors(), loadFunnel(), loadRetention()].map((p) => p.catch((e) => console.warn(e))));
+  await Promise.all([loadOverview(), loadProgress(), loadSchedule(), loadReports(), loadErrors(), loadFunnel(), loadRetention(), loadSocial(), loadLog()].map((p) => p.catch((e) => console.warn(e))));
+  if (current) await openPlayer(current).catch((e) => console.warn(e));
 }
 
 function table(head, rows) {
   if (!rows.length) return el("p", { class: "muted", text: "Nimic deocamdată." });
   return el("div", { class: "scroll" }, el("table", {}, el("thead", {}, el("tr", {}, ...head.map((h) => el("th", { text: h })))), el("tbody", {}, ...rows)));
 }
+/** Bars for a few counts: label, count, share. */
+function bars(rows) {
+  const top = Math.max(1, ...rows.map(([, n]) => Number(n) || 0));
+  const all = rows.reduce((t, [, n]) => t + (Number(n) || 0), 0);
+  return table(["", "Jucători", "", "%"], rows.map(([label, n]) => el("tr", {},
+    el("td", { text: label, style: "white-space: nowrap" }), el("td", { class: "num", text: num(n) }),
+    el("td", { style: "width: 40%; min-width: 80px" }, el("div", { class: "bar", style: `width: ${Math.round((100 * (Number(n) || 0)) / top)}%` })),
+    el("td", { class: "num", text: all ? `${Math.round((100 * (Number(n) || 0)) / all)}%` : "–" }))));
+}
+const state = (e, now) => {
+  const start = Date.parse(e.starts_at), end = Date.parse(e.ends_at);
+  return e.cancelled_at ? ["anulat", "off"] : end <= now ? ["încheiat", ""] : start <= now ? ["rulează acum", "on"] : ["programat", "soon"];
+};
 
+// ── the game at a glance ──
 async function loadOverview() {
   const o = await rpc("admin_overview");
-  const tiles = [
-    ["accounts", "conturi"], ["guests", "conturi de oaspete"], ["new7d", "conturi noi (7 zile)"], ["active1d", "au jucat azi"],
-    ["active7d", "au jucat în 7 zile"], ["starts7d", "jocuri noi pornite (7 zile)"], ["alliances", "alianțe"], ["openReports", "raportări deschise"],
-    ["errors1d", "erori azi"], ["errorKinds7d", "erori diferite (7 zile)"],
-  ];
-  $("tiles").replaceChildren(...tiles.map(([k, label]) => el("div", { class: "tile" }, el("b", { text: num(o[k]) }), el("span", { text: label }))));
+  $("tiles").replaceChildren(
+    tile(num(o.accounts), "conturi"),
+    tile(num(o.guests), "conturi de oaspete"),
+    tile(num(o.new7d), "conturi noi (7 zile)", delta(o.new7d, o.new7dPrev)),
+    tile(num(o.active1d), "au jucat azi"),
+    tile(num(o.played7d ?? o.active7d), "au jucat în 7 zile", delta(o.played7d, o.played7dPrev)),
+    tile(num(o.starts7d), "jocuri noi pornite (7 zile)", delta(o.starts7d, o.starts7dPrev)),
+    tile(num(o.nordheim), "au deschis Nordheim"),
+    tile(num(o.alliances), "alianțe"),
+    tile(num(o.openReports), "raportări deschise"),
+    tile(num(o.errors7d), "erori (7 zile)", delta(o.errors7d, o.errors7dPrev, true)),
+    tile(num(o.errors1d), "erori azi"),
+    tile(num(o.errorKinds7d), "erori diferite (7 zile)"),
+  );
 }
 
-async function loadEvents() {
-  const list = await rpc("admin_events");
-  const now = Date.now();
-  $("events").replaceChildren(table(["Eveniment", "Începe", "Se termină", "Stare", ""], list.map((e) => {
-    const start = Date.parse(e.starts_at), end = Date.parse(e.ends_at);
-    const state = e.cancelled_at ? ["anulat", "off"] : end <= now ? ["încheiat", ""] : start <= now ? ["rulează acum", "on"] : ["programat", "soon"];
-    const cancel = !e.cancelled_at && end > now ? el("button", { class: "ghost small", text: "Anulează", onclick: () => cancelEvent(e.id) }) : null;
-    return el("tr", {}, el("td", { text: EVENTS[e.event] || e.event }), el("td", { text: when(start) }), el("td", { text: when(end) }), el("td", {}, el("span", { class: `tag ${state[1]}`, text: state[0] })), el("td", {}, cancel));
+// ── progress ──
+async function loadProgress() {
+  const p = await rpc("admin_progress", { p_days: Number($("progDays").value) });
+  const m = p.median || {};
+  $("progTiles").replaceChildren(
+    tile(num(p.players), "jucători"),
+    tile(num(p.north), "au deschis Nordheim"),
+    tile(num(p.inNorth), "joacă acum în Nordheim"),
+    tile(num(p.readyForNorth), "pot deschide Nordheim (6 teritorii)"),
+    tile(num(p.racing), "au echipa de curse"),
+    tile(num(Math.round(m.plants)), "fabrici (mediana)"),
+    tile(num(Math.round(m.stars)), "⭐ Stele (mediana)"),
+    tile(num(Math.round(m.research)), "cercetări (mediana)"),
+    tile(num(Math.round(m.cars)), "mașini făcute (mediana)"),
+    tile(money(m.earned), "bani câștigați (mediana)"),
+    tile(money(p.top?.earned), "cel mai bogat"),
+  );
+  const e = p.earned || [];
+  $("progEarned").replaceChildren(bars([["sub $1M", e[0]], ["$1M – $1B", e[1]], ["$1B – $1T", e[2]], ["$1T – $1Qa", e[3]], ["peste $1Qa", e[4]]]));
+  const t = p.territories || [];
+  $("progTerritories").replaceChildren(bars(t.map((n, i) => [i === 6 ? "toate 6" : `${i}`, n])));
+  const r = p.resets || [];
+  $("progResets").replaceChildren(bars([["niciunul", r[0]], ["1", r[1]], ["2", r[2]], ["3 sau mai multe", r[3]]]));
+  $("progVersions").replaceChildren(bars([...(p.versions || []).map((v) => [v.version, v.players]), ["înainte de 1.0.7 (nu spun)", p.noVersion]]));
+}
+
+// ── players ──
+let current = null;
+async function findPlayers() {
+  const q = $("findQ").value.trim();
+  $("findMsg").textContent = "";
+  if (q.length < 2) { $("findMsg").textContent = "Scrie cel puțin 2 caractere."; return; }
+  const list = await rpc("admin_find_players", { p_query: q });
+  if (!list.length) $("findMsg").textContent = "Niciun jucător găsit.";
+  $("findList").replaceChildren(table(["Jucător", "Companie", "Cont", "Ultima salvare", "", ""], list.map((p) => el("tr", {},
+    el("td", { text: p.username || "—" }), el("td", { class: "wrap", text: p.company || "—" }),
+    el("td", { class: "wrap", text: p.guest ? "oaspete" : p.email || "—" }), el("td", { text: when(p.last_save) || "fără salvare" }),
+    el("td", {}, p.banned ? el("span", { class: "tag off", text: "ascuns" }) : null),
+    el("td", {}, el("button", { class: "small", text: "Fișa", onclick: () => openPlayer(p.id) }))))));
+}
+async function openPlayer(id) {
+  current = id;
+  $("pcMsg").textContent = "";
+  const p = await rpc("admin_player", { p_user: id });
+  if (!p) { $("pcMsg").textContent = "Jucătorul nu mai există."; return; }
+  showTab("players");
+  $("playerCard").hidden = false;
+  const s = p.save;
+  const prof = p.profile || {};
+  $("pcTitle").textContent = `${prof.avatar || ""} ${prof.username || "fără profil"}${s?.company ? ` · ${s.company}` : ""}`;
+  $("pcAccount").replaceChildren(...dd([
+    ["Id", el("code", { text: p.id })],
+    ["Cont", p.guest ? "oaspete (fără email)" : p.email],
+    ["Făcut", when(p.createdAt)],
+    ["Ultima intrare", when(p.lastSignIn) || "—"],
+    ["Zile jucate (30)", num(p.daysPlayed30)],
+    ["Clasamente", prof.banned ? "ascuns de tine" : prof.listed ? "apare" : "nu apare (a ales el)"],
+    ["Alianța", p.alliance ? `${p.alliance.name} [${p.alliance.tag}]${p.alliance.leader ? " · lider" : ""}` : "—"],
+    ["Invitații", `${p.invites?.code || "—"} · ${num(p.invites?.friends)} prieteni${p.invites?.usedCode ? " · a folosit un cod" : ""}`],
+    ["Raportări", `${num(p.reportsAboutTotal)} despre el · ${num(p.reportsBy)} făcute de el`],
+  ]));
+  $("pcSave").replaceChildren(...(s ? dd([
+    ["Salvată", `${when(s.updatedAt)} · ${s.device || "?"}`],
+    ["Aplicația", s.app || "înainte de 1.0.7"],
+    ["Joacă în", CITIES[s.activeCity] || s.activeCity],
+    ["Bani", `${money(s.cash?.home)} în orașul natal${s.cash?.north != null ? ` · ${money(s.cash.north)} în Nordheim` : ""}`],
+    ["Fabrici", `${num(s.plants?.home)}${s.plants?.north != null ? ` · ${num(s.plants.north)} în Nordheim` : ""}`],
+    ["Teritorii", `${num(s.territories)} din 6`],
+    ["Câștigați", money(s.earned)],
+    ["Mașini făcute", num(s.cars)],
+    ["⭐ Stele", num(s.stars)],
+    ["Puncte de cercetare", num(Math.round(s.rp))],
+    ["Reset Imperium", num(s.resets)],
+    ["Curse", s.racing ? "da" : "nu"],
+    ["Compania făcută", s.createdAt ? when(s.createdAt) : "—"],
+    ["Jucat ultima dată", s.lastActiveAt ? when(s.lastActiveAt) : "—"],
+  ]) : [el("dd", { class: "muted", text: "Nicio salvare în cloud." })]));
+  $("pcName").value = prof.username || "";
+  $("pcBanState").textContent = prof.banned ? "Ascuns din clasamente." : "Apare în clasamente dacă vrea.";
+  $("pcBan").textContent = prof.banned ? "Lasă-l înapoi în clasamente" : "Ascunde din clasamente";
+  $("pcBan").dataset.banned = prof.banned ? "1" : "";
+  $("pcBackups").replaceChildren(table(["Făcută", "De ce", "Companie", "Bani", "Câștigați", "Fabrici", ""], (p.backups || []).map((b) => el("tr", {},
+    el("td", { text: `${when(b.madeAt)}${b.device ? ` · ${b.device}` : ""}` }), el("td", { text: BACKUP_REASONS[b.reason] || b.reason }),
+    el("td", { class: "wrap", text: b.company || "—" }), el("td", { class: "num", text: money(b.cash) }), el("td", { class: "num", text: money(b.earned) }),
+    el("td", { class: "num", text: num(b.plants) }),
+    el("td", {}, el("button", { class: "ghost small", text: "Restaurează", onclick: () => restore(b) }))))));
+  $("pcCommands").replaceChildren(table(["Trimisă", "Ce", "Mesaj", "Stare", ""], (p.commands || []).map((c) => {
+    const st = c.cancelledAt ? ["anulată", "off"] : c.claimedAt ? [`făcută ${when(c.claimedAt)}`, "on"] : ["așteaptă jocul", "soon"];
+    return el("tr", {}, el("td", { text: when(c.createdAt) }), el("td", { class: "wrap", text: commandText(c.kind, c.payload) }), el("td", { class: "wrap", text: c.note || "" }),
+      el("td", {}, el("span", { class: `tag ${st[1]}`, text: st[0] })),
+      el("td", {}, !c.claimedAt && !c.cancelledAt ? el("button", { class: "ghost small", text: "Anulează", onclick: () => cancelCommand(c.id) }) : null));
   })));
+  $("pcReports").replaceChildren(table(["Când", "Motiv", "Ce a văzut", "Stare"], (p.reportsAbout || []).map((r) => el("tr", {},
+    el("td", { text: when(r.at) }), el("td", { text: REASONS[r.reason] || r.reason }), el("td", { class: "wrap", text: r.seen || "" }), el("td", { text: REPORT_STATUS[r.status] || r.status })))));
+  $("pcLog").replaceChildren(table(["Când", "Cine", "Ce", "Detalii"], (p.log || []).map((l) => el("tr", {},
+    el("td", { text: when(l.at) }), el("td", { class: "wrap", text: l.admin || "—" }), el("td", { text: ACTIONS[l.action] || l.action }), el("td", { class: "wrap", text: logText(l.action, l.detail) })))));
+}
+/** What a command does, in words. */
+function commandText(kind, p) {
+  p = p || {};
+  if (kind === "cash") return p.mode === "set" ? `💰 bani: exact ${money(p.amount)} (${CITIES[p.city] || p.city})` : `💰 bani: ${Number(p.amount) >= 0 ? "+" : ""}${money(p.amount)} (${CITIES[p.city] || p.city})`;
+  if (kind === "stars") return p.mode === "set" ? `⭐ Stele: exact ${num(p.amount)}` : `⭐ Stele: ${Number(p.amount) >= 0 ? "+" : ""}${num(p.amount)}`;
+  if (kind === "company") return `🏷️ compania: ${p.name}`;
+  if (kind === "restore") return `♻️ copia din ${when(p.made_at)}`;
+  if (kind === "message") return "📨 mesaj";
+  return kind;
+}
+function logText(action, d) {
+  d = d || {};
+  if (action.startsWith("command.") && action !== "command.cancel") return `${commandText(action.slice(8), d)}${d.note ? ` · „${d.note}”` : ""}`;
+  if (action === "command.cancel") return commandText(d.kind, {}).split(":")[0];
+  if (action === "player.name") return `${d.from || "?"} → ${d.to || "?"}`;
+  if (action.startsWith("event.")) return `${EVENTS[d.name] || d.name} · ${when(d.starts_at)} – ${when(d.ends_at)}`;
+  if (action.startsWith("season.")) return `${SEASONS[d.name] || d.name} · ${when(d.starts_at)} – ${when(d.ends_at)}`;
+  if (action.startsWith("news.")) return `${d.name || ""} · ${when(d.starts_at)} – ${when(d.ends_at)}`;
+  if (action.startsWith("error.")) return d.message || "";
+  if (action.startsWith("report.")) return `raportarea ${d.report}`;
+  return "";
+}
+async function setName(neutral) {
+  if (!current) return;
+  if (neutral && !confirm("Dai jucătorului un nume neutru (Player-…)?")) return;
+  try {
+    const r = neutral ? await rpc("admin_rename_player", { p_user: current }) : await rpc("admin_set_name", { p_user: current, p_name: $("pcName").value });
+    $("pcMsg").textContent = neutral ? (r === "unknown" ? "Jucătorul nu are profil." : `Redenumit: ${r}`)
+      : { ok: "Nume schimbat.", invalid: "Numele trebuie să aibă 3–20 de caractere.", blocked: "Filtrul de nume nu-l primește.", taken: "Numele e luat de alt jucător.", unknown: "Jucătorul nu are profil." }[r] || String(r);
+  } catch (e) { $("pcMsg").textContent = e.message; }
+  await openPlayer(current);
+}
+async function toggleBan() {
+  if (!current) return;
+  const ban = !$("pcBan").dataset.banned;
+  if (ban && !confirm("Îl scoți din clasamente? Își joacă jocul mai departe, dar nu mai apare la nimeni și nu se mai poate lista.")) return;
+  try { const r = await rpc("admin_set_banned", { p_user: current, p_banned: ban }); $("pcMsg").textContent = r === "ok" ? (ban ? "Ascuns din clasamente." : "Se poate lista din nou (din Profil, în joc).") : "Jucătorul nu are profil."; } catch (e) { $("pcMsg").textContent = e.message; }
+  await Promise.all([openPlayer(current), loadLog()]);
+}
+function commandForm() {
+  const kind = $("cmdKind").value;
+  for (const l of document.querySelectorAll("[data-for]")) l.hidden = !l.dataset.for.split(" ").includes(kind);
+  const a = parseAmount($("cmdAmount").value);
+  $("cmdPreview").textContent = (kind === "cash" || kind === "stars") && $("cmdAmount").value.trim()
+    ? (Number.isFinite(a) ? `= ${commandText(kind, { mode: $("cmdMode").value, amount: kind === "stars" ? Math.round(a) : a, city: $("cmdCity").value })}` : "Suma nu se înțelege (ex.: 1.5M, 250k, -1000).")
+    : "";
+}
+async function sendCommand() {
+  if (!current) return;
+  const kind = $("cmdKind").value;
+  const note = $("cmdNote").value.trim();
+  let payload = {};
+  if (kind === "cash" || kind === "stars") {
+    const a = parseAmount($("cmdAmount").value);
+    if (!Number.isFinite(a)) { $("pcMsg").textContent = "Scrie suma (ex.: 1.5M, 250k, -1000)."; return; }
+    payload = { mode: $("cmdMode").value, amount: kind === "stars" ? Math.round(a) : a };
+    if (kind === "cash") payload.city = $("cmdCity").value;
+  }
+  if (kind === "company") payload = { name: $("cmdName").value.trim() };
+  if (!confirm(`Trimiți în jocul lui: ${commandText(kind, payload)}${note ? ` cu mesajul „${note}”` : ""}?`)) return;
+  $("cmdSend").disabled = true;
+  try {
+    const r = await rpc("admin_send_command", { p_user: current, p_kind: kind, p_payload: payload, p_note: note || null });
+    $("pcMsg").textContent = { ok: "Trimis. Jocul lui o face când pornește sau în cel mult 10 minute.", invalid: "Ceva nu e bine: suma, numele (1–24 de caractere) sau mesajul (cel mult 200; obligatoriu pentru un mesaj).", blocked: "Filtrul de nume nu primește numele companiei.", limit: "Sunt deja 20 care așteaptă jocul lui.", unknown: "Jucătorul nu mai există." }[r] || String(r);
+    if (r === "ok") { $("cmdNote").value = ""; $("cmdAmount").value = ""; commandForm(); }
+  } catch (e) { $("pcMsg").textContent = e.message; }
+  $("cmdSend").disabled = false;
+  await Promise.all([openPlayer(current), loadLog()]);
+}
+async function restore(b) {
+  const note = prompt(`Îi trimiți jocului copia din ${when(b.madeAt)} (${b.company || "fără nume"}, ${money(b.cash)})?\nUn mesaj pentru jucător (poate rămâne gol):`, "");
+  if (note === null) return;
+  try {
+    const r = await rpc("admin_send_command", { p_user: current, p_kind: "restore", p_payload: { backup: b.id }, p_note: note.trim() || null });
+    $("pcMsg").textContent = { ok: "Trimisă. Jocul lui o deschide când pornește sau în cel mult 10 minute.", invalid: "Copia nu mai e (s-a făcut între timp alta în locul ei).", limit: "Sunt deja 20 care așteaptă jocul lui." }[r] || String(r);
+  } catch (e) { $("pcMsg").textContent = e.message; }
+  await Promise.all([openPlayer(current), loadLog()]);
+}
+async function cancelCommand(id) {
+  if (!confirm("Anulezi? Jocul lui n-o mai primește.")) return;
+  try { const r = await rpc("admin_cancel_command", { p_id: id }); $("pcMsg").textContent = r === "ok" ? "Anulată." : "Jocul a luat-o deja."; } catch (e) { $("pcMsg").textContent = e.message; }
+  await Promise.all([openPlayer(current), loadLog()]);
+}
+
+// ── events, seasons, announcements, and the calendar of all three ──
+let schedule = { events: [], seasons: [], news: [] };
+async function loadSchedule() {
+  const [events, seasons, news] = await Promise.all([rpc("admin_events"), rpc("admin_seasons"), rpc("admin_announcements")]);
+  schedule = { events, seasons, news };
+  const now = Date.now();
+  $("events").replaceChildren(table(["Eveniment", "Începe", "Se termină", "Stare", ""], events.map((e) => {
+    const st = state(e, now);
+    const cancel = !e.cancelled_at && Date.parse(e.ends_at) > now ? el("button", { class: "ghost small", text: "Anulează", onclick: () => cancelEvent(e.id) }) : null;
+    return el("tr", {}, el("td", { text: EVENTS[e.event] || e.event }), el("td", { text: when(e.starts_at) }), el("td", { text: when(e.ends_at) }), el("td", {}, el("span", { class: `tag ${st[1]}`, text: st[0] })), el("td", {}, cancel));
+  })));
+  $("seasons").replaceChildren(table(["Anotimp", "Începe", "Se termină", "Stare", ""], seasons.map((e) => {
+    const st = state(e, now);
+    const cancel = !e.cancelled_at && Date.parse(e.ends_at) > now ? el("button", { class: "ghost small", text: "Anulează", onclick: () => cancelSeason(e.id) }) : null;
+    return el("tr", {}, el("td", { text: SEASONS[e.season] || e.season }), el("td", { text: when(e.starts_at) }), el("td", { text: when(e.ends_at) }), el("td", {}, el("span", { class: `tag ${st[1]}`, text: st[0] })), el("td", {}, cancel));
+  })));
+  $("announcements").replaceChildren(table(["Anunț", "Începe", "Se termină", "Stare", ""], news.map((a) => {
+    const st = state(a, now);
+    const t = a.texts?.ro || a.texts?.en || Object.values(a.texts || {})[0] || {};
+    const cancel = !a.cancelled_at && Date.parse(a.ends_at) > now ? el("button", { class: "ghost small", text: "Anulează", onclick: () => cancelNews(a.id) }) : null;
+    return el("tr", {}, el("td", { class: "wrap", text: `${a.icon} ${t.title || ""} (${Object.keys(a.texts || {}).join(", ")})` }), el("td", { text: when(a.starts_at) }), el("td", { text: when(a.ends_at) }), el("td", {}, el("span", { class: `tag ${st[1]}`, text: st[0] })), el("td", {}, cancel));
+  })));
+  drawCalendar();
+}
+/** The calendar's seasons on a day (local time, like the game: engine/season.ts). */
+function calendarSeason(d) {
+  const m = d.getMonth(), day = d.getDate();
+  if ((m === 2 && day >= 21) || (m === 3 && day <= 10)) return "🌸 primăvara (din calendar)";
+  if ((m === 6 && day >= 15) || (m === 7 && day <= 10)) return "☀️ vara (din calendar)";
+  if ((m === 9 && day >= 10) || (m === 10 && day <= 2)) return "🎃 Halloween (din calendar)";
+  if (m === 11 || (m === 0 && day <= 6)) return "❄️ iarna (din calendar)";
+  return null;
+}
+function drawCalendar() {
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  const rows = [];
+  for (let i = 0; i < 28; i++) {
+    const from = new Date(start); from.setDate(start.getDate() + i);
+    const to = new Date(from); to.setDate(from.getDate() + 1);
+    const on = (x) => !x.cancelled_at && Date.parse(x.starts_at) < to.getTime() && Date.parse(x.ends_at) > from.getTime();
+    const seasons = schedule.seasons.filter(on);
+    const chips = [
+      ...schedule.events.filter(on).map((e) => ["tag on", EVENTS[e.event] || e.event]),
+      ...seasons.map((s) => ["tag gold", `${SEASONS[s.season] || s.season} (programat)`]),
+      ...(seasons.length ? [] : [calendarSeason(from)].filter(Boolean).map((t) => ["tag", t])),
+      ...schedule.news.filter(on).map((a) => ["tag soon", `${a.icon} ${(a.texts?.ro || a.texts?.en || Object.values(a.texts || {})[0] || {}).title || "anunț"}`]),
+    ];
+    const weekend = from.getDay() === 0 || from.getDay() === 6;
+    rows.push(el("tr", {}, el("td", { text: from.toLocaleDateString("ro-RO", { weekday: "short", day: "numeric", month: "short" }), style: weekend ? "color: #fcd34d" : null }),
+      el("td", {}, chips.length ? el("div", { class: "row", style: "gap: 6px" }, ...chips.map(([c, t]) => el("span", { class: c, text: t }))) : el("span", { class: "muted", text: "doar evenimentele obișnuite" }))));
+  }
+  $("calendar").replaceChildren(table(["Ziua", "Ce rulează"], rows));
 }
 async function cancelEvent(id) {
   if (!confirm("Anulezi evenimentul? Jucătorii nu-l mai văd.")) return;
   try { const r = await rpc("admin_cancel_event", { p_id: id }); $("evMsg").textContent = r === "ok" ? "Anulat." : "Nu mai e de anulat."; } catch (e) { $("evMsg").textContent = e.message; }
-  await loadEvents();
+  await Promise.all([loadSchedule(), loadLog()]);
 }
 async function addEvent() {
   const start = $("evStart").value ? new Date($("evStart").value) : new Date();
@@ -302,24 +731,14 @@ async function addEvent() {
     $("evMsg").textContent = { ok: "Programat. Jucătorii îl primesc în cel mult o jumătate de oră (sau când deschid jocul).", overlap: "Se suprapune cu alt eveniment programat: unul singur odată.", invalid: "Ora sau durata nu e bună (cel mult 60 de zile înainte, 0,25–72 de ore).", limit: "Sunt deja 20 de evenimente în așteptare.", unknown: "Eveniment necunoscut." }[r] || String(r);
   } catch (e) { $("evMsg").textContent = e.message; }
   $("evAdd").disabled = false;
-  await loadEvents();
+  await Promise.all([loadSchedule(), loadLog()]);
 }
 
 const SEASONS = { spring: "🌸 Festivalul de primăvară", summer: "☀️ Road trip de vară" };
-async function loadSeasons() {
-  const list = await rpc("admin_seasons");
-  const now = Date.now();
-  $("seasons").replaceChildren(table(["Anotimp", "Începe", "Se termină", "Stare", ""], list.map((e) => {
-    const start = Date.parse(e.starts_at), end = Date.parse(e.ends_at);
-    const state = e.cancelled_at ? ["anulat", "off"] : end <= now ? ["încheiat", ""] : start <= now ? ["rulează acum", "on"] : ["programat", "soon"];
-    const cancel = !e.cancelled_at && end > now ? el("button", { class: "ghost small", text: "Anulează", onclick: () => cancelSeason(e.id) }) : null;
-    return el("tr", {}, el("td", { text: SEASONS[e.season] || e.season }), el("td", { text: when(start) }), el("td", { text: when(end) }), el("td", {}, el("span", { class: `tag ${state[1]}`, text: state[0] })), el("td", {}, cancel));
-  })));
-}
 async function cancelSeason(id) {
   if (!confirm("Anulezi anotimpul? Jucătorii revin la cel din calendar.")) return;
   try { const r = await rpc("admin_cancel_season", { p_id: id }); $("seMsg").textContent = r === "ok" ? "Anulat." : "Nu mai e de anulat."; } catch (e) { $("seMsg").textContent = e.message; }
-  await loadSeasons();
+  await Promise.all([loadSchedule(), loadLog()]);
 }
 async function addSeason() {
   const start = $("seStart").value ? new Date($("seStart").value) : new Date();
@@ -331,37 +750,92 @@ async function addSeason() {
     $("seMsg").textContent = { ok: "Programat. Jucătorii îl primesc în cel mult o jumătate de oră (sau când deschid jocul).", overlap: "Se suprapune cu alt anotimp programat: unul singur odată.", invalid: "Ziua sau durata nu e bună (cel mult 120 de zile înainte, 1–31 de zile).", limit: "Sunt deja 10 anotimpuri în așteptare.", unknown: "Anotimp necunoscut." }[r] || String(r);
   } catch (e) { $("seMsg").textContent = e.message; }
   $("seAdd").disabled = false;
-  await loadSeasons();
+  await Promise.all([loadSchedule(), loadLog()]);
 }
 
+async function addNews() {
+  const start = $("anStart").value ? new Date($("anStart").value) : new Date();
+  const hours = Number($("anHours").value);
+  const texts = {};
+  for (const [id] of LANGS) {
+    const title = $(`an-${id}-t`).value.trim(), body = $(`an-${id}-b`).value.trim();
+    if (title || body) texts[id] = { title, body };
+  }
+  if (!Object.keys(texts).length) { $("anMsg").textContent = "Scrie cel puțin un titlu."; return; }
+  if (!Number.isFinite(start.getTime()) || !(hours >= 1 && hours <= 336)) { $("anMsg").textContent = "Alege începutul și o durată între 1 și 336 de ore (14 zile)."; return; }
+  if (!confirm(`Publici anunțul în ${Object.keys(texts).join(", ")} pentru ${hours} ore? Fiecare joc îl arată o dată.`)) return;
+  $("anAdd").disabled = true;
+  try {
+    const r = await rpc("admin_post_announcement", { p_icon: $("anIcon").value, p_texts: texts, p_starts: start.toISOString(), p_hours: hours });
+    $("anMsg").textContent = { ok: "Publicat. Jocurile îl arată în cel mult o jumătate de oră.", invalid: "Fiecare limbă scrisă are nevoie de un titlu (1–60 de caractere); textul are cel mult 300; durata 1–336 de ore, începutul în cel mult 60 de zile.", limit: "Sunt deja 10 anunțuri în așteptare." }[r] || String(r);
+    if (r === "ok") for (const [id] of LANGS) { $(`an-${id}-t`).value = ""; $(`an-${id}-b`).value = ""; }
+  } catch (e) { $("anMsg").textContent = e.message; }
+  $("anAdd").disabled = false;
+  await Promise.all([loadSchedule(), loadLog()]);
+}
+async function cancelNews(id) {
+  if (!confirm("Anulezi anunțul? Jocurile care nu l-au arătat încă nu-l mai arată.")) return;
+  try { const r = await rpc("admin_cancel_announcement", { p_id: id }); $("anMsg").textContent = r === "ok" ? "Anulat." : "Nu mai e de anulat."; } catch (e) { $("anMsg").textContent = e.message; }
+  await Promise.all([loadSchedule(), loadLog()]);
+}
+
+// ── reports ──
 async function loadReports() {
   const list = await rpc("admin_reports");
   $("reports").replaceChildren(table(["Când", "Motiv", "Ce a văzut", "Numele acum", "Raportări", ""], list.map((r) => {
     const seen = [r.seen_name, r.seen_company, r.seen_alliance].filter(Boolean).join(" · ");
-    const act = (label, fn, ghost = true) => el("button", { class: `${ghost ? "ghost " : ""}small`, text: label, onclick: fn });
+    const act = (label, fn, cls = "ghost") => el("button", { class: `${cls} small`, text: label, onclick: fn });
     return el("tr", {},
       el("td", { text: when(r.created_at) }), el("td", { text: REASONS[r.reason] || r.reason }), el("td", { class: "wrap", text: seen }),
       el("td", { class: "wrap", text: r.name_now ?? "—" }), el("td", { class: "num", text: num(r.reports_about_them) }),
       el("td", {}, el("div", { class: "row" },
+        r.target ? act("Fișa", () => openPlayer(r.target)) : null,
         r.target ? act("Redenumește", () => rename(r.target, r.id)) : null,
+        r.target ? act("Ascunde", () => banFromReport(r.target, r.id), "danger") : null,
         act("Rezolvat", () => mark(r.id, "done")), act("Respinge", () => mark(r.id, "dismissed")))));
   })));
 }
 async function mark(id, status) {
   try { await rpc("admin_report_status", { p_id: id, p_status: status }); $("repMsg").textContent = status === "done" ? "Marcat rezolvat." : "Respins."; } catch (e) { $("repMsg").textContent = e.message; }
-  await Promise.all([loadReports(), loadOverview()]);
+  await Promise.all([loadReports(), loadOverview(), loadLog()]);
 }
 async function rename(user, reportId) {
   if (!confirm("Dai jucătorului un nume neutru (Player-…)?")) return;
   try { const n = await rpc("admin_rename_player", { p_user: user }); $("repMsg").textContent = n === "unknown" ? "Jucătorul nu mai există." : `Redenumit: ${n}`; if (n !== "unknown") await rpc("admin_report_status", { p_id: reportId, p_status: "done" }); } catch (e) { $("repMsg").textContent = e.message; }
-  await Promise.all([loadReports(), loadOverview()]);
+  await Promise.all([loadReports(), loadOverview(), loadLog()]);
+}
+async function banFromReport(user, reportId) {
+  if (!confirm("Îl scoți din clasamente? Își joacă jocul mai departe, dar nu mai apare la nimeni și nu se mai poate lista.")) return;
+  try { const r = await rpc("admin_set_banned", { p_user: user, p_banned: true }); $("repMsg").textContent = r === "ok" ? "Ascuns din clasamente." : "Jucătorul nu mai există."; if (r === "ok") await rpc("admin_report_status", { p_id: reportId, p_status: "done" }); } catch (e) { $("repMsg").textContent = e.message; }
+  await Promise.all([loadReports(), loadOverview(), loadLog()]);
 }
 
+// ── errors ──
 async function loadErrors() {
-  const list = await rpc("admin_errors");
-  $("errors").replaceChildren(table(["De câte ori", "Zile", "Eroare", "Loc", "Versiuni", "Sisteme", "Ultima dată"], list.map((e) =>
-    el("tr", {}, el("td", { class: "num", text: num(e.times) }), el("td", { class: "num", text: num(e.days) }), el("td", { class: "wrap", text: `${e.kind}: ${e.message}` }),
-      el("td", { class: "wrap" }, el("code", { text: e.place || "" })), el("td", { text: e.versions || "" }), el("td", { class: "wrap", text: e.engines || e.platforms || "" }), el("td", { text: when(e.last_seen) })))));
+  const version = $("errVersion").value;
+  const r = await rpc("admin_error_list", { p_version: version || null });
+  const pick = $("errVersion");
+  const had = new Set([...pick.options].map((o) => o.value));
+  for (const v of r.versions || []) if (!had.has(v)) pick.append(el("option", { value: v, text: v }));
+  const all = $("errAll").checked;
+  const list = (r.errors || []).filter((e) => all || !e.resolved_at || e.back);
+  const hidden = (r.errors || []).length - list.length;
+  $("errMsg").textContent = hidden ? `${hidden} rezolvate ascunse.` : "";
+  $("errors").replaceChildren(table(["De câte ori", "Zile", "Eroare", "Loc", "Versiuni", "Prima dată în", "Ultima dată", ""], list.map((e) => {
+    const tags = [
+      version && e.first_version === version ? el("span", { class: "tag gold", text: "nouă în versiunea asta" }) : null,
+      e.back ? el("span", { class: "tag off", text: "a revenit" }) : e.resolved_at ? el("span", { class: "tag on", text: `rezolvată ${when(e.resolved_at)}` }) : null,
+    ].filter(Boolean);
+    return el("tr", {}, el("td", { class: "num", text: num(e.times) }), el("td", { class: "num", text: num(e.days) }),
+      el("td", { class: "wrap" }, document.createTextNode(`${e.kind}: ${e.message}`), ...tags.map((t) => el("div", { style: "margin-top: 4px" }, t))),
+      el("td", { class: "wrap" }, el("code", { text: e.place || "" })), el("td", { text: e.versions || "" }), el("td", { text: e.first_version || "" }),
+      el("td", { text: when(e.last_seen) }),
+      el("td", {}, el("button", { class: "ghost small", text: e.resolved_at && !e.back ? "Redeschide" : "Rezolvat", onclick: () => resolveError(e.key, !(e.resolved_at && !e.back)) })));
+  })));
+}
+async function resolveError(key, resolved) {
+  try { await rpc("admin_error_resolve", { p_key: key, p_resolved: resolved }); } catch (e) { $("errMsg").textContent = e.message; }
+  await Promise.all([loadErrors(), loadLog()]);
 }
 
 async function loadFunnel() {
@@ -382,7 +856,7 @@ async function loadRetention() {
     [pct(r.d7), `revin în ziua 7 (${num(r.d7?.back ?? 0)} din ${num(r.d7?.of ?? 0)})`],
     [pct(r.week), `revin în prima săptămână (${num(r.week?.back ?? 0)} din ${num(r.week?.of ?? 0)})`],
   ];
-  $("retTiles").replaceChildren(...tiles.map(([v, label]) => el("div", { class: "tile" }, el("b", { text: v }), el("span", { text: label }))));
+  $("retTiles").replaceChildren(...tiles.map(([v, label]) => tile(v, label)));
   $("retSince").textContent = r.since ? `Zilele se numără de pe ${new Date(r.since).toLocaleDateString("ro-RO")}; înainte de 20 octombrie 2026 sunt doar cele aflate din salvări.` : "";
   const top = Math.max(1, ...r.days.map((d) => Number(d.active) || 0));
   const share = (n, of, ready) => (!ready ? "" : of > 0 ? `${num(n)} (${Math.round((100 * n) / of)}%)` : "–");
@@ -393,10 +867,58 @@ async function loadRetention() {
       el("td", { style: "width: 22%; min-width: 70px" }, el("div", { class: "bar", style: `width: ${Math.round((100 * (Number(d.active) || 0)) / top)}%` })),
       el("td", { class: "num", text: num(d.new) }), el("td", { class: "num", text: share(d.d1, d.new, age >= 1) }), el("td", { class: "num", text: share(d.d7, d.new, age >= 7) }), el("td", { class: "num", text: share(d.week, d.new, age >= 7) }));
   })));
+  // the overview's chart: the same days, oldest first, today in gold
+  const days = [...r.days].reverse();
+  $("dauChart").replaceChildren(
+    el("div", { class: "chart", role: "img", "aria-label": `Au jucat în ultimele 30 de zile: între ${num(Math.min(...days.map((d) => d.active)))} și ${num(top)} pe zi` },
+      ...days.map((d) => el("div", { style: `height: ${Math.max(2, Math.round((100 * (Number(d.active) || 0)) / top))}%`, title: `${new Date(d.day).toLocaleDateString("ro-RO", { day: "numeric", month: "short" })}: ${num(d.active)}` }))),
+    el("div", { class: "axis" }, el("span", { text: days[0] ? new Date(days[0].day).toLocaleDateString("ro-RO", { day: "numeric", month: "short" }) : "" }), el("span", { text: `cel mult ${num(top)} pe zi` }), el("span", { text: "azi" })),
+  );
+}
+
+// ── social ──
+async function loadSocial() {
+  const s = await rpc("admin_social");
+  const i = s.invites || {}, g = s.gifts || {}, a = s.alliances || {}, p = s.push || {};
+  $("socTiles").replaceChildren(
+    tile(num(i.codes), "coduri de invitație făcute"),
+    tile(num(i.used), "coduri folosite (în total)"),
+    tile(num(i.used7d), "coduri folosite (7 zile)"),
+    tile(num(i.rewarded), "prieteni care au adus recompensa"),
+    tile(num(i.inviters), "jucători care au adus pe cineva"),
+    tile(num(g.today), "cadouri azi"),
+    tile(num(g.week), "cadouri (7 zile)"),
+    tile(num(g.senders7d), "jucători care au trimis cadouri (7 zile)"),
+    tile(num(a.count), "alianțe"),
+    tile(num(a.members), "membri în alianțe"),
+    tile(num(p.phones), "telefoane cu notificări"),
+    tile(num(p.sent7d), "notificări trimise (7 zile)"),
+  );
+  // a week's Monday (UTC): week 1 began on 1970-01-05 (ops.cup_week)
+  const monday = (w) => new Date((7 * w - 3) * 86400000).toLocaleDateString("ro-RO", { day: "numeric", month: "short", timeZone: "UTC" });
+  $("socCup").replaceChildren(table(["Săptămâna", "Participanți", "Premii luate", ""], (s.cup || []).map((c) => el("tr", {},
+    el("td", { text: `de luni ${monday(c.week)}` }), el("td", { class: "num", text: num(c.entrants) }), el("td", { class: "num", text: num(c.claimed) }),
+    el("td", {}, c.week === s.cupWeek ? el("span", { class: "tag on", text: "acum" }) : null)))));
+}
+
+// ── the log ──
+async function loadLog() {
+  const list = await rpc("admin_log_list", { p_user: null });
+  $("log").replaceChildren(table(["Când", "Cine", "Ce", "Jucător", "Detalii"], list.map((l) => el("tr", {},
+    el("td", { text: when(l.at) }), el("td", { class: "wrap", text: l.admin || "—" }), el("td", { text: ACTIONS[l.action] || l.action }),
+    el("td", {}, l.target ? el("button", { class: "ghost small", text: l.targetName || "jucătorul", onclick: () => openPlayer(l.target) }) : null),
+    el("td", { class: "wrap", text: logText(l.action, l.detail) })))));
 }
 
 // ── wiring ──
+function showTab(name) {
+  for (const x of document.querySelectorAll("[data-tab]")) x.setAttribute("aria-pressed", String(x.dataset.tab === name));
+  for (const p of document.querySelectorAll("[data-panel]")) p.hidden = p.dataset.panel !== name || (p.id === "playerCard" && !current);
+}
 for (const [id, name] of Object.entries(EVENTS)) $("evId").append(el("option", { value: id, text: name }));
+$("anLangs").replaceChildren(...LANGS.map(([id, name]) => el("div", { class: "box" },
+  el("label", {}, `${name} – titlu`, el("input", { id: `an-${id}-t`, maxlength: 60 })),
+  el("label", { style: "margin-top: 6px" }, "text", el("textarea", { id: `an-${id}-b`, maxlength: 300 })))));
 $("go").addEventListener("click", async () => {
   $("signinMsg").textContent = "";
   try {
@@ -418,10 +940,21 @@ for (const b of document.querySelectorAll("[data-out]")) b.addEventListener("cli
 $("reload").addEventListener("click", () => loadAll());
 $("evAdd").addEventListener("click", addEvent);
 $("seAdd").addEventListener("click", addSeason);
-for (const b of document.querySelectorAll("[data-tab]")) b.addEventListener("click", () => {
-  for (const x of document.querySelectorAll("[data-tab]")) x.setAttribute("aria-pressed", String(x === b));
-  for (const p of document.querySelectorAll("[data-panel]")) p.hidden = p.dataset.panel !== b.dataset.tab;
-});
+$("anAdd").addEventListener("click", addNews);
+$("progDays").addEventListener("change", () => loadProgress().catch((e) => console.warn(e)));
+$("errVersion").addEventListener("change", () => loadErrors().catch((e) => ($("errMsg").textContent = e.message)));
+$("errAll").addEventListener("change", () => loadErrors().catch((e) => ($("errMsg").textContent = e.message)));
+$("findGo").addEventListener("click", () => findPlayers().catch((e) => ($("findMsg").textContent = e.message)));
+$("findQ").addEventListener("keydown", (e) => { if (e.key === "Enter") $("findGo").click(); });
+$("pcClose").addEventListener("click", () => { current = null; $("playerCard").hidden = true; });
+$("pcReload").addEventListener("click", () => current && openPlayer(current).catch((e) => ($("pcMsg").textContent = e.message)));
+$("pcNameSet").addEventListener("click", () => setName(false));
+$("pcNameNeutral").addEventListener("click", () => setName(true));
+$("pcBan").addEventListener("click", toggleBan);
+$("cmdSend").addEventListener("click", sendCommand);
+for (const id of ["cmdKind", "cmdMode", "cmdAmount", "cmdCity"]) $(id).addEventListener("input", commandForm);
+commandForm();
+for (const b of document.querySelectorAll("[data-tab]")) b.addEventListener("click", () => showTab(b.dataset.tab));
 show();
 </script>
 </body>

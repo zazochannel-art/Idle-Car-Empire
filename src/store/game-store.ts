@@ -63,6 +63,7 @@ import { hasPlant as hasPlantType } from "@/game/engine/chain";
 import * as Tu from "@/game/engine/tuning";
 import * as Gf from "@/game/engine/gifts";
 import * as Iv from "@/game/engine/invites";
+import * as Tm from "@/game/engine/team";
 import * as Cu from "@/game/engine/cup";
 import * as Gh from "@/game/engine/ghost";
 import { allianceReward } from "@/game/engine/alliance";
@@ -147,6 +148,8 @@ interface GameStore {
   sendCup: () => Promise<CupSubmitResult | "network" | null>;
   /** Pays the player's places in finished cup weeks: how many weeks were paid. */
   claimCupPrizes: () => Promise<number>;
+  /** Carries out what the game's team sent this player from the dashboard (engine/team.ts): how many commands. */
+  claimTeamCommands: () => Promise<number>;
   /** Forgets this phone's notification token on the server (before signing out; lib/push.ts). */
   forgetPush: () => Promise<void>;
   /** Pays the thank-you for a gift the server accepted. */
@@ -738,6 +741,36 @@ export const useGame = create<GameStore>((set, get) => {
       if (paid) persist(true);
       return paid;
     },
+    claimTeamCommands: async () => {
+      const social = saves?.social;
+      // not while two saves wait for the player's choice: what the team sent might be dropped
+      if (!social || !get().ready || saves?.sync?.state.status === "conflict") return 0;
+      const list = await social.claimCommands().catch(() => [] as Tm.TeamCommand[]);
+      const say = (icon: string, title: string, note: string) =>
+        uiEvents.emit({ type: "toast", kind: "events", tone: "gold", icon, title, body: note || undefined });
+      for (const c of list) {
+        if (c.kind === "restore") {
+          const res = await get().restoreCloudBackup(c.backup);
+          const date = c.madeAt ? new Date(c.madeAt).toLocaleString(get().state.settings.lang, { dateStyle: "medium", timeStyle: "short" }) : "";
+          say("♻️", res === "ok" ? tr("team.restored", { date }) : tr("team.restoreFailed"), c.note);
+          continue;
+        }
+        if (!act((s) => Tm.applyTeamCommand(s, c))) continue;
+        if (c.kind === "cash") {
+          const money = formatMoney(Math.abs(c.amount));
+          say("💰", tr(c.mode === "set" ? "team.cashSet" : c.amount > 0 ? "team.cashAdded" : "team.cashTaken", { money }), c.note);
+        } else if (c.kind === "stars") {
+          const n = formatNumber(Math.abs(c.amount));
+          say("⭐", tr(c.mode === "set" ? "team.starsSet" : c.amount > 0 ? "team.starsAdded" : "team.starsTaken", { n }), c.note);
+        } else if (c.kind === "company") {
+          say("🏷️", tr("team.company", { name: c.name }), c.note);
+        } else {
+          say("📨", tr("team.message"), c.note);
+        }
+      }
+      if (list.length) persist(true);
+      return list.length;
+    },
     forgetPush: async () => {
       await Promise.race([forgetPush(), new Promise((r) => setTimeout(r, 4_000))]);
     },
@@ -919,6 +952,7 @@ export const useGame = create<GameStore>((set, get) => {
           void get().claimGifts();
           void get().claimInviteRewards();
           void get().claimCupPrizes();
+          void get().claimTeamCommands();
           void get().sendCup();
           void get().publishGhost();
         };
