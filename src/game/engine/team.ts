@@ -1,5 +1,6 @@
-// What the game's team sends one player from the dashboard (supabase/migrations/0020): money,
-// ⭐ Stars, the company's name, a message, or one of the player's cloud backups to play again.
+// What the game's team sends one player from the dashboard (supabase/migrations/0020, 0021):
+// money, ⭐ Stars, reputation (the company's or the racing team's), the company's name, a
+// message, or one of the player's cloud backups to play again.
 // The server hands each command out once (save/social.ts claimCommands); the game carries it
 // out here, shows it, and saves. The save lives on the player's phone, so this is the only way a
 // change from the team reaches it without the two copies of the game disagreeing.
@@ -9,7 +10,7 @@ import { ownsCity, withWallet } from "./cities";
 import { payReward } from "./materials";
 
 /** The kinds this game knows: the server hands out only these (a newer kind waits for a newer game). */
-export const TEAM_KINDS = ["cash", "stars", "company", "restore", "message"] as const;
+export const TEAM_KINDS = ["cash", "stars", "company", "restore", "message", "rep"] as const;
 
 /** Largest amount a command may carry (the server's limit too). */
 const MAX = 1e30;
@@ -17,6 +18,8 @@ const MAX = 1e30;
 export type TeamCommand =
   | { id: number; kind: "cash"; mode: "add" | "set"; amount: number; city: CityId | "here"; note: string }
   | { id: number; kind: "stars"; mode: "add" | "set"; amount: number; note: string }
+  /** The company's reputation (0–100, 50 neutral) or the racing team's (whole points). */
+  | { id: number; kind: "rep"; which: "company" | "racing"; mode: "add" | "set"; amount: number; note: string }
   | { id: number; kind: "company"; name: string; note: string }
   | { id: number; kind: "restore"; backup: number; madeAt: number; note: string }
   | { id: number; kind: "message"; note: string };
@@ -45,6 +48,10 @@ export function parseTeamCommands(rows: unknown): TeamCommand[] {
       case "stars":
         if (mode && Number.isInteger(amount) && Math.abs(amount) <= MAX) out.push({ id, kind: "stars", mode, amount, note });
         break;
+      case "rep":
+        if (mode && p.which === "company" && Number.isFinite(amount) && Math.abs(amount) <= 100) out.push({ id, kind: "rep", which: "company", mode, amount, note });
+        if (mode && p.which === "racing" && Number.isInteger(amount) && Math.abs(amount) <= MAX) out.push({ id, kind: "rep", which: "racing", mode, amount, note });
+        break;
       case "company": {
         const name = typeof p.name === "string" ? p.name.trim().slice(0, 24) : "";
         if (name) out.push({ id, kind: "company", name, note });
@@ -71,7 +78,8 @@ export function teamWallet(s: GameState, c: Extract<TeamCommand, { kind: "cash" 
 
 /**
  * Carries out a command on the game (all but "restore", which replaces the game: game-store.ts).
- * Money never goes below 0, nor Stars; money added is booked as a reward. False: nothing to do.
+ * Money never goes below 0, nor Stars nor reputation (the company's stays within 0–100); money
+ * added is booked as a reward. False: nothing to do.
  */
 export function applyTeamCommand(s: GameState, c: TeamCommand): boolean {
   switch (c.kind) {
@@ -84,6 +92,10 @@ export function applyTeamCommand(s: GameState, c: TeamCommand): boolean {
       return true;
     case "stars":
       s.stars = Math.max(0, Math.round(c.mode === "set" ? c.amount : s.stars + c.amount));
+      return true;
+    case "rep":
+      if (c.which === "company") s.quality.rep = Math.max(0, Math.min(100, c.mode === "set" ? c.amount : s.quality.rep + c.amount));
+      else s.racing.rep = Math.max(0, Math.round(c.mode === "set" ? c.amount : s.racing.rep + c.amount));
       return true;
     case "company":
       s.brand.name = c.name;

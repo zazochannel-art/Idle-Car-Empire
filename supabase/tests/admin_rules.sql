@@ -1,4 +1,4 @@
--- The dashboard's tools (migration 0020), checked inside one transaction that is rolled back: an
+-- The dashboard's tools (migrations 0020 and 0021), checked inside one transaction that is rolled back: an
 -- admin, a player P with a save in Nordheim and cloud backups, and another player Q (made up here,
 -- never committed), each acting as the "authenticated" role with their own JWT. Any failed check
 -- raises an exception naming it.
@@ -138,7 +138,8 @@ begin
   if j -> 'save' ->> 'company' <> 'Zq Test Motors' or j -> 'save' ->> 'activeCity' <> 'north'
      or (j -> 'save' -> 'cash' ->> 'home')::numeric <> 7e8 or (j -> 'save' -> 'cash' ->> 'north')::numeric <> 5000
      or (j -> 'save' -> 'plants' ->> 'home')::int <> 2 or (j -> 'save' ->> 'territories')::int <> 6
-     or jsonb_array_length(j -> 'backups') <> 1 or j ->> 'email' <> 'player-test-0020@example.invalid' then
+     or jsonb_array_length(j -> 'backups') <> 1 or j ->> 'email' <> 'player-test-0020@example.invalid'
+     or (j -> 'save' ->> 'rep')::numeric <> 50 or (j -> 'save' ->> 'racingRep')::numeric <> 0 then
     raise exception 'FAIL player card: %', j;
   end if;
   if public.admin_player('00000000-0000-4000-8000-000000000000') is not null then raise exception 'FAIL card of nobody'; end if;
@@ -168,6 +169,13 @@ begin
   if public.admin_send_command(p, 'message', '{}', null) <> 'invalid' then raise exception 'FAIL empty message'; end if;
   if public.admin_send_command(p, 'message', '{}', 'Hello from the team') <> 'ok' then raise exception 'FAIL message'; end if;
   if public.admin_send_command(p, 'teleport', '{}', 'x') <> 'invalid' then raise exception 'FAIL unknown kind'; end if;
+  -- reputation (0021): the company's within 0–100, the racing team's in whole points
+  if public.admin_send_command(p, 'rep', '{"which": "company", "mode": "set", "amount": 120}', null) <> 'invalid' then raise exception 'FAIL company reputation over 100'; end if;
+  if public.admin_send_command(p, 'rep', '{"which": "racing", "mode": "add", "amount": 1.5}', null) <> 'invalid' then raise exception 'FAIL half a racing point'; end if;
+  if public.admin_send_command(p, 'rep', '{"which": "fame", "mode": "add", "amount": 5}', null) <> 'invalid' then raise exception 'FAIL unknown reputation'; end if;
+  if public.admin_send_command(p, 'rep', '{"mode": "add", "amount": 5}', null) <> 'invalid' then raise exception 'FAIL reputation without which'; end if;
+  if public.admin_send_command(p, 'rep', '{"which": "company", "mode": "set", "amount": 80}', 'Sorry for the recall') <> 'ok' then raise exception 'FAIL company reputation'; end if;
+  if public.admin_send_command(p, 'rep', '{"which": "racing", "mode": "add", "amount": 500}', null) <> 'ok' then raise exception 'FAIL racing reputation'; end if;
   if public.admin_send_command('00000000-0000-4000-8000-000000000000', 'message', '{}', 'x') <> 'unknown' then raise exception 'FAIL nobody'; end if;
   reset role;
   n := (select max(id) from ops.player_commands where user_id = p and kind = 'message');
@@ -193,6 +201,7 @@ begin
   if (select count(*) from public.claim_my_commands(array['cash', 'stars'])) <> 2 then raise exception 'FAIL claim cash and stars'; end if;
   if (select count(*) from public.claim_my_commands(array['cash', 'stars'])) <> 0 then raise exception 'FAIL claimed twice'; end if;
   if (select string_agg(c.kind, ',' order by c.id) from public.claim_my_commands(array['company', 'restore', 'message']) c) <> 'company,restore' then raise exception 'FAIL claim the rest (the message was cancelled)'; end if;
+  if (select string_agg(c.payload ->> 'which', ',' order by c.id) from public.claim_my_commands(array['rep']) c) <> 'company,racing' then raise exception 'FAIL claim the reputation'; end if;
   reset role;
 
   -- every game reads the running announcements, without an account
@@ -213,7 +222,7 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', adm, 'role', 'authenticated')::text, true);
   set local role authenticated;
   j := public.admin_log_list(p);
-  for r in select unnest(array['player.name', 'player.ban', 'player.unban', 'command.cash', 'command.stars', 'command.company', 'command.restore', 'command.cancel']) loop
+  for r in select unnest(array['player.name', 'player.ban', 'player.unban', 'command.cash', 'command.stars', 'command.rep', 'command.company', 'command.restore', 'command.cancel']) loop
     if not exists (select 1 from jsonb_array_elements(j) e where e ->> 'action' = r and e ->> 'admin' = 'admin-test-0020@example.invalid') then
       raise exception 'FAIL log has no %: %', r, j;
     end if;

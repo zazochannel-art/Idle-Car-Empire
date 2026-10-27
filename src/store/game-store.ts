@@ -762,6 +762,10 @@ export const useGame = create<GameStore>((set, get) => {
         } else if (c.kind === "stars") {
           const n = formatNumber(Math.abs(c.amount));
           say("⭐", tr(c.mode === "set" ? "team.starsSet" : c.amount > 0 ? "team.starsAdded" : "team.starsTaken", { n }), c.note);
+        } else if (c.kind === "rep") {
+          const n = formatNumber(Math.round(Math.abs(c.amount)));
+          const key = c.which === "company" ? (c.mode === "set" ? "team.repSet" : c.amount > 0 ? "team.repAdded" : "team.repTaken") : c.mode === "set" ? "team.racingRepSet" : c.amount > 0 ? "team.racingRepAdded" : "team.racingRepTaken";
+          say(c.which === "company" ? "🏅" : "🏁", tr(key, { n }), c.note);
         } else if (c.kind === "company") {
           say("🏷️", tr("team.company", { name: c.name }), c.note);
         } else {
