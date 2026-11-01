@@ -937,6 +937,20 @@ export function StartGate() {
   return <StartLoading label={t(phase === "account" ? "account.loadingAccount" : "account.loadingSave")} />;
 }
 
+/** The game was opened again in another tab or window and this copy stopped (lib/tabs.ts): "Play here" reloads it as the newest. */
+export function OpenElsewhere() {
+  const { t } = useT();
+  return (
+    <div role="alert" className="max-w-sm space-y-3 text-center">
+      <div className="text-lg font-black">{t("elsewhere.title")}</div>
+      <p className="text-sm text-white/80">{t("elsewhere.body")}</p>
+      <Button variant="gold" onClick={() => window.location.reload()}>
+        <RefreshCw /> {t("elsewhere.playHere")}
+      </Button>
+    </div>
+  );
+}
+
 /**
  * Before the game: create an account or sign in (nobody plays without an account). A guest from
  * when the game could be played without one ("guest") registers its own account, keeping its game.

@@ -30,7 +30,7 @@ import { Sheet } from "../panels/sheet";
 import { passWaiting } from "@/game/engine/pass";
 import { winterWaiting } from "@/game/engine/winter";
 import { festivalWaiting } from "@/game/engine/festival";
-import { ConflictDialog, ProfileView, StartGate } from "./account";
+import { ConflictDialog, OpenElsewhere, ProfileView, StartGate } from "./account";
 import { StartScreen } from "./start-screen";
 import { useCloud } from "@/store/cloud-store";
 import { Coach } from "./coach";
@@ -205,6 +205,7 @@ function useBadges() {
 
 export function Game() {
   const ready = useGame((g) => g.ready);
+  const elsewhere = useGame((g) => g.elsewhere);
   const init = useGame((g) => g.init);
 
   useEffect(() => {
@@ -231,7 +232,16 @@ export function Game() {
     <>
       {/* the app's Back button and background/foreground, from the welcome page on */}
       <NativeApp />
-      {ready ? <Shell /> : <Splash />}
+      {/* opened again in another tab or window: the map is gone with the game it showed */}
+      {elsewhere ? (
+        <StartScreen compact>
+          <OpenElsewhere />
+        </StartScreen>
+      ) : ready ? (
+        <Shell />
+      ) : (
+        <Splash />
+      )}
     </>
   );
 }
