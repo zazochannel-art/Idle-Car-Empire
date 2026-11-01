@@ -44,6 +44,9 @@ jobs:
       # welcome page → account → tutorial → first body → first cloud save (e2e/first-minutes.mjs)
       - name: Play the first minutes
         run: npm run e2e
+      # the game open in two tabs: only the newest saves, "Play here" takes over (e2e/two-tabs.mjs)
+      - name: Two tabs, one game
+        run: npm run e2e:tabs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

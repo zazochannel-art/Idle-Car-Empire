@@ -91,6 +91,7 @@ import { browserOptOut, sendStep } from "@/game/save/funnel";
 import { PASS, type WeeklyId } from "@/game/config/pass";
 import { batteryState, isIdle, isSaving, minTickMs, onSaverChange, setSaverSetting, startPower, type SaverSetting } from "@/lib/power";
 import { maybeAskForReview } from "@/lib/review";
+import { claimTab } from "@/lib/tabs";
 
 const TICK_MS = 100;
 /** How often the ticks refresh the screens' view of the state (ms). */
@@ -116,6 +117,8 @@ const SOCIAL_EVERY_MS = 10 * 60_000;
 
 interface GameStore {
   ready: boolean;
+  /** The game was opened again in another tab or window (lib/tabs.ts): this copy has stopped for good. */
+  elsewhere: boolean;
   state: GameState;
   snap: EconomySnapshot;
   /**
@@ -327,6 +330,10 @@ let loop: ReturnType<typeof setInterval> | null = null;
 let starting = false;
 /** The app is in the background (Android): the loop stays stopped until it is back. */
 let away = false;
+/** A newer copy of the game took over (lib/tabs.ts): this one never ticks or saves again. */
+let replaced = false;
+/** The timers that collect gifts and the like from the server: stopped with the rest. */
+const socialTimers: ReturnType<typeof setTimeout>[] = [];
 let lastTick = 0;
 /** What the plants' auto-upgrades may still spend (Ch.autoBudget): it starts empty with each session. */
 let autoMoney = 0;
@@ -379,10 +386,30 @@ export const useGame = create<GameStore>((set, get) => {
   }
 
   function persist(force = false) {
-    if (!saves) return;
+    if (!saves || replaced) return;
     const s = get().state;
     lastSave = Date.now();
     saves.save({ ...s, lastActiveAt: Date.now() }, force);
+  }
+
+  /**
+   * The game was opened again in another tab or window (lib/tabs.ts): this copy saves once (not
+   * before its save has loaded: it would save a new company over it; nor when it heard `late`: the
+   * newer copy has read the save already), then stops for good, with no ticks, no saves and nothing
+   * more for the cloud, so the two never write over each other. Not ready any more, nothing here
+   * claims gifts or purchases it could no longer keep; the screen says the game is open elsewhere,
+   * with "Play here" (a reload makes this copy the newest).
+   */
+  async function stepDown(late: boolean) {
+    if (get().ready && !late) persist(true);
+    replaced = true;
+    if (loop) clearInterval(loop);
+    loop = null;
+    for (const t of socialTimers) clearTimeout(t);
+    set({ ready: false, elsewhere: true });
+    if (!late) await saves?.flush();
+    // (a cloud save that failed is not retried from here: the newer copy sends this one's last state)
+    saves?.sync?.stop();
   }
 
   function runTick() {
@@ -617,6 +644,7 @@ export const useGame = create<GameStore>((set, get) => {
 
   return {
     ready: false,
+    elsewhere: false,
     state: initial,
     snap: snapshot(initial),
     view: { state: initial, snap: snapshot(initial) },
@@ -880,9 +908,11 @@ export const useGame = create<GameStore>((set, get) => {
     },
 
     init: async () => {
-      if (get().ready || loop || starting) return;
+      if (get().ready || loop || starting || replaced) return;
       starting = true;
-      const now = Date.now();
+      // one copy of the game at a time (lib/tabs.ts): this one being the newest, a copy still open in
+      // another tab or window saves its last state and stops, and this one starts from that save
+      const tab = saves ? claimTab({ onReplaced: stepDown }) : null;
       // the loading and sign-in screens in the player's language
       const guess = detectLanguage();
       await loadLanguage(guess).catch(() => {});
@@ -890,10 +920,18 @@ export const useGame = create<GameStore>((set, get) => {
         const state = { ...get().state, settings: { ...get().state.settings, lang: guess } };
         set({ state, view: { state, snap: get().snap } });
       }
+      await tab?.ready;
+      if (replaced) return;
+      const now = Date.now();
       // the account and its save first: nothing starts (or gets saved) before they are known
       const start = saves
         ? await saves.start(now, { choose: (local, cloud, reason) => askStartChoice({ local, cloud, reason }), signIn: askWelcome })
         : { state: null, mode: "local" as const };
+      if (replaced) {
+        // opened again elsewhere meanwhile: what the start was about to send to the cloud stays unsent
+        saves?.sync?.stop();
+        return;
+      }
       useCloud.setState({ mode: start.mode, account: saves?.account ?? null, outdated: !!start.outdated, phase: "save" });
       set({ backend: saves?.saveWhere ?? "local" });
       if (start.outdated) {
@@ -919,6 +957,7 @@ export const useGame = create<GameStore>((set, get) => {
       // the player's language before the first screen (English if it cannot load)
       await loadLanguage(state.settings.lang).catch(() => {});
       applyLanguage(state.settings.lang);
+      if (replaced) return;
       lastTick = Date.now();
       lastSave = lastTick;
       {
@@ -960,8 +999,7 @@ export const useGame = create<GameStore>((set, get) => {
           void get().sendCup();
           void get().publishGhost();
         };
-        setTimeout(social, SOCIAL_FIRST_MS);
-        setInterval(social, SOCIAL_EVERY_MS);
+        socialTimers.push(setTimeout(social, SOCIAL_FIRST_MS), setInterval(social, SOCIAL_EVERY_MS));
         syncPush();
       }
     },
@@ -1477,7 +1515,8 @@ export const useGame = create<GameStore>((set, get) => {
     },
     resume: () => {
       away = false;
-      if (loop || !get().ready) return;
+      // (a copy replaced by a newer one stays stopped: lib/tabs.ts)
+      if (loop || !get().ready || replaced) return;
       runTick();
       loop = setInterval(runTick, TICK_MS);
     },

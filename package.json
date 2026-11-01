@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "e2e": "node e2e/first-minutes.mjs",
+    "e2e:tabs": "node e2e/two-tabs.mjs",
     "simulate": "tsx scripts/simulate.ts",
     "build:app": "node scripts/build-app.mjs",
     "build:android": "node scripts/build-app.mjs android",
