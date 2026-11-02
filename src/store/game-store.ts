@@ -227,6 +227,7 @@ interface GameStore {
   buyLogistics: (id: LogisticsUpgrade) => boolean;
   buyTransportTier: () => boolean;
   developDesign: (id: CarId, option: DesignOption) => boolean;
+  developNordic: (id: CarId) => boolean;
   renameDesign: (id: CarId, name: string) => void;
   setDesignColor: (id: CarId, color: string) => void;
   research: (id: string) => boolean;
@@ -1187,6 +1188,7 @@ export const useGame = create<GameStore>((set, get) => {
     buyTransportTier: () => act((s) => L.buyTier(s, get().snap.gm.costMult)),
     developDesign: (id, option) =>
       act((s) => D.develop(s, id, option, D.developCost(Ch.carBaseValue(s, CAR_BY_ID[id], get().snap.gm), s.designs[id], option))),
+    developNordic: (id) => act((s) => D.developNordic(s, id, D.nordicCost(Ch.carBaseValue(s, CAR_BY_ID[id], get().snap.gm), s.designs[id]))),
     renameDesign: (id, name) => {
       act((s) => D.renameDesign(s, id, name));
     },

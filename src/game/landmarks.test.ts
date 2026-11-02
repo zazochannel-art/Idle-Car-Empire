@@ -12,6 +12,7 @@ import { marketPrice } from "./engine/materials";
 import { createInitialState } from "./engine/state";
 import { unlockTerritory } from "./engine/territory";
 import { decodeSave, encodeSave } from "./save/serialize";
+import * as D from "./engine/design";
 import type { TerritoryId } from "./config/city";
 import type { GameState } from "./types";
 
@@ -155,5 +156,25 @@ describe("landmark works", () => {
     expect(back.landmarks).toEqual(s.landmarks);
     expect(Lm.migrateLandmarks({ fleet: 1e9, rewarded: ["airport", "atlantis", "airport"], levels: { nowhere: 3 } })).toEqual({ lease: 0, fleet: LANDMARK.airport.fleetPerLevel * LANDMARK.maxLevel, fleetValue: 0, rewarded: ["airport"], levels: {} });
     expect(Lm.migrateLandmarks(undefined)).toEqual(Lm.createLandmarks());
+  });
+
+  it("a city's lines are built only there, and the Nordic package sells for more in Nordheim", () => {
+    const s = createInitialState(T0);
+    const gm = snapshot(s).gm;
+    expect(carLock(s, CAR_BY_ID.oreHauler, gm)).toEqual({ kind: "city", city: "north" });
+    s.activeCity = "north";
+    expect(carLock(s, CAR_BY_ID.pickup, gm)).toEqual({ kind: "city", city: "home" });
+    expect(carLock(s, CAR_BY_ID.oreHauler, gm)?.kind).not.toBe("city");
+    // the package: once, for its price, and only Nordheim's buyers pay for it
+    const car = CAR_BY_ID.sedan;
+    const before = carValue(s, car, gm);
+    s.cash = 1e15;
+    const cost = D.nordicCost(1_000, s.designs.sedan);
+    expect(cost).toBeGreaterThan(0);
+    expect(D.developNordic(s, "sedan", cost)).toBe(true);
+    expect(D.developNordic(s, "sedan", D.nordicCost(1_000, s.designs.sedan))).toBe(false);
+    expect(carValue(s, car, gm) / before).toBeGreaterThan(1.1);
+    s.activeCity = "home";
+    expect(D.nordicMult(s, "sedan")).toBe(1);
   });
 });

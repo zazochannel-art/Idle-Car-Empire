@@ -559,6 +559,8 @@ export interface CarDesign {
   paint: number;
   /** Paint colour; "" = the platform's factory colour. */
   color: string;
+  /** The Nordic package (winterised): sells for more in Nordheim (engine/design.ts). */
+  nordic: boolean;
 }
 
 /** A player the player hid (their account id, and their name then, to list them in the Profile). */

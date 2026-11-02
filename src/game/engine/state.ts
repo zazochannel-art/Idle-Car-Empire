@@ -54,7 +54,7 @@ export function emptyParts(): Record<ComponentId, number> {
 
 /** Every platform starts with its default model name and no options. */
 export function createDesigns(): Record<CarId, CarDesign> {
-  return Object.fromEntries(CARS.map((c) => [c.id, { name: c.modelName, engine: 0, interior: 0, rims: 0, paint: 0, color: "" }])) as Record<CarId, CarDesign>;
+  return Object.fromEntries(CARS.map((c) => [c.id, { name: c.modelName, engine: 0, interior: 0, rims: 0, paint: 0, color: "", nordic: false }])) as Record<CarId, CarDesign>;
 }
 
 export function createStats(): Stats {

@@ -273,7 +273,7 @@ export function enterShow(s: GameState, car: CarId, now: number, unlocked: Set<C
     const tier = Math.max(1, Math.min(CARS.length, cfg.tier + Math.floor(r() * 3) - 1));
     const rc = CARS[tier - 1];
     const lv = () => Math.floor(r() * (DESIGN_MAX + 1));
-    const design: CarDesign = { name: "", engine: lv(), interior: lv(), rims: lv(), paint: lv(), color: "" };
+    const design: CarDesign = { name: "", engine: lv(), interior: lv(), rims: lv(), paint: lv(), color: "", nordic: false };
     return { name, car: rc.id, score: showScore(rc, design), you: false };
   });
   board.push({ name: s.designs[car].name, car, score: mine, you: true });

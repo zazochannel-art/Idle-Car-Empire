@@ -92,6 +92,12 @@ export const DESIGN_COST = [8, 40, 200];
 /** Paint colours the player can pick for a model ("" = factory colour). */
 export const DESIGN_COLORS = ["", "#c3141b", "#f2681c", "#f3c014", "#1c9a3c", "#1b46b8", "#6a2fd6", "#f2f2ef", "#b3b9c0", "#121418"];
 
+/**
+ * The Nordic package: heated seats, studded tyres and cold-start kit for a model.
+ * Developed once (in multiples of one car's value); Nordheim's buyers pay this much more for it.
+ */
+export const NORDIC = { cost: 60, value: 0.12, time: 0.03 };
+
 /** Model refinement (Cars tab): global per-model value upgrades. */
 export const CAR_MODEL = {
   /** Cost of the first refinement, in multiples of one car's value. */

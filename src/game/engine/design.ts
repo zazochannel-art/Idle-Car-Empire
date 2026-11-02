@@ -1,7 +1,7 @@
 // The Design studio: the player's own model on each car platform. Options
 // (engine, interior, rims, paint) are developed with money and change the
 // model's stats, its sale value and its time on the assembly line.
-import { CAR_BY_ID, DESIGN_COLORS, DESIGN_COST, DESIGN_MAX, DESIGN_OPTIONS, type CarConfig, type DesignOption } from "../config/cars";
+import { CAR_BY_ID, DESIGN_COLORS, DESIGN_COST, DESIGN_MAX, DESIGN_OPTIONS, NORDIC, type CarConfig, type DesignOption } from "../config/cars";
 import type { CarDesign, CarId, GameState } from "../types";
 
 export interface DesignStats {
@@ -38,6 +38,8 @@ export function designStats(car: CarConfig, d: CarDesign, grade = car.grade): De
     valueMult *= 1 + o.value * d[o.id];
     timeMult *= 1 + o.time * d[o.id];
   }
+  // the Nordic package's cold-weather kit takes a little longer to fit
+  if (d.nordic) timeMult *= 1 + NORDIC.time;
   const quality = Math.min(100, Math.round(35 + 13 * grade + 3 * d.interior + 2 * d.paint));
   valueMult *= 0.9 + quality / 500;
   const comfort = Math.min(100, car.comfort + 8 * d.interior);
@@ -65,6 +67,22 @@ export function develop(s: GameState, id: CarId, option: DesignOption, cost: num
   return true;
 }
 
+/** R&D price of the Nordic package (null: already developed). */
+export const nordicCost = (baseValue: number, d: CarDesign): number | null => (d.nordic ? null : baseValue * NORDIC.cost);
+
+export function developNordic(s: GameState, id: CarId, cost: number | null): boolean {
+  const d = s.designs[id];
+  if (cost === null || !Number.isFinite(cost) || s.cash < cost || d.nordic) return false;
+  s.cash -= cost;
+  d.nordic = true;
+  s.run.upgradesBought += 1;
+  s.lifetime.upgradesBought += 1;
+  return true;
+}
+
+/** What the Nordic package adds to a model sold in the city being played (1 elsewhere than Nordheim). */
+export const nordicMult = (s: GameState, id: CarId) => (s.activeCity === "north" && s.designs[id]?.nordic ? 1 + NORDIC.value : 1);
+
 export function renameDesign(s: GameState, id: CarId, name: string): boolean {
   const clean = name.replace(/\s+/g, " ").trim().slice(0, 24);
   s.designs[id].name = clean || CAR_BY_ID[id].modelName;
@@ -79,5 +97,8 @@ export function setDesignColor(s: GameState, id: CarId, color: string): boolean 
 
 /** Global Expansion keeps names and colours but the developed options start over. */
 export function resetDesignLevels(s: GameState) {
-  for (const d of Object.values(s.designs)) d.engine = d.interior = d.rims = d.paint = 0;
+  for (const d of Object.values(s.designs)) {
+    d.engine = d.interior = d.rims = d.paint = 0;
+    d.nordic = false;
+  }
 }
