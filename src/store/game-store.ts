@@ -304,6 +304,7 @@ interface GameStore {
   unlockTerritory: (id: import("@/game/config/city").TerritoryId) => boolean;
   /** Move the company to another of its cities, or open a new one (engine/cities.ts). */
   switchCity: (id: CityId) => boolean;
+  sendTradeConvoy: () => number;
   unlockCity: (id: CityId) => boolean;
   setBrand: (patch: Parameters<typeof Br.setBrand>[1]) => boolean;
   cancelRaceOrder: (car: CarId) => boolean;
@@ -1142,6 +1143,11 @@ export const useGame = create<GameStore>((set, get) => {
         uiEvents.emit({ type: "fireworks", area: `t:${id}` });
       }
       return ok;
+    },
+    sendTradeConvoy: () => {
+      const got = act((s) => Cy.sendTradeConvoy(s, Date.now(), get().snap.steadyIncomePerSec));
+      if (got > 0) uiEvents.emit({ type: "toast", tone: "gold", icon: "🚢", title: tr("trade.toast"), body: tr("trade.toastBody", { money: formatMoney(got) }) });
+      return got;
     },
     switchCity: (id) => {
       const ok = act((s) => Cy.switchCity(s, id, Date.now()));

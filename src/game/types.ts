@@ -694,6 +694,8 @@ export interface GameState {
   /** The city being played (its parts are the fields above: the wallet, the city, the chain, …) and the others, parked (engine/cities.ts). */
   activeCity: CityId;
   cities: Partial<Record<CityId, import("./engine/cities").ParkedCity>>;
+  /** The trade route between the cities: when its next convoy can leave (ms; 0 = now; engine/cities.ts). */
+  tradeRoute: number;
   createdAt: number;
   runStartedAt: number;
   lastActiveAt: number;

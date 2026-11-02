@@ -25,6 +25,12 @@ export const CITIES: Record<CityId, CityConfig> = {
   north: { id: "north", assets: "/world-north", lotPrefix: "n:", landmarks: true, emoji: "🏔️" },
 };
 
+/**
+ * The trade route: with two cities, a convoy runs between them every few hours and
+ * brings the city being played this many seconds of the company's income (both cities').
+ */
+export const TRADE_ROUTE = { cooldownHours: 4, incomeSeconds: 1_800 };
+
 export const CITY_RULES = {
   /** Share of its steady income a city brings in while the company is busy in another one. */
   passiveShare: 0.75,

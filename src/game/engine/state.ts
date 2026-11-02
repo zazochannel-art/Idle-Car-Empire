@@ -139,6 +139,7 @@ export function createInitialState(now: number): GameState {
     settings: { buyAmount: 1, lang: "en", lowGraphics: false, sound: true, music: true, haptics: true, notify: false, saver: "auto", stats: true, hidden: [], toastsOff: [], autoRecall: "ask", autoVip: false, autoFleet: false, autoCollect: false, whatsNew: WHATS_NEW.id },
     funnel: [],
     activeCity: "home",
+    tradeRoute: 0,
     cities: {},
     createdAt: now,
     runStartedAt: now,
