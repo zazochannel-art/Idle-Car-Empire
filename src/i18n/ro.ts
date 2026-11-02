@@ -2268,6 +2268,7 @@ export const ro: Record<MessageKey, string> = {
   "mapBonus.drone.taken": "Ai deschis lada dronei",
   "mapBonus.vip.taken": "VIP-ul e încântat",
   "mapBonus.breakdown.taken": "Drum liber: livrările merg din nou normal",
+  "mapBonus.storm.taken": "Plugul de zăpadă a plecat: drumurile sunt libere",
   "mapBonus.reward": "Recompensă: {money}",
   "mapBonus.tap": "Atinge!",
   "mapBonus.slowed": "Livrări încetinite",

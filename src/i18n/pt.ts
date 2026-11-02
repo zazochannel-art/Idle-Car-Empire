@@ -2268,6 +2268,7 @@ export const pt: Record<MessageKey, string> = {
   "mapBonus.drone.taken": "Caixa do drone aberta",
   "mapBonus.vip.taken": "O VIP está encantado",
   "mapBonus.breakdown.taken": "Estrada livre: as entregas voltam ao ritmo",
+  "mapBonus.storm.taken": "Limpa-neve enviado: as estradas estão livres",
   "mapBonus.reward": "Recompensa: {money}",
   "mapBonus.tap": "Toque!",
   "mapBonus.slowed": "Entregas lentas",

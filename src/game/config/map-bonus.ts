@@ -1,9 +1,10 @@
 // Bonuses that turn up on the Empire Map while the game is played: a golden
 // car in the town's traffic, a drone dropping a crate on one of the plants, a
 // VIP's limousine, and a truck broken down on the road that holds up every
-// delivery until someone helps. One at a time; tapping it takes its reward.
+// delivery until someone helps; in Nordheim, a snowstorm that slows them until
+// the snowplough is sent. One at a time; tapping it takes its reward.
 
-export type MapBonusKind = "golden" | "drone" | "vip" | "breakdown";
+export type MapBonusKind = "golden" | "drone" | "vip" | "breakdown" | "storm";
 
 export interface MapBonusConfig {
   kind: MapBonusKind;
@@ -34,6 +35,8 @@ export const MAP_BONUSES: MapBonusConfig[] = [
   { kind: "drone", emoji: "📦", weight: 3, stay: 50, incomeSeconds: 60 },
   { kind: "vip", emoji: "💎", weight: 1.5, stay: 40, incomeSeconds: 150 },
   { kind: "breakdown", emoji: "🔧", weight: 2, stay: 60, incomeSeconds: 30 },
+  // Nordheim only: a snowstorm on the roads, the snowplough clears it
+  { kind: "storm", emoji: "🌨️", weight: 2, stay: 60, incomeSeconds: 45 },
 ];
 
 export const MAP_BONUS_BY_KIND = Object.fromEntries(MAP_BONUSES.map((b) => [b.kind, b])) as Record<MapBonusKind, MapBonusConfig>;

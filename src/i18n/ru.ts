@@ -2268,6 +2268,7 @@ export const ru: Record<MessageKey, string> = {
   "mapBonus.drone.taken": "Ящик дрона открыт",
   "mapBonus.vip.taken": "VIP-гость в восторге",
   "mapBonus.breakdown.taken": "Дорога свободна: доставки снова в норме",
+  "mapBonus.storm.taken": "Снегоуборщик выехал: дороги расчищены",
   "mapBonus.reward": "Награда: {money}",
   "mapBonus.tap": "Жми!",
   "mapBonus.slowed": "Доставки медленнее",

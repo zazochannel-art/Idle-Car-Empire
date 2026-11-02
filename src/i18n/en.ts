@@ -2270,6 +2270,7 @@ export const en = {
   "mapBonus.drone.taken": "Drone crate opened",
   "mapBonus.vip.taken": "The VIP is delighted",
   "mapBonus.breakdown.taken": "Road cleared: deliveries are back to speed",
+  "mapBonus.storm.taken": "Snowplough sent: the roads are clear",
   "mapBonus.reward": "Reward: {money}",
   "mapBonus.tap": "Tap!",
   "mapBonus.slowed": "Deliveries slowed",

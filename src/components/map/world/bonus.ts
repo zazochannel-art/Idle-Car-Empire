@@ -101,6 +101,8 @@ export class BonusLayer {
     const s: Shown = { id: b.id, kind: b.kind, age: 0, fxAt: 0 };
     if (b.kind === "golden") s.car = this.traffic.spawnSpecial("supercar", "#e8b923", "metallic", 1, 1.3) ?? undefined;
     else if (b.kind === "vip") s.car = this.traffic.spawnSpecial("luxury", "#16181d", "gloss", 1.5, 1.2) ?? undefined;
+    // the snowplough out in the storm, slow and orange
+    else if (b.kind === "storm") s.car = this.traffic.spawnSpecial("offroad", "#f97316", "gloss", 1.2, 1.35) ?? undefined;
     else if (b.kind === "drone") s.drone = this.drone(b.plot);
     else s.truck = this.brokenTruck();
     return s;
@@ -238,11 +240,16 @@ export class BonusLayer {
     c.age += dt;
     if (c.car) {
       // gone off the map (a dead end): another one takes its place
-      if (!this.traffic.positionOf(c.car)) c.car = this.traffic.spawnSpecial(c.kind === "vip" ? "luxury" : "supercar", c.kind === "vip" ? "#16181d" : "#e8b923", c.kind === "vip" ? "gloss" : "metallic", c.kind === "vip" ? 1.5 : 1, 1.25) ?? undefined;
+      if (!this.traffic.positionOf(c.car))
+        c.car =
+          (c.kind === "storm"
+            ? this.traffic.spawnSpecial("offroad", "#f97316", "gloss", 1.2, 1.35)
+            : this.traffic.spawnSpecial(c.kind === "vip" ? "luxury" : "supercar", c.kind === "vip" ? "#16181d" : "#e8b923", c.kind === "vip" ? "gloss" : "metallic", c.kind === "vip" ? 1.5 : 1, 1.25)) ?? undefined;
       const p = this.position();
       if (p && t - c.fxAt > (c.kind === "golden" ? 0.07 : 0.3)) {
         c.fxAt = t;
-        this.fx.sparkle(p.x, p.y + 0.1, p.z, c.kind === "golden" ? 2 : 1, c.kind === "golden" ? "#ffd75e" : "#c4b5fd");
+        // the plough throws snow up; the others sparkle
+        this.fx.sparkle(p.x, p.y + 0.1, p.z, c.kind === "golden" ? 2 : 1, c.kind === "golden" ? "#ffd75e" : c.kind === "storm" ? "#f8fafc" : "#c4b5fd");
       }
     }
     if (c.drone) this.flyDrone(c, dt);
