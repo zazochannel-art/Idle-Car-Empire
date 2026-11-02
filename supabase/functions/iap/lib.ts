@@ -1,7 +1,7 @@
 // The purchases check's work (index.ts runs it: docs/android/iap.md, "Checking purchases on
 // the server"). Two calls:
 //   - POST {"productId", "token"} with a player's session: asks Google Play about one purchase
-//     the phone reports, keeps it for that account (supabase/migrations/0019_purchases.sql) and
+//     the phone reports, keeps it for that account (supabase/migrations/0022_purchases.sql) and
 //     answers whether the game may give it;
 //   - POST {"action": "voided"} (the database's schedule): reads the purchases Google refunded or
 //     cancelled, and marks them refunded.

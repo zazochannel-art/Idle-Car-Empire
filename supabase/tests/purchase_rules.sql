@@ -1,4 +1,4 @@
--- The purchases ledger (0019_purchases.sql), checked inside one transaction that is rolled
+-- The purchases ledger (0022_purchases.sql), checked inside one transaction that is rolled
 -- back: two players A and B (made up here, never committed). The "iap" function's calls run
 -- as service_role; players run as "authenticated" with their own JWT, the way PostgREST runs
 -- their requests. Any failed check raises an exception naming it.

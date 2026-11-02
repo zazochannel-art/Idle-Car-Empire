@@ -291,7 +291,7 @@ Migrations in `supabase/migrations/`, in order:
 8. `0013_weekly_cup.sql` — the weekly cup (see "Weekly cup"): the
    `ops.cup_entries` table (not reachable from the API), `cup_submit()`,
    `cup_board()` and `claim_cup_prizes()`.
-9. `0019_purchases.sql` — the server's check of in-app purchases
+9. `0022_purchases.sql` — the server's check of in-app purchases
    ([android/iap.md](android/iap.md)): the `ops.purchases` ledger (not
    reachable from the API), `my_purchases()` for players, and three functions
    for the service key only (`iap_record()`, `iap_refunded()`,

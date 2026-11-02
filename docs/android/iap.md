@@ -147,7 +147,7 @@ Why turn it on: tools such as Lucky Patcher answer the app's purchase requests w
   - Google knows it, for this app and this product, and it is paid (or still pending);
   - it was bought by this game account (the account's hash Google keeps with it);
   - no other game account received it before.
-- **The ledger** ([0019_purchases.sql](../../supabase/migrations/0019_purchases.sql)):
+- **The ledger** ([0022_purchases.sql](../../supabase/migrations/0022_purchases.sql)):
   `ops.purchases`, out of the API's reach. One row per purchase:
   - a hash of Google's token (never the token);
   - the account, the product, Google's order id (GPA.…);
@@ -165,7 +165,7 @@ Do them in this order. Turning on the build switch (step 6) before the server is
 would hold back every purchase until Google refunds it.
 
 1. **Run the migration.** Supabase dashboard → SQL Editor: paste
-   `supabase/migrations/0019_purchases.sql` and run it. To check it,
+   `supabase/migrations/0022_purchases.sql` and run it. To check it,
    `supabase/tests/purchase_rules.sql` should end with "purchase rules: all checks passed".
 2. **Deploy the function.** With the Supabase CLI, from the repository:
    `supabase functions deploy iap`. (It shares a file with the push sender, so deploy it

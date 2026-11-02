@@ -1,5 +1,5 @@
 // The purchases check (supabase/functions/iap/lib.ts), run in Node with a fake Google Play, a
-// fake sign-in and a fake ledger that answers like supabase/migrations/0019_purchases.sql.
+// fake sign-in and a fake ledger that answers like supabase/migrations/0022_purchases.sql.
 import { createHash } from "node:crypto";
 import { beforeEach, describe, expect, it } from "vitest";
 import { IAP_PRODUCTS } from "@/game/config/iap";
