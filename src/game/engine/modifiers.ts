@@ -22,8 +22,10 @@ export interface GlobalMods {
   speed: number;
   delivery: number;
   income: number;
-  /** Offline efficiency (0.6 = 60% of live production). */
+  /** Offline efficiency (0.6 = 60% of live production): offlineShare of offlineRaw. */
   offline: number;
+  /** The offline bonuses added up, before offlineShare (a plant adds its automation and manager to it). */
+  offlineRaw: number;
   offlineCapHours: number;
   dealerCap: number;
   markup: number;
@@ -56,7 +58,7 @@ export function applyEffect(m: GlobalMods, e: Effect) {
       m.income *= e.mult;
       break;
     case "offline":
-      m.offline += e.add * OFFLINE.baseEfficiency;
+      m.offlineRaw += e.add * OFFLINE.baseEfficiency;
       break;
     case "offlineCap":
       m.offlineCapHours += e.hours;
@@ -85,6 +87,19 @@ export function applyEffect(m: GlobalMods, e: Effect) {
   }
 }
 
+/**
+ * Share of live production earned while away, from the offline bonuses added up: in full up to
+ * OFFLINE.softFrom, then each bonus counts for less, so the share nears 100% but never reaches it.
+ * Away must never pay more than playing (research, Stars, managers and automation together add up
+ * to more than 1 late on).
+ */
+export function offlineShare(raw: number): number {
+  const from = OFFLINE.softFrom;
+  if (raw <= from) return raw;
+  const room = 1 - from;
+  return from + room * (1 - Math.exp(-(raw - from) / room));
+}
+
 /** Strength of a manager's bonus at its current level, as a multiplier. */
 export function managerMult(cfg: ManagerConfig, level: number, power = 1): number {
   return 1 + cfg.bonus.pct * level * power;
@@ -97,6 +112,7 @@ export function computeGlobalMods(s: GameState): GlobalMods {
     delivery: 1,
     income: 1,
     offline: OFFLINE.baseEfficiency,
+    offlineRaw: OFFLINE.baseEfficiency,
     offlineCapHours: OFFLINE.baseCapHours,
     dealerCap: 1,
     markup: 0,
@@ -125,7 +141,7 @@ export function computeGlobalMods(s: GameState): GlobalMods {
   const star = starMods(s);
   m.speed *= star.speed;
   applyValue(m.value, star.value);
-  m.offline += star.offline * OFFLINE.baseEfficiency;
+  m.offlineRaw += star.offline * OFFLINE.baseEfficiency;
   m.costMult *= star.cost;
 
   // Car model refinements (Cars tab).
@@ -159,7 +175,7 @@ export function computeGlobalMods(s: GameState): GlobalMods {
         applyValue(m.value, mult, cfg.bonus.minTier);
         break;
       case "offline":
-        m.offline += (mult - 1) * OFFLINE.baseEfficiency;
+        m.offlineRaw += (mult - 1) * OFFLINE.baseEfficiency;
         break;
       case "cost":
         // −3% per level, never below half price
@@ -189,5 +205,6 @@ export function computeGlobalMods(s: GameState): GlobalMods {
   m.income *= 1 + editionBonus(s);
   // the ×2 sales boost of a rewarded ad
   if (s.ads?.boostLeft > 0) m.income *= ADS.boostMult;
+  m.offline = offlineShare(m.offlineRaw);
   return m;
 }

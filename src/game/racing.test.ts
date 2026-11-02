@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RACE_EVENT_BY_ID, RACING_DISTRICT } from "./config/racing";
+import { RACE_EVENT_BY_ID, RACE_EVENTS, RACING_DISTRICT, RIVAL_CEILING, RIVAL_GROWTH, RIVAL_TEAMS } from "./config/racing";
 import { STARTER_PLOT, RACING, WORLD_MAP } from "./city/layout";
 import * as R from "./engine/racing";
 import * as Ch from "./engine/chain";
@@ -192,6 +192,36 @@ describe("racing district", () => {
     }
     expect(s.racing.championship).toBeNull();
     expect(s.racing.last!.result!.title).toBeDefined();
+  });
+
+  it("automatic racing goes where the car can place, not to the richest race it can't", () => {
+    const s = team();
+    const rc = R.receiveRaceCar(s, "city");
+    s.racing.rep = 1_000;
+    for (const u of ["engine", "tires", "transmission"] as const) rc.upgrades[u] = 2;
+    // fresh rivals: the City Sprint pays best for this car
+    expect(R.bestEventFor(s, rc)?.id).toBe("citySprint");
+    // thirty wins later its rivals (and the Drag Day's, the richest of the three) have outgrown the car
+    s.racing.wins = { citySprint: RIVAL_GROWTH.max, dragDay: RIVAL_GROWTH.max };
+    const outlook = (id: string) => R.raceOutlook(s, RACE_EVENT_BY_ID[id], rc);
+    expect(outlook("amateurCup")).toBeGreaterThan(outlook("dragDay"));
+    expect(outlook("amateurCup")).toBeGreaterThan(outlook("citySprint"));
+    expect(R.bestEventFor(s, rc)?.id).toBe("amateurCup");
+  });
+
+  it("no rival is faster than a car can be (1000), and the ceiling only touches the top", () => {
+    const s = team();
+    s.racing.wins = Object.fromEntries(RACE_EVENTS.map((e) => [e.id, RIVAL_GROWTH.max]));
+    for (const ev of RACE_EVENTS) for (const x of R.rivalsFor(s, ev, ev.type, 7)) expect(x.rating).toBeLessThan(RIVAL_CEILING.max);
+    // below the ceiling's start a rival rates what its team and growth make it
+    expect(R.rivalRating(RIVAL_CEILING.from - 1)).toBe(RIVAL_CEILING.from - 1);
+    expect(R.rivalRating(RIVAL_CEILING.from + 50)).toBeLessThan(RIVAL_CEILING.from + 50);
+    expect(R.rivalRating(RIVAL_CEILING.from + 50)).toBeGreaterThan(R.rivalRating(RIVAL_CEILING.from + 10));
+    // the Grand Prix's best team used to start out faster than any car (980 × 1.07)
+    const top = Math.max(...RIVAL_TEAMS.map((t) => t.skill));
+    expect(R.referenceRating(RACE_EVENT_BY_ID.grandPrix) * top).toBeGreaterThan(RIVAL_CEILING.max);
+    s.racing.wins = {};
+    expect(Math.max(...R.rivalsFor(s, RACE_EVENT_BY_ID.grandPrix, "grandPrix", 7).map((x) => x.rating))).toBeLessThan(RIVAL_CEILING.max * 0.99);
   });
 
   it("races cost an entry fee and can't be repeated straight away", () => {

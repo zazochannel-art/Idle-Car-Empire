@@ -100,7 +100,7 @@ import { logisticsMods } from "./logistics";
 import { deliverySlowdown } from "./map-bonus";
 import { landmarkSale, landmarkTick, localValueMult } from "./landmarks";
 import { starMods } from "./imperium";
-import { managerMult, type GlobalMods } from "./modifiers";
+import { managerMult, offlineShare, type GlobalMods } from "./modifiers";
 import { floorPace, floorTick, MORALE } from "./floor";
 import { SKIN_BY_ID, type SkinId } from "../config/collection";
 
@@ -530,6 +530,8 @@ export interface ChainSnapshot {
   /** Best case income per second if every plant ran flat out and sold everything. */
   potential: number;
   carsPerSec: number;
+  /** Share of live play earned while away (GlobalMods.offline): customers come at that pace then. */
+  offline: number;
 }
 
 function managerMods(s: GameState, plotId: string) {
@@ -614,7 +616,7 @@ export function plantStats(s: GameState, plotId: string, gm: GlobalMods, cars: C
     trucks: trucksOf(b) + lm.trucks,
     dock: lm.dock,
     load: lm.dock / haul,
-    offline: gm.offline + AUTOMATION[p.automation].offline + mm.offline,
+    offline: offlineShare(gm.offlineRaw + AUTOMATION[p.automation].offline + mm.offline),
     rp: (cfg.item ? (COMPONENT_BY_ID[cfg.item].value / 5_000) * p.grade : (car?.rp ?? 0)) * gm.rp,
   };
 }
@@ -657,7 +659,7 @@ export function chainSnapshot(s: GameState, gm: GlobalMods): ChainSnapshot {
   }
   const dealers: Partial<Record<DealerId, DealerStats>> = {};
   for (const d of DEALERS) if (s.dealers[d.id].owned) dealers[d.id] = dealerStats(s, d.id, gm);
-  return { plants, dealers, cars, potential, carsPerSec };
+  return { plants, dealers, cars, potential, carsPerSec, offline: gm.offline };
 }
 
 // ───────────────────────────── travel ─────────────────────────────
@@ -1072,7 +1074,9 @@ export function chainTick(
   for (const d of Object.values(snap.dealers)) {
     if (!d) continue;
     const stock = (s.chain.dealers[d.id] ??= emptyDealerStock());
-    stock.next -= dt;
+    // while away fewer customers come, as fewer cars are made: away earns the offline share of
+    // play even when the dealers, not the plants, set the pace (else it paid as much as playing)
+    stock.next -= offline ? dt * snap.offline : dt;
     while (stock.next <= 0) {
       if (stock.cars < 1) {
         stock.next = Math.max(stock.next, 0);
@@ -1129,9 +1133,10 @@ export function chainTick(
   // the chain's income rate is read off the ledger (and the stock change), never smoothed on its own
   s.chain.rate = chainNet(s.chain.ledger.rate) + s.chain.goodsRate;
   s.chain.wholesale += (out.wholesale / dt - s.chain.wholesale) * Math.min(1, dt / 120);
-  // the Parts Market forgets what it bought, over its window
+  // the Parts Market forgets what it bought, over its window (more slowly while away, like the
+  // dealers' customers: a full market pays the same whatever is sent, so it must not pay more then)
   if (s.chain.demand) {
-    const k = Math.exp(-dt / PARTS_DEMAND.window);
+    const k = Math.exp(-(offline ? dt * snap.offline : dt) / PARTS_DEMAND.window);
     for (const key of Object.keys(s.chain.demand) as ItemId[]) {
       const v = (s.chain.demand[key] ?? 0) * k;
       if (v < 0.01) delete s.chain.demand[key];
@@ -1384,10 +1389,10 @@ function arrive(s: GameState, sh: Shipment, snap: ChainSnapshot, earn: (n: numbe
  * offline efficiency; trucks keep driving. Returns what happened; money is
  * credited to the wallet as it is earned.
  */
-export function simulateChain(s: GameState, seconds: number, snap: ChainSnapshot, credit: (amount: number) => void): ChainTickOut {
+export function simulateChain(s: GameState, seconds: number, snap: ChainSnapshot, credit: (amount: number) => void, maxSteps = 20_000): ChainTickOut {
   const total: ChainTickOut = { earned: 0, spent: 0, components: 0, cars: 0, deliveries: 0, rp: 0, wholesale: 0, carsSold: 0, materials: 0 };
   if (seconds <= 0 || Object.keys(snap.plants).length === 0) return total;
-  const steps = Math.max(1, Math.min(Math.ceil(seconds), 20_000));
+  const steps = Math.max(1, Math.min(Math.ceil(seconds), Math.floor(maxSteps)));
   const dt = seconds / steps;
   // the HUD and dashboard rates describe the session, not the absence: keep them
   const rates = { ...s.chain.ledger.rate };

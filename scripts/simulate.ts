@@ -2,6 +2,12 @@
  * Balance simulator: a greedy bot plays the real engine and logs when it hits
  * each milestone of the supply chain. Used to tune config/ so the first
  * factory comes quickly and the empire takes hours. Run: npm run simulate -- [hours]
+ *
+ * Like a player it keeps its plants in material: it restocks every plant that runs
+ * low (switching auto-restock on once the supplier delivers by itself), makes a
+ * warehouse bigger when it holds only minutes of work, and spends only the cash above
+ * what a few restocks cost. (It used to spend it all and never buy material, so the
+ * first plant stopped after ten minutes and nothing moved again.)
  */
 import { CARS } from "../src/game/config/cars";
 import { PLANTS } from "../src/game/config/chain";
@@ -13,13 +19,15 @@ import * as A from "../src/game/engine/actions";
 import * as Ch from "../src/game/engine/chain";
 import * as C from "../src/game/engine/city";
 import { carModelCost, dealerUpgradeCost, snapshot } from "../src/game/engine/economy";
-import { freePlot } from "../src/game/engine/insights";
+import { freePlot, restockLow, workingCapital } from "../src/game/engine/insights";
+import { plantMaterials, stockTotal, supplierOf, warehouseCap, warehouseCost } from "../src/game/engine/materials";
+import { WAREHOUSE_MINUTES } from "../src/game/config/economy";
 import { freePlotFor } from "../src/game/engine/construction";
 import { checkAchievements, claimMilestone, openMilestones } from "../src/game/engine/progress";
 import { cloneState, createInitialState } from "../src/game/engine/state";
 import { tick } from "../src/game/engine/tick";
 import { formatDuration, formatMoney, formatNumber } from "../src/game/format";
-import type { GameState } from "../src/game/types";
+import type { GameState, PlantType } from "../src/game/types";
 
 const hours = Number(process.argv[2] ?? 8);
 const STEP = 1;
@@ -32,7 +40,8 @@ type Option = { label: string; cost: number; act: (g: GameState) => unknown; wei
 
 function options(g: GameState): Option[] {
   const out: Option[] = [];
-  const gm = snapshot(g).gm;
+  const snap = snapshot(g);
+  const gm = snap.gm;
   for (const p of PLANTS) {
     if (Ch.plantLock(g, p.id)) continue;
     const plot = freePlotFor(g, p.id);
@@ -52,6 +61,13 @@ function options(g: GameState): Option[] {
     push("level", Ch.levelCost(b, gm), (x) => Ch.upgradePlantLevel(x, id, snapshot(x).gm));
     push("speed", Ch.speedCost(b, gm), (x) => Ch.upgradePlantSpeed(x, id, snapshot(x).gm));
     push("auto", Ch.automationCost(b, gm), (x) => Ch.upgradeAutomation(x, id, snapshot(x).gm));
+    // a warehouse that holds only a few minutes of work runs dry between deliveries: first
+    const st = snap.chain.plants[id];
+    const per = st ? stockTotal(st.need) : 0;
+    if (st && per > 0 && st.unitsPerSec > 0) {
+      const minutes = warehouseCap(b.plant) / per / st.unitsPerSec / 60;
+      push("warehouse", warehouseCost(b, gm.costMult), (x) => Ch.upgradeWarehouse(x, id, snapshot(x).gm), minutes < WAREHOUSE_MINUTES ? 0.3 : 3);
+    }
     // grades that unlock the next car model come first
     const nextCar = CARS.find((c) => Ch.carLock(g, c, gm) !== null);
     const needed = nextCar && Ch.hasPlant(g, "assemblyPlant") && b.plant.grade < nextCar.grade;
@@ -96,12 +112,22 @@ while (t < end) {
   checkAchievements(s);
   for (const m of openMilestones(s, 3)) claimMilestone(s, m.id);
   for (const r of RESEARCH) if (A.canResearch(s, r.id) && s.rp >= r.cost) A.doResearch(s, r.id);
-  // buy the cheapest affordable thing (weighted), a few per second
+  // material first: auto-restock once the supplier delivers by itself, else buy for every plant running low
+  const snap = snapshot(s);
+  if (supplierOf(s).autoBuy)
+    for (const [id, b] of Ch.plantsOf(s)) if (!b.plant.autoBuy && plantMaterials(b.type as PlantType).length) Ch.setAutoBuy(s, id, true);
+  restockLow(s, snap);
+  // then the cheapest thing (weighted), a few per second, keeping the cash for a few restocks:
+  // while saving up for it, only what costs a tenth of it meanwhile (else the next plant never came)
+  const reserve = workingCapital(s, snap);
   for (let i = 0; i < 5; i++) {
-    const opts = options(s).filter((o) => o.cost <= s.cash).sort((a, b) => a.cost * (a.weight ?? 1) - b.cost * (b.weight ?? 1));
-    if (!opts.length) break;
+    const opts = options(s).sort((a, b) => a.cost * (a.weight ?? 1) - b.cost * (b.weight ?? 1));
+    const target = opts[0];
+    if (!target) break;
+    const pick = target.cost + reserve <= s.cash ? target : opts.find((o) => o.cost + reserve <= s.cash && o.cost * 10 <= target.cost);
+    if (!pick) break;
     const g = cloneState(s);
-    if (opts[0].act(g)) s = g;
+    if (pick.act(g)) s = g;
     else break;
   }
   for (const [label, test] of marks) {
@@ -113,7 +139,8 @@ while (t < end) {
   if (t >= nextReport) {
     nextReport += 1800;
     const plants = Ch.plantsOf(s).map(([, b]) => `${b.type.replace(/Factory|Works|Plant/, "")}${b.level}/${b.plant.speed}/${b.plant.grade}`).join(" ");
-    log(`· earned ${formatMoney(s.lifetime.moneyEarned)} rate ${formatMoney(s.chain.rate)}/s trucks ${s.chain.shipments.length} cars ${formatNumber(s.lifetime.carsProduced)} | ${plants}`);
+    const dry = Ch.plantsOf(s).filter(([, b]) => b.plant.status === "noRaw").length;
+    log(`· earned ${formatMoney(s.lifetime.moneyEarned)} rate ${formatMoney(s.chain.rate)}/s trucks ${s.chain.shipments.length} cars ${formatNumber(s.lifetime.carsProduced)} out of material ${dry} | ${plants}`);
   }
 }
 if (process.env.DEBUG) {
