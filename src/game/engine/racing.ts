@@ -41,6 +41,7 @@ import { DRIVETRAIN_GRADE,
   RACE_WEIGHTS,
   RACING_DISTRICT,
   RATING_SOFTEN,
+  RIVAL_CEILING,
   REPAIR_COST,
   REP_SHARE,
   REP_TIERS,
@@ -435,15 +436,47 @@ export function eventLock(s: GameState, ev: RaceEventConfig, rc: RaceCarState | 
   return null;
 }
 
-/** The hardest event this car may enter now (what automatic racing picks). */
+/**
+ * What a race of this event should bring the car, less the entry fee: the prize at each place,
+ * weighed by the chance of finishing there against this field. Each rival is beaten with a
+ * chance that grows with how much faster the car laps, on the scale of a driver's form.
+ */
+export function raceOutlook(s: GameState, ev: RaceEventConfig, rc: RaceCarState): number {
+  const mine = carRating(rc, ev.type) + RATING_SOFTEN;
+  // chance[k]: k rivals finish ahead
+  let chance = [1];
+  for (const x of rivalsFor(s, ev, ev.type, 0)) {
+    const gap = mine / (x.rating + RATING_SOFTEN) - 1;
+    const beat = 1 / (1 + Math.exp(-gap / RACE_NOISE.form));
+    const next = new Array(chance.length + 1).fill(0);
+    chance.forEach((p, k) => {
+      next[k] += p * beat;
+      next[k + 1] += p * (1 - beat);
+    });
+    chance = next;
+  }
+  const prize = chance.reduce((a, p, k) => a + p * (PRIZE_SHARE[k] ?? 0), 0) * ev.prize;
+  return prize - entryFee(ev);
+}
+
+/**
+ * The event automatic racing picks for this car: the one where a race should bring the most
+ * (raceOutlook). The richest event is no use to a car that can't place there: once its rivals
+ * have grown past the car, the car goes where it still wins.
+ */
 export function bestEventFor(s: GameState, rc: RaceCarState): RaceEventConfig | null {
   if (!atTrack(rc) || rc.install) return null;
   let best: RaceEventConfig | null = null;
+  let most = -Infinity;
   for (const ev of RACE_EVENTS) {
     if (ev.type === "championship") continue;
     if (s.racing.rep < ev.minRep || !ev.classes.includes(classOf(rc.car))) continue;
     if (cooldownLeft(s, ev.id) > 0 || s.cash < entryFee(ev)) continue;
-    if (!best || ev.prize > best.prize) best = ev;
+    const got = raceOutlook(s, ev, rc);
+    if (got > most) {
+      best = ev;
+      most = got;
+    }
   }
   return best;
 }
@@ -474,6 +507,14 @@ export function liveryOf(s: GameState, rc: RaceCarState): { color: string; accen
 /** Platforms the rivals drive in each class. */
 const RIVAL_CARS: Record<RaceClass, CarId[]> = { D: ["city", "sedan"], C: ["suv", "luxury"], B: ["sports", "perfSuv"], A: ["supercar"], S: ["hypercar", "electric"] };
 
+/** A rival's rating from its team's strength: never past what a car can reach (RIVAL_CEILING). */
+export function rivalRating(strength: number): number {
+  const { from, max } = RIVAL_CEILING;
+  if (strength <= from) return strength;
+  const room = max - from;
+  return from + room * (1 - Math.exp(-(strength - from) / room));
+}
+
 /** The rival field of an event: teams, drivers, cars and how fast they are. */
 export function rivalsFor(s: GameState, ev: RaceEventConfig, type: RaceType, seed: number) {
   const r = rng(seed ^ 0x51a7);
@@ -492,7 +533,7 @@ export function rivalsFor(s: GameState, ev: RaceEventConfig, type: RaceType, see
       team,
       driver: team.drivers[second],
       model: cars[(i + second) % cars.length],
-      rating: ref * team.skill * grow * (second ? 0.985 : 1) * (1 + (r() - 0.5) * 0.02),
+      rating: rivalRating(ref * team.skill * grow * (second ? 0.985 : 1) * (1 + (r() - 0.5) * 0.02)),
       id: `${team.id}:${second}`,
     });
   }

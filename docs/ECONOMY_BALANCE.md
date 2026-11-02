@@ -63,6 +63,12 @@ $15,000 Tire Factory). The first sale opens the Local Dealer.
   spending.
 - **Offline** runs the very same simulation (at the offline efficiency): it cannot create material,
   parts or cars that the online game couldn't; the Welcome Back report shows how the account changed.
+- **Away never pays more than playing**: the offline bonuses count in full up to 80% of live
+  production, then less and less, never reaching 100% (`offlineShare`). The dealers' customers and
+  the parts market's memory slow to the same share (when they, not the plants, set the pace), and
+  the absence is played in stretches of at most an hour that follow the calendar, so an event or a
+  season counts only while it lasts. On fair mid and late saves, 1 h to 12 h away earns 0.94–0.96
+  of the same hours played (it was up to 1.38 at 4 h, with a car show frozen in place).
 
 ## 5. After the first car: cash, debt and the profit shown (second pass)
 

@@ -186,6 +186,13 @@ export const RIVAL_BY_ID = Object.fromEntries(RIVAL_TEAMS.map((r) => [r.id, r]))
 /** Each win in an event makes its rivals this much stronger (up to `max` wins): they learn and spend. */
 // up to +36%: a dominant car (development, turbo, R&D tech) keeps finding rivals that catch up
 export const RIVAL_GROWTH = { perWin: 0.012, max: 30 };
+/**
+ * No car rates past 1000 (each stat tops out at 100), so no rival does either: up to `from` a
+ * rival rates what its team and growth make it, past it only ever nearer `max` (engine/racing.ts
+ * rivalRating). The top events' reference cars already rate 980 to 1000: their best teams were
+ * faster than any car can be, and those races could not be won.
+ */
+export const RIVAL_CEILING = { from: 900, max: 1000 };
 
 // ───────────────────────────── events ─────────────────────────────
 

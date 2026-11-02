@@ -9,10 +9,32 @@ import { constructionTick } from "./construction";
 import { book, chainNet, LEDGER_KEYS, settleLedger } from "./materials";
 import { payDividends } from "./stock";
 import { parkedEarnings, withCity, withWallet } from "./cities";
+import { activeEvent, nextEvent } from "./events";
+import { seasonWindow } from "./season";
 
 const addTo = (report: OfflineReport, id: CityId, money: number) => {
   if (money > 0) (report.cities ??= {})[id] = (report.cities[id] ?? 0) + money;
 };
+
+/** Longest stretch of an absence played on one snapshot (the market and the stock move on). */
+const SPAN_MS = 60 * 60 * 1000;
+/** Steps the whole absence is played in (engine/chain.ts simulateChain), shared by its spans. */
+const STEPS = 20_000;
+
+/**
+ * Where the stretch of the absence starting at `t` ends: at the next change of the calendar
+ * (a market event starting or ending, a season ending) or after SPAN_MS, whichever is first.
+ */
+export function spanEnd(t: number, end: number): number {
+  let to = Math.min(end, t + SPAN_MS);
+  const ev = activeEvent(t);
+  if (ev) to = Math.min(to, ev.end);
+  else to = Math.min(to, nextEvent(t).start);
+  const season = seasonWindow(t);
+  if (season) to = Math.min(to, season.end);
+  // a window already over (never at a real boundary) would stall the walk: move on regardless
+  return to > t ? to : Math.min(end, t + SPAN_MS);
+}
 
 /**
  * Plays out the time between `lastActiveAt` and `now`: plants keep producing
@@ -38,12 +60,6 @@ function absence(s: GameState, now: number): OfflineReport {
   const capped = Math.min(seconds, snap.gm.offlineCapHours * 3600);
   const report: OfflineReport = { seconds, cappedSeconds: capped, cars: 0, components: 0, deliveries: 0, money: 0, rp: 0, carsByType: {} };
   if (capped <= 0) return report;
-  // construction never stops: sites and upgrades advance for the whole absence
-  // (what they finish starts working when the player is back)
-  const before0 = new Set(Object.keys(s.city.sites));
-  const finished = constructionTick(s, seconds);
-  const built = finished.filter((id) => before0.has(id));
-  if (built.length) report.built = built;
 
   const cash = s.cash;
   const owed = s.chain.owed;
@@ -52,7 +68,30 @@ function absence(s: GameState, now: number): OfflineReport {
   const byType = { ...s.lifetime.carsByType };
   const rp = s.rp;
   const before = { ...s.chain.ledger.run };
-  const r = simulateChain(s, capped, snap.chain, (amount) => credit(s, amount));
+  // The absence is played stretch by stretch, each on the calendar of its own time: a market
+  // event or a season counts only while it lasts, as it would have in play (one snapshot taken
+  // when the player left kept a car show going for the whole twelve hours).
+  const r = { cars: 0, components: 0, deliveries: 0, carsSold: 0, materials: 0 };
+  let city = 0;
+  let serviced = 0;
+  const left = s.lastActiveAt;
+  const end = left + capped * 1000;
+  try {
+    for (let t = left; t < end; ) {
+      const to = spanEnd(t, end);
+      const span = (to - t) / 1000;
+      s.lastActiveAt = t;
+      const at = t === left ? snap : snapshot(s);
+      const got = simulateChain(s, span, at.chain, (amount) => credit(s, amount), Math.max(1, (STEPS * span) / capped));
+      for (const k of ["cars", "components", "deliveries", "carsSold", "materials"] as const) r[k] += got[k];
+      // garages and map buildings keep working too, at the offline efficiency
+      city += at.city.incomePerSec * span * at.gm.offline;
+      serviced += at.city.carsPerSec * span * at.gm.offline;
+      t = to;
+    }
+  } finally {
+    s.lastActiveAt = left;
+  }
   // the racing team keeps racing (automatic racing only), in the first city: what it
   // wins there waits for COLLECT too, for that city's wallet
   const racing =
@@ -89,15 +128,18 @@ function absence(s: GameState, now: number): OfflineReport {
     if (d > 0) report.carsByType[car as keyof typeof byType] = d;
   }
 
-  // Garages and map buildings keep working too, at the offline efficiency.
-  const eff = snap.gm.offline;
-  const city = snap.city.incomePerSec * capped * eff;
+  // what the garages and map buildings earned
   credit(s, city);
   s.cash -= city;
   report.money += city;
-  report.serviced = Math.floor(snap.city.carsPerSec * capped * eff);
+  report.serviced = Math.floor(serviced);
   book(s, "services", city);
   settleLedger(s, capped);
+  // construction never stops: sites and upgrades advance for the whole absence (what they
+  // finish starts working when the player is back, so it is played after the chain)
+  const before0 = new Set(Object.keys(s.city.sites));
+  const built = constructionTick(s, seconds).filter((id) => before0.has(id));
+  if (built.length) report.built = built;
   // where the money came from and where it went while away
   report.ledger = Object.fromEntries(LEDGER_KEYS.map((k) => [k, Math.max(0, s.chain.ledger.run[k] - before[k])])) as OfflineReport["ledger"];
   s.chain.ledger.rate = rates;

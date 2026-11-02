@@ -2,14 +2,18 @@
 // simulation as the online game (at the offline efficiency): the same cost
 // per unit, nothing made from material that isn't there, and the money the
 // report holds is exactly what the company gained.
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { STARTER_PLOT } from "./city/layout";
+import { EVENT_BLOCK_MS, EVENT_LENGTH_MS, EVENT_OFFSET_MS } from "./config/events";
+import { OFFLINE } from "./config/offline";
 import * as C from "./engine/city";
 import * as Ch from "./engine/chain";
 import * as Co from "./engine/construction";
 import * as M from "./engine/materials";
 import { snapshot } from "./engine/economy";
-import { collectOffline, settleOffline } from "./engine/offline";
+import { setScheduledEvents } from "./engine/events";
+import { offlineShare } from "./engine/modifiers";
+import { collectOffline, computeOffline, settleOffline, spanEnd } from "./engine/offline";
 import { createInitialState } from "./engine/state";
 import { tick } from "./engine/tick";
 import type { GameState, PlantType } from "./types";
@@ -20,15 +24,15 @@ const run = (s: GameState, seconds: number, step = 0.5) => {
   for (let t = 0; t < seconds; t += step) tick(s, step);
 };
 
-/** A Body Works with 40 bodies' worth of material that cost $1,700 a body. */
-function stocked() {
-  const s = createInitialState(T0);
+/** A Body Works with `bodies` bodies' worth of material (40) that cost $1,700 a body. */
+function stocked(now = T0, bodies = 40) {
+  const s = createInitialState(now);
   const p = s.city.buildings[STARTER_PLOT].plant!;
   p.warehouse = 10;
   p.stock = {};
   p.stockCost = 0;
   p.stockCostBy = {};
-  M.addStock(p, Ch.starterStock("bodyWorks", 1, 40), 40 * 1_700);
+  M.addStock(p, Ch.starterStock("bodyWorks", 1, bodies), bodies * 1_700);
   s.cash = 0;
   return { s, p };
 }
@@ -136,5 +140,61 @@ describe("a short absence", () => {
     long.s.lastActiveAt = T0;
     expect(settleOffline(long.s, T0 + 6 * 60_000)?.seconds).toBeCloseTo(360);
     expect(long.s.pendingOffline).not.toBeNull();
+  });
+});
+
+describe("away never pays more than playing", () => {
+  it("the offline bonuses count in full up to the soft cap, then less and less, never to 100%", () => {
+    for (const x of [0, 0.3, OFFLINE.baseEfficiency, OFFLINE.softFrom]) expect(offlineShare(x)).toBe(x);
+    let last = offlineShare(OFFLINE.softFrom);
+    for (let x = OFFLINE.softFrom + 0.05; x <= 5; x += 0.05) {
+      const y = offlineShare(x);
+      // every bonus still adds something
+      expect(y).toBeGreaterThan(last);
+      expect(y).toBeLessThan(1);
+      last = y;
+    }
+  });
+
+  it("a plant's automation and manager go under the same cap", () => {
+    const { s } = stocked();
+    s.city.buildings[STARTER_PLOT].plant!.automation = 4;
+    const st = snapshot(s);
+    st.gm.offlineRaw += 2;
+    expect(Ch.plantStats(s, STARTER_PLOT, st.gm, st.chain.cars)!.offline).toBeLessThan(1);
+  });
+});
+
+describe("the calendar while away", () => {
+  afterEach(() => setScheduledEvents([]));
+  // a quiet stretch of the regular schedule: from the end of a block's event to the next one's start
+  const QUIET = Math.floor(T0 / EVENT_BLOCK_MS) * EVENT_BLOCK_MS + EVENT_OFFSET_MS + EVENT_LENGTH_MS;
+  const MIN = 60_000;
+
+  it("the absence is played in stretches that end where an event starts or ends", () => {
+    setScheduledEvents([{ id: "carShow", start: QUIET + 20 * MIN, end: QUIET + 50 * MIN }]);
+    const end = QUIET + 2 * HOUR;
+    expect(spanEnd(QUIET, end)).toBe(QUIET + 20 * MIN);
+    expect(spanEnd(QUIET + 20 * MIN, end)).toBe(QUIET + 50 * MIN);
+    // never longer than an hour, never past the absence
+    expect(spanEnd(QUIET + 50 * MIN, end)).toBe(QUIET + 110 * MIN);
+    expect(spanEnd(QUIET + 110 * MIN, end)).toBe(end);
+  });
+
+  it("an event counts only while it lasts, not the whole absence", () => {
+    const made = (event: boolean) => {
+      setScheduledEvents(event ? [{ id: "rushOrders", start: QUIET, end: QUIET + 15 * MIN }] : []);
+      const { s, p } = stocked(QUIET, 4_000);
+      computeOffline(s, QUIET + 2 * HOUR);
+      // the clock is put back: the absence is settled from where it began
+      expect(s.lastActiveAt).toBe(QUIET);
+      return p.made;
+    };
+    const base = made(false);
+    expect(base).toBeGreaterThan(50);
+    // plants 50% faster for 15 minutes of the 2 hours: about 6% more, not 50%
+    const ratio = made(true) / base;
+    expect(ratio).toBeGreaterThan(1.02);
+    expect(ratio).toBeLessThan(1.15);
   });
 });
