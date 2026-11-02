@@ -18,7 +18,7 @@ import { plotStatus, type PlotStatus } from "@/game/engine/construction";
 import type { EconomySnapshot } from "@/game/engine/economy";
 import { unlockedAreas } from "@/game/engine/territory";
 import type { ComponentId, GameState, StructureType, ZoneId } from "@/game/types";
-import { dawnMist, skyAt, worldClock, type TimeMode } from "../lighting";
+import { MOON, dawnMist, skyAt, sunAt, worldClock, type TimeMode } from "../lighting";
 import { weatherAt, type Weather } from "../weather";
 import type { MapArea, MapNames, MapTarget, ShipView, Site, ZoomTier } from "../map-types";
 import type { CarModel } from "../vehicles";
@@ -50,6 +50,17 @@ const LABEL_ZOOM = 0.55;
  * models; further out, the whole scenery sets and the simple car batch.
  */
 const CLOSE_VIEW = 70;
+/**
+ * Where the sun stands at noon, round the map (radians in the ground plane, from +x towards +z): in
+ * front of the usual view (the camera looks along −z) and to its left, so the sides in view are lit
+ * and the shadows fall behind and to the right, where they show. Morning comes from the right, the
+ * evening sun from the left: never from straight behind the scene, its shadows hidden under it.
+ */
+const NOON = (150 * Math.PI) / 180;
+/** How far round from noon it rises and sets (radians). */
+const SUN_SWING = 1.45;
+/** The tallest things on the map: the shadow box reaches this high over the ground in view. */
+const SHADOW_TOP = 7;
 const FOV = 40;
 /** Game area ids in the order of the areas raster (id = index + 1; 0 = sea). */
 const AREA_IDS = ["town", "industrial", "downtown", "automotive", "luxury", "supercar", "mega", "global", "mountain", "port", "raw", "suburbs", "boulevard", "airport", "campus", "racing"];
@@ -178,8 +189,13 @@ export class MapEngine {
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
   private camera = new THREE.PerspectiveCamera(FOV, 1, 0.5, 2000);
-  private sun = new THREE.DirectionalLight("#fff3df", 2.6);
-  private hemi = new THREE.HemisphereLight("#d6ecff", "#6f7d5c", 1.15);
+  private sun = new THREE.DirectionalLight("#fff3df", 3.3);
+  private hemi = new THREE.HemisphereLight("#d6ecff", "#6f7d5c", 0.6);
+  /** Towards the sun (or the moon) now, and the shadow camera's frame worked out from it. */
+  private sunDir = new THREE.Vector3(-0.45, 1, -0.3).normalize();
+  private sunNext = new THREE.Vector3();
+  private sunFrame = new THREE.OrthographicCamera();
+  private sunPts = Array.from({ length: 8 }, () => new THREE.Vector3());
   private ctx: CanvasRenderingContext2D;
   private w = 1;
   private h = 1;
@@ -274,7 +290,7 @@ export class MapEngine {
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     pmrem.dispose();
-    this.scene.environmentIntensity = 0.55;
+    this.scene.environmentIntensity = 0.25;
     this.scene.background = new THREE.Color("#bfe3f7");
     this.scene.fog = new THREE.Fog("#bfe3f7", 400, 1600);
     this.sun.castShadow = true;
@@ -644,15 +660,7 @@ export class MapEngine {
     // the shadow box moved with the view: redraw the shadows this frame
     if (near) this.renderer.shadowMap.needsUpdate = true;
     this.sun.shadow.intensity = smoothstep(110, 80, d);
-    const ext = Math.max(10, Math.min(110, d * 1.1));
-    const sh = this.sun.shadow.camera;
-    sh.left = sh.bottom = -ext;
-    sh.right = sh.top = ext;
-    sh.near = 1;
-    sh.far = ext * 4 + 200;
-    sh.updateProjectionMatrix();
-    this.sun.target.position.set(c.x, this.ty, c.z);
-    this.sun.position.set(c.x - 0.45 * (ext * 2 + 60), this.ty + ext * 2 + 60, c.z - 0.3 * (ext * 2 + 60));
+    this.aimSun();
     this.lastCamera.x = c.x;
     this.lastCamera.z = c.z;
     this.lastCamera.zoom = c.zoom;
@@ -660,6 +668,71 @@ export class MapEngine {
     this.lastCamera.ty = this.ty;
     this.cameraDirty = false;
     this.viewVersion++;
+  }
+
+  /**
+   * Points the sun (from where it stands this time of day) at the middle of the view, and fits its
+   * shadow box round what the camera sees: the view's corners on the ground and up to the tallest
+   * buildings, in the sun's own frame. Everything on screen casts its shadow, as sharp as the
+   * shadow map allows (the box was a square round the middle before: the edges of the view had none).
+   */
+  private aimSun() {
+    const c = this.cam;
+    const cam = this.camera;
+    const target = this.sun.target.position.set(c.x, this.ty, c.z);
+    this.sun.position.copy(target).addScaledVector(this.sunDir, 400);
+    const frame = this.sunFrame;
+    frame.position.copy(this.sun.position);
+    frame.lookAt(target);
+    frame.updateMatrixWorld();
+    // the ground the camera sees: its four corners (a ray that misses the ground stops three views out)
+    const reach = c.dist * 3 + 20;
+    const pts = this.sunPts;
+    for (let i = 0; i < 4; i++) {
+      const v = pts[i].set(i & 1 ? 1 : -1, i & 2 ? 1 : -1, 0.5).unproject(cam).sub(cam.position).normalize();
+      let t = v.y < -1e-3 ? (this.ty - cam.position.y) / v.y : reach;
+      const flat = Math.hypot(v.x, v.z) * t;
+      if (flat > reach) t *= reach / flat;
+      v.multiplyScalar(t).add(cam.position);
+      v.y = this.ty;
+      pts[i + 4].copy(v).setY(this.ty + SHADOW_TOP);
+    }
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const q of pts) {
+      q.applyMatrix4(frame.matrixWorldInverse);
+      x0 = Math.min(x0, q.x);
+      x1 = Math.max(x1, q.x);
+      y0 = Math.min(y0, q.y);
+      y1 = Math.max(y1, q.y);
+      z0 = Math.min(z0, q.z);
+      z1 = Math.max(z1, q.z);
+    }
+    // a margin for what stands just out of view, no more than the old box at its widest, and
+    // snapped to whole units so the box keeps still while the view creeps
+    const cap = 110;
+    const mid = [(x0 + x1) / 2, (y0 + y1) / 2];
+    const hx = Math.min(cap, (x1 - x0) / 2 + 2);
+    const hy = Math.min(cap, (y1 - y0) / 2 + 2);
+    const sh = this.sun.shadow.camera;
+    sh.left = Math.floor(mid[0] - hx);
+    sh.right = Math.ceil(mid[0] + hx);
+    sh.bottom = Math.floor(mid[1] - hy);
+    sh.top = Math.ceil(mid[1] + hy);
+    sh.near = Math.max(1, -z1 - 40);
+    sh.far = -z0 + 40;
+    sh.updateProjectionMatrix();
+  }
+
+  /** Towards the light now: the sun along its path through the day, handed over to the moon by night. */
+  private sunNow(out: THREE.Vector3) {
+    const sun = sunAt(this.timeMode, worldClock.t);
+    const toward = (el: number, turn: number, v: THREE.Vector3) => {
+      const a = NOON + turn * SUN_SWING;
+      return v.set(Math.cos(el) * Math.cos(a), Math.sin(el), Math.cos(el) * Math.sin(a));
+    };
+    toward(sun.el, sun.turn, out);
+    if (sun.moon > 0) out.lerp(toward(MOON.el, MOON.turn, this.v3), sun.moon).normalize();
+    return out;
   }
 
   private render(dt: number) {
@@ -695,6 +768,12 @@ export class MapEngine {
     worldClock.t += dt;
     const sky = skyAt(this.timeMode, worldClock.t);
     this.applySky(sky.dark);
+    // the sun moves on (its shadows with it) once it has turned a little
+    if (this.sunNow(this.sunNext).dot(this.sunDir) < 0.99999) {
+      this.sunDir.copy(this.sunNext);
+      this.aimSun();
+      if (this.shadowLive) this.renderer.shadowMap.needsUpdate = true;
+    }
 
     if (this.ground && live) {
       for (const e of this.earners) {
@@ -769,11 +848,13 @@ export class MapEngine {
     fog.far = d * 6 + 400 + (d * 1.5 - (d * 6 + 400)) * mist;
     // the fog itself is a pale grey (by night it takes the sky's colour)
     fog.color.lerp(this.fogGrey, mist * 0.8 * (1 - dark));
-    this.sun.intensity = 2.6 * (1 - dark * 0.9) * (1 - 0.45 * over - 0.2 * mist);
+    // the sun carries the light and the fill (sky and room light) stays low, so the shadows read
+    // clearly; by night the fill dims less than the sun, or the map would go black
+    this.sun.intensity = 3.3 * (1 - dark * 0.9) * (1 - 0.45 * over - 0.2 * mist);
     this.sun.color.copy(this.sunWarm).lerp(this.sunNight, Math.min(1, dark * 1.4) * 0.6);
-    this.hemi.intensity = 1.15 - dark * 0.8;
+    this.hemi.intensity = 0.6 - dark * 0.3;
     this.hemi.color.copy(this.hemiDay).lerp(this.hemiNight, dark);
-    this.scene.environmentIntensity = 0.55 * (1 - dark * 0.6);
+    this.scene.environmentIntensity = 0.25 * (1 - dark * 0.5);
     if (this.glows) {
       const k = smoothstep(0.55, 0.9, dark);
       (this.glows.material as THREE.PointsMaterial).opacity = k;

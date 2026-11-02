@@ -280,6 +280,25 @@ function withDetail(m: THREE.MeshStandardMaterial, detail: THREE.Texture) {
   grass *= mix(vec3(0.84, 0.97, 0.82), vec3(1.12, 1.04, 0.78), smoothstep(0.25, 0.8, big));
   vec3 other = c0 * (0.9 + 0.12 * fine2 + 0.08 * mid);
   diffuseColor.rgb = mix(other, grass, green);
+  // the towns' paving (the map's pale grey: squares, yards, lots) is laid in slabs a quarter of a
+  // unit across, each a shade of its own, with joints and the grime of use, a little warmer and
+  // less bright than the paint, which read as white patches; far off, where a slab is a few
+  // pixels, it evens out (fwidth) instead of shimmering
+  float sat = max(c0.r, max(c0.g, c0.b)) - min(c0.r, min(c0.g, c0.b));
+  float pave = (1.0 - smoothstep(0.035, 0.07, sat)) * smoothstep(0.38, 0.46, luma) * (1.0 - smoothstep(0.74, 0.82, luma));
+  if (pave > 0.0) {
+    vec2 q = vDetXZ * 4.0;
+    vec2 f = fract(q);
+    vec2 w = fwidth(q);
+    vec2 edge = smoothstep(vec2(0.045) - w, vec2(0.045) + w, min(f, 1.0 - f));
+    float joint = 1.0 - edge.x * edge.y;
+    float h = fract(sin(dot(floor(q), vec2(127.1, 311.7))) * 43758.5453);
+    float worn = (0.86 + 0.2 * mid) * (0.92 + 0.12 * big);
+    vec3 laid = c0 * vec3(0.85, 0.83, 0.79) * worn;
+    vec3 slabs = laid * (0.9 + 0.13 * h) * (0.93 + 0.1 * fine2) * (1.0 - 0.3 * joint);
+    float far = smoothstep(0.12, 0.35, max(w.x, w.y));
+    diffuseColor.rgb = mix(diffuseColor.rgb, mix(slabs, laid * 0.96, far), pave);
+  }
 }`,
       );
   };
