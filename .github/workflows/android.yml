@@ -117,7 +117,10 @@ jobs:
         env:
           # the AdMob app id, a repository variable (unset: Google's sample id, test ads only)
           ADMOB_APP_ID: ${{ vars.ADMOB_APP_ID }}
-        run: ./gradlew --no-daemon --stacktrace assembleDebug bundleRelease lintDebug
+        # lint for the app only (its report is the one kept below): the Capacitor libraries in
+        # node_modules lint themselves with warnings as errors, and the Android Gradle plugin 9's
+        # lint has new warnings about their own build files, code that isn't ours
+        run: ./gradlew --no-daemon --stacktrace assembleDebug bundleRelease :app:lintDebug
       - name: Inspect the APK and the bundle
         env:
           GH_TOKEN: ${{ github.token }}
