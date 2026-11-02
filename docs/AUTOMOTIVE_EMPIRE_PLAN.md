@@ -78,6 +78,7 @@ Ce a arătat și ce s-a reparat:
 - **Asamblarea se bloca după prestige**: o fabrică proprie de frâne fără materiale oprea furnizorul extern, iar linia stătea ore întregi. Acum furnizorul acoperă golul (la prețul lui) cât timp fabrica proprie nu livrează: 23K → 152K mașini în 7 zile.
 - **Campania de marketing** costa din tot venitul (inclusiv piese) și golea casa; acum costă 300 s din media vânzărilor de mașini ale rundei.
 - **Cursele** deveniseră prea ușoare pe termen lung (96% victorii): rivalii unui eveniment cresc acum până la +36% (30 de victorii).
+- …apoi prea grele: după ~10 h botul complet câștiga 20 din 672 de curse. Cursele automate alegeau cel mai mare premiu, chiar fără nicio șansă; acum aleg evenimentul cu cel mai bun câștig așteptat (premiul pe locuri × șansele contra acestui grup, minus taxa). Iar rivalii treceau de 1000, maximul oricărei mașini (statisticile se opresc la 100): Grand Prix-ul și campionatele de supercar și hypercar nu se puteau câștiga deloc. Acum ratingul rivalilor încetinește peste 900 și nu atinge 1000 (`RIVAL_CEILING`): 231 de victorii din 869 de curse după 10 h.
 - Contribuția sistemelor noi la 10 h (fără cercetare/prestige): sponsori + obiective de eveniment + campanii ≈ +25% venit; cercetarea rămâne cel mai mare multiplicator.
 
 ## 6. Verificarea finală (specificația, secțiunea 36)
