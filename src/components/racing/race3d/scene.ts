@@ -193,15 +193,17 @@ export class RaceScene3D {
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     pmrem.dispose();
-    this.scene.environmentIntensity = 0.45 * (1 - night * 0.7);
+    // the sun carries the light and the fill (sky and room light) stays low, so the shadows of the
+    // stands, the trees and the cars read clearly (as on the map); by night the fill dims less
+    this.scene.environmentIntensity = 0.25 * (1 - night * 0.45);
     const L = this.track.layout;
     const R = Math.hypot(L.w, L.d) * U * 0.5;
     // the haze starts beyond the circuit and hides the land's far edge
     this.scene.fog = new THREE.Fog(this.look.sky[1], R * 2.2, R * 2.2 + 1600);
     this.scene.background = new THREE.Color(this.look.sky[1]);
     this.scene.add(skyDome(this.look.sky[0], this.look.sky[1], night));
-    const hemi = new THREE.HemisphereLight(night > 0.5 ? "#6b7fc4" : "#cfe4f5", night > 0.5 ? "#1a1f2e" : "#4b5a3a", 0.85 - night * 0.5);
-    this.sun = new THREE.DirectionalLight(this.look.sun, 2.3 * (1 - night * 0.8));
+    const hemi = new THREE.HemisphereLight(night > 0.5 ? "#6b7fc4" : "#cfe4f5", night > 0.5 ? "#1a1f2e" : "#4b5a3a", 0.5 - night * 0.15);
+    this.sun = new THREE.DirectionalLight(this.look.sun, 2.9 * (1 - night * 0.8));
     const cx = (L.w / 2) * U;
     const cz = (L.d / 2) * U;
     this.sun.position.set(cx - R * 0.8, R * 1.2, cz - R * 0.5);
