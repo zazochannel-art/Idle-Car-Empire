@@ -140,6 +140,7 @@ export const en = {
   "goal.manager": "Hire {name}",
 
   "req.research": "Research {name}",
+  "req.city": "Built only in {name}",
   "req.unavailable": "Not buildable yet",
 
   "mission.reward": "Reward: {reward}",

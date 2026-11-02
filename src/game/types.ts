@@ -19,7 +19,15 @@ export type CarId =
   | "offroad"
   | "estate"
   | "hotHatch"
-  | "shuttle";
+  | "shuttle"
+  // Nordheim's lines on its own landmark works (config/landmarks.ts), and its flagship
+  | "oreHauler"
+  | "fjordWagon"
+  | "snowCrawler"
+  | "auroraGt"
+  | "iceRally"
+  | "polarShuttle"
+  | "northernLights";
 
 /** Parts that plants make and the Car Assembly Plant puts together. */
 export type ComponentId =

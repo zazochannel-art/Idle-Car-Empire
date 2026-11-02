@@ -22,7 +22,7 @@ export const CITY_IDS: readonly CityId[] = ["home", "north"];
 /** Nordheim's island is made by scripts/island-gen (its map data and its 3D map's files). */
 export const CITIES: Record<CityId, CityConfig> = {
   home: { id: "home", assets: "/world", lotPrefix: "", landmarks: true, emoji: "🏙️" },
-  north: { id: "north", assets: "/world-north", lotPrefix: "n:", landmarks: false, emoji: "🏔️" },
+  north: { id: "north", assets: "/world-north", lotPrefix: "n:", landmarks: true, emoji: "🏔️" },
 };
 
 export const CITY_RULES = {

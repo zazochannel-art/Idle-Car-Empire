@@ -127,6 +127,9 @@ export function computeGlobalMods(s: GameState): GlobalMods {
     const node = RESEARCH_BY_ID[id];
     if (node) node.effects.forEach((e) => applyEffect(m, e));
   }
+  // every car that waits on a completed research (the lines' cars share their node with a base car)
+  const done = new Set(s.research);
+  for (const car of CARS) if (car.requiresResearch && done.has(car.requiresResearch)) m.unlockedCars.add(car.id);
 
   // Territories bought around the districts.
   for (const t of BUYABLE_TERRITORIES) if (s.city.territories?.includes(t.id)) t.effects.forEach((e) => applyEffect(m, e));

@@ -4,7 +4,7 @@
 // reward, and the cars built on it raise the territory's level (1–5), which
 // makes the line sell for more to the territory's buyers and grows the
 // territory's specialty. engine/landmarks.ts runs it.
-import type { CarId, PlantType } from "../types";
+import type { CarId, CityId, PlantType } from "../types";
 import type { TerritoryId } from "./city";
 
 export interface LandmarkConfig {
@@ -21,6 +21,22 @@ export const LANDMARKS: LandmarkConfig[] = [
   { territory: "port", works: "harbourWorks", car: "hotHatch" },
   { territory: "airport", works: "mobilityHub", car: "shuttle" },
 ];
+
+/** Nordheim's own landmark works: the same works in its territories, each with a Nordic line. */
+export const LANDMARKS_NORTH: LandmarkConfig[] = [
+  { territory: "raw", works: "frameWorks", car: "oreHauler" },
+  { territory: "suburbs", works: "familyWorks", car: "fjordWagon" },
+  { territory: "mountain", works: "trailWorks", car: "snowCrawler" },
+  { territory: "boulevard", works: "coachWorks", car: "auroraGt" },
+  { territory: "port", works: "harbourWorks", car: "iceRally" },
+  { territory: "airport", works: "mobilityHub", car: "polarShuttle" },
+];
+
+/** A city's landmark works (none in a city whose territories hold none). */
+export const landmarksOf = (city: CityId): LandmarkConfig[] => (city === "north" ? LANDMARKS_NORTH : LANDMARKS);
+
+/** A city's landmark works in a territory. */
+export const landmarkIn = (city: CityId, t: TerritoryId): LandmarkConfig | undefined => landmarksOf(city).find((l) => l.territory === t);
 
 export const LANDMARK = {
   /** Cars of the line built in total (lifetime) for levels 2, 3, 4 and 5; level 1 comes with the restoration. */
@@ -43,4 +59,4 @@ export const LANDMARK = {
 };
 
 export const LANDMARK_BY_TERRITORY = Object.fromEntries(LANDMARKS.map((l) => [l.territory, l])) as Partial<Record<TerritoryId, LandmarkConfig>>;
-export const LANDMARK_BY_CAR = Object.fromEntries(LANDMARKS.map((l) => [l.car, l])) as Partial<Record<CarId, LandmarkConfig>>;
+export const LANDMARK_BY_CAR = Object.fromEntries([...LANDMARKS, ...LANDMARKS_NORTH].map((l) => [l.car, l])) as Partial<Record<CarId, LandmarkConfig>>;

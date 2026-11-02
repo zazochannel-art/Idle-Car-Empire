@@ -3,7 +3,7 @@
 // specialty: cheaper materials (raw), leasing (suburbs), race prizes
 // (mountain), limited editions sooner (boulevard), exports (port) and the
 // robotaxi fleet (airport).
-import { LANDMARK, LANDMARKS, LANDMARK_BY_CAR, LANDMARK_BY_TERRITORY, type LandmarkConfig } from "../config/landmarks";
+import { LANDMARK, LANDMARKS, LANDMARK_BY_CAR, landmarkIn, landmarksOf, type LandmarkConfig } from "../config/landmarks";
 import type { TerritoryId } from "../config/city";
 import type { CarConfig } from "../config/cars";
 import type { CarId, GameState } from "../types";
@@ -44,13 +44,13 @@ export function nextLevelAt(s: GameState, l: LandmarkConfig): number | null {
 }
 
 const levelOf = (s: GameState, t: TerritoryId) => {
-  const l = LANDMARK_BY_TERRITORY[t];
+  const l = landmarkIn(s.activeCity, t);
   return l ? landmarkLevel(s, l) : 0;
 };
 
 /** What the territory's buyers add to its line's car (1: not a line car). */
 export function localValueMult(s: GameState, car: CarConfig): number {
-  const l = car.line ? LANDMARK_BY_TERRITORY[car.line] : undefined;
+  const l = car.line ? LANDMARK_BY_CAR[car.id] : undefined;
   return l ? 1 + LANDMARK.localPerLevel * landmarkLevel(s, l) : 1;
 }
 
@@ -75,8 +75,9 @@ export function fleetIncome(s: GameState): number {
 export function landmarkSale(s: GameState, model: CarId | undefined, price: number) {
   if (!model || !(price > 0)) return;
   const L = s.landmarks;
-  if (model === "minivan") L.lease += price * LANDMARK.suburbs.lease * levelOf(s, "suburbs");
-  if (model === "shuttle") {
+  const line = LANDMARK_BY_CAR[model]?.territory;
+  if (line === "suburbs") L.lease += price * LANDMARK.suburbs.lease * levelOf(s, "suburbs");
+  if (line === "airport") {
     const max = fleetMax(s);
     if (max > 0) {
       // the fleet's shuttles are worth what they sold for, on average
@@ -120,7 +121,7 @@ export interface LandmarkNews {
 export function landmarkNews(s: GameState): LandmarkNews {
   const news: LandmarkNews = { firstCar: [], levelUp: [] };
   const L = s.landmarks;
-  for (const l of LANDMARKS) {
+  for (const l of landmarksOf(s.activeCity)) {
     if (!L.rewarded.includes(l.territory) && lineBuilt(s, l) > 0) {
       const R = LANDMARK.firstCar;
       const cash = Math.max(R.minCash, Math.max(0, s.chain.steady ?? s.chain.rate) * R.incomeSeconds);

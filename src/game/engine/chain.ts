@@ -77,6 +77,7 @@ import type {
   CarId,
   CarRoute,
   ChainState,
+  CityId,
   ComponentId,
   DealerId,
   DealerStock,
@@ -414,12 +415,15 @@ export function bestGrade(s: GameState, c: ComponentId): number {
 
 /** Why a car model cannot be built yet, or null. */
 export type CarLock =
+  | { kind: "city"; city: CityId }
   | { kind: "research"; research: string }
   | { kind: "plant"; plant: PlantType }
   | { kind: "grade"; plant: PlantType; grade: number }
   | null;
 
 export function carLock(s: GameState, car: CarConfig, gm: GlobalMods): CarLock {
+  // a landmark works' line, or Nordheim's flagship, is built only in its own city
+  if (car.city && car.city !== s.activeCity) return { kind: "city", city: car.city };
   if (car.requiresResearch && !gm.unlockedCars.has(car.id)) return { kind: "research", research: car.requiresResearch };
   if (!hasPlant(s, "assemblyPlant")) return { kind: "plant", plant: "assemblyPlant" };
   // missing plants first (the bigger step), then grades

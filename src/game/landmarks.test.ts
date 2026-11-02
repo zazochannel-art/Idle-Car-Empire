@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { WORLD_MAP } from "./city/layout";
 import { CARS, CAR_BY_ID } from "./config/cars";
 import { PLANT_BY_ID } from "./config/chain";
-import { LANDMARK, LANDMARKS, LANDMARK_BY_TERRITORY } from "./config/landmarks";
+import { LANDMARK, LANDMARKS, LANDMARKS_NORTH, LANDMARK_BY_TERRITORY } from "./config/landmarks";
+import { worldOf } from "./city/layout";
 import { activeCar, carLock, carValue, newPlant } from "./engine/chain";
 import * as Co from "./engine/construction";
 import { snapshot } from "./engine/economy";
@@ -38,7 +39,17 @@ describe("landmark works", () => {
       // the line needs the works' own part
       expect(car.extras).toContain(PLANT_BY_ID[l.works].item);
     }
-    expect(CARS.filter((c) => c.line)).toHaveLength(LANDMARKS.length);
+    expect(CARS.filter((c) => c.line)).toHaveLength(LANDMARKS.length + LANDMARKS_NORTH.length);
+    // Nordheim's works stand on its own map, each with a Nordic line built only there
+    const north = worldOf("north");
+    for (const l of LANDMARKS_NORTH) {
+      const lots = north.plots.filter((p) => p.territory === l.territory);
+      expect(lots, l.territory).toHaveLength(1);
+      expect(lots[0].use).toBe(l.works);
+      const car = CAR_BY_ID[l.car];
+      expect(car).toMatchObject({ line: l.territory, city: "north" });
+      expect(car.extras).toContain(PLANT_BY_ID[l.works].item);
+    }
   });
 
   it("a works' lot opens with its territory, then with the plant before it in the chain", () => {

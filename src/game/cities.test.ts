@@ -61,8 +61,10 @@ describe("city maps", () => {
     for (const id of [MARKET, DEPOT, RACING, "d:local", "d:city", "d:premium", "d:luxury", "d:supercar", "d:global"]) expect(north.plotById[id]).toBeDefined();
     // no lot of one city is a lot of the other
     for (const p of lots) expect(home.plotById[p.id]).toBeUndefined();
-    // no landmark works there
-    expect(north.plots.some((p) => p.territory)).toBe(false);
+    // its own landmark works: one lot in each territory, with the city's prefix
+    const works = north.plots.filter((p) => p.territory);
+    expect(works.map((p) => p.territory).sort()).toEqual(["airport", "boulevard", "mountain", "port", "raw", "suburbs"]);
+    expect(works.every((p) => p.id.startsWith("n:w:"))).toBe(true);
     // the biggest island: more lots than the first one, in every district
     expect(lots.length).toBeGreaterThan(home.plots.filter((p) => p.kind === "plot" && !p.territory).length);
     for (const z of ["town", "industrial", "downtown", "automotive", "luxury", "supercar", "mega", "global"]) {

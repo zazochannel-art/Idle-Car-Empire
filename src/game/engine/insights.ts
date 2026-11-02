@@ -23,6 +23,7 @@ import { cityUnlockStatus } from "./cities";
 import type { CityId } from "../types";
 
 export type Requirement =
+  | { kind: "city"; city: CityId }
   | { kind: "research"; research: string }
   | { kind: "plant"; plant: PlantType }
   | { kind: "grade"; plant: PlantType; grade: number }

@@ -177,6 +177,13 @@ export const CAR_MODEL_FOR: Record<CarId, CarModel> = {
   estate: "wagon",
   hotHatch: "compact",
   shuttle: "robotaxi",
+  oreHauler: "pickup",
+  fjordWagon: "wagon",
+  snowCrawler: "offroad",
+  auroraGt: "luxury",
+  iceRally: "compact",
+  polarShuttle: "robotaxi",
+  northernLights: "electric",
 };
 
 

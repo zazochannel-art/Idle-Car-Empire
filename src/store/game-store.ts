@@ -81,7 +81,8 @@ import * as Fe from "@/game/engine/festival";
 import * as Ps from "@/game/engine/pass";
 import * as Mb from "@/game/engine/map-bonus";
 import * as Lm from "@/game/engine/landmarks";
-import { LANDMARK_BY_TERRITORY } from "@/game/config/landmarks";
+import { landmarkIn } from "@/game/config/landmarks";
+import { landmarkLotId } from "@/game/city/landmark-lots";
 import { RACING, setWorld } from "@/game/city/layout";
 import { CITIES } from "@/game/config/cities";
 import * as Cy from "@/game/engine/cities";
@@ -536,12 +537,12 @@ export const useGame = create<GameStore>((set, get) => {
     for (const f of lm.firstCar) {
       const car = CAR_BY_ID[f.car];
       uiEvents.emit({ type: "toast", kind: "progress", tone: "gold", icon: car.emoji, title: tr("landmark.firstCarToast", { car: names().car(car) }), body: tr("landmark.firstCarBody", { money: formatMoney(f.cash), stars: f.stars }), action: { label: tr("toast.open"), view: "landmarks" } });
-      uiEvents.emit({ type: "fireworks", plot: `w:${f.territory}`, big: true });
+      uiEvents.emit({ type: "fireworks", plot: landmarkLotId(next.activeCity, f.territory), big: true });
     }
     for (const u of lm.levelUp) {
-      const works = LANDMARK_BY_TERRITORY[u.territory]!.works;
+      const works = landmarkIn(next.activeCity, u.territory)!.works;
       uiEvents.emit({ type: "toast", kind: "progress", tone: "gold", icon: "🏗️", title: tr("landmark.levelToast", { works: tr(`structure.${works}`), n: u.level }), body: tr("landmark.levelToastBody"), action: { label: tr("toast.open"), view: "landmarks" } });
-      uiEvents.emit({ type: "fireworks", plot: `w:${u.territory}` });
+      uiEvents.emit({ type: "fireworks", plot: landmarkLotId(next.activeCity, u.territory) });
     }
     // a new city can be opened (once)
     if (!next.unlocks.includes("notice:city:north") && Cy.cityUnlockStatus(next, "north").ready) {

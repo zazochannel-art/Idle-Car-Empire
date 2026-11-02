@@ -23,6 +23,8 @@ export function contentFor(lang: Lang) {
   /** Why something is locked, in words. */
   const requirement = (r: Requirement): string => {
     switch (r.kind) {
+      case "city":
+        return t("req.city", { name: t(`city.${r.city}`) });
       case "research":
         return t("req.research", { name: research(RESEARCH_BY_ID[r.research]) });
       case "plant":

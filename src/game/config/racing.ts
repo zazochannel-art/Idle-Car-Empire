@@ -40,6 +40,13 @@ export const RACE_CLASS_OF: Record<CarId, RaceClass> = {
   estate: "B",
   hotHatch: "A",
   shuttle: "S",
+  oreHauler: "D",
+  fjordWagon: "C",
+  snowCrawler: "C",
+  auroraGt: "A",
+  iceRally: "A",
+  polarShuttle: "S",
+  northernLights: "S",
 };
 
 // ───────────────────────────── performance ─────────────────────────────
@@ -62,6 +69,13 @@ export const BASE_WEIGHT: Record<CarId, number> = {
   estate: 1_900,
   hotHatch: 1_300,
   shuttle: 2_300,
+  oreHauler: 2_250,
+  fjordWagon: 1_950,
+  snowCrawler: 2_100,
+  auroraGt: 1_800,
+  iceRally: 1_280,
+  polarShuttle: 2_400,
+  northernLights: 1_950,
 };
 
 /** Base handling and aerodynamics of each body shape. */
@@ -82,6 +96,13 @@ export const BODY_DYNAMICS: Record<CarId, { handling: number; aero: number }> = 
   estate: { handling: 54, aero: 48 },
   hotHatch: { handling: 66, aero: 52 },
   shuttle: { handling: 50, aero: 56 },
+  oreHauler: { handling: 30, aero: 18 },
+  fjordWagon: { handling: 42, aero: 36 },
+  snowCrawler: { handling: 44, aero: 26 },
+  auroraGt: { handling: 58, aero: 58 },
+  iceRally: { handling: 70, aero: 54 },
+  polarShuttle: { handling: 52, aero: 58 },
+  northernLights: { handling: 68, aero: 72 },
 };
 
 /** Engine output by the grade the Engine Factory makes (Economy, Turbo, V6, V8, V12). */
