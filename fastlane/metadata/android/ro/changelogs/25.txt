@@ -1,0 +1,7 @@
+Noutăți în 1.0.9:
+• Uzinele din Nordheim: șase linii de mașini nordice (Ore Hauler, Fjord Wagon, Snow Crawler, Aurora GT, Ice Rally, Polar Shuttle) și vârful de gamă Northern Lights
+• Pachetul nordic în studioul de design
+• Rută comercială între orașe
+• Furtuni de zăpadă în Nordheim
+• Cumpărături verificate cu Google Play
+• Reparații și stabilitate mai bună

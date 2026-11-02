@@ -1,0 +1,7 @@
+Novedades en 1.0.9:
+• Fábricas propias en Nordheim: seis modelos nórdicos (Ore Hauler, Fjord Wagon, Snow Crawler, Aurora GT, Ice Rally, Polar Shuttle) y el Northern Lights
+• Paquete nórdico en el estudio de diseño
+• Ruta comercial entre tus ciudades
+• Tormentas de nieve en Nordheim
+• Compras verificadas con Google Play
+• Correcciones y más estabilidad

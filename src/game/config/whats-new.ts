@@ -11,14 +11,11 @@ export interface NewsItem {
 }
 
 export const WHATS_NEW: { id: string; items: NewsItem[] } = {
-  id: "1.0.6",
+  id: "1.0.9",
   items: [
-    { icon: "🏔️", key: "cities", view: "world" },
-    { icon: "🏗️", key: "landmarks", view: "landmarks" },
-    { icon: "📈", key: "stock", view: "stock" },
-    { icon: "🔧", key: "crew", view: "managers" },
-    { icon: "🔔", key: "inbox", view: "inbox" },
-    { icon: "🤖", key: "auto", settings: true },
-    { icon: "💰", key: "money" },
+    { icon: "🏗️", key: "northWorks", view: "landmarks" },
+    { icon: "❄️", key: "nordic" },
+    { icon: "🚢", key: "trade", view: "world" },
+    { icon: "🌨️", key: "storm" },
   ],
 };
