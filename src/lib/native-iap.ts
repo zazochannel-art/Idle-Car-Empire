@@ -10,6 +10,12 @@
 // and every return to the app, the store is asked again for this account's
 // purchases: one paid for later (a pending payment) or not given yet (the app
 // closed in between) is given then, and a reinstalled game gets them back.
+//
+// With the server check on (NEXT_PUBLIC_IAP_VERIFY=1, docs/android/iap.md), a purchase is
+// given only once the server has asked Google Play about it (supabase/functions/iap): a forged
+// purchase, or one given to another account already, is never given (and never acknowledged).
+// When the server can't answer, the purchase waits for the next try. And a purchase Google
+// refunded since stops what it can (the ad-free rewards).
 import { App } from "@capacitor/app";
 import { NativePurchases, PURCHASE_TYPE, type Transaction } from "@capgo/native-purchases";
 import { IAP_PRODUCTS, type IapProduct } from "@/game/config/iap";
@@ -28,23 +34,47 @@ async function accountToken(): Promise<string | null> {
   return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+/** The server checks every purchase before the game gives it (the build's choice). */
+const verifyOn = () => process.env.NEXT_PUBLIC_IAP_VERIFY === "1";
+
 /** The game is loaded (its save, for its account): a purchase given now is given to the right company. */
 const gameReady = () => useGame.getState().ready && useCloud.getState().phase === "ready";
 
 /**
  * A purchase from the store: given to the company (once) and saved, then acknowledged.
- * Null: not one to give now (a payment still pending, another account's, not a product of this build).
+ * Null: not one to give (a payment still pending, another account's, not a product of this build, or
+ * one the server refused); "wait": paid, but the server's check hasn't answered yet.
  */
-async function take(t: Transaction, mine: string): Promise<GrantResult | null> {
+async function take(t: Transaction, mine: string): Promise<GrantResult | "wait" | null> {
   const p = productOf(t.productIdentifier);
   // "1": paid ("2": the payment is still pending; it comes back once paid)
   if (!p || t.purchaseState !== "1" || !t.purchaseToken) return null;
   // a purchase with no account was redeemed in the Play Store (a promo code): it is this player's
   if (t.appAccountToken && t.appAccountToken !== mine) return null;
-  const result = useGame.getState().iapGrant(p, iapTokenKey(t.purchaseToken));
+  const key = iapTokenKey(t.purchaseToken);
+  // a purchase not given yet: the server's word first (one the game gave already only needs its acknowledgement)
+  if (verifyOn() && !useGame.getState().state.iap.tokens.includes(key)) {
+    const social = useGame.getState().saves?.social;
+    const verdict = social ? await social.verifyPurchase(t.productIdentifier, t.purchaseToken) : "error";
+    // not paid yet, or no answer from the server now: it comes back at the next start or return to the app
+    if (verdict === "pending" || verdict === "error") return "wait";
+    if (verdict !== "valid") return null;
+  }
+  const result = useGame.getState().iapGrant(p, key);
   // a second purchase of a product the company already owns is left alone: Google Play refunds it
   if (result !== "duplicate" && !t.isAcknowledged) await NativePurchases.acknowledgePurchase({ purchaseToken: t.purchaseToken }).catch(() => {});
   return result;
+}
+
+/** The products the server says were refunded (and not bought again) stop: the ad-free rewards. */
+async function takeBackRefunds() {
+  const social = useGame.getState().saves?.social;
+  if (!social) return;
+  const rows = await social.myPurchases().catch(() => []);
+  for (const r of rows) {
+    const p = IAP_PRODUCTS.find((x) => x === r.product);
+    if (p && r.state === "refunded" && useGame.getState().state.iap.owned.includes(p)) useGame.getState().iapRevoke(p);
+  }
 }
 
 let syncing: Promise<number> | null = null;
@@ -75,6 +105,7 @@ function sync(): Promise<number> {
       const { purchases } = await NativePurchases.getPurchases({ productType: PURCHASE_TYPE.INAPP });
       let given = 0;
       for (const t of purchases) if ((await take(t, mine)) === "granted") given++;
+      if (verifyOn()) await takeBackRefunds();
       return given;
     } catch {
       // no Play Store, no network: the store stays closed until the next try
@@ -112,6 +143,8 @@ async function buy(p: IapProduct): Promise<BuyResult> {
     });
     const given = await take(t, mine);
     if (given === "granted" || given === "known") result = "granted";
+    // paid: given once the server has checked it (the next start, or the next return to the app)
+    else if (given === "wait") result = "pending";
   } catch (e) {
     const r = reason(e);
     if (/USER_CANCELED/i.test(r)) result = "cancelled";

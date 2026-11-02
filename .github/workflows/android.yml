@@ -61,6 +61,7 @@ jobs:
           # unset: nothing is sold
           NEXT_PUBLIC_IAP_STARTER_ID: ${{ vars.IAP_STARTER_ID }}
           NEXT_PUBLIC_IAP_ADFREE_ID: ${{ vars.IAP_ADFREE_ID }}
+          NEXT_PUBLIC_IAP_VERIFY: ${{ vars.IAP_VERIFY }}
           # the test app compares it with the test-apk release's and offers a newer build (lib/test-update.ts)
           NEXT_PUBLIC_TEST_BUILD: ${{ github.run_number }}
           # "on" once Supabase sends email to every address (custom SMTP): the game then emails password

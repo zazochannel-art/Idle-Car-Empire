@@ -78,4 +78,21 @@ describe("in-app purchases", () => {
     const keys = new Set(Array.from({ length: 2000 }, (_, i) => P.iapTokenKey(`token-${i}`)));
     expect(keys.size).toBe(2000);
   });
+
+  it("a refund takes back the ad-free rewards; the starter pack stays given", () => {
+    const s = createInitialState(T0);
+    const snap = snapshot(s);
+    P.grantPurchase(s, "adFree", TOKEN, snap);
+    P.grantPurchase(s, "starter", P.iapTokenKey("play-purchase-token-2"), snap);
+    const stars = s.stars;
+    expect(P.revokePurchase(s, "starter")).toBe(false);
+    expect(P.revokePurchase(s, "adFree")).toBe(true);
+    expect(s.iap.owned).toEqual(["starter"]);
+    expect(s.stars).toBe(stars);
+    // nothing more to take back
+    expect(P.revokePurchase(s, "adFree")).toBe(false);
+    // bought again (a new purchase): owned again
+    expect(P.grantPurchase(s, "adFree", P.iapTokenKey("play-purchase-token-3"), snap)).toBe("granted");
+    expect(P.owns(s, "adFree")).toBe(true);
+  });
 });
