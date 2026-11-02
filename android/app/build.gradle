@@ -104,6 +104,13 @@ android {
             }
         }
     }
+    lint {
+        // the app's own code only: the Capacitor libraries in node_modules are theirs to lint
+        checkDependencies = false
+        // the SARIF writer of the Android Gradle plugin 9's lint stopped the build on a place past the
+        // end of its line ("Index 94 out of bounds for length 26"); CI keeps the HTML report (android.yml)
+        sarifReport = false
+    }
 }
 
 if (admobAppIdGiven && !admobAppIdValid) {
