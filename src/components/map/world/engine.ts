@@ -1073,10 +1073,10 @@ export class MapEngine {
     if (!p || !kind) return;
     const emoji = MAP_BONUS_BY_KIND[kind].emoji;
     const bob = Math.sin(this.t * 4) * 2;
-    const bg = kind === "golden" ? "rgba(202,138,4,0.97)" : kind === "vip" ? "rgba(109,40,217,0.95)" : kind === "drone" ? "rgba(21,128,61,0.95)" : "rgba(220,38,38,0.95)";
+    const bg = kind === "golden" ? "rgba(202,138,4,0.97)" : kind === "vip" ? "rgba(109,40,217,0.95)" : kind === "drone" ? "rgba(21,128,61,0.95)" : kind === "storm" ? "rgba(2,132,199,0.95)" : "rgba(220,38,38,0.95)";
     const at = this.project(p.x, p.y + 0.5, p.z);
     if (at && at[0] > 24 && at[1] > 24 && at[0] < this.w - 24 && at[1] < this.h - 24) {
-      tag(c, kind === "breakdown" ? names.bonusSlowed : names.bonusTap, at[0], at[1] + bob, { icon: emoji, bg, fg: "#fff", size: 11 });
+      tag(c, kind === "breakdown" || kind === "storm" ? names.bonusSlowed : names.bonusTap, at[0], at[1] + bob, { icon: emoji, bg, fg: "#fff", size: 11 });
       return;
     }
     // where it is, seen from the middle of the screen (behind the camera: the other way)

@@ -19,7 +19,15 @@ export type CarId =
   | "offroad"
   | "estate"
   | "hotHatch"
-  | "shuttle";
+  | "shuttle"
+  // Nordheim's lines on its own landmark works (config/landmarks.ts), and its flagship
+  | "oreHauler"
+  | "fjordWagon"
+  | "snowCrawler"
+  | "auroraGt"
+  | "iceRally"
+  | "polarShuttle"
+  | "northernLights";
 
 /** Parts that plants make and the Car Assembly Plant puts together. */
 export type ComponentId =
@@ -551,6 +559,8 @@ export interface CarDesign {
   paint: number;
   /** Paint colour; "" = the platform's factory colour. */
   color: string;
+  /** The Nordic package (winterised): sells for more in Nordheim (engine/design.ts). */
+  nordic: boolean;
 }
 
 /** A player the player hid (their account id, and their name then, to list them in the Profile). */
@@ -684,6 +694,8 @@ export interface GameState {
   /** The city being played (its parts are the fields above: the wallet, the city, the chain, …) and the others, parked (engine/cities.ts). */
   activeCity: CityId;
   cities: Partial<Record<CityId, import("./engine/cities").ParkedCity>>;
+  /** The trade route between the cities: when its next convoy can leave (ms; 0 = now; engine/cities.ts). */
+  tradeRoute: number;
   createdAt: number;
   runStartedAt: number;
   lastActiveAt: number;

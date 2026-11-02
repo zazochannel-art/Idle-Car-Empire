@@ -81,7 +81,8 @@ import * as Fe from "@/game/engine/festival";
 import * as Ps from "@/game/engine/pass";
 import * as Mb from "@/game/engine/map-bonus";
 import * as Lm from "@/game/engine/landmarks";
-import { LANDMARK_BY_TERRITORY } from "@/game/config/landmarks";
+import { landmarkIn } from "@/game/config/landmarks";
+import { landmarkLotId } from "@/game/city/landmark-lots";
 import { RACING, setWorld } from "@/game/city/layout";
 import { CITIES } from "@/game/config/cities";
 import * as Cy from "@/game/engine/cities";
@@ -226,6 +227,7 @@ interface GameStore {
   buyLogistics: (id: LogisticsUpgrade) => boolean;
   buyTransportTier: () => boolean;
   developDesign: (id: CarId, option: DesignOption) => boolean;
+  developNordic: (id: CarId) => boolean;
   renameDesign: (id: CarId, name: string) => void;
   setDesignColor: (id: CarId, color: string) => void;
   research: (id: string) => boolean;
@@ -240,6 +242,8 @@ interface GameStore {
   shopBuy: (id: ShopItemId) => boolean;
   /** A purchase from Google Play (`token`: its iapTokenKey), given once and saved at once; acknowledge it only if not "duplicate". */
   iapGrant: (p: IapProduct, token: string) => Iap.GrantResult;
+  /** The server says a purchase was refunded (docs/android/iap.md): the ad-free rewards stop. */
+  iapRevoke: (p: IapProduct) => boolean;
   upgradeBuilding: (plot: string) => boolean;
   placeFacility: (plot: string, type: FacilityType, x: number, y: number, rot: 0 | 1) => boolean;
   moveFacility: (plot: string, uid: number, x: number, y: number, rot: 0 | 1) => boolean;
@@ -300,6 +304,7 @@ interface GameStore {
   unlockTerritory: (id: import("@/game/config/city").TerritoryId) => boolean;
   /** Move the company to another of its cities, or open a new one (engine/cities.ts). */
   switchCity: (id: CityId) => boolean;
+  sendTradeConvoy: () => number;
   unlockCity: (id: CityId) => boolean;
   setBrand: (patch: Parameters<typeof Br.setBrand>[1]) => boolean;
   cancelRaceOrder: (car: CarId) => boolean;
@@ -534,12 +539,12 @@ export const useGame = create<GameStore>((set, get) => {
     for (const f of lm.firstCar) {
       const car = CAR_BY_ID[f.car];
       uiEvents.emit({ type: "toast", kind: "progress", tone: "gold", icon: car.emoji, title: tr("landmark.firstCarToast", { car: names().car(car) }), body: tr("landmark.firstCarBody", { money: formatMoney(f.cash), stars: f.stars }), action: { label: tr("toast.open"), view: "landmarks" } });
-      uiEvents.emit({ type: "fireworks", plot: `w:${f.territory}`, big: true });
+      uiEvents.emit({ type: "fireworks", plot: landmarkLotId(next.activeCity, f.territory), big: true });
     }
     for (const u of lm.levelUp) {
-      const works = LANDMARK_BY_TERRITORY[u.territory]!.works;
+      const works = landmarkIn(next.activeCity, u.territory)!.works;
       uiEvents.emit({ type: "toast", kind: "progress", tone: "gold", icon: "🏗️", title: tr("landmark.levelToast", { works: tr(`structure.${works}`), n: u.level }), body: tr("landmark.levelToastBody"), action: { label: tr("toast.open"), view: "landmarks" } });
-      uiEvents.emit({ type: "fireworks", plot: `w:${u.territory}` });
+      uiEvents.emit({ type: "fireworks", plot: landmarkLotId(next.activeCity, u.territory) });
     }
     // a new city can be opened (once)
     if (!next.unlocks.includes("notice:city:north") && Cy.cityUnlockStatus(next, "north").ready) {
@@ -1139,6 +1144,11 @@ export const useGame = create<GameStore>((set, get) => {
       }
       return ok;
     },
+    sendTradeConvoy: () => {
+      const got = act((s) => Cy.sendTradeConvoy(s, Date.now(), get().snap.steadyIncomePerSec));
+      if (got > 0) uiEvents.emit({ type: "toast", tone: "gold", icon: "🚢", title: tr("trade.toast"), body: tr("trade.toastBody", { money: formatMoney(got) }) });
+      return got;
+    },
     switchCity: (id) => {
       const ok = act((s) => Cy.switchCity(s, id, Date.now()));
       if (ok) {
@@ -1184,6 +1194,7 @@ export const useGame = create<GameStore>((set, get) => {
     buyTransportTier: () => act((s) => L.buyTier(s, get().snap.gm.costMult)),
     developDesign: (id, option) =>
       act((s) => D.develop(s, id, option, D.developCost(Ch.carBaseValue(s, CAR_BY_ID[id], get().snap.gm), s.designs[id], option))),
+    developNordic: (id) => act((s) => D.developNordic(s, id, D.nordicCost(Ch.carBaseValue(s, CAR_BY_ID[id], get().snap.gm), s.designs[id]))),
     renameDesign: (id, name) => {
       act((s) => D.renameDesign(s, id, name));
     },
@@ -1268,6 +1279,12 @@ export const useGame = create<GameStore>((set, get) => {
       // saved before the store hears it was given: a purchase is never acknowledged and then lost
       persist(true);
       return result;
+    },
+    iapRevoke: (p) => {
+      if (!act((s) => Iap.revokePurchase(s, p))) return false;
+      uiEvents.emit({ type: "toast", tone: "info", icon: IAP_ICON[p], title: tr("iap.refundedTitle"), body: tr("iap.refundedBody", { name: tr(`iap.item.${p}` as MessageKey) }) });
+      persist(true);
+      return true;
     },
     upgradeBuilding: (plot) => act((s) => C.upgradeBuilding(s, plot)),
     placeFacility: (plot, type, x, y, rot) => act((s) => C.placeFacility(s, plot, type, x, y, rot)),

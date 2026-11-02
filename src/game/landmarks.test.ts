@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { WORLD_MAP } from "./city/layout";
 import { CARS, CAR_BY_ID } from "./config/cars";
 import { PLANT_BY_ID } from "./config/chain";
-import { LANDMARK, LANDMARKS, LANDMARK_BY_TERRITORY } from "./config/landmarks";
+import { LANDMARK, LANDMARKS, LANDMARKS_NORTH, LANDMARK_BY_TERRITORY } from "./config/landmarks";
+import { worldOf } from "./city/layout";
 import { activeCar, carLock, carValue, newPlant } from "./engine/chain";
 import * as Co from "./engine/construction";
 import { snapshot } from "./engine/economy";
@@ -11,6 +12,7 @@ import { marketPrice } from "./engine/materials";
 import { createInitialState } from "./engine/state";
 import { unlockTerritory } from "./engine/territory";
 import { decodeSave, encodeSave } from "./save/serialize";
+import * as D from "./engine/design";
 import type { TerritoryId } from "./config/city";
 import type { GameState } from "./types";
 
@@ -38,7 +40,17 @@ describe("landmark works", () => {
       // the line needs the works' own part
       expect(car.extras).toContain(PLANT_BY_ID[l.works].item);
     }
-    expect(CARS.filter((c) => c.line)).toHaveLength(LANDMARKS.length);
+    expect(CARS.filter((c) => c.line)).toHaveLength(LANDMARKS.length + LANDMARKS_NORTH.length);
+    // Nordheim's works stand on its own map, each with a Nordic line built only there
+    const north = worldOf("north");
+    for (const l of LANDMARKS_NORTH) {
+      const lots = north.plots.filter((p) => p.territory === l.territory);
+      expect(lots, l.territory).toHaveLength(1);
+      expect(lots[0].use).toBe(l.works);
+      const car = CAR_BY_ID[l.car];
+      expect(car).toMatchObject({ line: l.territory, city: "north" });
+      expect(car.extras).toContain(PLANT_BY_ID[l.works].item);
+    }
   });
 
   it("a works' lot opens with its territory, then with the plant before it in the chain", () => {
@@ -144,5 +156,25 @@ describe("landmark works", () => {
     expect(back.landmarks).toEqual(s.landmarks);
     expect(Lm.migrateLandmarks({ fleet: 1e9, rewarded: ["airport", "atlantis", "airport"], levels: { nowhere: 3 } })).toEqual({ lease: 0, fleet: LANDMARK.airport.fleetPerLevel * LANDMARK.maxLevel, fleetValue: 0, rewarded: ["airport"], levels: {} });
     expect(Lm.migrateLandmarks(undefined)).toEqual(Lm.createLandmarks());
+  });
+
+  it("a city's lines are built only there, and the Nordic package sells for more in Nordheim", () => {
+    const s = createInitialState(T0);
+    const gm = snapshot(s).gm;
+    expect(carLock(s, CAR_BY_ID.oreHauler, gm)).toEqual({ kind: "city", city: "north" });
+    s.activeCity = "north";
+    expect(carLock(s, CAR_BY_ID.pickup, gm)).toEqual({ kind: "city", city: "home" });
+    expect(carLock(s, CAR_BY_ID.oreHauler, gm)?.kind).not.toBe("city");
+    // the package: once, for its price, and only Nordheim's buyers pay for it
+    const car = CAR_BY_ID.sedan;
+    const before = carValue(s, car, gm);
+    s.cash = 1e15;
+    const cost = D.nordicCost(1_000, s.designs.sedan);
+    expect(cost).toBeGreaterThan(0);
+    expect(D.developNordic(s, "sedan", cost)).toBe(true);
+    expect(D.developNordic(s, "sedan", D.nordicCost(1_000, s.designs.sedan))).toBe(false);
+    expect(carValue(s, car, gm) / before).toBeGreaterThan(1.1);
+    s.activeCity = "home";
+    expect(D.nordicMult(s, "sedan")).toBe(1);
   });
 });

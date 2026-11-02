@@ -22,8 +22,14 @@ export const CITY_IDS: readonly CityId[] = ["home", "north"];
 /** Nordheim's island is made by scripts/island-gen (its map data and its 3D map's files). */
 export const CITIES: Record<CityId, CityConfig> = {
   home: { id: "home", assets: "/world", lotPrefix: "", landmarks: true, emoji: "🏙️" },
-  north: { id: "north", assets: "/world-north", lotPrefix: "n:", landmarks: false, emoji: "🏔️" },
+  north: { id: "north", assets: "/world-north", lotPrefix: "n:", landmarks: true, emoji: "🏔️" },
 };
+
+/**
+ * The trade route: with two cities, a convoy runs between them every few hours and
+ * brings the city being played this many seconds of the company's income (both cities').
+ */
+export const TRADE_ROUTE = { cooldownHours: 4, incomeSeconds: 1_800 };
 
 export const CITY_RULES = {
   /** Share of its steady income a city brings in while the company is busy in another one. */

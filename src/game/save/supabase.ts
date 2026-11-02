@@ -199,12 +199,20 @@ export class SupabaseBackend implements CloudBackend {
 
   /** The leaderboard, visits and gifts, on this player's session. */
   social(): Social {
-    return new Social(async (fn, args) => {
-      const c = await this.client;
-      const { data, error } = await c.rpc(fn, args);
-      if (error) throw error;
-      return data;
-    });
+    return new Social(
+      async (fn, args) => {
+        const c = await this.client;
+        const { data, error } = await c.rpc(fn, args);
+        if (error) throw error;
+        return data;
+      },
+      async (fn, body) => {
+        const c = await this.client;
+        const { data, error } = await c.functions.invoke(fn, { body });
+        if (error) throw error;
+        return data;
+      },
+    );
   }
 
   async load(): Promise<CloudCopy> {

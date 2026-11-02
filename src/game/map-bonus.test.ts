@@ -114,4 +114,23 @@ describe("map bonuses", () => {
     // a save from before the bonuses gets the defaults
     expect(Mb.migrateMapBonus(Mb.createMapBonus())).toEqual(Mb.createMapBonus());
   });
+
+  it("a snowstorm comes only in Nordheim, and slows deliveries until the plough is sent", () => {
+    const s = started();
+    s.chain.shipments.push({ id: 99, from: STARTER_PLOT, to: MARKET, item: "body", qty: 1, value: 10, t: 0, dur: 100, back: false, vehicle: "van" });
+    // the first city: every draw is something else
+    for (let i = 0; i < 20; i++) {
+      Mb.mapBonusTick(s, MAP_BONUS.gap[1] + MAP_BONUS.first, T0, seq(i / 20, 0));
+      expect(s.mapBonus.active?.kind).not.toBe("storm");
+      s.mapBonus.active = null;
+    }
+    s.activeCity = "north";
+    // the last kind in the draw
+    expect(Mb.mapBonusTick(s, MAP_BONUS.gap[1] + MAP_BONUS.first, T0, seq(0.999, 0))).toBe("spawned");
+    expect(s.mapBonus.active?.kind).toBe("storm");
+    expect(Mb.deliverySlowdown(s)).toBe(MAP_BONUS.breakdownSlow);
+    expect(Mb.claimMapBonus(s, s.mapBonus.active!.id, T0)).toBeGreaterThanOrEqual(MAP_BONUS.minReward);
+    expect(Mb.deliverySlowdown(s)).toBe(1);
+    expect(MAP_BONUS_BY_KIND.storm.emoji).toBeTruthy();
+  });
 });

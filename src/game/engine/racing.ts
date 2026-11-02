@@ -357,7 +357,7 @@ export function referenceRating(ev: RaceEventConfig, type: RaceType = ev.type): 
   const cfg = CAR_BY_ID[ev.ref.car];
   const grades: Partial<Record<ComponentId, number>> = {};
   for (const c of recipeOf(cfg)) grades[c] = ev.ref.grade;
-  const ds = designStats(cfg, { name: "", engine: 0, interior: 0, rims: 0, paint: 0, color: "" }, ev.ref.grade);
+  const ds = designStats(cfg, { name: "", engine: 0, interior: 0, rims: 0, paint: 0, color: "", nordic: false }, ev.ref.grade);
   const ups = Object.fromEntries(REF_UPGRADES.map((u) => [u, ev.ref.upgrades])) as RaceCarState["upgrades"];
   return rating(statsOf(ev.ref.car, grades, ds, ups), type === "championship" ? "circuit" : type);
 }

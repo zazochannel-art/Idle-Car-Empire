@@ -80,6 +80,7 @@ jobs:
           NEXT_PUBLIC_ADMOB_REWARDED_ID: ${{ vars.ADMOB_REWARDED_ID }}
           NEXT_PUBLIC_IAP_STARTER_ID: ${{ vars.IAP_STARTER_ID }}
           NEXT_PUBLIC_IAP_ADFREE_ID: ${{ vars.IAP_ADFREE_ID }}
+          NEXT_PUBLIC_IAP_VERIFY: ${{ vars.IAP_VERIFY }}
           NEXT_PUBLIC_PASSWORD_RESET: ${{ vars.PASSWORD_RESET }}
           # the robot check's public site key (Cloudflare Turnstile), a repository variable once CAPTCHA
           # is on in Supabase (docs/captcha.md); unset: no check

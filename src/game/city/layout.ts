@@ -14,7 +14,7 @@
 // delivery times) and the renderer.
 import DATA from "./world-data.json";
 import NORTH from "./world-north.json";
-import { LANDMARK_LOTS } from "./landmark-lots";
+import { landmarkLotsOf } from "./landmark-lots";
 import { PLOT_USES, ZONES, plotSizeOf, type PlotSize, type TerritoryId } from "../config/city";
 import { CITIES } from "../config/cities";
 import type { CityId, DealerId, StructureType, ZoneId } from "../types";
@@ -244,7 +244,7 @@ function build(id: CityId): World {
   }
 
   // the landmark works: one lot in each territory, zoned for its works
-  for (const l of CITIES[id].landmarks ? LANDMARK_LOTS : []) {
+  for (const l of CITIES[id].landmarks ? landmarkLotsOf(id) : []) {
     const road = roads[l.edge];
     const at = along(road.pts, road.acc, l.s);
     plots.push({ id: l.id, zone: l.zone, kind: "plot", x: l.x, y: l.y, w: l.w, d: l.d, rot: l.rot, h: l.h, territory: l.territory, use: l.use, size: "large", rank: rank++, entry: { edge: l.edge, s: Math.min(l.s, road.len), x: at.x, y: at.y, drive: l.drive } });

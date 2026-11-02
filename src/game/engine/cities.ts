@@ -9,7 +9,7 @@
 // Everything else (Stars, research, managers, designs, the racing team, the
 // stock) belongs to the company. The racing team stays in the first city:
 // what it pays and wins goes through that city's wallet and books (withCity).
-import { CITY_IDS, CITY_RULES } from "../config/cities";
+import { CITY_IDS, CITY_RULES, TRADE_ROUTE } from "../config/cities";
 import { BUYABLE_TERRITORIES } from "../config/city";
 import { setWorld, withWorld } from "../city/layout";
 import type { CityId, GameState } from "../types";
@@ -21,6 +21,7 @@ import { createExport, createFleet } from "./expansion";
 import { createLandmarks } from "./landmarks";
 import { createLogistics } from "./logistics";
 import { createMapBonus } from "./map-bonus";
+import { payReward } from "./materials";
 import { createDealers, createShowroom } from "./state";
 import { payDividends } from "./stock";
 
@@ -95,6 +96,28 @@ export function cityIncome(s: GameState, id: CityId, steadyNow: number): number 
   if (id === s.activeCity) return Math.max(0, steadyNow);
   const c = s.cities[id];
   return c ? Math.max(0, c.steady) * CITY_RULES.passiveShare : 0;
+}
+
+/** The trade route runs once the company has a second city. */
+export const hasTradeRoute = (s: GameState) => parkedCities(s).length > 0;
+
+/** Ms until the next convoy can leave (0: now). */
+export const tradeRouteWait = (s: GameState, now: number) => Math.max(0, (s.tradeRoute || 0) - now);
+
+/** What the next convoy brings: minutes of the company's income from every city. */
+export function tradeRouteReward(s: GameState, steadyNow: number): number {
+  const income = ownedCities(s).reduce((a, id) => a + cityIncome(s, id, steadyNow), 0);
+  return Math.max(0, income) * TRADE_ROUTE.incomeSeconds;
+}
+
+/** Sends a convoy (into the wallet of the city being played): what it brought, or 0. */
+export function sendTradeConvoy(s: GameState, now: number, steadyNow: number): number {
+  if (!hasTradeRoute(s) || tradeRouteWait(s, now) > 0) return 0;
+  const cash = tradeRouteReward(s, steadyNow);
+  if (!(cash > 0)) return 0;
+  payReward(s, cash);
+  s.tradeRoute = now + TRADE_ROUTE.cooldownHours * 3_600_000;
+  return cash;
 }
 
 /** Plants in every city. */

@@ -77,6 +77,7 @@ import type {
   CarId,
   CarRoute,
   ChainState,
+  CityId,
   ComponentId,
   DealerId,
   DealerStock,
@@ -95,7 +96,7 @@ import { carDemandMult, carPriceMult, defectRate, onCarBuilt, qualityOf, quality
 import { vipBuilt } from "./live";
 import { dockCars, exportTick, fleetTick, isExportRoute, portPlot, protoValueMult } from "./expansion";
 import { EXPORT_BY_ID, type ExportMarketId } from "../config/expansion";
-import { designStats } from "./design";
+import { designStats, nordicMult } from "./design";
 import { logisticsMods } from "./logistics";
 import { deliverySlowdown } from "./map-bonus";
 import { landmarkSale, landmarkTick, localValueMult } from "./landmarks";
@@ -414,12 +415,15 @@ export function bestGrade(s: GameState, c: ComponentId): number {
 
 /** Why a car model cannot be built yet, or null. */
 export type CarLock =
+  | { kind: "city"; city: CityId }
   | { kind: "research"; research: string }
   | { kind: "plant"; plant: PlantType }
   | { kind: "grade"; plant: PlantType; grade: number }
   | null;
 
 export function carLock(s: GameState, car: CarConfig, gm: GlobalMods): CarLock {
+  // a landmark works' line, or Nordheim's flagship, is built only in its own city
+  if (car.city && car.city !== s.activeCity) return { kind: "city", city: car.city };
   if (car.requiresResearch && !gm.unlockedCars.has(car.id)) return { kind: "research", research: car.requiresResearch };
   if (!hasPlant(s, "assemblyPlant")) return { kind: "plant", plant: "assemblyPlant" };
   // missing plants first (the bigger step), then grades
@@ -444,8 +448,8 @@ export function carPartsValue(car: CarConfig): number {
 
 /** Sale value of one car before dealer markup (bonuses widen its margin). */
 export function carValue(s: GameState, car: CarConfig, gm: GlobalMods, extra = 1): number {
-  // a landmark works' line sells for more to its territory's buyers
-  return carListPrice(car, recipe(car), carMarginMult(s, car, gm) * modelStats(s, car).valueMult * protoValueMult(s, car.id) * extra) * localValueMult(s, car);
+  // a landmark works' line sells for more to its territory's buyers, a winterised model to Nordheim's
+  return carListPrice(car, recipe(car), carMarginMult(s, car, gm) * modelStats(s, car).valueMult * protoValueMult(s, car.id) * extra) * localValueMult(s, car) * nordicMult(s, car.id);
 }
 
 /** Sale value before the Design studio options (what R&D prices are based on). */

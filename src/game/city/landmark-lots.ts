@@ -5,7 +5,7 @@
 // world-data.json, plus the territory, the works it is zoned for and the
 // district whose prices it follows.
 import type { TerritoryId } from "../config/city";
-import type { PlantType, ZoneId } from "../types";
+import type { CityId, PlantType, ZoneId } from "../types";
 
 export interface LandmarkLot {
   id: string;
@@ -32,3 +32,19 @@ export const LANDMARK_LOTS: LandmarkLot[] = [
   { id: "w:port", territory: "port", use: "harbourWorks", zone: "town", x: -41.527, y: -15.398, w: 4, d: 4, rot: -3.0045, h: 6, edge: 0, s: 3, drive: 1.1 },
   { id: "w:airport", territory: "airport", use: "mobilityHub", zone: "global", x: 28.287, y: 15.69, w: 5, d: 5, rot: 1.8568, h: 6, edge: 24, s: 7, drive: 1.1 },
 ];
+
+/** Nordheim's (its map, src/game/city/world-north.json): found the same way, with the city's lot prefix. */
+export const LANDMARK_LOTS_NORTH: LandmarkLot[] = [
+  { id: "n:w:raw", territory: "raw", use: "frameWorks", zone: "industrial", x: -87.002, y: -5.287, w: 4, d: 4, rot: -1.6406, h: 3.1, edge: 27, s: 1.5, drive: 1.1 },
+  { id: "n:w:suburbs", territory: "suburbs", use: "familyWorks", zone: "downtown", x: -102.314, y: 41.567, w: 5, d: 5, rot: 1.4629, h: 8.3, edge: 19, s: 6, drive: 1.1 },
+  { id: "n:w:mountain", territory: "mountain", use: "trailWorks", zone: "town", x: -25.872, y: -29.134, w: 5, d: 5, rot: -1.2528, h: 25.7, edge: 38, s: 18.75, drive: 1.1 },
+  { id: "n:w:boulevard", territory: "boulevard", use: "coachWorks", zone: "luxury", x: 12.263, y: 67.774, w: 5, d: 5, rot: 2.8422, h: 2.5, edge: 51, s: 14.25, drive: 1.1 },
+  { id: "n:w:port", territory: "port", use: "harbourWorks", zone: "town", x: 97.734, y: -76.676, w: 4, d: 4, rot: 0.5648, h: 7.1, edge: 72, s: 6.75, drive: 1.1 },
+  { id: "n:w:airport", territory: "airport", use: "mobilityHub", zone: "global", x: 102.348, y: 39.44, w: 5, d: 5, rot: 2.3561, h: 7.8, edge: 59, s: 9.75, drive: 1.1 },
+];
+
+/** A city's landmark lots. */
+export const landmarkLotsOf = (city: CityId): LandmarkLot[] => (city === "north" ? LANDMARK_LOTS_NORTH : LANDMARK_LOTS);
+
+/** The lot of a city's landmark works in a territory. */
+export const landmarkLotId = (city: CityId, t: TerritoryId) => landmarkLotsOf(city).find((l) => l.territory === t)?.id ?? `w:${t}`;

@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { CAR_BY_ID } from "@/game/config/cars";
 import { PLANT_BY_ID } from "@/game/config/chain";
 import { TERRITORY_BY_ID } from "@/game/config/city";
-import { LANDMARK, LANDMARKS, type LandmarkConfig } from "@/game/config/landmarks";
+import { LANDMARK, landmarksOf, type LandmarkConfig } from "@/game/config/landmarks";
+import { landmarkLotId } from "@/game/city/landmark-lots";
 import * as Lm from "@/game/engine/landmarks";
 import { isTerritoryOpen } from "@/game/engine/territory";
 import { formatMoney, formatNumber } from "@/game/format";
@@ -36,11 +37,9 @@ export function LandmarksView() {
           </div>
         </div>
       </div>
-      {state.activeCity === "home" ? (
-        LANDMARKS.map((l) => <LandmarkCard key={l.territory} l={l} state={state} />)
-      ) : (
-        <div className="rounded-2xl bg-sky-500/10 p-3 text-[12px] leading-snug text-sky-100 ring-1 ring-sky-300/30">🏙️ {t("landmark.otherCity", { home: t("city.home") })}</div>
-      )}
+      {landmarksOf(state.activeCity).map((l) => (
+        <LandmarkCard key={l.territory} l={l} state={state} />
+      ))}
     </div>
   );
 }
@@ -65,9 +64,9 @@ function LandmarkCard({ l, state }: { l: LandmarkConfig; state: GameState }) {
   const go = () => {
     const ui = useUi.getState();
     // the works' lot, or the territory while it is closed
-    if (open) ui.selectPlot(`w:${l.territory}`, true);
+    if (open) ui.selectPlot(landmarkLotId(state.activeCity, l.territory), true);
     else ui.setView(null);
-    if (!open) ui.map({ kind: "plot", id: `w:${l.territory}`, zoom: 0.6 });
+    if (!open) ui.map({ kind: "plot", id: landmarkLotId(state.activeCity, l.territory), zoom: 0.6 });
   };
   return (
     <div className={cn("space-y-2 rounded-2xl p-3 ring-1", restored ? "bg-white/[0.05] ring-emerald-400/25" : "bg-white/[0.03] ring-white/[0.07]")}>

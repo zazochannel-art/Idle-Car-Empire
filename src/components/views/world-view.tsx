@@ -3,9 +3,10 @@
 import { Check, Lock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CITIES, CITY_IDS, CITY_RULES } from "@/game/config/cities";
+import { useEffect, useState } from "react";
+import { CITIES, CITY_IDS, CITY_RULES, TRADE_ROUTE } from "@/game/config/cities";
 import * as Cy from "@/game/engine/cities";
-import { formatMoney, formatNumber } from "@/game/format";
+import { formatDuration, formatMoney, formatNumber } from "@/game/format";
 import type { CityId, GameState } from "@/game/types";
 import { useT } from "@/i18n/use-t";
 import { cue } from "@/lib/feedback";
@@ -25,6 +26,7 @@ export function WorldView() {
   return (
     <div className="space-y-3">
       <ViewHeader icon="🌍" title={t("nav.world")} subtitle={t("world.subtitle")} />
+      {Cy.hasTradeRoute(state) && <TradeRoute state={state} steady={steady} />}
       {CITY_IDS.map((id) => (Cy.ownsCity(state, id) ? <CityCard key={id} id={id} state={state} steady={steady} /> : <LockedCity key={id} id={id} state={state} />))}
       <div className="space-y-1.5 rounded-2xl bg-white/[0.04] p-3 text-[11px] leading-snug text-white/70 ring-1 ring-white/[0.07]">
         <div className="text-[11px] font-bold uppercase tracking-wider text-white/45">{t("world.rulesTitle")}</div>
@@ -33,6 +35,40 @@ export function WorldView() {
         <p>🏢 {t("world.rule.company")}</p>
         <p>🏁 {t("world.rule.racing", { home })}</p>
       </div>
+    </div>
+  );
+}
+
+/** 🚢 The trade route between the cities: a convoy every few hours, with part of both cities' income. */
+function TradeRoute({ state, steady }: { state: GameState; steady: number }) {
+  const { t } = useT();
+  const send = useGame((g) => g.sendTradeConvoy);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const wait = Cy.tradeRouteWait(state, now);
+  const reward = Cy.tradeRouteReward(state, steady);
+  return (
+    <div className="space-y-2 rounded-2xl bg-sky-500/[0.08] p-3 ring-1 ring-sky-300/30">
+      <div className="flex items-center gap-2">
+        <span className="text-2xl">🚢</span>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-base font-black">{t("trade.title")}</div>
+          <div className="text-[11px] leading-snug text-white/55">{t("trade.body", { hours: TRADE_ROUTE.cooldownHours, minutes: Math.round(TRADE_ROUTE.incomeSeconds / 60) })}</div>
+        </div>
+      </div>
+      <Button
+        variant={wait > 0 ? "locked" : "gold"}
+        className="w-full"
+        onClick={() => {
+          if (wait > 0) return cue("error");
+          if (send() > 0) cue("buy");
+        }}
+      >
+        {wait > 0 ? t("trade.wait", { time: formatDuration(wait / 1000) }) : t("trade.send", { money: formatMoney(reward) })}
+      </Button>
     </div>
   );
 }

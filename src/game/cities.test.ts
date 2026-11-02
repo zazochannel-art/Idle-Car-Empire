@@ -61,8 +61,10 @@ describe("city maps", () => {
     for (const id of [MARKET, DEPOT, RACING, "d:local", "d:city", "d:premium", "d:luxury", "d:supercar", "d:global"]) expect(north.plotById[id]).toBeDefined();
     // no lot of one city is a lot of the other
     for (const p of lots) expect(home.plotById[p.id]).toBeUndefined();
-    // no landmark works there
-    expect(north.plots.some((p) => p.territory)).toBe(false);
+    // its own landmark works: one lot in each territory, with the city's prefix
+    const works = north.plots.filter((p) => p.territory);
+    expect(works.map((p) => p.territory).sort()).toEqual(["airport", "boulevard", "mountain", "port", "raw", "suburbs"]);
+    expect(works.every((p) => p.id.startsWith("n:w:"))).toBe(true);
     // the biggest island: more lots than the first one, in every district
     expect(lots.length).toBeGreaterThan(home.plots.filter((p) => p.kind === "plot" && !p.territory).length);
     for (const z of ["town", "industrial", "downtown", "automotive", "luxury", "supercar", "mega", "global"]) {
@@ -391,5 +393,23 @@ describe("playing in two cities", () => {
     s.city.territories = BUYABLE_TERRITORIES.map((t) => t.id);
     Cy.unlockCity(s, "north", T0);
     expect(goal()).toBeUndefined();
+  });
+
+  it("the trade route: a convoy every few hours once there are two cities, kept in the save", () => {
+    const one = ready();
+    expect(Cy.hasTradeRoute(one)).toBe(false);
+    expect(Cy.sendTradeConvoy(one, T0, 1_000)).toBe(0);
+    const s = withNorth();
+    expect(Cy.hasTradeRoute(s)).toBe(true);
+    const cash = s.cash;
+    const got = Cy.sendTradeConvoy(s, T0, 1_000);
+    expect(got).toBeCloseTo(Cy.tradeRouteReward(s, 1_000));
+    expect(got).toBeGreaterThanOrEqual(1_000 * 1_800);
+    expect(s.cash).toBeCloseTo(cash + got);
+    // not again until the cooldown is over
+    expect(Cy.sendTradeConvoy(s, T0 + 3_600_000, 1_000)).toBe(0);
+    expect(Cy.tradeRouteWait(s, T0 + 3_600_000)).toBe(3 * 3_600_000);
+    expect(roundTrip(s).tradeRoute).toBe(s.tradeRoute);
+    expect(Cy.sendTradeConvoy(s, T0 + 4 * 3_600_000, 1_000)).toBeGreaterThan(0);
   });
 });

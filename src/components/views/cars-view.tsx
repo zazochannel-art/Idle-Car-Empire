@@ -9,11 +9,11 @@ import { netOfSale } from "@/game/engine/costs";
 import { Lock, Palette } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { CARS, CAR_MODEL, DESIGN_COLORS, DESIGN_MAX, DESIGN_OPTIONS, type CarConfig } from "@/game/config/cars";
+import { CARS, CAR_MODEL, DESIGN_COLORS, DESIGN_MAX, DESIGN_OPTIONS, NORDIC, type CarConfig } from "@/game/config/cars";
 import { COMPONENT_BY_ID } from "@/game/config/chain";
 import { DEALERS } from "@/game/config/dealerships";
 import { carBaseValue, carLock, carPartsValue, carValue, modelStats, recipe } from "@/game/engine/chain";
-import { developCost, REVIEW_BASE, REVIEW_PER_STAR } from "@/game/engine/design";
+import { developCost, nordicCost, REVIEW_BASE, REVIEW_PER_STAR } from "@/game/engine/design";
 import { carModelCost, unlockedCarIds } from "@/game/engine/economy";
 import { formatMoney, formatNumber, formatPercent, formatTime } from "@/game/format";
 import type { MessageKey } from "@/i18n";
@@ -171,7 +171,7 @@ function ModelCard({ car, unlocked, open, onToggle }: { car: CarConfig; unlocked
 function DesignStudio({ car }: { car: CarConfig }) {
   const state = useGame((g) => g.view.state);
   const snap = useGame((g) => g.view.snap);
-  const { developDesign, renameDesign, setDesignColor } = useGame.getState();
+  const { developDesign, developNordic, renameDesign, setDesignColor } = useGame.getState();
   const { t } = useT();
   const d = state.designs[car.id];
   const base = carBaseValue(state, car, snap.gm);
@@ -238,6 +238,17 @@ function DesignStudio({ car }: { car: CarConfig }) {
             </div>
           );
         })}
+        {/* the Nordic package: once Nordheim is open */}
+        {(state.activeCity === "north" || state.cities.north) && (
+          <div className="flex items-center gap-2 rounded-xl bg-sky-500/[0.08] p-2 ring-1 ring-sky-300/20">
+            <span className="text-xl">❄️</span>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-xs font-bold">{t("design.nordic")}</div>
+              <div className="mt-0.5 text-[10px] leading-snug text-white/45">{t("design.nordicEffect", { value: formatPercent(NORDIC.value), time: formatPercent(NORDIC.time) })}</div>
+            </div>
+            {d.nordic ? <Badge variant="gold">✓</Badge> : <CostButton size="sm" cost={nordicCost(base, d) ?? 0} onBuy={() => developNordic(car.id)} label={t("design.nordicBuy")} />}
+          </div>
+        )}
       </div>
     </div>
   );

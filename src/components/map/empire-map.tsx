@@ -32,7 +32,7 @@ import { Minimap } from "./minimap";
 import { plantName } from "../panels/plant-panel";
 import type { MapArea, MapNames, ShipView, Site } from "./map-types";
 import { CAR_MODEL_FOR } from "./vehicles";
-import { LANDMARK_BY_TERRITORY } from "@/game/config/landmarks";
+import { landmarkIn } from "@/game/config/landmarks";
 import { cityLife, cityLifeKey } from "./world/city-life";
 
 /** Changes only when something visible on the map changes (not every tick). */
@@ -550,7 +550,7 @@ function TerritoryInfo({ id }: { id: TerritoryId }) {
   const n = useContent(lang);
   const cfg = TERRITORY_BY_ID[id];
   // the old works waiting there, and the car line it opens
-  const works = LANDMARK_BY_TERRITORY[id];
+  const works = landmarkIn(state.activeCity, id);
   const can = !lock && state.cash >= cfg.cost;
   const why =
     lock?.kind === "zone"

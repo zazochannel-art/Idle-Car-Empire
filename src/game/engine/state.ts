@@ -54,7 +54,7 @@ export function emptyParts(): Record<ComponentId, number> {
 
 /** Every platform starts with its default model name and no options. */
 export function createDesigns(): Record<CarId, CarDesign> {
-  return Object.fromEntries(CARS.map((c) => [c.id, { name: c.modelName, engine: 0, interior: 0, rims: 0, paint: 0, color: "" }])) as Record<CarId, CarDesign>;
+  return Object.fromEntries(CARS.map((c) => [c.id, { name: c.modelName, engine: 0, interior: 0, rims: 0, paint: 0, color: "", nordic: false }])) as Record<CarId, CarDesign>;
 }
 
 export function createStats(): Stats {
@@ -139,6 +139,7 @@ export function createInitialState(now: number): GameState {
     settings: { buyAmount: 1, lang: "en", lowGraphics: false, sound: true, music: true, haptics: true, notify: false, saver: "auto", stats: true, hidden: [], toastsOff: [], autoRecall: "ask", autoVip: false, autoFleet: false, autoCollect: false, whatsNew: WHATS_NEW.id },
     funnel: [],
     activeCity: "home",
+    tradeRoute: 0,
     cities: {},
     createdAt: now,
     runStartedAt: now,
