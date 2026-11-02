@@ -546,7 +546,10 @@ describe("the whole loop: one car from the factory to the sale", () => {
     const fair = Sh.fairPrice(s, rc);
     expect(fair).toBeGreaterThan(R.carWorth(rc) * R.condition(rc) * 1.05);
     expect(Ch.sendCar(s, rc.id, "showroom", fair)).toBe(true);
+    // no buyer on the way: the tick it arrives in would sell it (at random) before the sale below
+    const noBuyer = vi.spyOn(Math, "random").mockReturnValue(0.999);
     for (let i = 0; i < 2000 && rc.location === "transit"; i++) tick(s, 0.5);
+    noBuyer.mockRestore();
     expect(rc.location).toBe("showroom");
     // 8. sold: money in the books as a car sale
     const cash = s.cash;
