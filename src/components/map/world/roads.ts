@@ -198,7 +198,15 @@ export interface RoadMeshes {
   markings: THREE.Group;
 }
 
-export function buildRoads(data: WorldJson, ground: Ground, roads: MapRoad[], aniso: number, rings: ReadonlyMap<number, Roundabout> = new Map()): RoadMeshes {
+export function buildRoads(
+  data: WorldJson,
+  ground: Ground,
+  roads: MapRoad[],
+  aniso: number,
+  rings: ReadonlyMap<number, Roundabout> = new Map(),
+  /** Crossings with lights along the streets (signals.ts): road and share of its length. */
+  crossings: readonly { road: number; f: number }[] = [],
+): RoadMeshes {
   const nodes: NodeInfo[] = data.drumuri.noduri.map((n, i) => ({ x: n.p[0], z: n.p[1], deg: 0, wmax: 0, ring: false, rb: rings.get(i) }));
   for (const r of roads)
     for (const k of [r.a, r.b]) {
@@ -262,7 +270,7 @@ export function buildRoads(data: WorldJson, ground: Ground, roads: MapRoad[], an
     return rows;
   };
 
-  roads.forEach((r) => {
+  roads.forEach((r, ri) => {
     pointOn(r, r.L / 2, o);
     const t = tileOf(o.x, o.z);
     const A = nodes[r.a];
@@ -302,6 +310,14 @@ export function buildRoads(data: WorldJson, ground: Ground, roads: MapRoad[], an
         if (r.decks.some(([d0, d1]) => s > d0 - 0.4 && s < d1 + 0.4)) continue;
         for (let u = -hw + 0.1; u < hw - 0.08; u += 0.13) marks[t].ribbon(band(r, s - 0.13, s + 0.13, u, u + 0.065, MARK_LIFT, 2, 0.13), ground, WHITE, 1);
       }
+    // and the crossings with lights along the longer streets, with a stop line before each
+    for (const c of crossings) {
+      if (c.road !== ri) continue;
+      const s = c.f * r.L;
+      for (let u = -hw + 0.1; u < hw - 0.08; u += 0.13) marks[t].ribbon(band(r, s - 0.13, s + 0.13, u, u + 0.065, MARK_LIFT, 2, 0.13), ground, WHITE, 1);
+      marks[t].ribbon(band(r, s - 0.3, s - 0.26, 0, hw - 0.04, MARK_LIFT, 2), ground, WHITE, 1);
+      marks[t].ribbon(band(r, s + 0.26, s + 0.3, -hw + 0.04, 0, MARK_LIFT, 2), ground, WHITE, 1);
+    }
 
     // kerbs and sidewalks along the town streets
     if (r.urban && !r.ring) {

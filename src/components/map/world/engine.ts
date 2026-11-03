@@ -32,6 +32,9 @@ import { Scenery, type BillboardAd } from "./scenery";
 import type { CityLife } from "./city-life";
 import { Ground, NTX, NTY, buildTerrain, type TerrainParts, type WorldJson } from "./terrain";
 import { Traffic3D } from "./traffic";
+import { Pedestrians } from "./pedestrians";
+import { Signals } from "./signals";
+import { Headlights, SignalLamps } from "./street-lights";
 import { BonusLayer } from "./bonus";
 import { Fx } from "./fx";
 import { Movers } from "./movers";
@@ -225,6 +228,10 @@ export class MapEngine {
   private plots: PlotLayer | null = null;
   readonly traffic: TrafficFacade;
   private trafficLayer: Traffic3D | null = null;
+  private signals: Signals | null = null;
+  private signalLamps: SignalLamps | null = null;
+  private peds: Pedestrians | null = null;
+  private headlights: Headlights | null = null;
   private race: RaceCars | null = null;
   private mats: MapMaterials | null = null;
   private fx: Fx | null = null;
@@ -366,7 +373,13 @@ export class MapEngine {
     this.scenery = new Scenery(data, ground, this.mats, { low: this.low, lots: [...WORLD_MAP.plots.map((p) => ({ x: p.x, y: p.y, w: p.w, d: p.d, rot: p.rot, clear: !!p.territory })), ...ringLots] });
     this.scene.add(this.scenery.root);
     this.scenery.setClose(this.cam.dist < CLOSE_VIEW);
-    const roads = buildRoads(data, ground, this.scenery.roads, aniso, rings);
+    // traffic lights at the plain junctions and crossings with lights along the long streets
+    const mapRoads = this.scenery.roads;
+    this.signals = new Signals(WORLD_MAP, rings, (i) => {
+      const r = mapRoads[i];
+      return { urban: !!r?.urban, ring: !!r?.ring, decks: (r?.decks ?? []).map(([a, b]) => [a / r.L, b / r.L] as [number, number]) };
+    });
+    const roads = buildRoads(data, ground, this.scenery.roads, aniso, rings, this.signals.crossings);
     this.roadMarks = roads.markings;
     this.scene.add(roads.root);
     this.glows = lampGlows(this.scenery.lamps);
@@ -374,8 +387,18 @@ export class MapEngine {
     this.plots = new PlotLayer(ground);
     this.plots.onFinished = (plot, text) => this.banners.push({ plot, text, age: 0 });
     this.scene.add(this.plots.root);
-    this.trafficLayer = new Traffic3D(ground, this.scenery.roads, this.mats.car, rings);
+    this.trafficLayer = new Traffic3D(ground, this.scenery.roads, this.mats.car, rings, this.signals);
     this.trafficLayer.density = this.low ? 0.5 : 1;
+    const tl = this.trafficLayer;
+    this.peds = new Pedestrians(ground, this.scenery.roads, rings, this.signals, (a, b, r) => tl.busyNear(a, b, r));
+    this.peds.density = this.low ? 0.5 : 1;
+    this.peds.setFar(this.cam.dist >= CLOSE_VIEW);
+    const peds = this.peds;
+    this.trafficLayer.obstacles = () => peds.bodies();
+    this.signalLamps = new SignalLamps(ground, this.signals);
+    this.headlights = new Headlights();
+    this.headlights.low = this.low;
+    this.scene.add(this.peds.root, this.signalLamps.root, this.headlights.root);
     this.trafficLayer.onArrive = (id) => this.pop(id, "🚗", "#93c5fd");
     this.scene.add(this.trafficLayer.root);
     this.trafficLayer.setFar(this.cam.dist >= CLOSE_VIEW);
@@ -421,6 +444,7 @@ export class MapEngine {
     if (!this.plots || !this.views) return;
     this.plots.update(this.views, this.t);
     this.trafficLayer?.setOpen(this.unlocked);
+    this.peds?.setOpen(this.unlocked);
     this.updateLock();
   }
 
@@ -554,6 +578,8 @@ export class MapEngine {
     if (this.low === on) return;
     this.low = on;
     if (this.trafficLayer) this.trafficLayer.density = on ? 0.5 : 1;
+    if (this.peds) this.peds.density = on ? 0.5 : 1;
+    if (this.headlights) this.headlights.low = on;
     this.maxDpr = on ? 1 : this.saving ? 1.5 : 2;
     this.renderer.shadowMap.enabled = !on;
     this.scene.traverse((o) => {
@@ -571,6 +597,9 @@ export class MapEngine {
     this.ro.disconnect();
     this.trafficLayer?.dispose();
     this.trafficLayer = null;
+    this.peds?.dispose();
+    this.signalLamps?.dispose();
+    this.headlights?.dispose();
     this.race?.dispose();
     this.race = null;
     this.fx?.dispose();
@@ -658,6 +687,7 @@ export class MapEngine {
     const close = d < CLOSE_VIEW;
     this.scenery?.setClose(close);
     this.trafficLayer?.setFar(!close);
+    this.peds?.setFar(!close);
     // road lines only shimmer from far away
     if (this.roadMarks) this.roadMarks.visible = d < 150;
     this.shadowLive = near;
@@ -789,7 +819,14 @@ export class MapEngine {
       }
       this.plots!.frame(this.t, live.state);
       // in steps of at most 0.1 s, as at full speed: the saver's rarer frames keep the same yielding and turns
-      for (let left = dt; left > 1e-6; left -= 0.1) this.trafficLayer!.update(Math.min(0.1, left));
+      for (let left = dt; left > 1e-6; left -= 0.1) {
+        const step = Math.min(0.1, left);
+        this.trafficLayer!.update(step);
+        this.peds!.update(step, sky.dark);
+        this.signals!.update(step);
+      }
+      this.signalLamps!.update(sky.dark);
+      this.headlights!.update(this.trafficLayer!.lamps(), sky.dark, this.cam.dist >= CLOSE_VIEW);
       this.race!.update(live.state, this.t);
       this.scenery!.animate(dt, this.t);
       this.bonus!.set(live.state.mapBonus.active);

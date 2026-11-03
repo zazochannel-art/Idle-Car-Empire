@@ -31,6 +31,7 @@ const TRAFFIC_SCALE: Record<CarModel, number> = {
 import { aroundRings, ringPath, type Roundabout } from "./junctions";
 import { freezeStatic, hazed, shadowFromLargest } from "./kit";
 import { ROAD_LIFT, carGeometry, roadSurface, type MapRoad } from "./scenery";
+import type { Arm, Signal, Signals } from "./signals";
 import { bake } from "./structures";
 import type { Ground } from "./terrain";
 
@@ -59,6 +60,8 @@ const SLOW_GAP = 0.85;
 /** A car that has stood this long (s) edges through a junction, then through anything (no jam lasts). */
 const WAIT_CROSS = 2;
 const WAIT_ANY = 5;
+/** …and past a red light or a pedestrian only after this long (should anything ever hold a car there for good). */
+const WAIT_HARD = 16;
 
 type P3 = [number, number, number];
 type P2 = [number, number];
@@ -186,11 +189,15 @@ function cumulative2(pts: P2[]) {
 }
 
 /** Something on the road that others keep behind: where it is, its heading and half its length. */
-interface Body {
+export interface Body {
   x: number;
   z: number;
   yaw: number;
   half: number;
+  /** A red light's stop line or a pedestrian on a crossing: nobody edges past it after a short wait (only after WAIT_HARD). */
+  hard?: boolean;
+  /** Only holds those going its way (a stop line holds its own lane, not the cars turning across it). */
+  oneWay?: boolean;
 }
 
 /** Point at distance s along a 3D path (and its direction on the ground). */
@@ -257,19 +264,21 @@ function toBody(x: number, z: number, o: Body) {
  * a junction) are no obstacle. `wait` (s stood still) lets it edge on at last.
  */
 export function clearance(me: Body, others: readonly Body[], way: (d: number) => [number, number], wait = 0): number {
-  if (wait > WAIT_ANY) return 1;
+  if (wait > WAIT_HARD) return 1;
   // only what is near enough to matter
   const R = me.half + SLOW_GAP + 1;
   const near: Body[] = [];
   for (const o of others) {
-    if (o === me) continue;
+    if (o === me || (wait > WAIT_ANY && !o.hard)) continue;
+    if (o.oneWay && Math.abs(angle(o.yaw - me.yaw)) > 0.8) continue;
     const dx = o.x - me.x;
     const dz = o.z - me.z;
     if (dx > R || dx < -R || dz > R || dz < -R) continue;
-    // already beside or behind its front: it is the one to wait (or we are passing)
-    if (dx * Math.cos(me.yaw) - dz * Math.sin(me.yaw) <= 0) continue;
+    // already beside or behind its front: it is the one to wait (or we are passing); a stop line already under it is behind it
+    const ahead = dx * Math.cos(me.yaw) - dz * Math.sin(me.yaw);
+    if (ahead <= (o.oneWay ? me.half - 0.05 : 0)) continue;
     // standing long enough, it edges past anything not going its way
-    if (wait > WAIT_CROSS && Math.abs(angle(o.yaw - me.yaw)) > 0.8) continue;
+    if (wait > WAIT_CROSS && !o.hard && Math.abs(angle(o.yaw - me.yaw)) > 0.8) continue;
     near.push(o);
   }
   if (!near.length) return 1;
@@ -278,6 +287,17 @@ export function clearance(me: Body, others: readonly Body[], way: (d: number) =>
     for (const o of near) if (toBody(x, z, o) < 2 * HALF_WIDTH + SIDE_ROOM) return Math.max(0, Math.min(1, (gap - STOP_GAP) / (SLOW_GAP - STOP_GAP)));
   }
   return 1;
+}
+
+/** Where the vehicles on an arm of a signal stop for its red light. */
+interface StopLine {
+  sig: Signal;
+  arm: Arm;
+  /** The stop line itself (a hard, one-way body while the light is red). */
+  body: Body;
+  /** Direction of travel. */
+  tx: number;
+  tz: number;
 }
 
 /** The cab paint trucks are built with, swapped for each truck's own colour (no truck is this colour). */
@@ -315,12 +335,20 @@ export class Traffic3D {
 
   /** How far before a junction a car leaves its road to turn (0: it just carries on). */
   private cut: number[] = [];
+  /** How much further back than that a car waits at a junction it may not go into yet, off its zebra crossing (per road end: [at a, at b]). */
+  private hold: [number, number][] = [];
+  /** Every signal's stop lines, and those showing red now. */
+  private stopLines: StopLine[] = [];
+  private stops: Body[] = [];
+  /** Others on the roads the cars keep behind: the pedestrians on the crossings (pedestrians.ts). */
+  obstacles: () => readonly Body[] = () => [];
 
   constructor(
     private ground: Ground,
     private mapRoads: MapRoad[],
     carMat: THREE.Material,
     private rings: ReadonlyMap<number, Roundabout> = new Map(),
+    private signals: Signals | null = null,
   ) {
     this.root.name = "traffic";
     this.inst = new THREE.InstancedMesh(this.carGeo, carMat, FAR_CAP);
@@ -355,6 +383,100 @@ export class Traffic3D {
       if (rb) return rb.outer + 0.25;
       return deg[i] >= 3 && !ring[i] ? wmax[i] * 0.62 + 0.3 : 0;
     });
+    // town streets have a zebra crossing just before their junctions (roads.ts): a waiting car stops short of it
+    this.hold = WORLD_MAP.roads.map((r, i) => {
+      const mr = this.mapRoads[i];
+      return [r.a, r.b].map((n) => {
+        if (!mr?.urban || mr.ring || deg[n] < 3 || ring[n] || this.cut[n] <= 0) return 0;
+        const rb = this.rings.get(n);
+        const far = (rb ? rb.outer + 0.22 : wmax[n] / 2 + 0.32) + 0.13 + 0.04;
+        return Math.max(0, far + 0.28 - this.cut[n]);
+      }) as [number, number];
+    });
+    if (signals) {
+      for (const sig of signals.list)
+        for (const arm of sig.arms) {
+          const r = WORLD_MAP.roads[arm.road];
+          let at: number;
+          if (sig.node >= 0) {
+            // just inside the junction's line: the first car stops at the line, off the crossing
+            const line = arm.dir > 0 ? r.len - this.cut[sig.node] : this.cut[sig.node];
+            at = line + arm.dir * 0.25;
+          } else {
+            const c = signals.crossings.find((x) => x.signal === sig)!;
+            at = c.f * r.len - arm.dir * 0.05;
+          }
+          const p = this.lanePoint(arm.road, Math.max(0, Math.min(r.len, at)), arm.dir);
+          this.stopLines.push({ sig, arm, tx: p.tx, tz: p.tz, body: { x: p.x, z: p.z, yaw: Math.atan2(-p.tz, p.tx), half: 0.05, hard: true, oneWay: true } });
+        }
+    }
+  }
+
+  /** How far before its junction's line a car waits when it may not go in. */
+  private holdAt(c: RoadCar, node: number) {
+    const h = this.hold[c.road];
+    if (!h) return 0;
+    return node === WORLD_MAP.roads[c.road].b ? h[1] : h[0];
+  }
+
+  /**
+   * Pedestrians look before they cross from `a` to `b`: is a car or truck
+   * standing on the crossing, or moving within `r` of its middle?
+   */
+  busyNear(a: [number, number], b: [number, number], r: number): boolean {
+    const mx = (a[0] + b[0]) / 2;
+    const mz = (a[1] + b[1]) / 2;
+    const on = (o: Body) => {
+      for (let k = 0; k <= 6; k++) {
+        const t = k / 6;
+        if (toBody(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, o) < HALF_WIDTH + 0.08) return true;
+      }
+      return false;
+    };
+    for (const c of this.cars) {
+      if (c.alpha < 0.5) continue;
+      const d = Math.hypot(c.x - mx, c.z - mz);
+      if (d > r + 0.6) continue;
+      if ((d < r && c.v > 0.15) || on(c)) return true;
+    }
+    for (const t of this.trucks.values()) {
+      if (t.gone) continue;
+      const d = Math.hypot(t.x - mx, t.z - mz);
+      if (d < r + 0.3 || (d < r + 1.2 && on(this.truckBody(t)))) return true;
+    }
+    return false;
+  }
+
+  /** Every vehicle on the roads now, for the headlights: position, heading, half its length and half its width. */
+  *lamps(): Generator<[number, number, number, number, number, number, number]> {
+    for (const c of this.cars) if (c.alpha > 0.05) yield [c.x, c.y, c.z, c.yaw, c.half, 0.1 * c.scale, c.alpha];
+    for (const t of this.trucks.values()) {
+      const size = (t.size ??= modelSize(t.obj));
+      yield [t.x, t.y, t.z, t.yaw, size.x / 2, size.z / 2, t.gone > 0 ? Math.max(0, 1 - t.gone / 0.8) : 1];
+    }
+  }
+
+  /** The signals' red stop lines hold the traffic; who waits at one calls its green (a truck at once: it is on the clock). */
+  private watchSignals() {
+    this.stops.length = 0;
+    if (!this.signals) return;
+    for (const st of this.stopLines) {
+      const red = this.signals.show(st.sig, st.arm) === "red";
+      if (red) this.stops.push(st.body);
+      const b = st.body;
+      const near = (x: number, z: number, yaw: number) => {
+        const dx = b.x - x;
+        const dz = b.z - z;
+        if (dx * dx + dz * dz > 3.2) return false;
+        // facing its way, not yet past it
+        return Math.cos(yaw) * st.tx - Math.sin(yaw) * st.tz > 0.6 && dx * st.tx + dz * st.tz > -0.05;
+      };
+      let car = false;
+      for (const c of this.cars) if (!c.turn && c.road === st.arm.road && c.dir === st.arm.dir && c.alpha > 0.5 && near(c.x, c.z, c.yaw)) car = true;
+      let truck = false;
+      for (const t of this.trucks.values()) if (!t.gone && near(t.x, t.z, t.yaw)) truck = true;
+      if (car || truck) this.signals.call(st.sig, st.arm, truck);
+    }
   }
 
   /**
@@ -463,6 +585,22 @@ export class Traffic3D {
    * cars already on the ring go first, and a few at most are on it.
    */
   private mayEnter(c: RoadCar, node: number): boolean {
+    const sig = this.signals?.at(node);
+    if (sig) {
+      // the lights: green (or amber at speed, too late to stop), and nobody from the other ways still in the junction
+      const arm = sig.arms.find((a) => a.road === c.road);
+      if (arm && c.wait < WAIT_HARD) {
+        const light = this.signals!.show(sig, arm);
+        if (light === "red" || (light === "amber" && c.v < this.cruise(c) * 0.5)) return false;
+        for (const o of this.cars) {
+          const t = o.turn;
+          if (o === c || !t || t.node !== node) continue;
+          const oa = sig.arms.find((a) => a.road === t.from);
+          if (oa && oa.phase !== arm.phase) return false;
+        }
+        return true;
+      }
+    }
     if (this.cut[node] <= 0 || c.wait > 6) return true;
     const rb = this.rings.get(node);
     const ae = rb ? Math.atan2(c.z - rb.z, c.x - rb.x) : 0;
@@ -957,15 +1095,19 @@ export class Traffic3D {
     for (const c of this.cars) if (!c.life && !c.special) ambient++;
     for (let i = 0; i < 3 && ambient < want; i++, ambient++) this.spawnAmbient();
     let extra = ambient - want;
-    // everyone keeps their distance: each car and truck slows for what is in front of it
+    // everyone keeps their distance: each car and truck slows for what is in front of it (red lights and pedestrians too)
+    this.watchSignals();
     const bodies = this.bodies();
+    for (const b of this.stops) bodies.push(b);
+    for (const b of this.obstacles()) bodies.push(b);
     for (const c of this.cars) {
       let room = clearance(c, bodies, (d) => this.way(c, d), c.wait);
       if (!c.turn) {
-        // nearing a junction it may not go into yet: it slows to stop at the line
+        // nearing a junction it may not go into yet: it slows to stop at the line (short of the zebra crossing)
         const { node, stop } = this.ahead(c);
+        const hold = this.holdAt(c, node);
         const left = (stop - c.s) * c.dir;
-        if (left < 0.8 && this.cut[node] > 0 && this.choose(c, node) && !this.mayEnter(c, node)) room = Math.min(room, Math.max(0, left - 0.02) / 0.8);
+        if (left < 0.8 + hold && this.cut[node] > 0 && this.choose(c, node) && !this.mayEnter(c, node)) room = Math.min(room, Math.max(0, left - hold - 0.02) / 0.8);
       }
       const pace = this.cruise(c) * room;
       c.v = pace < c.v ? pace : Math.min(pace, c.v + ACCEL * dt);
