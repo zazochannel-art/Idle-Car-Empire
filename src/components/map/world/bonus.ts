@@ -1,11 +1,14 @@
 // The bonus on the Empire Map (engine/map-bonus.ts) as the player sees it: a
 // golden car or a VIP's limousine in the traffic, a drone flying a crate in
 // to one of the plants, a truck broken down by the road with its hazard
-// lights on. One at a time; it says where it is (for its label, the tap and
+// lights on, a crash with cones round it, a queue of cars stuck in a jam, a
+// police car with its lights on chasing a speeder. One at a time; it says where it is (for its label, the tap and
 // the arrow at the screen's edge) and leaves with coins when it is taken.
 import * as THREE from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { WORLD_MAP } from "@/game/city/layout";
+import { buildCar } from "../../three/car-models";
+import type { CarModel } from "../vehicles";
 import type { MapBonus } from "@/game/engine/map-bonus";
 import type { MapBonusKind } from "@/game/config/map-bonus";
 import type { Fx } from "./fx";
@@ -36,8 +39,10 @@ interface Shown {
   car?: object;
   /** The drone, its rotors, the cable and the crate. */
   drone?: { obj: THREE.Group; rotors: THREE.Object3D[]; cable: THREE.Mesh; crate: THREE.Object3D; from: THREE.Vector3; to: THREE.Vector3; away: THREE.Vector3; ground: number };
-  /** The broken-down truck and its hazard lights. */
-  truck?: { obj: THREE.Group; lights: THREE.Mesh[]; hood: THREE.Vector3 };
+  /** The broken-down truck, the crash or the jam: what stands on the road, its blinking lights, where smoke rises (if it does). */
+  truck?: { obj: THREE.Group; lights: THREE.Mesh[]; hood?: THREE.Vector3; red?: boolean };
+  /** The police chase: the speeder ahead, the light bar over the police car. */
+  chase?: { speeder?: object; bar: THREE.Group; red: THREE.Mesh; blue: THREE.Mesh };
   /** Last sparkle or puff of smoke (s). */
   fxAt: number;
 }
@@ -50,6 +55,11 @@ export class BonusLayer {
   private pos = new THREE.Vector3();
   private lightOn: THREE.MeshBasicMaterial;
   private lightOff: THREE.MeshBasicMaterial;
+  private brakeOn = new THREE.MeshBasicMaterial({ color: "#ff2a2a" });
+  private brakeOff = new THREE.MeshBasicMaterial({ color: "#5a1414" });
+  private policeRed = new THREE.MeshBasicMaterial({ color: "#ff2020" });
+  private policeBlue = new THREE.MeshBasicMaterial({ color: "#2060ff" });
+  private policeDim = new THREE.MeshBasicMaterial({ color: "#2a2f3a" });
 
   constructor(
     private ground: Ground,
@@ -104,8 +114,132 @@ export class BonusLayer {
     // the snowplough out in the storm, slow and orange
     else if (b.kind === "storm") s.car = this.traffic.spawnSpecial("offroad", "#f97316", "gloss", 1.2, 1.35) ?? undefined;
     else if (b.kind === "drone") s.drone = this.drone(b.plot);
-    else s.truck = this.brokenTruck();
+    else if (b.kind === "accident") s.truck = this.crash();
+    else if (b.kind === "jam") s.truck = this.queue();
+    else if (b.kind === "police") {
+      s.car = this.traffic.spawnSpecial("sedan", "#f4f6f8", "gloss", 1, 1.2) ?? undefined;
+      s.chase = this.lightBar();
+      s.chase.speeder = this.traffic.spawnSpecial("sports", "#dc2626", "metallic", 1, 1.15) ?? undefined;
+    } else s.truck = this.brokenTruck();
     return s;
+  }
+
+  /** A spot on a road the trucks drive (or the first plot's yard when there is no road). */
+  private spot() {
+    return this.traffic.roadSpot() ?? { x: WORLD_MAP.plots[0].x, y: this.ground.at(WORLD_MAP.plots[0].x, WORLD_MAP.plots[0].y), z: WORLD_MAP.plots[0].y, yaw: 0 };
+  }
+
+  /** A parked car model like those in the traffic (null before the models have loaded). */
+  private carModel(model: CarModel, color: string): THREE.Object3D | null {
+    const m = buildCar(THREE, { model, color, finish: "gloss", build: { color } });
+    if (!m.children.length) return null;
+    m.scale.setScalar(0.118 * 1.15);
+    freezeStatic(m);
+    return m;
+  }
+
+  /** A blinking light on the road scene (hazards, brake lights). */
+  private lamp(obj: THREE.Group, lights: THREE.Mesh[], x: number, y: number, z: number, off: THREE.Material) {
+    const m = new THREE.Mesh(this.lampGeo, off);
+    m.position.set(x, y, z);
+    obj.add(m);
+    lights.push(m);
+  }
+
+  private lampGeo = new THREE.SphereGeometry(0.045, 8, 6);
+
+  /** Traffic cones round a spot (in the scene's own units). */
+  private cones(obj: THREE.Group, at: [number, number][]) {
+    const geo = mergeGeometries([cone(0.07, 0.22, C("#f97316"), 0, 0, 0, 10, 0), cylinder(0.048, 0.035, C("#f8fafc"), 0, 0.07, 0, 10, 0.041), box(0.16, 0.015, 0.16, C("#f97316"), 0, 0, 0, 0)].map(plainUv));
+    for (const [x, z] of at) {
+      const m = new THREE.Mesh(geo, this.mats.byKind.plain);
+      m.position.set(x, 0, z);
+      obj.add(m);
+    }
+  }
+
+  /** Two cars run into each other on a delivery road: hazards blinking, smoke from the bonnet, cones round them. */
+  private crash(): Shown["truck"] {
+    const spot = this.spot();
+    const obj = new THREE.Group();
+    const lights: THREE.Mesh[] = [];
+    const a = this.carModel("sedan", "#2563eb");
+    const b = this.carModel("compact", "#eab308");
+    if (a) {
+      a.position.set(0.28, 0, -0.05);
+      a.rotation.y = 0.45;
+      obj.add(a);
+    }
+    if (b) {
+      b.position.set(-0.32, 0, 0.14);
+      b.rotation.y = -0.9;
+      obj.add(b);
+    }
+    // the hazards of both cars
+    for (const [x, z] of [
+      [0.62, 0.05],
+      [-0.05, -0.2],
+      [-0.6, 0.35],
+      [-0.1, -0.05],
+    ])
+      this.lamp(obj, lights, x, 0.14, z, this.lightOff);
+    this.cones(obj, [
+      [1.05, 0.3],
+      [1.05, -0.3],
+      [-1.05, 0.3],
+      [-1.05, -0.3],
+    ]);
+    // glass on the road
+    const bits = new THREE.Mesh(plainUv(box(0.3, 0.01, 0.2, C("#cbd5e1"), 0, 0.005, 0.05, 0.3)), this.mats.byKind.plain);
+    obj.add(bits);
+    obj.position.set(spot.x, spot.y, spot.z);
+    obj.rotation.y = spot.yaw;
+    this.root.add(obj);
+    const hood = new THREE.Vector3(-0.05, 0.3, 0.05).applyAxisAngle(new THREE.Vector3(0, 1, 0), spot.yaw).add(obj.position);
+    return { obj, lights, hood };
+  }
+
+  /** A queue of cars stood still on a delivery road, their brake lights on. */
+  private queue(): Shown["truck"] {
+    const spot = this.spot();
+    const obj = new THREE.Group();
+    const lights: THREE.Mesh[] = [];
+    const models: CarModel[] = ["sedan", "suv", "city", "wagon"];
+    const colors = ["#e5e7eb", "#1f2937", "#16a34a", "#7c3aed"];
+    models.forEach((model, i) => {
+      const m = this.carModel(model, colors[i]);
+      const x = 0.9 - i * 0.62;
+      if (m) {
+        m.position.set(x, 0, 0);
+        m.rotation.y = (i % 2 ? 1 : -1) * 0.04;
+        obj.add(m);
+      }
+      this.lamp(obj, lights, x - 0.27, 0.12, 0.09, this.brakeOff);
+      this.lamp(obj, lights, x - 0.27, 0.12, -0.09, this.brakeOff);
+    });
+    // what holds them up: cones across the lane ahead
+    this.cones(obj, [
+      [1.45, -0.15],
+      [1.45, 0.1],
+      [1.45, 0.35],
+    ]);
+    obj.position.set(spot.x, spot.y, spot.z);
+    obj.rotation.y = spot.yaw;
+    this.root.add(obj);
+    return { obj, lights, red: true };
+  }
+
+  /** The police car's light bar, red and blue, carried over it. */
+  private lightBar(): NonNullable<Shown["chase"]> {
+    const bar = new THREE.Group();
+    const geo = new THREE.BoxGeometry(0.09, 0.05, 0.09);
+    const red = new THREE.Mesh(geo, this.policeRed);
+    const blue = new THREE.Mesh(geo, this.policeBlue);
+    red.position.set(0, 0, 0.06);
+    blue.position.set(0, 0, -0.06);
+    bar.add(red, blue);
+    this.root.add(bar);
+    return { bar, red, blue };
   }
 
   /** The drone with its crate, on its way from out at sea to the plant's yard. */
@@ -217,6 +351,10 @@ export class BonusLayer {
     this.cur = null;
     if (!c) return;
     if (c.car) this.traffic.releaseSpecial(c.car);
+    if (c.chase) {
+      if (c.chase.speeder) this.traffic.releaseSpecial(c.chase.speeder);
+      this.root.remove(c.chase.bar);
+    }
     if (c.drone) {
       // the drone and the crate go (the crate is on its own once it has landed)
       this.leaving.push({ obj: c.drone.obj, t: taken ? 0 : 0.2 });
@@ -244,9 +382,20 @@ export class BonusLayer {
         c.car =
           (c.kind === "storm"
             ? this.traffic.spawnSpecial("offroad", "#f97316", "gloss", 1.2, 1.35)
-            : this.traffic.spawnSpecial(c.kind === "vip" ? "luxury" : "supercar", c.kind === "vip" ? "#16181d" : "#e8b923", c.kind === "vip" ? "gloss" : "metallic", c.kind === "vip" ? 1.5 : 1, 1.25)) ?? undefined;
+            : c.kind === "police"
+              ? this.traffic.spawnSpecial("sedan", "#f4f6f8", "gloss", 1, 1.2)
+              : this.traffic.spawnSpecial(c.kind === "vip" ? "luxury" : "supercar", c.kind === "vip" ? "#16181d" : "#e8b923", c.kind === "vip" ? "gloss" : "metallic", c.kind === "vip" ? 1.5 : 1, 1.25)) ?? undefined;
       const p = this.position();
-      if (p && t - c.fxAt > (c.kind === "golden" ? 0.07 : 0.3)) {
+      if (c.chase) {
+        // the light bar rides on the police car and flashes red, blue
+        const ch = c.chase;
+        ch.bar.visible = !!p;
+        if (p) ch.bar.position.set(p.x, p.y + 0.12, p.z);
+        const k = Math.floor(t * 6) % 2 === 0;
+        ch.red.material = k ? this.policeRed : this.policeDim;
+        ch.blue.material = k ? this.policeDim : this.policeBlue;
+        if (ch.speeder && !this.traffic.positionOf(ch.speeder)) ch.speeder = this.traffic.spawnSpecial("sports", "#dc2626", "metallic", 1, 1.15) ?? undefined;
+      } else if (p && t - c.fxAt > (c.kind === "golden" ? 0.07 : 0.3)) {
         c.fxAt = t;
         // the plough throws snow up; the others sparkle
         this.fx.sparkle(p.x, p.y + 0.1, p.z, c.kind === "golden" ? 2 : 1, c.kind === "golden" ? "#ffd75e" : c.kind === "storm" ? "#f8fafc" : "#c4b5fd");
@@ -254,11 +403,18 @@ export class BonusLayer {
     }
     if (c.drone) this.flyDrone(c, dt);
     if (c.truck) {
-      const on = Math.sin(t * Math.PI * 3) > 0;
-      for (const l of c.truck.lights) l.material = on ? this.lightOn : this.lightOff;
-      if (t - c.fxAt > 0.22) {
+      const tr = c.truck;
+      if (tr.red) {
+        // brake lights: on, with a flicker as the queue creeps
+        const on = Math.sin(t * Math.PI * 0.8) > -0.7;
+        for (const l of tr.lights) l.material = on ? this.brakeOn : this.brakeOff;
+      } else {
+        const on = Math.sin(t * Math.PI * 3) > 0;
+        for (const l of tr.lights) l.material = on ? this.lightOn : this.lightOff;
+      }
+      if (tr.hood && t - c.fxAt > 0.22) {
         c.fxAt = t;
-        this.fx.smoke(c.truck.hood.x, c.truck.hood.y, c.truck.hood.z);
+        this.fx.smoke(tr.hood.x, tr.hood.y, tr.hood.z);
       }
     }
   }

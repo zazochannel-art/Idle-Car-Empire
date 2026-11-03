@@ -29,7 +29,7 @@ import { activeEvent } from "@/game/engine/events";
 import * as Ev from "@/game/engine/events";
 import { OFFLINE } from "@/game/config/offline";
 import { collectOffline, settleOffline } from "@/game/engine/offline";
-import { checkAchievements, claimDaily, claimMilestone, recordHistory, refreshDaily, rewardCash } from "@/game/engine/progress";
+import { checkAchievements, chestStreakToday, claimDaily, claimDailyChest, claimMilestone, recordHistory, refreshDaily, rewardCash } from "@/game/engine/progress";
 import { cloneState, createInitialState } from "@/game/engine/state";
 import { tick as engineTick } from "@/game/engine/tick";
 import { formatDuration, formatMoney, formatNumber, formatPercent } from "@/game/format";
@@ -251,6 +251,8 @@ interface GameStore {
   hireWorker: (plot: string) => boolean;
   setSpecialization: (plot: string, spec: Specialization) => boolean;
   claimDaily: (id: string) => void;
+  /** Opens today's chest (all daily missions taken). */
+  claimDailyChest: () => void;
   claimMilestone: (id: string) => void;
   dismissTip: (id: string) => void;
   claimLogin: () => void;
@@ -1294,6 +1296,23 @@ export const useGame = create<GameStore>((set, get) => {
     setSpecialization: (plot, spec) => act((s) => C.setSpecialization(s, plot, spec)),
     claimDaily: (id) => {
       act((s) => claimDaily(s, id));
+    },
+    claimDailyChest: () => {
+      const now = Date.now();
+      const cash0 = get().state.cash;
+      let got: ReturnType<typeof claimDailyChest> = null;
+      act((s) => (got = claimDailyChest(s, now)) !== null);
+      const r = got as ReturnType<typeof claimDailyChest>;
+      if (!r) return;
+      const streak = chestStreakToday(get().state, now);
+      uiEvents.emit({
+        type: "toast",
+        kind: "progress",
+        tone: "gold",
+        icon: "🧰",
+        title: tr("chest.toast"),
+        body: r.stars ? tr("chest.star", { n: streak }) : tr("mapBonus.reward", { money: formatMoney(Math.max(0, get().state.cash - cash0)) }),
+      });
     },
     startPrototype: (car, focus) => {
       act((s) => Ex.startPrototype(s, car, focus, Date.now(), Ch.carBaseValue(s, CAR_BY_ID[car], get().snap.gm)));

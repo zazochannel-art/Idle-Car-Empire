@@ -37,8 +37,14 @@ export const bonusesToday = (s: GameState, now: number) => (s.mapBonus.day === d
 /** Bonuses come once the first car is built. */
 export const mapBonusOpen = (s: GameState) => s.chain.firstCar || s.lifetime.carsProduced > 0;
 
-/** A truck broken down on the road, or a snowstorm, slows every delivery (1: the roads are clear). */
-export const deliverySlowdown = (s: GameState) => (s.mapBonus.active?.kind === "breakdown" || s.mapBonus.active?.kind === "storm" ? MAP_BONUS.breakdownSlow : 1);
+/** A truck broken down on the road, a snowstorm, a crash or a jam slows every delivery (1: the roads are clear). */
+export const deliverySlowdown = (s: GameState) => {
+  const a = s.mapBonus.active;
+  return a ? (MAP_BONUS_BY_KIND[a.kind]?.slow ?? 1) : 1;
+};
+
+/** Whether a kind holds up the deliveries while it is on the map. */
+export const slowsDeliveries = (kind: MapBonusKind) => MAP_BONUS_BY_KIND[kind].slow !== undefined;
 
 const gap = (rand: () => number) => MAP_BONUS.gap[0] + rand() * (MAP_BONUS.gap[1] - MAP_BONUS.gap[0]);
 
@@ -55,6 +61,12 @@ function possible(s: GameState, kind: MapBonusKind): boolean {
       return s.chain.shipments.length > 0;
     case "storm":
       return s.activeCity === "north" && s.chain.shipments.length > 0;
+    // road events need deliveries to hold up; the chase, a town with a dealership
+    case "accident":
+    case "jam":
+      return s.chain.shipments.length > 0;
+    case "police":
+      return Object.values(s.dealers).some((d) => d.owned);
   }
 }
 
@@ -101,6 +113,9 @@ export function claimMapBonus(s: GameState, id: number, now: number, rand: () =>
   payReward(s, cash);
   const day = dateKey(now);
   mb.taken = (mb.day === day ? mb.taken : 0) + 1;
+  // counted for the daily missions ("handle N events on the map")
+  s.run.mapEvents++;
+  s.lifetime.mapEvents++;
   mb.day = day;
   mb.active = null;
   mb.wait = gap(rand);

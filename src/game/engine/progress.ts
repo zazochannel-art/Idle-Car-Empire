@@ -1,5 +1,6 @@
 import { ACHIEVEMENTS, type Condition } from "../config/achievements";
 import {
+  DAILY_CHEST,
   DAILY_COUNT,
   DAILY_REWARD_SECONDS,
   DAILY_TEMPLATES,
@@ -63,6 +64,8 @@ export function metric(s: GameState, id: MetricId, snap?: EconomySnapshot): numb
       return s.lifetime.carsShipped ?? 0;
     case "fullChain":
       return (["bodyWorks", "engineFactory", "tireFactory", "assemblyPlant"] as const).every((t) => hasPlant(s, t)) && s.lifetime.carsProduced > 0 ? 1 : 0;
+    case "mapEvents":
+      return s.lifetime.mapEvents;
     case "sportUnlocked": {
       const ids = unlockedCarIds(s, (snap ?? snapshot(s)).gm);
       return CARS.some((c) => c.class === "sport" && ids.has(c.id)) ? 1 : 0;
@@ -141,7 +144,7 @@ export function generateDaily(s: GameState, now: number, snap?: EconomySnapshot)
   const rand = seeded(`${key}:${s.createdAt}`);
   const researchLeft = RESEARCH.some((r) => !s.research.includes(r.id));
   // research needs RP, which only cars make
-  const pool = DAILY_TEMPLATES.filter((t) => (t.metric !== "researchDone" || (researchLeft && eco.carsPerSec > 0)) && ((t.metric !== "carsProduced" && t.metric !== "carsSold") || eco.carsPerSec > 0));
+  const pool = DAILY_TEMPLATES.filter((t) => (t.metric !== "researchDone" || (researchLeft && eco.carsPerSec > 0)) && ((t.metric !== "carsProduced" && t.metric !== "carsSold") || eco.carsPerSec > 0) && (t.metric !== "mapEvents" || s.chain.firstCar || s.lifetime.carsProduced > 0));
   const picked: typeof pool = [];
   while (picked.length < Math.min(DAILY_COUNT, pool.length)) {
     const t = pool[Math.floor(rand() * pool.length)];
@@ -199,6 +202,48 @@ export function claimDaily(s: GameState, id: string): boolean {
   return true;
 }
 
+// ───────────────────────────── the daily chest ─────────────────────────────
+
+function yesterdayKey(now: number): string {
+  const d = new Date(now);
+  d.setDate(d.getDate() - 1);
+  return dateKey(d.getTime());
+}
+
+/** Days in a row the chest will have been opened if it is opened today. */
+export function chestStreakToday(s: GameState, now: number): number {
+  const m = s.missions;
+  if (m.chestDate === dateKey(now)) return m.chestStreak;
+  return m.chestDate === yesterdayKey(now) ? m.chestStreak + 1 : 1;
+}
+
+/** Whether today's chest waits: every daily mission taken, the chest not yet opened today. */
+export function dailyChestReady(s: GameState, now: number): boolean {
+  const m = s.missions;
+  return m.daily.length > 0 && m.dailyDate === dateKey(now) && m.daily.every((d) => d.claimed) && m.chestDate !== dateKey(now);
+}
+
+/** What today's chest holds: income growing with the days in a row, RP, a star every few days in a row. */
+export function dailyChestReward(s: GameState, now: number, snap?: EconomySnapshot): Reward {
+  const eco = snap ?? snapshot(s);
+  const streak = chestStreakToday(s, now);
+  const mult = 1 + DAILY_CHEST.streakStep * (Math.min(streak, DAILY_CHEST.streakMax) - 1);
+  const r: Reward = { incomeSeconds: Math.round(DAILY_CHEST.incomeSeconds * mult), rp: Math.max(10, Math.round(eco.rpPerSec * DAILY_CHEST.rpSeconds)) };
+  if (streak % DAILY_CHEST.starEvery === 0) r.stars = 1;
+  return r;
+}
+
+/** Opens today's chest (when it waits): its reward, or null. */
+export function claimDailyChest(s: GameState, now: number): Reward | null {
+  if (!dailyChestReady(s, now)) return null;
+  const snap = snapshot(s);
+  const r = dailyChestReward(s, now, snap);
+  s.missions.chestStreak = chestStreakToday(s, now);
+  s.missions.chestDate = dateKey(now);
+  grantReward(s, r, snap);
+  return r;
+}
+
 /** Next milestone missions to show: the unclaimed ones, in order. */
 export function openMilestones(s: GameState, count = 3): MilestoneMission[] {
   return MILESTONES.filter((m) => !s.missions.milestonesClaimed.includes(m.id)).slice(0, count);
@@ -215,11 +260,12 @@ export function claimMilestone(s: GameState, id: string): boolean {
 }
 
 /** Count of rewards waiting to be claimed — drives the nav badge. */
-export function claimableCount(s: GameState, snap?: EconomySnapshot): number {
+export function claimableCount(s: GameState, snap?: EconomySnapshot, now: number = s.lastActiveAt): number {
   const eco = snap ?? snapshot(s);
+  const chest = dailyChestReady(s, now) ? 1 : 0;
   const daily = s.missions.daily.filter((m) => !m.claimed && dailyProgress(s, m, eco) >= m.target).length;
   const miles = openMilestones(s, MILESTONES.length).filter((m) => metric(s, m.metric, eco) >= m.target).length;
-  return daily + miles;
+  return daily + miles + chest;
 }
 
 export const HISTORY_EVERY_MS = 60_000;

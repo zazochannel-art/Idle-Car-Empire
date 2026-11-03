@@ -73,6 +73,7 @@ export function createStats(): Stats {
     deliveries: 0,
     carsSold: 0,
     carRevenue: 0,
+    mapEvents: 0,
   };
 }
 
@@ -119,7 +120,7 @@ export function createInitialState(now: number): GameState {
     iap: createIap(),
     research: [],
     achievements: [],
-    missions: { dailyDate: "", daily: [], milestonesClaimed: [] },
+    missions: { dailyDate: "", daily: [], milestonesClaimed: [], chestDate: "", chestStreak: 0 },
     run: createStats(),
     lifetime: createStats(),
     city: createCity(),
