@@ -5,7 +5,9 @@
 // draped over the terrain and merged into a few meshes per terrain tile;
 // bridges keep their own decks (scenery.ts).
 import * as THREE from "three";
-import { hazed, noiseLayer } from "./kit";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import type { Roundabout } from "./junctions";
+import { C, cylinder, hazed, noiseLayer, paint } from "./kit";
 import { ROAD_LIFT, pointOn, type MapRoad } from "./scenery";
 import { NTX, NTY, type Ground, type WorldJson } from "./terrain";
 
@@ -17,6 +19,11 @@ const KERB = 0.035;
 /** Highway markings are yellow; everything else white. */
 const WHITE = new THREE.Color("#f3f3ee");
 const YELLOW = new THREE.Color("#f2c12e");
+/** A roundabout's island. */
+const KERB_COL = C("#d6d2c8");
+const GRASS = C("#5f9a46");
+const SHRUB = C("#3f7a35");
+const SHRUB2 = C("#c75b7a");
 
 /** One strip of quads along a road, with its own vertex colour. */
 class Strip {
@@ -181,6 +188,8 @@ interface NodeInfo {
   wmax: number;
   /** On the roundabout's ring. */
   ring: boolean;
+  /** The junction is a roundabout (junctions.ts). */
+  rb?: Roundabout;
 }
 
 export interface RoadMeshes {
@@ -189,8 +198,16 @@ export interface RoadMeshes {
   markings: THREE.Group;
 }
 
-export function buildRoads(data: WorldJson, ground: Ground, roads: MapRoad[], aniso: number): RoadMeshes {
-  const nodes: NodeInfo[] = data.drumuri.noduri.map((n) => ({ x: n.p[0], z: n.p[1], deg: 0, wmax: 0, ring: false }));
+export function buildRoads(
+  data: WorldJson,
+  ground: Ground,
+  roads: MapRoad[],
+  aniso: number,
+  rings: ReadonlyMap<number, Roundabout> = new Map(),
+  /** Crossings with lights along the streets (signals.ts): road and share of its length. */
+  crossings: readonly { road: number; f: number }[] = [],
+): RoadMeshes {
+  const nodes: NodeInfo[] = data.drumuri.noduri.map((n, i) => ({ x: n.p[0], z: n.p[1], deg: 0, wmax: 0, ring: false, rb: rings.get(i) }));
   for (const r of roads)
     for (const k of [r.a, r.b]) {
       nodes[k].deg++;
@@ -253,7 +270,7 @@ export function buildRoads(data: WorldJson, ground: Ground, roads: MapRoad[], an
     return rows;
   };
 
-  roads.forEach((r) => {
+  roads.forEach((r, ri) => {
     pointOn(r, r.L / 2, o);
     const t = tileOf(o.x, o.z);
     const A = nodes[r.a];
@@ -263,7 +280,7 @@ export function buildRoads(data: WorldJson, ground: Ground, roads: MapRoad[], an
     for (const [a, b] of offDeck(r, 0, r.L)) asphalt[t].ribbon(band(r, a, b, -hw - 0.03, hw + 0.03, ROAD_LIFT, 3), ground, WHITE, ASPH_UV);
 
     // where the lines stop: before a junction (after its crossing) or a road end
-    const cross = (n: NodeInfo) => n.wmax / 2 + 0.32;
+    const cross = (n: NodeInfo) => (n.rb ? n.rb.outer + 0.22 : n.wmax / 2 + 0.32);
     const cut = (n: NodeInfo) => (n.deg >= 3 ? cross(n) + (r.urban && !n.ring ? 0.32 : 0.1) : n.deg === 1 ? 0.25 : 0);
     const m0 = cut(A);
     const m1 = r.L - cut(B);
@@ -293,11 +310,20 @@ export function buildRoads(data: WorldJson, ground: Ground, roads: MapRoad[], an
         if (r.decks.some(([d0, d1]) => s > d0 - 0.4 && s < d1 + 0.4)) continue;
         for (let u = -hw + 0.1; u < hw - 0.08; u += 0.13) marks[t].ribbon(band(r, s - 0.13, s + 0.13, u, u + 0.065, MARK_LIFT, 2, 0.13), ground, WHITE, 1);
       }
+    // and the crossings with lights along the longer streets, with a stop line before each
+    for (const c of crossings) {
+      if (c.road !== ri) continue;
+      const s = c.f * r.L;
+      for (let u = -hw + 0.1; u < hw - 0.08; u += 0.13) marks[t].ribbon(band(r, s - 0.13, s + 0.13, u, u + 0.065, MARK_LIFT, 2, 0.13), ground, WHITE, 1);
+      marks[t].ribbon(band(r, s - 0.3, s - 0.26, 0, hw - 0.04, MARK_LIFT, 2), ground, WHITE, 1);
+      marks[t].ribbon(band(r, s + 0.26, s + 0.3, -hw + 0.04, 0, MARK_LIFT, 2), ground, WHITE, 1);
+    }
 
     // kerbs and sidewalks along the town streets
     if (r.urban && !r.ring) {
-      const k0 = A.deg >= 3 ? A.wmax / 2 + WALK + 0.02 : 0;
-      const k1 = r.L - (B.deg >= 3 ? B.wmax / 2 + WALK + 0.02 : 0);
+      const kerbStop = (n: NodeInfo) => (n.rb ? n.rb.outer + 0.02 : n.deg >= 3 ? n.wmax / 2 + WALK + 0.02 : 0);
+      const k0 = kerbStop(A);
+      const k1 = r.L - kerbStop(B);
       if (k1 - k0 > 0.3)
         for (const [a, b] of offDeck(r, k0, k1))
           for (const sd of [-1, 1]) {
@@ -315,11 +341,82 @@ export function buildRoads(data: WorldJson, ground: Ground, roads: MapRoad[], an
     }
   });
 
-  // junction pads (fill the corners where roads meet) and rounded road ends
+  // junction pads (fill the corners where roads meet) and rounded road ends; a roundabout's whole ring
   nodes.forEach((n) => {
     if (n.deg === 0) return;
-    const r = n.deg >= 3 ? n.wmax * (n.ring ? 0.55 : 0.62) : n.wmax / 2 + 0.03;
-    asphalt[tileOf(n.x, n.z)].disc(n.x, n.z, r, ground, ROAD_LIFT, WHITE, ASPH_UV);
+    const r = n.rb ? n.rb.outer : n.deg >= 3 ? n.wmax * (n.ring ? 0.55 : 0.62) : n.wmax / 2 + 0.03;
+    asphalt[tileOf(n.x, n.z)].disc(n.x, n.z, r, ground, ROAD_LIFT, WHITE, ASPH_UV, n.rb ? 40 : 20);
+  });
+
+  // roundabouts: "give way" dashes across each way in, and the pavement round the ring in town
+  const islands: THREE.BufferGeometry[] = [];
+  roads.forEach((r) => {
+    pointOn(r, r.L / 2, o);
+    const t = tileOf(o.x, o.z);
+    const hw = r.l / 2;
+    for (const [n, end] of [
+      [nodes[r.a], 0],
+      [nodes[r.b], 1],
+    ] as const) {
+      if (!n.rb) continue;
+      // the lane coming in: left of the centre line at the road's start, right of it at its end
+      const s = end === 0 ? n.rb.outer + 0.05 : r.L - n.rb.outer - 0.05;
+      const [u0, u1] = end === 0 ? [-hw + 0.06, -0.04] : [0.04, hw - 0.06];
+      for (let u = u0; u < u1 - 0.04; u += 0.11) marks[t].ribbon(band(r, s - 0.025, s + 0.025, u, Math.min(u1, u + 0.06), MARK_LIFT, 2), ground, WHITE, 1);
+    }
+  });
+  nodes.forEach((n, i) => {
+    const rb = n.rb;
+    if (!rb) return;
+    const t = tileOf(n.x, n.z);
+    // the island: a kerb, grass, and a few shrubs in the middle
+    const h = ground.at(n.x, n.z) + ROAD_LIFT;
+    islands.push(cylinder(rb.island, 0.16, KERB_COL, n.x, h - 0.1, n.z, 28));
+    islands.push(cylinder(rb.island - 0.06, 0.17, GRASS, n.x, h - 0.1, n.z, 28));
+    for (let k = 0; k < 3; k++) {
+      const a = k * 2.094 + i;
+      const g = new THREE.IcosahedronGeometry(0.11 + (k % 2) * 0.03, 0).scale(1, 0.7, 1);
+      g.translate(n.x + Math.cos(a) * 0.22, h + 0.12, n.z + Math.sin(a) * 0.22);
+      islands.push(paint(g, k === 1 ? SHRUB2 : SHRUB));
+    }
+    // the town's pavement round the ring, cut where the roads come in
+    const town = roads.filter((r) => r.urban && (r.a === i || r.b === i));
+    if (!town.length) return;
+    const gaps: [number, number][] = roads
+      .filter((r) => r.a === i || r.b === i)
+      .map((r) => {
+        pointOn(r, r.a === i ? Math.min(r.L, rb.outer) : Math.max(0, r.L - rb.outer), o);
+        const a = Math.atan2(o.z - n.z, o.x - n.x);
+        const half = Math.asin(Math.min(0.95, (r.l / 2 + WALK + 0.06) / rb.outer));
+        return [a - half, a + half];
+      });
+    const free = (a: number) => gaps.every(([g0, g1]) => Math.abs(Math.atan2(Math.sin(a - (g0 + g1) / 2), Math.cos(a - (g0 + g1) / 2))) > (g1 - g0) / 2);
+    const r0 = rb.outer + 0.01;
+    const r1 = rb.outer + KERB + WALK;
+    const SEG = 64;
+    let run: number[] = [];
+    const flush = () => {
+      if (run.length >= 2) {
+        const at = (a: number, r: number, y: number): [number, number, number] => {
+          const x = n.x + Math.cos(a) * r;
+          const z = n.z + Math.sin(a) * r;
+          return [x, ground.at(x, z) + y, z];
+        };
+        // walk top (outer to inner: left to right going round with a rising angle), then the kerb's face both ways
+        walks[t].ribbon(run.map((a) => [at(a, r1, ROAD_LIFT + KERB_H - 0.004), at(a, r0, ROAD_LIFT + KERB_H)]), ground, WHITE, WALK_UV);
+        walks[t].ribbon(run.map((a) => [at(a, r0, ROAD_LIFT + KERB_H), at(a, r0, ROAD_LIFT - 0.01)]), ground, new THREE.Color("#c9c6bf"), WALK_UV * 4);
+        walks[t].ribbon(run.map((a) => [at(a, r0, ROAD_LIFT - 0.01), at(a, r0, ROAD_LIFT + KERB_H)]), ground, new THREE.Color("#c9c6bf"), WALK_UV * 4);
+      }
+      run = [];
+    };
+    // start in a gap so no stretch is split at the seam
+    const a0 = (gaps[0][0] + gaps[0][1]) / 2;
+    for (let k = 0; k <= SEG; k++) {
+      const a = a0 + (k / SEG) * Math.PI * 2;
+      if (free(a)) run.push(a);
+      else flush();
+    }
+    flush();
   });
 
   const asphaltMat = hazed(
@@ -346,5 +443,14 @@ export function buildRoads(data: WorldJson, ground: Ground, roads: MapRoad[], an
   add(root, walks, walkMat);
   add(markings, marks, markMat);
   root.add(markings);
+  if (islands.length) {
+    const islandMat = hazed(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0, envMapIntensity: 0.4 }));
+    islandMat.userData.snowK = 0.7;
+    const m = new THREE.Mesh(mergeGeometries(islands.map((g) => (g.index ? g.toNonIndexed() : g))), islandMat);
+    m.name = "roundabout-islands";
+    m.castShadow = true;
+    m.receiveShadow = true;
+    root.add(m);
+  }
   return { root, markings };
 }
