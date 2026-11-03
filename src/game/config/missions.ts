@@ -58,7 +58,7 @@ export const MILESTONES: MilestoneMission[] = [
  */
 export type DailyTemplate =
   | { metric: "carsProduced" | "carsSold" | "moneyEarned" | "componentsProduced" | "deliveries" | "netProfit"; title: string; seconds: number; min: number }
-  | { metric: "levelsBought" | "upgradesBought" | "researchDone" | "managersHired"; title: string; amount: number };
+  | { metric: "levelsBought" | "upgradesBought" | "researchDone" | "managersHired" | "mapEvents"; title: string; amount: number };
 
 export const DAILY_TEMPLATES: DailyTemplate[] = [
   { metric: "componentsProduced", title: "Produce {n} components", seconds: 900, min: 30 },
@@ -68,8 +68,24 @@ export const DAILY_TEMPLATES: DailyTemplate[] = [
   { metric: "netProfit", title: "Make {n} net profit", seconds: 1_200, min: 2_000 },
   { metric: "carsSold", title: "Sell {n} cars", seconds: 900, min: 3 },
   { metric: "researchDone", title: "Complete {n} research project", amount: 1 },
+  { metric: "mapEvents", title: "Handle {n} events on the map", amount: 3 },
 ];
 
 export const DAILY_COUNT = 3;
 /** Daily reward: this many seconds of income, plus RP. */
 export const DAILY_REWARD_SECONDS = 900;
+
+/**
+ * The daily chest: opened once all of the day's missions are taken. Its income
+ * grows with every day in a row it is opened (up to `streakMax` days), and
+ * every `starEvery`th day in a row it holds a star too.
+ */
+export const DAILY_CHEST = {
+  incomeSeconds: 1_800,
+  /** Extra share of the income per day in a row after the first. */
+  streakStep: 0.25,
+  streakMax: 5,
+  /** Seconds of research points. */
+  rpSeconds: 600,
+  starEvery: 7,
+};

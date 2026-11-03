@@ -172,7 +172,9 @@ export type MetricId =
   /** Cars delivered to a dealer's lot. */
   | "carsShipped"
   /** 1 once the company runs the whole chain itself: Body Works, Engine and Tire Factory, Assembly, a car made. */
-  | "fullChain";
+  | "fullChain"
+  /** Bonuses and road events taken on the Empire Map. */
+  | "mapEvents";
 
 export interface MissionState {
   id: string;
@@ -205,6 +207,8 @@ export interface Stats {
   carRevenue: number;
   /** Cars delivered to dealers' lots. */
   carsShipped?: number;
+  /** Bonuses and road events taken on the Empire Map. */
+  mapEvents: number;
 }
 
 export interface OfflineReport {
@@ -649,6 +653,9 @@ export interface GameState {
     dailyDate: string;
     daily: MissionState[];
     milestonesClaimed: string[];
+    /** The day (dateKey) the daily chest was last opened, and how many days in a row. */
+    chestDate: string;
+    chestStreak: number;
   };
   run: Stats;
   lifetime: Stats;

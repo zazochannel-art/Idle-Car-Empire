@@ -134,3 +134,54 @@ describe("map bonuses", () => {
     expect(MAP_BONUS_BY_KIND.storm.emoji).toBeTruthy();
   });
 });
+
+describe("road events on the map", () => {
+  const withTruck = () => {
+    const s = started();
+    s.chain.shipments.push({ id: 99, from: STARTER_PLOT, to: MARKET, item: "body", qty: 1, value: 10, t: 0, dur: 100, back: false, vehicle: "van" });
+    return s;
+  };
+
+  it("a crash and a jam come only with deliveries on the road, the police chase only with a dealership", () => {
+    for (let k = 0; k < 60; k++) {
+      const s = started();
+      Mb.mapBonusTick(s, MAP_BONUS.first, T0, seq(k / 60, 0.5));
+      expect(["accident", "jam", "police"]).not.toContain(s.mapBonus.active!.kind);
+    }
+    const seen = new Set<string>();
+    for (let k = 0; k < 200; k++) {
+      const s = withTruck();
+      for (const d of Object.values(s.dealers)) d.owned = true;
+      Mb.mapBonusTick(s, MAP_BONUS.first, T0, seq(k / 200, 0.5));
+      seen.add(s.mapBonus.active!.kind);
+    }
+    expect(seen).toContain("accident");
+    expect(seen).toContain("jam");
+    expect(seen).toContain("police");
+  });
+
+  it("each slows deliveries by its own share until it is taken; the chase slows nothing", () => {
+    const s = withTruck();
+    s.mapBonus.active = { id: 1, kind: "accident", left: 60 };
+    expect(Mb.deliverySlowdown(s)).toBe(MAP_BONUS_BY_KIND.accident.slow);
+    s.mapBonus.active = { id: 2, kind: "jam", left: 60 };
+    expect(Mb.deliverySlowdown(s)).toBe(MAP_BONUS_BY_KIND.jam.slow);
+    const snap = snapshot(s).chain;
+    chainTick(s, 10, snap, () => {});
+    expect(s.chain.shipments.find((x) => x.id === 99)!.t).toBeCloseTo(10 * MAP_BONUS_BY_KIND.jam.slow!);
+    expect(Mb.claimMapBonus(s, 2, T0)).not.toBeNull();
+    expect(Mb.deliverySlowdown(s)).toBe(1);
+    s.mapBonus.active = { id: 3, kind: "police", left: 40 };
+    expect(Mb.deliverySlowdown(s)).toBe(1);
+    expect(Mb.slowsDeliveries("police")).toBe(false);
+    expect(Mb.slowsDeliveries("accident")).toBe(true);
+  });
+
+  it("every bonus taken counts toward the daily missions", () => {
+    const s = started();
+    Mb.mapBonusTick(s, MAP_BONUS.first, T0, seq(0));
+    Mb.claimMapBonus(s, s.mapBonus.active!.id, T0);
+    expect(s.lifetime.mapEvents).toBe(1);
+    expect(s.run.mapEvents).toBe(1);
+  });
+});
