@@ -100,3 +100,28 @@ What was wrong, and what changed:
 The ledger itself is unchanged: every dollar is still booked once, and the Welcome Back report
 still shows money in and out. Only the profit figure adds the stock change.
 
+
+## 6. Nordheim (1.0.9): its lines, the Nordic package, the trade route
+
+Nordheim's numbers were first picked by hand. Measured against the rest with
+`npx tsx scripts/car-table.ts` (list prices, Level 1 plants, no bonuses): each Nordic line should
+do about what its home twin does against the regular car of its tier: better in one way
+(per second of assembly, the dealers' demand for its class, or per part), not worse in all of them.
+
+| Value | OLD | NEW | WHY |
+|---|---|---|---|
+| Ore Hauler (t3) assembly time | 75 s | **65 s** | $51/s against the SUV's $64/s: only its economy-class demand made it worth building. Now $59/s and it still sells fastest. |
+| Snow Crawler (t5) class, time | premium, 100 s | **luxury, 90 s** | Worse than the Luxury Coupe of its tier in every way (−23% per second, per part). Now about level with it ($134/s against $129/s), like the home Shooting Brake. |
+| Northern Lights (t11) assembly time | 165 s | **145 s** | The flagship earned less per second than the tier 9 Electric ($559/s against $609/s). Now $636/s. |
+| Research points of the Fjord Wagon, Snow Crawler, Aurora GT, Ice Rally | 9, 24, 120, 320 | **13, 32, 160, 420** | Below the regular cars of their tiers; the home lines give a little more than theirs. |
+| Nordic package (`NORDIC.cost`) | 60 × a car's value | **30 ×** | +12% value only in Nordheim, −3% speed: it paid back in ~500 cars, twice the first Model refinement (25 ×, +10% everywhere). |
+| Trade route (`TRADE_ROUTE`) | 30 min of income every 4 h | **20 min every 6 h** | Up to 3 h of income a day for a tap: four times the best login reward and more than all of a day's map bonuses. Now at most 80 min a day. |
+
+Unchanged: Fjord Wagon, Aurora GT, Ice Rally and Polar Shuttle already sit where their home twins do;
+the snowstorm (45 s, same slowdown as a breakdown) keeps Nordheim's average map bonus below the first
+city's; opening Nordheim ($10B and every territory) is about 6 h of a 24 h company's income.
+
+Measured with `goal-bot north` (a new company starting in Nordheim): it runs 15–25% behind the first
+city in its first hours (`8 q`: $32M against $38M at 8 h) and about half as fast in `full` mode, where
+its racing prizes go to the first city's wallet. That gap comes from the map, not the prices; a
+real player arrives with the company's research, managers and Stars.
