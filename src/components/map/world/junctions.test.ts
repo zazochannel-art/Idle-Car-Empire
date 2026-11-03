@@ -86,4 +86,16 @@ describe("keeping distance", () => {
     expect(clearance(me, [car(1.0, 0, Math.PI)], bend)).toBe(1);
     expect(clearance(me, [car(0.4, 0.5, Math.PI / 2)], bend)).toBeLessThan(0.3);
   });
+
+  it("stops at a red light's line and for a pedestrian crossing, long after it would edge past a car", () => {
+    const me = car(0, 0, 0);
+    const line = { x: 0.6, z: 0, yaw: 0, half: 0.05, hard: true, oneWay: true };
+    const walker = { x: 0.5, z: 0, yaw: Math.PI / 2, half: 0.05, hard: true };
+    expect(clearance(me, [line], straight)).toBe(0);
+    expect(clearance(me, [line], straight, 10)).toBe(0);
+    expect(clearance(me, [walker], straight, 10)).toBe(0);
+    // a stop line holds its own lane only, and not the car already over it
+    expect(clearance(me, [{ ...line, yaw: Math.PI / 2 }], straight)).toBe(1);
+    expect(clearance(me, [{ ...line, x: 0.1 }], straight)).toBe(1);
+  });
 });
