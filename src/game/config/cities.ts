@@ -29,7 +29,7 @@ export const CITIES: Record<CityId, CityConfig> = {
  * The trade route: with two cities, a convoy runs between them every few hours and
  * brings the city being played this many seconds of the company's income (both cities').
  */
-export const TRADE_ROUTE = { cooldownHours: 4, incomeSeconds: 1_800 };
+export const TRADE_ROUTE = { cooldownHours: 6, incomeSeconds: 1_200 };
 
 export const CITY_RULES = {
   /** Share of its steady income a city brings in while the company is busy in another one. */

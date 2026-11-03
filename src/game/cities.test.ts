@@ -3,7 +3,7 @@
 // stays in the first city; saves keep every city on its own map.
 import { afterEach, describe, expect, it } from "vitest";
 import { DEPOT, MARKET, RACING, RACING_AREA, STARTER_PLOT, WORLD_MAP, setWorld, withWorld, worldOf } from "./city/layout";
-import { CITY_RULES } from "./config/cities";
+import { CITY_RULES, TRADE_ROUTE } from "./config/cities";
 import { BUYABLE_TERRITORIES } from "./config/city";
 import * as C from "./engine/city";
 import * as Ch from "./engine/chain";
@@ -404,12 +404,12 @@ describe("playing in two cities", () => {
     const cash = s.cash;
     const got = Cy.sendTradeConvoy(s, T0, 1_000);
     expect(got).toBeCloseTo(Cy.tradeRouteReward(s, 1_000));
-    expect(got).toBeGreaterThanOrEqual(1_000 * 1_800);
+    expect(got).toBeGreaterThanOrEqual(1_000 * TRADE_ROUTE.incomeSeconds);
     expect(s.cash).toBeCloseTo(cash + got);
     // not again until the cooldown is over
     expect(Cy.sendTradeConvoy(s, T0 + 3_600_000, 1_000)).toBe(0);
-    expect(Cy.tradeRouteWait(s, T0 + 3_600_000)).toBe(3 * 3_600_000);
+    expect(Cy.tradeRouteWait(s, T0 + 3_600_000)).toBe((TRADE_ROUTE.cooldownHours - 1) * 3_600_000);
     expect(roundTrip(s).tradeRoute).toBe(s.tradeRoute);
-    expect(Cy.sendTradeConvoy(s, T0 + 4 * 3_600_000, 1_000)).toBeGreaterThan(0);
+    expect(Cy.sendTradeConvoy(s, T0 + TRADE_ROUTE.cooldownHours * 3_600_000, 1_000)).toBeGreaterThan(0);
   });
 });
