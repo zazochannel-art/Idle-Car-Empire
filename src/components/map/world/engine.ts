@@ -27,6 +27,7 @@ import { banner, pop, tag } from "./labels";
 import { PlotLayer, plotViews, type PlotView } from "./plots";
 import { RaceCars } from "./race";
 import { buildRoads } from "./roads";
+import { roundabouts } from "./junctions";
 import { Scenery, type BillboardAd } from "./scenery";
 import type { CityLife } from "./city-life";
 import { Ground, NTX, NTY, buildTerrain, type TerrainParts, type WorldJson } from "./terrain";
@@ -359,10 +360,13 @@ export class MapEngine {
     this.mats = mapMaterials(aniso);
     this.terrain = buildTerrain(ground, tiles);
     this.scene.add(...this.terrain.tiles, this.terrain.sea, this.terrain.floor);
-    this.scenery = new Scenery(data, ground, this.mats, { low: this.low, lots: WORLD_MAP.plots.map((p) => ({ x: p.x, y: p.y, w: p.w, d: p.d, rot: p.rot, clear: !!p.territory })) });
+    // the junctions that are roundabouts: the scenery keeps off them, the roads draw them, the traffic drives round them
+    const rings = roundabouts(WORLD_MAP, data.cladiri);
+    const ringLots = [...rings.values()].map((r) => ({ x: r.x, y: r.z, w: 2 * r.outer + 0.3, d: 2 * r.outer + 0.3, rot: 0 }));
+    this.scenery = new Scenery(data, ground, this.mats, { low: this.low, lots: [...WORLD_MAP.plots.map((p) => ({ x: p.x, y: p.y, w: p.w, d: p.d, rot: p.rot, clear: !!p.territory })), ...ringLots] });
     this.scene.add(this.scenery.root);
     this.scenery.setClose(this.cam.dist < CLOSE_VIEW);
-    const roads = buildRoads(data, ground, this.scenery.roads, aniso);
+    const roads = buildRoads(data, ground, this.scenery.roads, aniso, rings);
     this.roadMarks = roads.markings;
     this.scene.add(roads.root);
     this.glows = lampGlows(this.scenery.lamps);
@@ -370,7 +374,7 @@ export class MapEngine {
     this.plots = new PlotLayer(ground);
     this.plots.onFinished = (plot, text) => this.banners.push({ plot, text, age: 0 });
     this.scene.add(this.plots.root);
-    this.trafficLayer = new Traffic3D(ground, this.scenery.roads, this.mats.car);
+    this.trafficLayer = new Traffic3D(ground, this.scenery.roads, this.mats.car, rings);
     this.trafficLayer.density = this.low ? 0.5 : 1;
     this.trafficLayer.onArrive = (id) => this.pop(id, "🚗", "#93c5fd");
     this.scene.add(this.trafficLayer.root);

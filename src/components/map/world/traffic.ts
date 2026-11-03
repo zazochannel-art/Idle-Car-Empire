@@ -28,6 +28,7 @@ const TRAFFIC_SCALE: Record<CarModel, number> = {
   pickup: 1,
   robotaxi: 1,
 };
+import { aroundRings, ringPath, type Roundabout } from "./junctions";
 import { freezeStatic, hazed, shadowFromLargest } from "./kit";
 import { ROAD_LIFT, carGeometry, roadSurface, type MapRoad } from "./scenery";
 import { bake } from "./structures";
@@ -39,19 +40,63 @@ const VSCALE = 0.12;
 const TOWN_SPEED = 1.9;
 const COUNTRY_SPEED = 3.6;
 /** Town cars at most: each is a full 3D model (several draw calls), so phones stay smooth. */
-const MAX_CARS = 48;
+const MAX_CARS = 24;
+/** Road length (world units) per town car: a calm town, not a traffic jam. */
+const ROAD_PER_CAR = 20;
 /** Buyers driving off at once, and the gap between two at the same dealership (s): a busy dealer sells several cars a second. */
-const MAX_BUYERS = 10;
-const BUYER_GAP = 2.5;
+const MAX_BUYERS = 5;
+const BUYER_GAP = 4;
+/** How fast a car gets back to its pace after slowing (units/s²). */
+const ACCEL = 2.4;
+/** Share of its pace a car keeps through a turn, and round a roundabout. */
+const TURN_PACE = 0.75;
+const RING_PACE = 0.62;
+/** A truck may run this far (s) behind its shipment's clock while it waits for the car in front. */
+const TRUCK_LAG = 2.5;
+/** The free room (units) a car leaves to the one in front, and from where it starts to slow. */
+const STOP_GAP = 0.12;
+const SLOW_GAP = 0.85;
+/** A car that has stood this long (s) edges through a junction, then through anything (no jam lasts). */
+const WAIT_CROSS = 2;
+const WAIT_ANY = 5;
 
 type P3 = [number, number, number];
+type P2 = [number, number];
+
+/** A car's way through a junction: a curve onto the next road, or round a roundabout. */
+interface Turn {
+  pts: P2[];
+  acc: number[];
+  /** Distance done along it. */
+  d: number;
+  /** The road it comes out on, the way along it, and where. */
+  road: number;
+  dir: 1 | -1;
+  s: number;
+  /** Round a roundabout (slower than a plain turn). */
+  ring: boolean;
+  /** The junction, and the road and way the car came in on. */
+  node: number;
+  from: number;
+  fromDir: 1 | -1;
+}
 
 /** A car driving the roads on its own. */
 interface RoadCar {
   road: number;
   s: number;
   dir: 1 | -1;
-  speed: number;
+  /** Its own pace (a share of the road's speed), its speed now, and how long it has stood still. */
+  pace: number;
+  v: number;
+  wait: number;
+  /** Going through a junction. */
+  turn: Turn | null;
+  /** Half its length (others keep this far off its middle). */
+  half: number;
+  /** The road it takes at the next junction (chosen as it gets near), and its way through. */
+  next: [number, boolean] | null;
+  plan: Turn | null;
   color: THREE.Color;
   hex: string;
   model: CarModel;
@@ -94,6 +139,11 @@ interface Truck {
   yaw: number;
   /** Delivered: fading out in the yard. */
   gone: number;
+  /** The shipment's clock as the engine runs it (lt, the one it is drawn at, may fall behind while it waits). */
+  et: number;
+  /** The two lots (the empty truck drives home on its own side of the road). */
+  a: Plot;
+  b: Plot;
   /** Its model's length, height and width (for the simple shape far out). */
   size?: THREE.Vector3;
 }
@@ -127,6 +177,20 @@ function cumulative(pts: P3[]) {
   const acc = [0];
   for (let i = 1; i < pts.length; i++) acc.push(acc[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][2] - pts[i - 1][2]));
   return acc;
+}
+
+function cumulative2(pts: P2[]) {
+  const acc = [0];
+  for (let i = 1; i < pts.length; i++) acc.push(acc[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+  return acc;
+}
+
+/** Something on the road that others keep behind: where it is, its heading and half its length. */
+interface Body {
+  x: number;
+  z: number;
+  yaw: number;
+  half: number;
 }
 
 /** Point at distance s along a 3D path (and its direction on the ground). */
@@ -169,6 +233,53 @@ function alongCached(pts: [number, number][], acc: number[], s: number, hint: nu
 }
 
 
+/** Half a vehicle's width, and the room kept beside it. */
+const HALF_WIDTH = 0.14;
+const SIDE_ROOM = 0.03;
+/** Step (units) of the look along a vehicle's way ahead. */
+const PROBE_STEP = 0.1;
+
+/** Distance from a point to the middle line of a body (from its back to its front, less the rounded ends). */
+function toBody(x: number, z: number, o: Body) {
+  const ex = Math.cos(o.yaw);
+  const ez = -Math.sin(o.yaw);
+  const l = Math.max(0, o.half - HALF_WIDTH);
+  const t = Math.max(-l, Math.min(l, (x - o.x) * ex + (z - o.z) * ez));
+  return Math.hypot(x - o.x - ex * t, z - o.z - ez * t);
+}
+
+/**
+ * How much of its pace a vehicle may keep (0–1) with `others` round it. It
+ * looks along its own way ahead (`way(d)`: the point d units ahead of its
+ * middle, round the bends and through the junction it is taking) and slows
+ * for anything its front would run into there, stopping a little short.
+ * Cars beside its way (oncoming ones in the other lane, those waiting at
+ * a junction) are no obstacle. `wait` (s stood still) lets it edge on at last.
+ */
+export function clearance(me: Body, others: readonly Body[], way: (d: number) => [number, number], wait = 0): number {
+  if (wait > WAIT_ANY) return 1;
+  // only what is near enough to matter
+  const R = me.half + SLOW_GAP + 1;
+  const near: Body[] = [];
+  for (const o of others) {
+    if (o === me) continue;
+    const dx = o.x - me.x;
+    const dz = o.z - me.z;
+    if (dx > R || dx < -R || dz > R || dz < -R) continue;
+    // already beside or behind its front: it is the one to wait (or we are passing)
+    if (dx * Math.cos(me.yaw) - dz * Math.sin(me.yaw) <= 0) continue;
+    // standing long enough, it edges past anything not going its way
+    if (wait > WAIT_CROSS && Math.abs(angle(o.yaw - me.yaw)) > 0.8) continue;
+    near.push(o);
+  }
+  if (!near.length) return 1;
+  for (let gap = 0; gap <= SLOW_GAP; gap += PROBE_STEP) {
+    const [x, z] = way(me.half + gap);
+    for (const o of near) if (toBody(x, z, o) < 2 * HALF_WIDTH + SIDE_ROOM) return Math.max(0, Math.min(1, (gap - STOP_GAP) / (SLOW_GAP - STOP_GAP)));
+  }
+  return 1;
+}
+
 /** The cab paint trucks are built with, swapped for each truck's own colour (no truck is this colour). */
 const CAB_PLACEHOLDER = "#fe01fe";
 
@@ -202,10 +313,14 @@ export class Traffic3D {
   private clock = 0;
   private lastBuyer = new Map<string, number>();
 
+  /** How far before a junction a car leaves its road to turn (0: it just carries on). */
+  private cut: number[] = [];
+
   constructor(
     private ground: Ground,
     private mapRoads: MapRoad[],
     carMat: THREE.Material,
+    private rings: ReadonlyMap<number, Roundabout> = new Map(),
   ) {
     this.root.name = "traffic";
     this.inst = new THREE.InstancedMesh(this.carGeo, carMat, FAR_CAP);
@@ -223,6 +338,22 @@ export class Traffic3D {
     WORLD_MAP.roads.forEach((r, i) => {
       this.exits[r.a].push([i, true]);
       if (!r.oneway) this.exits[r.b].push([i, false]);
+    });
+    // where three roads meet or more, cars turn on a curve from a little before it (round the ring at a roundabout);
+    // on the old roundabout's own ring (one-way roads) they keep to its line
+    const deg = new Array<number>(N).fill(0);
+    const wmax = new Array<number>(N).fill(0);
+    const ring = new Array<boolean>(N).fill(false);
+    for (const r of WORLD_MAP.roads)
+      for (const k of [r.a, r.b]) {
+        deg[k]++;
+        wmax[k] = Math.max(wmax[k], r.w);
+        if (r.oneway) ring[k] = true;
+      }
+    this.cut = Array.from({ length: N }, (_, i) => {
+      const rb = this.rings.get(i);
+      if (rb) return rb.outer + 0.25;
+      return deg[i] >= 3 && !ring[i] ? wmax[i] * 0.62 + 0.3 : 0;
     });
   }
 
@@ -249,7 +380,144 @@ export class Traffic3D {
   // ───────────────────────── road cars ─────────────────────────
 
   private target() {
-    return Math.round(Math.min(MAX_CARS, this.openLen / 11) * this.density);
+    return Math.round(Math.min(MAX_CARS, this.openLen / ROAD_PER_CAR) * this.density);
+  }
+
+  /** The part of a road a car drives along (outside the junctions at its ends). */
+  private span(road: number): [number, number] {
+    const r = WORLD_MAP.roads[road];
+    const s0 = this.cut[r.a];
+    const s1 = r.len - this.cut[r.b];
+    return s1 - s0 > 0.1 ? [s0, s1] : [r.len / 2, r.len / 2];
+  }
+
+  /** Nothing (car or truck) this close to a spot: room for a car to appear. */
+  private roomAt(x: number, z: number, room = 1) {
+    for (const c of this.cars) if (Math.abs(c.x - x) < room && Math.abs(c.z - z) < room) return false;
+    for (const t of this.trucks.values()) if (!t.gone && Math.abs(t.x - x) < room + 0.4 && Math.abs(t.z - z) < room + 0.4) return false;
+    return true;
+  }
+
+  /** A point on a road's right-hand lane, going `dir` along it, and the way it faces. */
+  private lanePoint(road: number, s: number, dir: 1 | -1) {
+    const r = WORLD_MAP.roads[road];
+    const p = along(r.pts, r.acc, s);
+    const dx = p.tx * dir;
+    const dz = p.ty * dir;
+    const lane = r.oneway ? 0 : r.w * 0.25;
+    return { x: p.x - dz * lane, z: p.y + dx * lane, tx: dx, tz: dz };
+  }
+
+  /** The way from the end of a car's road, through `node`, onto the next road. */
+  private makeTurn(c: RoadCar, node: number, next: [number, boolean], at = c.s): Turn {
+    const from = this.lanePoint(c.road, at, c.dir);
+    const nr = WORLD_MAP.roads[next[0]];
+    const dir: 1 | -1 = next[1] ? 1 : -1;
+    const cut = Math.min(this.cut[node], nr.len / 2);
+    const s = dir > 0 ? cut : nr.len - cut;
+    const to = this.lanePoint(next[0], s, dir);
+    const rb = this.rings.get(node);
+    let pts: P2[];
+    if (rb) pts = ringPath(rb, [from.x, from.z], [to.x, to.z]);
+    else {
+      // a smooth curve from one lane into the other (a U-turn at a dead end too)
+      const h = Math.max(0.35, Math.hypot(to.x - from.x, to.z - from.z) * 0.42);
+      const p1: P2 = [from.x + from.tx * h, from.z + from.tz * h];
+      const p2: P2 = [to.x - to.tx * h, to.z - to.tz * h];
+      pts = [];
+      for (let k = 0; k <= 10; k++) {
+        const t = k / 10;
+        const u = 1 - t;
+        const a = u * u * u;
+        const b = 3 * u * u * t;
+        const d = 3 * u * t * t;
+        const e = t * t * t;
+        pts.push([a * from.x + b * p1[0] + d * p2[0] + e * to.x, a * from.z + b * p1[1] + d * p2[1] + e * to.z]);
+      }
+    }
+    return { pts, acc: cumulative2(pts), d: 0, road: next[0], dir, s, ring: !!rb, node, from: c.road, fromDir: c.dir };
+  }
+
+  /** The junction a car on a road drives into next, and where it stops for it. */
+  private ahead(c: RoadCar) {
+    const r = WORLD_MAP.roads[c.road];
+    const node = c.dir > 0 ? r.b : r.a;
+    return { node, stop: c.dir > 0 ? r.len - this.cut[node] : this.cut[node] };
+  }
+
+  /** The road a car takes at `node` (it keeps its choice until it is through). */
+  private choose(c: RoadCar, node: number): [number, boolean] | null {
+    if (c.next) return c.next;
+    const r = WORLD_MAP.roads[c.road];
+    const back = c.road;
+    const options = this.exits[node].filter(([i]) => (this.open[i] || c.life > 0) && i !== back);
+    c.next = options.length ? options[Math.floor(Math.random() * options.length)] : r.oneway ? null : [back, node === r.a];
+    const { stop } = this.ahead(c);
+    c.plan = c.next && (this.cut[node] > 0 || c.next[0] === back) ? this.makeTurn(c, node, c.next, stop) : null;
+    return c.next;
+  }
+
+  /**
+   * May a car waiting at a junction go? At a plain junction one stream at a
+   * time (the cars behind the one turning follow it); at a roundabout the
+   * cars already on the ring go first, and a few at most are on it.
+   */
+  private mayEnter(c: RoadCar, node: number): boolean {
+    if (this.cut[node] <= 0 || c.wait > 6) return true;
+    const rb = this.rings.get(node);
+    const ae = rb ? Math.atan2(c.z - rb.z, c.x - rb.x) : 0;
+    let onRing = 0;
+    for (const o of this.cars) {
+      const t = o.turn;
+      if (o === c || !t || t.node !== node || (o.life > 0 && o.alpha < 0.5)) continue;
+      if (!rb) {
+        if (t.from === c.road && t.fromDir === c.dir) continue;
+        return false;
+      }
+      onRing++;
+      // coming round toward this entry (the ring turns the angle down): give way
+      const d = angle(Math.atan2(o.z - rb.z, o.x - rb.x) - ae);
+      if (d > -0.35 && d < 1.5) return false;
+    }
+    return onRing < 4;
+  }
+
+  /** The point `d` ahead of a car along its way: its road, the junction it is taking, the road after. */
+  private way(c: RoadCar, d: number): [number, number] {
+    const t = c.turn;
+    if (t) {
+      const L = t.acc[t.acc.length - 1];
+      if (t.d + d <= L) {
+        const p = along(t.pts, t.acc, t.d + d);
+        return [p.x, p.y];
+      }
+      const r = WORLD_MAP.roads[t.road];
+      const p = this.lanePoint(t.road, Math.max(0, Math.min(r.len, t.s + (t.d + d - L) * t.dir)), t.dir);
+      return [p.x, p.z];
+    }
+    const { node, stop } = this.ahead(c);
+    const left = (stop - c.s) * c.dir;
+    if (d <= left || this.cut[node] <= 0) {
+      const r = WORLD_MAP.roads[c.road];
+      const p = this.lanePoint(c.road, Math.max(0, Math.min(r.len, c.s + d * c.dir)), c.dir);
+      return [p.x, p.z];
+    }
+    // past the line: the way through the junction it chose (straight on if it has not chosen yet)
+    const plan = c.plan;
+    const k = d - Math.max(0, left);
+    if (plan && k <= plan.acc[plan.acc.length - 1]) {
+      const p = along(plan.pts, plan.acc, k);
+      return [p.x, p.y];
+    }
+    const p = this.lanePoint(c.road, stop, c.dir);
+    return [p.x + p.tx * k, p.z + p.tz * k];
+  }
+
+  /** A car's usual speed on its road. */
+  private cruise(c: RoadCar) {
+    const r = WORLD_MAP.roads[c.turn ? c.turn.road : c.road];
+    const base = (r.fast ? COUNTRY_SPEED : TOWN_SPEED) * c.pace * (c.hero ? 0.6 : 1) * (c.special ? 0.8 : 1);
+    return c.turn ? base * (c.turn.ring ? RING_PACE : TURN_PACE) : base;
   }
 
   private randomRoad(): number {
@@ -265,9 +533,17 @@ export class Traffic3D {
   private newCar(road: number, s: number, dir: 1 | -1, hex: string, model: CarModel, life = 0, scale = 1, paint = false): RoadCar {
     const r = WORLD_MAP.roads[road];
     if (r.oneway) dir = 1;
+    const [s0, s1] = this.span(road);
+    s = Math.max(s0, Math.min(s1, s));
     const c: RoadCar = {
       road, s, dir,
-      speed: (r.fast ? COUNTRY_SPEED : TOWN_SPEED) * (0.85 + Math.random() * 0.3),
+      pace: 0.88 + Math.random() * 0.24,
+      v: 0,
+      wait: 0,
+      turn: null,
+      next: null,
+      plan: null,
+      half: 0.28 * scale,
       color: new THREE.Color(hex), hex, model, x: 0, y: 0, z: 0, yaw: 0,
       alpha: life ? 0 : 1, life, scale, paint, visual: new THREE.Group(), seg: 0, visualScale: -1,
     };
@@ -279,14 +555,26 @@ export class Traffic3D {
   }
 
   private spawnAmbient() {
-    const road = this.randomRoad();
+    // a free stretch of an open road (a few tries), so no car appears on top of another
+    let road = -1;
+    let s = 0;
+    let dir: 1 | -1 = 1;
+    for (let k = 0; k < 4 && road < 0; k++) {
+      const i = this.randomRoad();
+      if (i < 0) return;
+      const [s0, s1] = this.span(i);
+      const ss = s0 + Math.random() * (s1 - s0);
+      const d: 1 | -1 = WORLD_MAP.roads[i].oneway || Math.random() < 0.5 ? 1 : -1;
+      const p = this.lanePoint(i, ss, d);
+      if (this.roomAt(p.x, p.z)) [road, s, dir] = [i, ss, d];
+    }
     if (road < 0) return;
-    const r = WORLD_MAP.roads[road];
     // as the company sells, more of the town drives its cars
     const mine = this.own.length && Math.random() < this.ownShare ? this.own[Math.floor(Math.random() * this.own.length)] : null;
     const hex = mine?.color ?? CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)];
     const model = mine?.model ?? TRAFFIC_MODELS[Math.floor(Math.random() * TRAFFIC_MODELS.length)];
-    const c = this.newCar(road, Math.random() * r.len, Math.random() < 0.5 ? 1 : -1, hex, model, 0, mine ? 1 : TRAFFIC_SCALE[model], mine ? mine.paint : true);
+    const c = this.newCar(road, s, dir, hex, model, 0, mine ? 1 : TRAFFIC_SCALE[model], mine ? mine.paint : true);
+    c.v = this.cruise(c);
     c.own = !!mine;
     c.alpha = 0;
     this.cars.push(c);
@@ -329,8 +617,9 @@ export class Traffic3D {
     let buyers = 0;
     for (const c of this.cars) if (c.buyer) buyers++;
     if (buyers >= MAX_BUYERS) return;
-    this.lastBuyer.set(site.id, this.clock);
     const e = site.entry;
+    if (!this.roomAt(e.x, e.y, 0.8)) return;
+    this.lastBuyer.set(site.id, this.clock);
     const c = this.newCar(e.edge, e.s, Math.random() < 0.5 ? 1 : -1, color ?? CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)], model, 14);
     c.buyer = true;
     this.cars.push(c);
@@ -354,12 +643,11 @@ export class Traffic3D {
     const road = this.randomRoad();
     if (road < 0) return null;
     const r = WORLD_MAP.roads[road];
-    const c = this.newCar(road, Math.random() * r.len, Math.random() < 0.5 ? 1 : -1, color, model, 0, scale, false);
+    const c = this.newCar(road, Math.random() * r.len, r.oneway || Math.random() < 0.5 ? 1 : -1, color, model, 0, scale, false);
     c.special = { finish, stretch };
     c.alpha = 0;
     // built again now that it is special (its finish and length)
     this.refreshCarVisual(c);
-    c.speed *= 0.8;
     this.cars.push(c);
     return c;
   }
@@ -419,6 +707,19 @@ export class Traffic3D {
 
   /** Sets a car's position from its road and distance; `k` eases the heading. */
   private place(c: RoadCar, k: number) {
+    if (c.turn) {
+      const t = c.turn;
+      const p = along(t.pts, t.acc, t.d);
+      c.x = p.x;
+      c.z = p.y;
+      c.y = Math.max(this.ground.at(c.x, c.z), 0) + ROAD_LIFT + 0.005;
+      const yaw = Math.atan2(-p.ty, p.tx);
+      c.yaw = k >= 1 ? yaw : c.yaw + angle(yaw - c.yaw) * k;
+      c.visual.position.set(c.x, c.y, c.z);
+      c.visual.rotation.y = c.yaw;
+      c.visual.visible = c.alpha > 0.01;
+      return;
+    }
     const r = WORLD_MAP.roads[c.road];
     const p = alongCached(r.pts, r.acc, c.s, c.seg, c.dir);
     c.seg = p.seg;
@@ -437,26 +738,51 @@ export class Traffic3D {
   }
 
   private drive(c: RoadCar, dt: number) {
-    let r = WORLD_MAP.roads[c.road];
-    c.s += c.speed * dt * c.dir;
-    let guard = 0;
-    while ((c.s > r.len || c.s < 0) && guard++ < 4) {
-      const over = c.s > r.len ? c.s - r.len : -c.s;
-      const node = c.s > r.len ? r.b : r.a;
+    let move = c.v * dt;
+    for (let guard = 0; move > 0 && guard < 6; guard++) {
+      const t = c.turn;
+      if (t) {
+        const left = t.acc[t.acc.length - 1] - t.d;
+        if (move < left) {
+          t.d += move;
+          break;
+        }
+        // out of the junction, on the next road
+        move -= left;
+        c.road = t.road;
+        c.dir = t.dir;
+        c.s = t.s;
+        c.turn = null;
+        c.seg = c.dir > 0 ? 0 : Math.max(0, WORLD_MAP.roads[c.road].pts.length - 2);
+        continue;
+      }
+      const { node, stop } = this.ahead(c);
+      const left = (stop - c.s) * c.dir;
+      if (move < left) {
+        c.s += move * c.dir;
+        break;
+      }
+      move -= Math.max(0, left);
+      c.s = stop;
       const back = c.road;
-      const options = this.exits[node].filter(([i]) => (this.open[i] || c.life > 0) && i !== back);
-      const pick = options.length ? options[Math.floor(Math.random() * options.length)] : r.oneway ? null : ([back, node === r.a] as [number, boolean]);
+      const pick = this.choose(c, node);
       if (!pick) {
-        c.s = Math.max(0, Math.min(r.len, c.s));
         c.life = Math.max(c.life, 0.01);
         break;
       }
-      c.road = pick[0];
-      r = WORLD_MAP.roads[c.road];
-      c.dir = pick[1] ? 1 : -1;
-      c.seg = c.dir > 0 ? 0 : Math.max(0, r.pts.length - 2);
-      c.s = pick[1] ? over : r.len - over;
-      c.speed = (r.fast ? COUNTRY_SPEED : TOWN_SPEED) * (0.85 + Math.random() * 0.3) * (c.hero ? 0.6 : 1);
+      // waits at the line until the junction is free
+      if (!this.mayEnter(c, node)) break;
+      const plan = c.plan;
+      c.next = null;
+      c.plan = null;
+      if (this.cut[node] > 0 || pick[0] === back) c.turn = plan ?? this.makeTurn(c, node, pick);
+      else {
+        // a bend between two roads: straight on
+        c.road = pick[0];
+        c.dir = pick[1] ? 1 : -1;
+        c.s = pick[1] ? 0 : WORLD_MAP.roads[c.road].len;
+        c.seg = c.dir > 0 ? 0 : Math.max(0, WORLD_MAP.roads[c.road].pts.length - 2);
+      }
     }
     this.place(c, Math.min(1, dt * 8));
   }
@@ -504,8 +830,9 @@ export class Traffic3D {
     const [ybx, ybz] = yard(b);
     push(fbx, fbz);
     push(ybx, ybz);
-    // drop repeated points (slice ends meet at the junctions)
-    return pts.filter((p, i) => i === 0 || Math.hypot(p[0] - pts[i - 1][0], p[2] - pts[i - 1][2]) > 1e-3);
+    // drop repeated points (slice ends meet at the junctions), then drive round the roundabouts on the way
+    const line = pts.filter((p, i) => i === 0 || Math.hypot(p[0] - pts[i - 1][0], p[2] - pts[i - 1][2]) > 1e-3);
+    return aroundRings(line, this.rings.values(), (x, z) => this.ground.at(x, z) + ROAD_LIFT + 0.005);
   }
 
   private truckModel(v: ShipView) {
@@ -568,29 +895,33 @@ export class Traffic3D {
       seen.add(v.id);
       let tr = this.trucks.get(v.id);
       if (tr && tr.back !== v.back) {
-        // turned round at the far end: unloaded, then the empty truck heads home
+        // turned round at the far end: unloaded, then the empty truck heads home (on the right, its own route back)
         if (!tr.back && tr.view.vehicle === "carrier") this.onArrive(tr.view.to.id);
         this.root.remove(tr.obj);
         tr.obj = this.truckModel(v);
+        tr.size = undefined;
         this.root.add(tr.obj);
         tr.back = v.back;
-        tr.lt = v.t;
+        tr.path = v.back ? this.route(tr.b, tr.a) : this.route(tr.a, tr.b);
+        tr.acc = cumulative(tr.path);
+        tr.lt = tr.et = v.t;
       }
       if (!tr) {
         const a = plotOf(v.from.id);
         const b = plotOf(v.to.id);
         if (!a || !b) continue;
-        const path = this.route(a, b);
+        const path = v.back ? this.route(b, a) : this.route(a, b);
         if (path.length < 2) continue;
-        tr = { view: v, path, acc: cumulative(path), lt: v.t, back: v.back, obj: this.truckModel(v), x: 0, y: 0, z: 0, yaw: 0, gone: 0 };
+        tr = { view: v, path, acc: cumulative(path), lt: v.t, et: v.t, a, b, back: v.back, obj: this.truckModel(v), x: 0, y: 0, z: 0, yaw: 0, gone: 0 };
         this.root.add(tr.obj);
         this.trucks.set(v.id, tr);
         this.placeTruck(tr, 1);
       }
       tr.view = v;
       // keep the local clock close to the engine's (it ticks 10× a second)
-      if (Math.abs(v.t - tr.lt) > 1.5) tr.lt = v.t;
-      else tr.lt += (v.t - tr.lt) * 0.25;
+      if (Math.abs(v.t - tr.et) > 1.5) tr.et = v.t;
+      else tr.et += (v.t - tr.et) * 0.25;
+      if (tr.lt > tr.et) tr.lt = tr.et;
       tr.gone = 0;
     }
     for (const [id, tr] of this.trucks)
@@ -603,9 +934,8 @@ export class Traffic3D {
   private placeTruck(tr: Truck, k: number) {
     const L = tr.acc[tr.acc.length - 1];
     const f = Math.max(0, Math.min(1, tr.lt / Math.max(0.01, tr.view.dur)));
-    const s = (tr.back ? 1 - f : f) * L;
-    const p = at3(tr.path, tr.acc, s);
-    const d = tr.back ? -1 : 1;
+    const p = at3(tr.path, tr.acc, f * L);
+    const d = 1;
     tr.x = p.x;
     tr.y = p.y;
     tr.z = p.z;
@@ -627,6 +957,20 @@ export class Traffic3D {
     for (const c of this.cars) if (!c.life && !c.special) ambient++;
     for (let i = 0; i < 3 && ambient < want; i++, ambient++) this.spawnAmbient();
     let extra = ambient - want;
+    // everyone keeps their distance: each car and truck slows for what is in front of it
+    const bodies = this.bodies();
+    for (const c of this.cars) {
+      let room = clearance(c, bodies, (d) => this.way(c, d), c.wait);
+      if (!c.turn) {
+        // nearing a junction it may not go into yet: it slows to stop at the line
+        const { node, stop } = this.ahead(c);
+        const left = (stop - c.s) * c.dir;
+        if (left < 0.8 && this.cut[node] > 0 && this.choose(c, node) && !this.mayEnter(c, node)) room = Math.min(room, Math.max(0, left - 0.02) / 0.8);
+      }
+      const pace = this.cruise(c) * room;
+      c.v = pace < c.v ? pace : Math.min(pace, c.v + ACCEL * dt);
+      c.wait = c.v < 0.05 ? c.wait + dt : 0;
+    }
     for (const c of this.cars) {
       if (extra > 0 && !c.life && !c.special && c.alpha >= 1) {
         c.life = 1;
@@ -665,12 +1009,49 @@ export class Traffic3D {
         if (tr.gone > 0.8) {
           this.root.remove(tr.obj);
           this.trucks.delete(id);
+          this.truckBodies.delete(tr);
         }
-      } else tr.lt = Math.min(tr.view.dur, tr.lt + dt);
+      } else {
+        // the shipment's clock runs on; the truck follows it unless the way in front is taken (then catches up)
+        tr.et = Math.min(tr.view.dur, tr.et + dt);
+        const L = tr.acc[tr.acc.length - 1];
+        const at = (Math.max(0, Math.min(1, tr.lt / Math.max(0.01, tr.view.dur)))) * L;
+        const room = tr.lt < 0.3 ? 1 : clearance(this.truckBody(tr), bodies, (d) => {
+          const p = at3(tr.path, tr.acc, at + d);
+          return [p.x, p.z];
+        });
+        tr.lt = Math.max(tr.et - TRUCK_LAG, Math.min(tr.et, tr.lt + dt * (room < 1 ? room : tr.lt < tr.et ? 1.35 : 1)));
+      }
       this.placeTruck(tr, Math.min(1, dt * 6));
       if (tr.obj.visible === this.far) tr.obj.visible = !this.far;
     }
     this.drawFar();
+  }
+
+  /** Everything on the roads that keeps others behind it (cars just appearing or fading out don't). */
+  private bodies(): Body[] {
+    const out: Body[] = [];
+    for (const c of this.cars) {
+      if (c.alpha < 0.5 && c.life > 0) continue;
+      c.half = 0.28 * c.scale * (c.special?.stretch ?? 1);
+      out.push(c);
+    }
+    for (const tr of this.trucks.values()) if (!tr.gone) out.push(this.truckBody(tr));
+    return out;
+  }
+
+  private truckBodies = new Map<Truck, Body>();
+  private truckBody(tr: Truck): Body {
+    let b = this.truckBodies.get(tr);
+    if (!b) {
+      b = { x: 0, z: 0, yaw: 0, half: 0.5 };
+      this.truckBodies.set(tr, b);
+    }
+    b.x = tr.x;
+    b.z = tr.z;
+    b.yaw = tr.yaw;
+    b.half = (tr.size ??= modelSize(tr.obj)).x / 2;
+    return b;
   }
 
   /** Far out: every car and truck on the road as one instance of the simple shape, in its colour. */
@@ -730,6 +1111,7 @@ export class Traffic3D {
     }
     this.cars = [];
     this.trucks.clear();
+    this.truckBodies.clear();
     this.hero = null;
   }
 
