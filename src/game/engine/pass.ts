@@ -6,7 +6,7 @@ import { PASS, PASS_TIERS, WEEKLY, type PassTier, type WeeklyId } from "../confi
 import type { SkinId } from "../config/collection";
 import type { GameState } from "../types";
 import { passiveIncome, type EconomySnapshot } from "./economy";
-import { grantReward, rewardCash } from "./progress";
+import { grantReward, rewardCash } from "./rewards";
 import { receiveRaceCar } from "./racing";
 
 export interface WeeklyState {

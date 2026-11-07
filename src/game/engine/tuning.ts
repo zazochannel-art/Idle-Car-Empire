@@ -3,7 +3,7 @@
 // respray is paid every time (back to the livery is free).
 import { PAINTS, PAINT_COST, RIMS, SPOILERS, type RimId, type SpoilerId } from "../config/tuning";
 import type { GameState, RaceCarState } from "../types";
-import { book } from "./materials";
+import { book } from "./ledger";
 import { carWorth, raceCar } from "./racing";
 
 export type TuneChoice = { kind: "rims"; id: RimId } | { kind: "spoiler"; id: SpoilerId } | { kind: "paint"; id: string };

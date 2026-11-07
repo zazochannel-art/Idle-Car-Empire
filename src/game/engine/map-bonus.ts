@@ -5,9 +5,9 @@
 // game reopened never finds one waiting.
 import { MAP_BONUS, MAP_BONUSES, MAP_BONUS_BY_KIND, type MapBonusKind } from "../config/map-bonus";
 import type { GameState } from "../types";
-import { plantsOf } from "./chain";
-import { payReward } from "./materials";
-import { dateKey } from "./progress";
+import { plantsOf } from "./plants";
+import { payReward } from "./ledger";
+import { dateKey } from "./calendar";
 
 export interface MapBonus {
   id: number;

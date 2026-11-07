@@ -5,7 +5,7 @@
 import { IAP, IAP_PRODUCTS, type IapProduct } from "../config/iap";
 import type { GameState, Reward } from "../types";
 import type { EconomySnapshot } from "./economy";
-import { grantReward } from "./progress";
+import { grantReward } from "./rewards";
 
 export interface IapState {
   /** The products bought (each one once). */

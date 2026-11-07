@@ -43,32 +43,8 @@ import {
 import { DEALERS, DEALER_BY_ID, DEALER_MARKUP_PER_LEVEL, DEALER_SPECIALTY } from "../config/dealerships";
 import { MATERIALS as MATERIALS_LIST, CAR_STORAGE, CLASS_DEMAND, CLASS_MARGIN, DEALER_FEE, DEBT, RESCUE, SALES_TAX, TRIP_FEE, UPGRADE_SCALING, WAREHOUSE_CAP, POWER_SYSTEM, type MaterialId } from "../config/economy";
 import { assemblyTime, carListPrice, carStdCost, componentPrice, componentStdCost, componentTime, netOfSale, opRates, opTotal, type OpRates } from "./costs";
-import {
-  addStock,
-  autoRestock,
-  book,
-  canOwe,
-  debtLimit,
-  depotTrip,
-  emergencyCost,
-  emergencyMaterials,
-  migrateCostBasis,
-  spendMaterials,
-  createLedger,
-  chainNet,
-  migrateLedger,
-  migrateStock,
-  orderCost,
-  payOrOwe,
-  powerCost,
-  repay,
-  settleLedger,
-  shortfall,
-  unitMaterials,
-  unitsInStock,
-  warehouseCap,
-  warehouseCost,
-} from "./materials";
+import { addStock, autoRestock, depotTrip, emergencyCost, emergencyMaterials, migrateCostBasis, spendMaterials, migrateLedger, migrateStock, orderCost, powerCost, shortfall, unitMaterials, unitsInStock, warehouseCap, warehouseCost } from "./materials";
+import { book, canOwe, debtLimit, createLedger, chainNet, payOrOwe, repay, settleLedger } from "./ledger";
 import { MANAGERS } from "../config/managers";
 import { OFFLINE } from "../config/offline";
 import { DEPOT, MARKET, RACING, WORLD_MAP, plotOf, roadRoute } from "../city/layout";
@@ -104,6 +80,7 @@ import { starMods } from "./imperium";
 import { managerMult, offlineShare, type GlobalMods } from "./modifiers";
 import { floorPace, floorTick, MORALE } from "./floor";
 import { SKIN_BY_ID, type SkinId } from "../config/collection";
+import { hasPlant, plantCount, plantsOf } from "./plants";
 
 // ───────────────────────────── state ─────────────────────────────
 
@@ -141,25 +118,8 @@ export function emptyDealerStock(): DealerStock {
   return { cars: 0, value: 0, models: [], next: 0, sold: 0 };
 }
 
-export type PlantEntry = [string, BuildingState & { plant: PlantData; type: PlantType }];
-
-export function plantsOf(s: GameState): PlantEntry[] {
-  return Object.entries(s.city.buildings).filter((e): e is PlantEntry => !!e[1].plant && isPlantType(e[1].type));
-}
-
-// counted in place (no list built): these run for every car and part, many times a tick
-export function plantCount(s: GameState, type: PlantType): number {
-  const all = s.city.buildings;
-  let n = 0;
-  for (const id in all) if (all[id].plant && all[id].type === type) n++;
-  return n;
-}
-
-export function hasPlant(s: GameState, type: PlantType): boolean {
-  const all = s.city.buildings;
-  for (const id in all) if (all[id].plant && all[id].type === type) return true;
-  return false;
-}
+// plantsOf, plantCount, hasPlant: plants.ts (a leaf every module may use)
+export * from "./plants";
 
 /** Plants are numbered per type in build order: Engine Factory #2… */
 export function plantNumber(s: GameState, plotId: string): number {

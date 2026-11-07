@@ -3,20 +3,14 @@ import { chainTick } from "./chain";
 import { cityTick } from "./city";
 import { constructionTick } from "./construction";
 import { snapshot, type EconomySnapshot } from "./economy";
-import { book } from "./materials";
+import { book, credit } from "./ledger";
 import { racingTick } from "./racing";
 import { showroomTick } from "./showroom";
 import { eventGoalTick } from "./events";
 import { adsTick } from "./ads";
 import { parkedTick, withCity } from "./cities";
 
-/** Adds money to the wallet and to the earnings stats. */
-export function credit(s: GameState, amount: number) {
-  if (!(amount > 0) || !Number.isFinite(amount)) return;
-  s.cash += amount;
-  s.run.moneyEarned += amount;
-  s.lifetime.moneyEarned += amount;
-}
+export { credit };
 
 /** Longest step simulated at once; longer gaps are split so trucks and stocks stay consistent. */
 const MAX_STEP = 2;

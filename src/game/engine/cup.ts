@@ -7,7 +7,7 @@ import { RACE_NOISE, RATING_SOFTEN, TRACKS, type TrackConfig } from "../config/r
 import type { CarId, GameState } from "../types";
 import type { EconomySnapshot } from "./economy";
 import { duelCar, duelRating } from "./ghost";
-import { grantReward, rewardCash } from "./progress";
+import { grantReward, rewardCash } from "./rewards";
 import { gauss, liveryOf, rng } from "./racing";
 
 const DAY = 86_400_000;

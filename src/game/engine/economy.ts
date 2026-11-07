@@ -4,7 +4,7 @@ import { MANAGER_BY_ID } from "../config/managers";
 import type { CarId, DealerId, GameState, ManagerId } from "../types";
 import { availableCars, carValue, chainSnapshot, type ChainSnapshot } from "./chain";
 import { citySnapshot, type CitySnapshot } from "./city";
-import { ledgerNet } from "./materials";
+import { ledgerNet } from "./ledger";
 import { computeGlobalMods, type GlobalMods } from "./modifiers";
 
 // ───────────────────────────── costs ─────────────────────────────

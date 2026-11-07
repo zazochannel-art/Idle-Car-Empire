@@ -7,8 +7,8 @@ import type { CarDesign, CarId, GameState, QualityMode } from "../types";
 import { carValue, modelStats } from "./chain";
 import { designStats } from "./design";
 import { unlockedCarIds, type EconomySnapshot } from "./economy";
-import { dateKey } from "./progress";
-import { payReward } from "./materials";
+import { dateKey } from "./calendar";
+import { payReward } from "./ledger";
 
 const DAY = 86_400_000;
 

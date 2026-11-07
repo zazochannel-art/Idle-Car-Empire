@@ -4,7 +4,7 @@
 // marked "legacy" and never counted.
 import { FUNNEL_LEGACY, FUNNEL_STEPS, type FunnelStep } from "../config/funnel";
 import type { GameState } from "../types";
-import { hasPlant } from "./chain";
+import { hasPlant } from "./plants";
 
 const dayNo = (t: number) => {
   const d = new Date(t);

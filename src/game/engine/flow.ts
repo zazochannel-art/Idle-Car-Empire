@@ -5,7 +5,8 @@
 import { MARKET } from "../city/layout";
 import { PLANT_BY_ID } from "../config/chain";
 import type { ComponentId, GameState, PlantData, PlantType } from "../types";
-import { plantsOf, recipe, type ChainSnapshot } from "./chain";
+import { recipe, type ChainSnapshot } from "./chain";
+import { plantsOf } from "./plants";
 
 export type FlowState = "ok" | "slow" | "stuck";
 

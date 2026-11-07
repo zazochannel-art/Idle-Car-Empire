@@ -3,7 +3,7 @@
 // toward no reset.
 import type { GameState, Reward } from "../types";
 import type { EconomySnapshot } from "./economy";
-import { grantReward, rewardCash } from "./progress";
+import { grantReward, rewardCash } from "./rewards";
 
 /** Rewards of tiers 1–3 of the week's goal. */
 export const ALLIANCE_REWARDS: Reward[] = [{ incomeSeconds: 15 * 60 }, { incomeSeconds: 45 * 60 }, { incomeSeconds: 2 * 3600, stars: 1 }];

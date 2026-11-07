@@ -2,7 +2,8 @@ import { LOGIN_REWARDS } from "../config/login";
 import { RIVALS, RIVAL_DAILY_GROWTH, type Rival } from "../config/rivals";
 import type { GameState } from "../types";
 import type { EconomySnapshot } from "./economy";
-import { dateKey, grantReward, yesterdayKey } from "./progress";
+import { grantReward } from "./rewards";
+import { dateKey, yesterdayKey } from "./calendar";
 
 // ───────────────────────────── daily login ─────────────────────────────
 

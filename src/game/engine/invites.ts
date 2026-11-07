@@ -3,7 +3,7 @@
 // the new player builds their first car. Paid as rewards: they count toward no reset.
 import type { GameState } from "../types";
 import type { EconomySnapshot } from "./economy";
-import { grantReward, rewardCash } from "./progress";
+import { grantReward, rewardCash } from "./rewards";
 
 export const INVITE = {
   /** The new player's welcome gift: a head start, plus a little of their income. */

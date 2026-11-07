@@ -4,7 +4,7 @@
 // engine/season.ts). Everything it pays is a reward: it counts toward no reset.
 import type { GameState, Reward } from "../types";
 import { passiveIncome, type EconomySnapshot } from "./economy";
-import { grantReward, rewardCash } from "./progress";
+import { grantReward, rewardCash } from "./rewards";
 
 export type WinterGoal = "cars" | "earned" | "wins";
 export const WINTER_GOALS: WinterGoal[] = ["cars", "earned", "wins"];

@@ -7,8 +7,8 @@ import { LANDMARK, LANDMARKS, LANDMARK_BY_CAR, landmarkIn, landmarksOf, type Lan
 import type { TerritoryId } from "../config/city";
 import type { CarConfig } from "../config/cars";
 import type { CarId, GameState } from "../types";
-import { hasPlant } from "./chain";
-import { book, payReward } from "./materials";
+import { hasPlant } from "./plants";
+import { book, payReward } from "./ledger";
 
 export interface LandmarksState {
   /** Leasing: rent still to come in (suburbs). */

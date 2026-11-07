@@ -27,7 +27,7 @@ import {
 } from "../config/expansion";
 import type { CarId, ComponentId, GameState } from "../types";
 import { componentPrice } from "./costs";
-import { book, payOrOwe } from "./materials";
+import { book, payOrOwe } from "./ledger";
 
 function rng(seed: number) {
   let a = seed >>> 0;
