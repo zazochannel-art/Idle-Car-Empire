@@ -33,7 +33,7 @@ type Tab = "build" | "upgrade" | "workers" | "production" | "stats";
 const lv2 = (n: number) => String(n).padStart(2, "0");
 
 export function GarageView({ plotId }: { plotId: string }) {
-  const b = useGame((g) => g.state.city.buildings[plotId]);
+  const b = useGame((g) => g.view.state.city.buildings[plotId]);
   const st = useGame((g) => g.snap.city.garages[plotId]);
   const cash = useGame((g) => g.state.cash);
   const exitGarage = useUi((u) => u.exitGarage);
@@ -305,7 +305,7 @@ function facilityLine(type: FacilityType, t: ReturnType<typeof useT>["t"], scale
 }
 
 function BuildTab({ plotId, onPick }: { plotId: string; onPick: (t: FacilityType) => void }) {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const { t } = useT();
   const b = state.city.buildings[plotId]!;
   const g = b.garage!;
@@ -345,7 +345,7 @@ function BuildTab({ plotId, onPick }: { plotId: string; onPick: (t: FacilityType
 }
 
 function UpgradeTab({ plotId }: { plotId: string }) {
-  const b = useGame((g) => g.state.city.buildings[plotId]);
+  const b = useGame((g) => g.view.state.city.buildings[plotId]);
   const cost = useGame((g) => buildingUpgradeCost(g.state, plotId));
   const upgradeBuilding = useGame((g) => g.upgradeBuilding);
   const { t } = useT();
@@ -411,7 +411,7 @@ function WorkersTab({ plotId }: { plotId: string }) {
 }
 
 function ProductionTab({ plotId }: { plotId: string }) {
-  const b = useGame((g) => g.state.city.buildings[plotId]);
+  const b = useGame((g) => g.view.state.city.buildings[plotId]);
   const st = useGame((g) => g.snap.city.garages[plotId]);
   const cost = useGame((g) => specCost(g.state, plotId));
   const setSpecialization = useGame((g) => g.setSpecialization);
@@ -472,7 +472,7 @@ function ProductionTab({ plotId }: { plotId: string }) {
 }
 
 function StatsTab({ plotId }: { plotId: string }) {
-  const b = useGame((g) => g.state.city.buildings[plotId]);
+  const b = useGame((g) => g.view.state.city.buildings[plotId]);
   const st = useGame((g) => g.snap.city.garages[plotId]);
   const { t } = useT();
   if (!b?.garage || !st) return null;

@@ -287,7 +287,8 @@ export class MapEngine {
   ) {
     this.low = opt.low;
     this.cam = new CameraRig([WORLD_MAP.size[0] / 2, WORLD_MAP.size[1] / 2]);
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+    // low graphics (battery saver, weak phones): no multisampling, and the GPU's power-saving mode
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !this.low, powerPreference: this.low ? "low-power" : "high-performance" });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
@@ -606,7 +607,26 @@ export class MapEngine {
     this.fx?.dispose();
     this.weather?.dispose();
     this.bonus?.dispose();
+    // everything else in the scene (ground tiles, terrain, buildings, scenery, roads, lots) and
+    // the lighting environment: the map is built again for each city, so nothing may stay behind
+    // in the GPU's memory (a geometry or material shared with the next map is sent again when used)
+    const textures = new Set<THREE.Texture>();
+    this.scene.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      mesh.geometry?.dispose();
+      const m = mesh.material;
+      if (!m) return;
+      for (const x of Array.isArray(m) ? m : [m]) {
+        for (const v of Object.values(x)) if (v instanceof THREE.Texture) textures.add(v);
+        x.dispose();
+      }
+    });
+    if (this.scene.environment) textures.add(this.scene.environment);
+    for (const t of textures) t.dispose();
+    this.scene.clear();
     this.renderer.dispose();
+    // the WebGL context goes now, not whenever the browser collects it (phones allow only a few at once)
+    this.renderer.forceContextLoss();
   }
 
   resize() {

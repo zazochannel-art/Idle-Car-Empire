@@ -342,8 +342,13 @@ function Shell() {
 
   return (
     <div className="game-shell fixed inset-0 overflow-hidden bg-ink">
-      <EmpireMap key={city} active={!garage && !floor && !racing} panelOffset={panelOffset} />
-      <Hud onSettings={() => setSettings(true)} />
+      {/* a crash in the map or the top bar asks to reload instead of blanking the whole game */}
+      <ScreenBoundary key={`map:${city}`} onClose={() => {}}>
+        <EmpireMap active={!garage && !floor && !racing} panelOffset={panelOffset} />
+      </ScreenBoundary>
+      <ScreenBoundary onClose={() => {}}>
+        <Hud onSettings={() => setSettings(true)} />
+      </ScreenBoundary>
       <LeftRail />
       {/* on phones the showroom card sits where the goal tracker is */}
       {!open && !(showcase && !desktop) && <GoalTracker />}

@@ -1094,7 +1094,7 @@ export function ConflictDialog() {
 function ConflictChoice() {
   const saves = useGame((g) => g.saves);
   const resolve = useGame((g) => g.resolveConflict);
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const [cloud, setCloud] = useState<SaveSummary | null>(null);
   const [busy, setBusy] = useState(false);
   // the cloud's copy is looked at first: the same game open on two devices needs no choice

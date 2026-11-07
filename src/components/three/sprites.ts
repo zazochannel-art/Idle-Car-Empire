@@ -164,7 +164,8 @@ class SpriteFactory {
   /** Use counter: each sprite remembers when it was last drawn (least recently used goes first). */
   private uses = 0;
   private lastUse = new Map<string, number>();
-  private static MAX_BYTES = 96 * 1024 * 1024;
+  /** The pictures kept, in bytes: less on phones with little memory (4 GB or less). */
+  private static MAX_BYTES = (typeof navigator !== "undefined" && ((navigator as { deviceMemory?: number }).deviceMemory ?? 8) <= 4 ? 40 : 96) * 1024 * 1024;
 
   get ready() {
     return !!this.renderer;
