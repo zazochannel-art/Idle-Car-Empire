@@ -24,9 +24,9 @@ export const IMPERIUM = {
   minRunEarnings: 20e9,
   /**
    * Stars earned in all = max(1, floor(perDecade × log10(total earnings / base))), counted from
-   * minRunEarnings (engine/imperium.ts starsAt): 3 at $20B, 6 at $100B, 9 at $1T, +3 per tenfold.
+   * minRunEarnings (engine/imperium.ts starsAt): 6 at $20B, 10 at $100B, 15 at $1T, +5 per tenfold.
    */
-  perDecade: 3,
+  perDecade: 5,
   base: 1e9,
 };
 

@@ -23,6 +23,8 @@ export const IAP = {
   starterIncome: 8 * 3600,
   starterRp: 8 * 3600,
   starterRpMin: 200,
+  /** The least cash the starter pack gives (8 hours of a first hour's income is under $1,000). */
+  starterCashMin: 50_000,
   /** The most purchases a save remembers (two products bought once, and a pass a season: years of them). */
   maxTokens: 40,
 };

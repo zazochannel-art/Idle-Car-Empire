@@ -6,6 +6,7 @@ import { SKINS } from "@/game/config/racing";
 import { FESTIVAL, FESTIVAL_GOALS, festivalNow, festivalProgress, type FestivalGoal } from "@/game/engine/festival";
 import { rewardCash } from "@/game/engine/progress";
 import { BLACK_FRIDAY, SEASON_ICON } from "@/game/engine/season";
+import { blackFridayCut } from "@/game/engine/shop";
 import { formatDuration, formatMoney, formatNumber } from "@/game/format";
 import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
@@ -41,7 +42,7 @@ export function FestivalView() {
       <p className="px-1 text-[11px] text-white/55">{t("festival.ends", { time: formatDuration((w.end - now) / 1000) })}</p>
       {w.season === "blackfriday" && (
         <p className="rounded-2xl bg-gradient-to-r from-red-500/20 to-yellow-400/10 p-3 text-xs font-bold leading-snug text-white/85 ring-1 ring-red-400/35">
-          🏷️ {t("festival.blackfridayDeals", { pct: Math.round((BLACK_FRIDAY.dealerCap - 1) * 100), cut: Math.round(-BLACK_FRIDAY.markup * 100), stars: Math.round((1 - BLACK_FRIDAY.starPrice) * 100) })}
+          🏷️ {t("festival.blackfridayDeals", { pct: Math.round((BLACK_FRIDAY.dealerCap - 1) * 100), cut: Math.round(-BLACK_FRIDAY.markup * 100), stars: blackFridayCut() })}
         </p>
       )}
 

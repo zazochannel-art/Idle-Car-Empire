@@ -102,10 +102,16 @@ export function shopReward(id: ShopItemId, snap: EconomySnapshot, s?: GameState,
 export type ShopBlock = "wait" | "limit" | "nothing" | "active" | "full" | "stars" | null;
 
 /** What an item costs now: during Black Friday week the Star items cost less (at least 1 ⭐). */
+/** About how much less the Star items cost in Black Friday week (%, on the 24 h warp, the best value): for the notices. */
+export function blackFridayCut(): number {
+  const full = SHOP_ITEM_BY_ID.warp24.price as number;
+  return Math.round((1 - (BLACK_FRIDAY.starPrices.warp24 ?? full) / full) * 100);
+}
+
 export function shopPrice(id: ShopItemId, now: number): ShopPrice {
   const price = SHOP_ITEM_BY_ID[id].price;
   if (typeof price !== "number" || seasonAt(now) !== "blackfriday") return price;
-  return Math.max(1, Math.round(price * BLACK_FRIDAY.starPrice));
+  return BLACK_FRIDAY.starPrices[id] ?? price;
 }
 
 export function shopBlock(s: GameState, id: ShopItemId, now: number): ShopBlock {

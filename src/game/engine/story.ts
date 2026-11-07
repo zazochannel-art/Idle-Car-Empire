@@ -6,7 +6,7 @@
 import { CHAPTERS, DILEMMA_BY_ID, DILEMMAS, STORY, type Chapter, type Dilemma, type StoryEffect } from "../config/story";
 import type { GameState } from "../types";
 import { plantsOf } from "./plants";
-import { passiveIncome, type EconomySnapshot } from "./economy";
+import { rewardIncome, type EconomySnapshot } from "./economy";
 import { BREAKDOWN, moraleOf } from "./floor";
 import { payReward } from "./ledger";
 import { conditionProgress } from "./progress";
@@ -77,7 +77,7 @@ export function storyTick(s: GameState, snap: EconomySnapshot): "offer" | "expir
 
 /** Money a choice moves (+ in, − out) at the company's current output. */
 export function effectCash(e: StoryEffect, snap: EconomySnapshot): number {
-  return e.kind === "cash" ? Math.round(e.minutes * 60 * Math.max(passiveIncome(snap), 5)) : 0;
+  return e.kind === "cash" ? Math.round(e.minutes * 60 * Math.max(rewardIncome(snap), 5)) : 0;
 }
 
 /** Research points a choice brings. */

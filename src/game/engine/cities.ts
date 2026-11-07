@@ -170,7 +170,7 @@ export function switchCity(s: GameState, to: CityId, now: number): boolean {
   const target = s.cities[to];
   if (to === s.activeCity || !target) return false;
   const from = s.activeCity;
-  const parked: ParkedCity = { ...bundleOf(s), at: now, steady: Math.max(0, snapshot(s).steadyIncomePerSec) };
+  const parked: ParkedCity = { ...bundleOf(s), at: now, steady: Math.max(0, snapshot(s).rewardIncomePerSec) };
   const cities = { ...s.cities, [from]: parked };
   delete cities[to];
   s.cities = cities;

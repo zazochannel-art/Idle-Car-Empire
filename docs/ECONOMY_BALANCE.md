@@ -125,3 +125,28 @@ Measured with `goal-bot north` (a new company starting in Nordheim): it runs 15�
 city in its first hours (`8 q`: $32M against $38M at 8 h) and about half as fast in `full` mode, where
 its racing prizes go to the first city's wallet. That gap comes from the map, not the prices; a
 real player arrives with the company's research, managers and Stars.
+
+## 7. Tap rewards, Stars and paid items (audit of Nov 7, 2026)
+
+The yardstick: a reward the player taps for should bring about 30–80 minutes of income a day, as
+the map bonuses (~33 min) and the trade route (≤ 80 min) do. Measured with `goal-bot 24 full`: a
+racing team wins ~13 races an hour.
+
+| Value | OLD | NEW | WHY |
+|---|---|---|---|
+| Partner deals (`SPONSOR_TIERS`) | 3 / 6 / 10 wins in 6 / 12 / 24 h for 30 / 75 / 150 min of income and 0 / 1 / 2 ⭐ | **4 / 8 / 15 wins** for **15 / 40 / 90 min** and **0 / 0 / 1 ⭐**, at most one ⭐ a day | The big deal took under an hour of racing (and was done overnight by the automatic races), with new offers 15 min later: ~1.6 ⭐ and 2 h of income an hour. |
+| New offers after a deal (`SPONSOR.afterDone`) | 15 min | **2 h** | Same reason. |
+| The deals' brand Aurum | Aurum | **Zenith**; the card is "Partner deals" | The race sponsors (config/racing.ts) already have an Aurum Bank and are called Sponsors. |
+| Quality control (`QC`) | 15 min of income every 30 min, no daily limit, +2 rep | **10 min every 60 min, 6 a day**, +1 rep; starting a round uses it | Up to 12 h of income a day for a 15-second game, and reputation pinned at 100. A round left half-way came back the same, so it could be learnt. |
+| Rewards in seconds of income (`rewardCash`) | the steady income with every multiplier | the steady income **without the ones that only last a while** (the ×2 boost and market events, which can be timed; a season lasts weeks and stays in: `GlobalMods.tempIncome`, `chain.steadyBase`) | Stars and pass tiers kept for the ×2 boost paid double (a 24 h warp gave 48 h). The parked city and the trade route are sized on it too. |
+| VIP Stars (`VIP`) | 1 per order, 2 for Premium-built, no limit | **0, 1 for Premium-built, 3 a day at most** | An order every ~45 min of play: with the automatic decisions on and the game left open, ~30 ⭐ a day. |
+| Stars from earnings (`IMPERIUM.perDecade`) | 3 per tenfold (3 at $20B, 9 at $1T) | **5** (6 at $20B, 10 at $100B, 15 at $1T) | 3–6 ⭐ a month against ~100 from the fixed sources: growing the company hardly counted. |
+| Starter pack | 8 h of income | the same, **at least $50,000** (`IAP.starterCashMin`) | Bought in the first hour, 8 h of income is under $1,000. |
+| Premium pass tiers | seconds of income | the same, **at least $2,000** a tier | Same reason, for a young company. |
+| Black Friday Star prices (`BLACK_FRIDAY.starPrices`) | × 0.6, rounded (pack 4 → 2, warp 8 h 3 → 2, warp 2 h unchanged) | fixed: warp 2 h **1**, 8 h **2**, 24 h **4**, research **1**, boost **1**, tycoon pack **3** | The pack cost the same as the 8 h warp it contains, and the cuts ran from 0% to 50%. |
+| Used cars (`USED`) | worth 25 min of income; sold for 0.85 of it; the whole price counted as earned | worth **20 min**; sold for **0.70 + 0.20 × condition**; only the **profit** counts as earned; the purchase is booked | Every car made the same 25–29% whatever it was; and the gross sale inflated the Stars from earnings and the boards. Now 17% for the worst, 30% for the best. |
+
+Stars a month for an engaged player (logs in daily, ~2 h of play), before → after: VIP 40–80 → ≤ 40
+(premium orders only), partner deals 50–160 → ≤ 28, earnings 3–6 → 5–10; the fixed sources
+(login 16, racing season ~12, Auto Show ~8, free pass 8, chest and box ~7) are unchanged. The
+premium pass's 14 ⭐ go from ~10% of a month's Stars to about 15–20%.

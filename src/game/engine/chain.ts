@@ -496,6 +496,8 @@ export interface ChainSnapshot {
   carsPerSec: number;
   /** Share of live play earned while away (GlobalMods.offline): customers come at that pace then. */
   offline: number;
+  /** The income multiplier that only lasts a while (GlobalMods.tempIncome): left out of steadyBase. */
+  tempIncome: number;
 }
 
 function managerMods(s: GameState, plotId: string) {
@@ -623,7 +625,7 @@ export function chainSnapshot(s: GameState, gm: GlobalMods): ChainSnapshot {
   }
   const dealers: Partial<Record<DealerId, DealerStats>> = {};
   for (const d of DEALERS) if (s.dealers[d.id].owned) dealers[d.id] = dealerStats(s, d.id, gm);
-  return { plants, dealers, cars, potential, carsPerSec, offline: gm.offline };
+  return { plants, dealers, cars, potential, carsPerSec, offline: gm.offline, tempIncome: gm.tempIncome };
 }
 
 // ───────────────────────────── travel ─────────────────────────────
@@ -1092,6 +1094,9 @@ export function chainTick(
   s.chain.goods = goods;
   const net = chainNet(s.chain.ledger.pending) + madeNotSold; // garages and racing are counted on their own
   s.chain.steady = (s.chain.steady ?? s.chain.rate) + (net / dt - (s.chain.steady ?? s.chain.rate)) * Math.min(1, dt / STEADY_WINDOW);
+  // the same average without the boosts that only last a while: what rewards are sized on
+  const base = net / dt / Math.max(1e-9, snap.tempIncome ?? 1);
+  s.chain.steadyBase = (s.chain.steadyBase ?? s.chain.steady) + (base - (s.chain.steadyBase ?? s.chain.steady)) * Math.min(1, dt / STEADY_WINDOW);
   settleLedger(s, dt, RATE_WINDOW);
   s.chain.goodsRate = (s.chain.goodsRate ?? 0) + (madeNotSold / dt - (s.chain.goodsRate ?? 0)) * Math.min(1, dt / RATE_WINDOW);
   // the chain's income rate is read off the ledger (and the stock change), never smoothed on its own
@@ -1361,6 +1366,7 @@ export function simulateChain(s: GameState, seconds: number, snap: ChainSnapshot
   // the HUD and dashboard rates describe the session, not the absence: keep them
   const rates = { ...s.chain.ledger.rate };
   const steady = s.chain.steady;
+  const steadyBase = s.chain.steadyBase;
   const goodsRate = s.chain.goodsRate;
   for (let i = 0; i < steps; i++) {
     const r = chainTick(s, dt, snap, credit, undefined, true);
@@ -1379,6 +1385,7 @@ export function simulateChain(s: GameState, seconds: number, snap: ChainSnapshot
   s.chain.goodsRate = goodsRate;
   s.chain.rate = chainNet(rates) + (goodsRate ?? 0);
   s.chain.steady = steady;
+  s.chain.steadyBase = steadyBase;
   return total;
 }
 
@@ -1570,6 +1577,7 @@ export function migrateChain(raw: unknown, s: GameState): ChainState {
     for (const [k, v] of Object.entries(raw.demand))
       if ((k in COMPONENT_BY_ID || k === "chassis") && typeof v === "number" && Number.isFinite(v) && v > 0) (chain.demand ??= {})[k as ItemId] = v;
   if (typeof raw.steady === "number" && Number.isFinite(raw.steady)) chain.steady = raw.steady;
+  if (typeof raw.steadyBase === "number" && Number.isFinite(raw.steadyBase)) chain.steadyBase = raw.steadyBase;
   if (typeof raw.goods === "number" && Number.isFinite(raw.goods) && raw.goods >= 0) chain.goods = raw.goods;
   if (typeof raw.goodsRate === "number" && Number.isFinite(raw.goodsRate)) chain.goodsRate = raw.goodsRate;
   if (typeof raw.rescueT === "number" && Number.isFinite(raw.rescueT)) chain.rescueT = raw.rescueT;

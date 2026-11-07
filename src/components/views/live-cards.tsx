@@ -51,7 +51,7 @@ export function VipCard() {
           </div>
           <div className="text-[11px] text-white/60">
             {o.premium && <span className="mr-1 rounded bg-sky-400/15 px-1 text-sky-200">💎 {t("vip.premium")}</span>}
-            {t("vip.reward", { cash: formatMoney(o.pay), stars: o.stars })}
+            {o.stars ? t("vip.reward", { cash: formatMoney(o.pay), stars: o.stars }) : t("vip.rewardCash", { cash: formatMoney(o.pay) })}
             {" · "}
             {v.active ? t("contract.left", { time: formatDuration(Math.max(0, (o.deadline ?? now) - now) / 1000) }) : t("contract.time", { m: o.minutes })}
           </div>

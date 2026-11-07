@@ -161,7 +161,7 @@ export function claimEventGoal(s: GameState, now: number): number | null {
   const st = eventGoal(s, now);
   if (!st || !st.done || st.claimed) return null;
   const g = st.window.event.goal;
-  const cash = Math.max(1_000, Math.max(0, s.chain.steady ?? s.chain.rate) * g.incomeSeconds);
+  const cash = Math.max(1_000, Math.max(0, s.chain.steadyBase ?? s.chain.steady ?? s.chain.rate) * g.incomeSeconds);
   payReward(s, cash);
   s.run.moneyEarned += cash;
   s.lifetime.moneyEarned += cash;

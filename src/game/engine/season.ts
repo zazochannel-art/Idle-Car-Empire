@@ -1,3 +1,4 @@
+import type { ShopItemId } from "../config/shop";
 // Seasons decorate the factories and add a small income bonus while they last. Halloween and
 // winter come with the calendar; spring and summer too (their festivals: engine/festival.ts),
 // and the game's owner can also put spring or summer on at another time from the dashboard
@@ -18,8 +19,11 @@ export const SEASON_BONUS = 0.1;
 export const BLACK_FRIDAY = {
   dealerCap: 1.6,
   markup: -0.05,
-  /** Star items cost this share of their price (rounded, at least 1 ⭐). */
-  starPrice: 0.6,
+  /**
+   * The Star items' prices that week (a share rounded the same way for all made the tycoon pack
+   * as cheap as the 8 h warp it contains): each a third or so off, the pack still a saving.
+   */
+  starPrices: { warp2: 1, warp8: 2, warp24: 4, rp8: 1, boostLong: 1, bundle: 3 } as Partial<Record<ShopItemId, number>>,
 };
 
 /** Black Friday of a year: the day after the fourth Thursday of November (local midnight). */
