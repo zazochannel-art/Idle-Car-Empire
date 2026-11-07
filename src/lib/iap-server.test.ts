@@ -100,8 +100,8 @@ beforeEach(() => {
 describe("the purchases check (functions/iap)", () => {
   it("knows the game's products, and marks accounts the way the app does", async () => {
     expect([...PRODUCTS]).toEqual(IAP_PRODUCTS);
-    expect(productsFrom(undefined, undefined)).toEqual({ starter_pack: "starter", ad_free_rewards: "adFree" });
-    expect(productsFrom(" my_starter ", "my_ad_free")).toEqual({ my_starter: "starter", my_ad_free: "adFree" });
+    expect(productsFrom(undefined, undefined)).toEqual({ starter_pack: "starter", ad_free_rewards: "adFree", premium_pass: "pass" });
+    expect(productsFrom(" my_starter ", "my_ad_free", " my_pass ")).toEqual({ my_starter: "starter", my_ad_free: "adFree", my_pass: "pass" });
     // lib/native-iap.ts: sha256("idle-car-empire:" + the account id), as hex
     expect(await accountMark("user-a")).toBe(markOf("user-a"));
   });

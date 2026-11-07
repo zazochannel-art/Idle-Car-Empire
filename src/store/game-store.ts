@@ -171,6 +171,8 @@ interface GameStore {
   claimFestivalGoal: (goal: Fe.FestivalGoal) => boolean;
   /** Season pass: takes a reached tier / every reached tier / a finished weekly challenge. */
   claimPassTier: (tier: number) => boolean;
+  /** Takes a reached tier of the premium track (bought for the season). */
+  claimPassPremium: (tier: number) => boolean;
   claimPassAll: () => boolean;
   claimPassWeekly: (id: WeeklyId) => boolean;
   /** Takes a reward tier of the alliance's weekly goal (the server decides): its answer. */
@@ -768,6 +770,15 @@ export const useGame = create<GameStore>((set, get) => {
       }
       return ok;
     },
+    claimPassPremium: (tier) => {
+      let money: number | null = null;
+      const ok = act((s) => (money = Ps.claimPremiumTier(s, tier, get().snap, Date.now())) !== null);
+      if (ok) {
+        persist(true);
+        uiEvents.emit({ type: "toast", tone: "gold", icon: "👑", title: tr("pass.premiumToast", { n: tier }), body: tr("pass.tierBody", { money: formatMoney(money ?? 0) }) });
+      }
+      return ok;
+    },
     claimPassAll: () => {
       let got = { tiers: 0, money: 0 };
       const ok = act((s) => (got = Ps.claimAllTiers(s, get().snap, Date.now())).tiers > 0);
@@ -1165,9 +1176,9 @@ export const useGame = create<GameStore>((set, get) => {
     iapGrant: (p, token) => {
       const { snap } = get();
       const r = Iap.starterReward(snap);
-      const result = act((s) => Iap.grantPurchase(s, p, token, snap));
+      const result = act((s) => Iap.grantPurchase(s, p, token, snap, Date.now()));
       if (result !== "granted") return result;
-      const body = p === "starter" ? tr("shop.got", { what: [formatMoney(rewardCash(r, snap)), tr("shop.rp", { n: formatNumber(r.rp ?? 0) }), `⭐ ${r.stars}`].join(" · ") }) : tr("iap.adFreeBody");
+      const body = p === "starter" ? tr("shop.got", { what: [formatMoney(rewardCash(r, snap)), tr("shop.rp", { n: formatNumber(r.rp ?? 0) }), `⭐ ${r.stars}`].join(" · ") }) : p === "pass" ? tr("iap.passBody") : tr("iap.adFreeBody");
       uiEvents.emit({ type: "toast", tone: "gold", icon: IAP_ICON[p], title: tr("iap.thanks", { name: tr(`iap.item.${p}` as MessageKey) }), body });
       // saved before the store hears it was given: a purchase is never acknowledged and then lost
       persist(true);

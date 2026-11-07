@@ -2,13 +2,14 @@
 // purchases it already received. Google Play hands a purchase to the app (when it
 // is bought, and again at every start until it is acknowledged); the game gives
 // it here once, and only then is it acknowledged (lib/native-iap.ts).
-import { IAP, IAP_PRODUCTS, type IapProduct } from "../config/iap";
+import { IAP, IAP_CONSUMABLE, IAP_PRODUCTS, type IapProduct } from "../config/iap";
 import type { GameState, Reward } from "../types";
 import type { EconomySnapshot } from "./economy";
+import { isPremium, passTick } from "./pass";
 import { grantReward } from "./rewards";
 
 export interface IapState {
-  /** The products bought (each one once). */
+  /** The products bought for good (each one once; the season's premium pass is kept on the pass: PassState.premium). */
   owned: IapProduct[];
   /** The purchases already given, by a short hash of their Play token (iapTokenKey). */
   tokens: string[];
@@ -16,7 +17,8 @@ export interface IapState {
 
 export const createIap = (): IapState => ({ owned: [], tokens: [] });
 
-export const owns = (s: GameState, p: IapProduct) => s.iap.owned.includes(p);
+/** The company has it now: bought for good, or (the premium pass) for the season running. */
+export const owns = (s: GameState, p: IapProduct) => (p === "pass" ? isPremium(s) : s.iap.owned.includes(p));
 
 /** What the starter pack gives now (its research scales with the company, like the shop's). */
 export function starterReward(snap: EconomySnapshot): Reward {
@@ -25,18 +27,22 @@ export function starterReward(snap: EconomySnapshot): Reward {
 
 /**
  * A purchase from the store, for this company:
- * - "granted": new, given now (the starter pack paid out, or the product owned);
+ * - "granted": new, given now (the starter pack paid out, the product owned, or the premium track
+ *   opened for the season running);
  * - "known": given before (acknowledge it, if it isn't yet);
  * - "duplicate": the product is owned through another purchase. Nothing is given,
  *   and it is left unacknowledged, so Google Play refunds it after three days.
  */
 export type GrantResult = "granted" | "known" | "duplicate";
 
-export function grantPurchase(s: GameState, p: IapProduct, token: string, snap: EconomySnapshot): GrantResult {
+export function grantPurchase(s: GameState, p: IapProduct, token: string, snap: EconomySnapshot, now = s.lastActiveAt): GrantResult {
   if (s.iap.tokens.includes(token)) return "known";
+  // the pass is for the season running now
+  if (p === "pass") passTick(s, snap, now);
   if (owns(s, p)) return "duplicate";
   if (p === "starter") grantReward(s, starterReward(snap), snap);
-  s.iap.owned.push(p);
+  if (p === "pass") s.pass.premium = s.pass.season;
+  else s.iap.owned.push(p);
   s.iap.tokens = [...s.iap.tokens, token].slice(-IAP.maxTokens);
   return "granted";
 }
@@ -69,7 +75,7 @@ export function iapTokenKey(token: string): string {
 /** A save's purchases: known products once each, and well-formed token keys. */
 export function migrateIap(raw: unknown): IapState {
   const r = (raw && typeof raw === "object" ? raw : {}) as { owned?: unknown; tokens?: unknown };
-  const owned = Array.isArray(r.owned) ? IAP_PRODUCTS.filter((p) => (r.owned as unknown[]).includes(p)) : [];
+  const owned = Array.isArray(r.owned) ? IAP_PRODUCTS.filter((p) => !IAP_CONSUMABLE.includes(p) && (r.owned as unknown[]).includes(p)) : [];
   const tokens = Array.isArray(r.tokens) ? [...new Set(r.tokens.filter((t): t is string => typeof t === "string" && /^[0-9a-f]{16}$/.test(t)))].slice(-IAP.maxTokens) : [];
   return { owned, tokens };
 }

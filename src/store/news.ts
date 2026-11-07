@@ -11,6 +11,7 @@ import { HOT_CLASS, RECALL } from "@/game/config/market";
 import { DILEMMA_BY_ID, RIVAL_CEO } from "@/game/config/story";
 import { landmarkLotId } from "@/game/city/landmark-lots";
 import { RACING } from "@/game/city/layout";
+import { SEASON_ICON } from "@/game/engine/season";
 import type { News } from "@/game/engine/session";
 import { formatMoney, formatPercent } from "@/game/format";
 import type { GameEvent, GameState } from "@/game/types";
@@ -114,7 +115,7 @@ export function showNews(news: readonly News[], s: GameState) {
         uiEvents.emit({ type: "toast", kind: "events", tone: "gold", icon: "🎄", title: tr("winter.startToast"), body: tr("winter.startToastBody"), action: { label: tr("winter.open"), view: "winter" } });
         break;
       case "festival":
-        uiEvents.emit({ type: "toast", kind: "events", tone: "gold", icon: n.which === "spring" ? "🌸" : "☀️", title: tr(`festival.${n.which}Start`), body: tr("festival.startBody"), action: { label: tr("winter.open"), view: "festival" } });
+        uiEvents.emit({ type: "toast", kind: "events", tone: "gold", icon: SEASON_ICON[n.which], title: tr(`festival.${n.which}Start`), body: tr("festival.startBody"), action: { label: tr("winter.open"), view: "festival" } });
         break;
       case "landmarkFirstCar": {
         const car = CAR_BY_ID[n.car.car];

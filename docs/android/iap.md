@@ -9,8 +9,11 @@ Play Console declaration changes.
 | --- | --- | --- | --- |
 | Starter pack 🧰 | `starter_pack` | One-time product | Once per game account: ⭐ 10 Stars, 8 hours of income and 8 hours of research (`IAP` in `src/game/config/iap.ts`). |
 | Ad-free rewards 🎟️ | `ad_free_rewards` | One-time product | Every rewarded-ad reward without watching the ad: the same rewards and the same daily limits, only the video is skipped. Kept for good. |
+| Premium pass 👑 | `premium_pass` | One-time product, **consumable** | The season pass's premium track for the season running (28 days): a second reward at every tier, ⭐ 14 Stars, the Gold Rush livery and a limited hypercar (`PREMIUM_TIERS` in `src/game/config/pass.ts`). Bought again every season. |
 
-Both are bought once. You choose the prices in Play Console. Nothing sold
+The first two are bought once. The premium pass is consumed once the game has
+given it (which also acknowledges it), so Google Play sells it again; a second
+one in the same season is left alone, and Google Play refunds it. You choose the prices in Play Console. Nothing sold
 for money is random: the mystery box stays an ad-only item, so the game has no
 paid loot boxes.
 
@@ -18,7 +21,8 @@ paid loot boxes.
 
 - `src/lib/iap.ts`: what the screens see (the products with Google Play's
   price in the player's currency, buying, restoring). It reads the product ids
-  from the build: `NEXT_PUBLIC_IAP_STARTER_ID` and `NEXT_PUBLIC_IAP_ADFREE_ID`.
+  from the build: `NEXT_PUBLIC_IAP_STARTER_ID`, `NEXT_PUBLIC_IAP_ADFREE_ID` and
+  `NEXT_PUBLIC_IAP_PASS_ID`.
   An id Google Play wouldn't accept is ignored.
 - `src/lib/native-iap.ts`: Google Play Billing (plugin
   `@capgo/native-purchases`, Play Billing Library 9). It is loaded only in the
@@ -83,12 +87,16 @@ These steps need your accounts and payment details, so only you can do them.
    - **Activate** the product.
    - Do the same for `ad_free_rewards` ("Ad-free rewards: every ad reward
      without the ad").
+   - And for `premium_pass` ("Premium pass: the premium track of the season
+     pass, for one season"). Google Play has no consumable switch on the
+     product: the game consumes it itself.
 
    You can use other ids. Step 4 must then use the ids you chose.
 4. **Turn it on in the builds.** In GitHub, go to the repository → *Settings* →
    *Secrets and variables* → *Actions* → *Variables*, and add:
    - `IAP_STARTER_ID` = `starter_pack`
    - `IAP_ADFREE_ID` = `ad_free_rewards`
+   - `IAP_PASS_ID` = `premium_pass`
 
    Product ids are public, so these are variables, not secrets. The next
    builds of `Android` and `Play publish` sell them. To sell only one product,
@@ -185,8 +193,10 @@ but players wait for nothing meanwhile.
 4. **Give the function its key.** Supabase → Edge Functions → **Secrets** → add
    `PLAY_SERVICE_ACCOUNT`, with the whole JSON file as the value. Then delete the file.
    Never put it in the repository or in a chat.
-   - If your product ids are not `starter_pack` and `ad_free_rewards`, also add
-     `IAP_STARTER_ID` and `IAP_ADFREE_ID` with yours.
+   - If your product ids are not `starter_pack`, `ad_free_rewards` and `premium_pass`, also add
+     `IAP_STARTER_ID`, `IAP_ADFREE_ID` and `IAP_PASS_ID` with yours.
+   - The premium pass needs migration `0029_premium_pass.sql` (the ledger accepts the product)
+     and the function deployed again after it.
    - Check it:
      `curl -H "Authorization: Bearer ANON-KEY" https://orffhhsogoymalyogfzl.supabase.co/functions/v1/iap`
      answers `{"configured":true}`.

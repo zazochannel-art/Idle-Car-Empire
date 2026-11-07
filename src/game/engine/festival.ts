@@ -1,4 +1,4 @@
-// The spring and summer festivals: while one of those seasons runs (engine/season.ts: on the
+// The spring and summer festivals, and Black Friday week: while one of those seasons runs (engine/season.ts: on the
 // calendar, or put on by the game's owner), three goals sized to the empire when it began,
 // each paying Stars and income, and a race livery for all three. Every run of a season (a year's
 // spring, or a scheduled one) is new. Everything it pays is a reward: it counts toward no reset.
@@ -6,6 +6,9 @@ import type { GameState, Reward } from "../types";
 import { passiveIncome, type EconomySnapshot } from "./economy";
 import { grantReward, rewardCash } from "./rewards";
 import { seasonWindow, type FestivalSeason } from "./season";
+
+/** The seasons with festival goals: spring, summer and Black Friday week. */
+export type FestivalKind = FestivalSeason | "blackfriday";
 
 export type FestivalGoal = "cars" | "earned" | "wins";
 export const FESTIVAL_GOALS: FestivalGoal[] = ["cars", "earned", "wins"];
@@ -19,20 +22,20 @@ export const FESTIVAL = {
   minEarned: 500_000,
   goalReward: { incomeSeconds: 3600, stars: 1 } as Reward,
   /** The livery for all three goals, by season. */
-  skin: { spring: "blossom", summer: "sunset" } as Record<FestivalSeason, string>,
+  skin: { spring: "blossom", summer: "sunset", blackfriday: "doorbuster" } as Record<FestivalKind, string>,
 };
 
-/** The spring or summer season running now, with its window (null: neither). */
+/** The spring, summer or Black Friday season running now, with its window (null: none of them). */
 export function festivalNow(now: number) {
   const w = seasonWindow(now);
-  return w && (w.season === "spring" || w.season === "summer") ? { ...w, season: w.season as FestivalSeason } : null;
+  return w && (w.season === "spring" || w.season === "summer" || w.season === "blackfriday") ? { ...w, season: w.season as FestivalKind } : null;
 }
 
 /**
  * Starts the festival the first time the game runs in this season's run: the goals are set from
  * what the empire makes now. Returns the season when it just started.
  */
-export function festivalTick(s: GameState, snap: EconomySnapshot, now: number): FestivalSeason | null {
+export function festivalTick(s: GameState, snap: EconomySnapshot, now: number): FestivalKind | null {
   const w = festivalNow(now);
   if (!w || s.festival.key === w.key) return null;
   s.festival = {

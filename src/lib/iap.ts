@@ -2,7 +2,7 @@
 // anything in this build, the products with their store prices, and buying. Safe
 // to load anywhere: the Google Play Billing code (lib/native-iap.ts) is loaded only
 // inside the Android app, and only when the products are set up for the build
-// (NEXT_PUBLIC_IAP_STARTER_ID, NEXT_PUBLIC_IAP_ADFREE_ID: docs/android/iap.md).
+// (NEXT_PUBLIC_IAP_STARTER_ID, NEXT_PUBLIC_IAP_ADFREE_ID, NEXT_PUBLIC_IAP_PASS_ID: docs/android/iap.md).
 // Without them nothing is sold and the shop is as it was.
 import { useSyncExternalStore } from "react";
 import type { IapProduct } from "@/game/config/iap";
@@ -14,6 +14,7 @@ const validId = (id: string | undefined) => (id && /^[a-z0-9][a-z0-9_.]{0,138}$/
 export const IAP_IDS: Record<IapProduct, string> = {
   starter: validId(process.env.NEXT_PUBLIC_IAP_STARTER_ID),
   adFree: validId(process.env.NEXT_PUBLIC_IAP_ADFREE_ID),
+  pass: validId(process.env.NEXT_PUBLIC_IAP_PASS_ID),
 };
 
 /** Some product is set up for this build. */

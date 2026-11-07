@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { SKINS } from "@/game/config/racing";
 import { FESTIVAL, FESTIVAL_GOALS, festivalNow, festivalProgress, type FestivalGoal } from "@/game/engine/festival";
 import { rewardCash } from "@/game/engine/progress";
-import { SEASON_ICON } from "@/game/engine/season";
+import { BLACK_FRIDAY, SEASON_ICON } from "@/game/engine/season";
 import { formatDuration, formatMoney, formatNumber } from "@/game/format";
 import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
@@ -15,7 +15,7 @@ import { ViewHeader } from "./section-title";
 
 const GOAL_ICON: Record<FestivalGoal, string> = { cars: "🚗", earned: "💰", wins: "🏆" };
 
-/** The spring or summer festival: three goals sized to the empire, and a livery for all three. */
+/** The spring or summer festival, or Black Friday week: three goals sized to the empire, and a livery for all three. */
 export function FestivalView() {
   const state = useGame((g) => g.view.state);
   const snap = useGame((g) => g.view.snap);
@@ -34,11 +34,16 @@ export function FestivalView() {
   const F = state.festival;
   const skin = FESTIVAL.skin[w.season];
   const hasSkin = state.racing.skins.includes(skin);
-  const spring = w.season === "spring";
+  const bar = w.season === "spring" ? "from-pink-400 to-lime-400" : w.season === "blackfriday" ? "from-red-500 to-yellow-400" : "from-amber-400 to-orange-500";
   return (
     <div className="space-y-4">
       <ViewHeader icon={SEASON_ICON[w.season]} title={t(`festival.${w.season}` as MessageKey)} subtitle={t(`festival.${w.season}Sub` as MessageKey)} />
       <p className="px-1 text-[11px] text-white/55">{t("festival.ends", { time: formatDuration((w.end - now) / 1000) })}</p>
+      {w.season === "blackfriday" && (
+        <p className="rounded-2xl bg-gradient-to-r from-red-500/20 to-yellow-400/10 p-3 text-xs font-bold leading-snug text-white/85 ring-1 ring-red-400/35">
+          🏷️ {t("festival.blackfridayDeals", { pct: Math.round((BLACK_FRIDAY.dealerCap - 1) * 100), cut: Math.round(-BLACK_FRIDAY.markup * 100), stars: Math.round((1 - BLACK_FRIDAY.starPrice) * 100) })}
+        </p>
+      )}
 
       <div className="space-y-1.5">
         <div className="px-1 text-[11px] font-bold uppercase tracking-wider text-white/55">{t("festival.goals")}</div>
@@ -61,7 +66,7 @@ export function FestivalView() {
                 )}
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                <div className={cn("h-full rounded-full bg-gradient-to-r", spring ? "from-pink-400 to-lime-400" : "from-amber-400 to-orange-500")} style={{ width: `${Math.min(100, (p.value / Math.max(1, p.target)) * 100)}%` }} />
+                <div className={cn("h-full rounded-full bg-gradient-to-r", bar)} style={{ width: `${Math.min(100, (p.value / Math.max(1, p.target)) * 100)}%` }} />
               </div>
               <div className="flex justify-between text-[11px] text-white/50">
                 <span className="tabular-nums">
