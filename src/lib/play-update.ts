@@ -36,7 +36,8 @@ export function lastOffered(raw: string | null): Offered | null {
   }
 }
 
-const playApp = () => isNativeApp() && platform() === "android" && !process.env.NEXT_PUBLIC_TEST_BUILD;
+/** The game installed from Google Play (not the test app, not the web game). */
+export const playApp = () => isNativeApp() && platform() === "android" && !process.env.NEXT_PUBLIC_TEST_BUILD;
 
 /**
  * The version code of a newer version Play has, if it is due to be offered (and marks it offered);

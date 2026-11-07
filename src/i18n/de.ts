@@ -2217,7 +2217,7 @@ export const de: Record<MessageKey, string> = {
   "welcome.guestLoginNote": "Mit der Anmeldung spielst du das Spiel dieses Kontos. Das Spiel auf diesem Gerät wird als Sicherung aufbewahrt: Profil → Sicherungen auf diesem Gerät.",
   "account.loadingAccount": "Dein Profil wird geladen …",
   "account.loadingSave": "Dein Spielstand wird geladen …",
-  "account.outdated": "Dein Cloud-Spielstand stammt von einer neueren Spielversion. Lade neu, um vor dem Spielen zu aktualisieren.",
+  "account.outdated": "Dein Cloud-Spielstand stammt von einer neueren Spielversion. Aktualisiere das Spiel, um weiterzuspielen: deine Firma ist in der Cloud sicher.",
   "account.reload": "Neu laden",
   "elsewhere.title": "Das Spiel ist in einem anderen Tab oder Fenster geöffnet",
   "elsewhere.body": "Damit dein Fortschritt sicher bleibt, läuft immer nur eine Kopie des Spiels. Alles hier wurde gespeichert.",

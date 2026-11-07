@@ -14,6 +14,7 @@
 import type { GameState } from "../types";
 import type { LocalStore } from "./local";
 import type { CloudBackend, CloudCopy } from "./types";
+import { newerSave } from "./serialize";
 
 export type SyncStatus = "idle" | "saving" | "saved" | "error" | "offline" | "conflict";
 
@@ -202,8 +203,14 @@ export class CloudSync {
    * cloud's is kept as a backup on this device). "cloud": the cloud's game
    * is returned to be played (this device's is kept as a backup).
    */
-  async resolve(keep: "local" | "cloud"): Promise<{ cloud: CloudCopy } | null> {
+  async resolve(keep: "local" | "cloud"): Promise<{ cloud: CloudCopy; outdated?: boolean } | null> {
     const cloud = await this.backend.load();
+    // the cloud holds a save from a newer version of the game (the server refused this one for
+    // it): neither copy is played here, and this game saves nothing more until it is updated
+    if (cloud.revision > 0 && (cloud.version > this.o.version || newerSave(cloud.state, cloud.version))) {
+      this.stop();
+      return { cloud, outdated: true };
+    }
     if (keep === "cloud") {
       if (this.latest) this.local.backup({ state: this.latest, savedAt: this.o.now() }, "device");
       this.latest = null;

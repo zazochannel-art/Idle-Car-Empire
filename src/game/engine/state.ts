@@ -24,8 +24,16 @@ import { createIap } from "./iap";
 import { createShop } from "./shop";
 import type { CarDesign, CarId, ComponentId, DealerId, DealerState, GameState, ManagerId, ManagerState, Stats } from "../types";
 
-/** v3: the supply-chain economy (older saves start a new company). */
-export const SAVE_VERSION = 3;
+/**
+ * The save format this game writes. v3: the supply-chain economy (older saves start a new
+ * company). v4: 1.0.10, the first raised with the format (Nordheim, the trade route, the
+ * daily chest...): raise it with every release that adds or changes a saved field, with its
+ * step in serialize.ts (SAVE_STEPS). A game never reads a save newer than its own format, and the
+ * server never lets an older game save over a newer one, so an old app can't drop new fields.
+ */
+export const SAVE_VERSION = 4;
+/** The first format of the supply-chain economy: older saves start a new company. */
+export const FIRST_CHAIN_SAVE = 3;
 /**
  * The world map the plot ids refer to: 3 is the island map (lots along its
  * roads). Saves from an older map start a new company (their lots are gone).

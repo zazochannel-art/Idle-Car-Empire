@@ -162,7 +162,9 @@ Why turn it on: tools such as Lucky Patcher answer the app's purchase requests w
 ### Turning it on (your steps)
 
 Do them in this order. Turning on the build switch (step 6) before the server is ready
-would hold back every purchase until Google refunds it.
+holds back every purchase for two days: a paid purchase the server still can't check by then
+is given anyway (`VERIFY_GRACE_MS` in `src/lib/native-iap.ts`), so Google doesn't refund it,
+but players wait for nothing meanwhile.
 
 1. **Run the migration.** Supabase dashboard → SQL Editor: paste
    `supabase/migrations/0022_purchases.sql` and run it. To check it,

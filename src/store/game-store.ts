@@ -665,6 +665,11 @@ export const useGame = create<GameStore>((set, get) => {
       if (!saves) return;
       const now = Date.now();
       const state = await saves.resolveConflict(keep, now);
+      // the cloud's save is from a newer version of the game: the update screen, nothing saved here
+      if (state === "outdated") {
+        useCloud.setState({ outdated: true });
+        return;
+      }
       if (keep === "cloud" && state) {
         settleAway(state, now);
         refreshDaily(state, now);
