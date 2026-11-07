@@ -10,7 +10,7 @@
 begin;
 
 insert into auth.users (id, instance_id, aud, role, is_anonymous, created_at, updated_at)
-select id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', true, now(), now()
+select id, '00000000-0000-0000-0000-000000000000'::uuid, 'authenticated', 'authenticated', true, now(), now()
 from (values
   ('a0000000-0000-4000-8000-00000000000a'::uuid), ('b0000000-0000-4000-8000-00000000000b'::uuid),
   ('c1000000-0000-4000-8000-00000000000c'::uuid), ('c2000000-0000-4000-8000-00000000000c'::uuid),
@@ -19,7 +19,7 @@ from (values
 ) as u(id)
 union all
 -- 21 senders for the daily cap on gifts received
-select md5('gift-sender-' || g)::uuid, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', true, now(), now()
+select md5('gift-sender-' || g)::uuid, '00000000-0000-0000-0000-000000000000'::uuid, 'authenticated', 'authenticated', true, now(), now()
 from generate_series(1, 21) g;
 
 -- five more players with a card each (gift targets), made directly by the owner
