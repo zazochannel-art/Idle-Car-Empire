@@ -270,7 +270,7 @@ export async function runPush(env: Env, f: Fetch = fetch, now = Date.now()): Pro
   for (let i = 0; i < notes.length; i += AT_ONCE) await Promise.all(notes.slice(i, i + AT_ONCE).map(send));
   if (gone.length) report.forgotten = await rpc<number>(env, f, "push_forget", { p_tokens: gone });
   if (again.length) {
-    // push_requeue (migration 0023): a project without it yet only loses these notes, as before
+    // push_requeue (migration 0024): a project without it yet only loses these notes, as before
     report.requeued = await rpc<number>(env, f, "push_requeue", { p_tokens: again.map((n) => n.token), p_kinds: again.map((n) => n.kind) }).catch(() => 0);
   }
   return report;
