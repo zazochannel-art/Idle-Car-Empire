@@ -1,7 +1,7 @@
 import { CAR_BY_ID } from "../config/cars";
 import { EVENTS, EVENT_BLOCK_MS, EVENT_BY_ID, EVENT_LENGTH_MS, EVENT_OFFSET_MS, type EventMetric, type MarketEvent } from "../config/events";
 import type { CarId, GameState } from "../types";
-import { payReward } from "./materials";
+import { payReward } from "./ledger";
 
 export interface EventWindow {
   event: MarketEvent;

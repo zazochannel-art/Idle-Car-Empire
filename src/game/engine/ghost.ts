@@ -6,7 +6,8 @@ import { CAR_BY_ID } from "../config/cars";
 import { RACE_NOISE, RATING_SOFTEN, TRACKS, type TrackId } from "../config/racing";
 import type { CarId, GameState, RaceCarState } from "../types";
 import type { EconomySnapshot } from "./economy";
-import { dateKey, grantReward, rewardCash } from "./progress";
+import { grantReward, rewardCash } from "./rewards";
+import { dateKey } from "./calendar";
 import { atTrack, carStats, gauss, liveryOf, raceCar, rating, rng, type RaceStats } from "./racing";
 
 export const DUEL = {

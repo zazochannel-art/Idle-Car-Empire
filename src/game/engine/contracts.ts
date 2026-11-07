@@ -5,8 +5,9 @@
 import type { CarId, GameState, Reward } from "../types";
 import type { EconomySnapshot } from "./economy";
 import { unlockedCarIds } from "./economy";
-import { hasPlant } from "./chain";
-import { grantReward, niceNumber } from "./progress";
+import { hasPlant } from "./plants";
+import { niceNumber } from "./progress";
+import { grantReward } from "./rewards";
 
 export const CLIENTS = ["taxi", "rental", "police", "delivery", "racing", "embassy"] as const;
 export type ClientId = (typeof CLIENTS)[number];

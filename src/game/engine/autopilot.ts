@@ -4,7 +4,8 @@
 // Each returns what it did, so the player can be told.
 import { CAR_BY_ID } from "../config/cars";
 import type { GameState } from "../types";
-import { carValue, plantsOf } from "./chain";
+import { carValue } from "./chain";
+import { plantsOf } from "./plants";
 import { claimContract } from "./contracts";
 import type { EconomySnapshot } from "./economy";
 import { acceptFleetOrder, finishFleetOrder } from "./expansion";

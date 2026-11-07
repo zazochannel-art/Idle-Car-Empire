@@ -10,14 +10,18 @@ import {
 import { CARS } from "../config/cars";
 import { RESEARCH } from "../config/research";
 import type { GameState, MetricId, MissionState, Reward } from "../types";
-import { hasPlant, plantsOf } from "./chain";
+import { hasPlant, plantsOf } from "./plants";
 import { passiveIncome, snapshot, unlockedCarIds, type EconomySnapshot } from "./economy";
 import { formatMoney, formatNumber } from "../format";
-import { ledgerNet, payReward } from "./materials";
+import { ledgerNet } from "./ledger";
 import { isMoneyMetric } from "../config/missions";
 import { PASS } from "../config/pass";
 import { addPassXp, passTick } from "./pass";
 import { plantsEverywhere } from "./cities";
+import { dateKey, yesterdayKey } from "./calendar";
+import { grantReward } from "./rewards";
+export { grantReward, rewardCash } from "./rewards";
+export { dateKey, yesterdayKey } from "./calendar";
 
 export { isMoneyMetric };
 
@@ -84,19 +88,6 @@ export function conditionProgress(s: GameState, c: Condition, snap: EconomySnaps
   }
 }
 
-/** Cash value of a reward right now (incomeSeconds scales with production). */
-export function rewardCash(r: Reward, snap: EconomySnapshot): number {
-  const income = Math.max(passiveIncome(snap), 5);
-  return (r.cash ?? 0) + (r.incomeSeconds ?? 0) * income;
-}
-
-/** Rewards go straight to the wallet; they are not "earned" (they count toward no reset). */
-export function grantReward(s: GameState, r: Reward, snap: EconomySnapshot) {
-  payReward(s, rewardCash(r, snap));
-  if (r.rp) s.rp += r.rp;
-  if (r.boost) s.boost += r.boost;
-  if (r.stars) s.stars += r.stars;
-}
 
 /** Unlocks every achievement whose condition is met and pays its reward. */
 export function checkAchievements(s: GameState, snap?: EconomySnapshot): string[] {
@@ -116,10 +107,6 @@ export function checkAchievements(s: GameState, snap?: EconomySnapshot): string[
 
 // ───────────────────────────── missions ─────────────────────────────
 
-export function dateKey(now: number): string {
-  const d = new Date(now);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 
 function seeded(seed: string) {
   let h = 2166136261;
@@ -204,12 +191,6 @@ export function claimDaily(s: GameState, id: string): boolean {
 
 // ───────────────────────────── the daily chest ─────────────────────────────
 
-/** The calendar day before `now`'s, on the phone's calendar (right across a daylight-saving change). */
-export function yesterdayKey(now: number): string {
-  const d = new Date(now);
-  d.setDate(d.getDate() - 1);
-  return dateKey(d.getTime());
-}
 
 /** Days in a row the chest will have been opened if it is opened today. */
 export function chestStreakToday(s: GameState, now: number): number {

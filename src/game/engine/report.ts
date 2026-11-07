@@ -2,8 +2,9 @@
 // here, and every money figure comes from the ledger (the single source the
 // HUD profit uses too) — no screen keeps a formula of its own.
 import type { GameState } from "../types";
-import { plantsOf } from "./chain";
-import { debtLimit, inventoryValue, ledgerCosts, ledgerNet, ledgerRevenue } from "./materials";
+import { plantsOf } from "./plants";
+import { inventoryValue } from "./materials";
+import { debtLimit, ledgerCosts, ledgerNet, ledgerRevenue } from "./ledger";
 
 export interface EconomyReport {
   cash: number;

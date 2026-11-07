@@ -7,7 +7,7 @@
 import { CITY_IDS } from "../config/cities";
 import type { CityId, GameState } from "../types";
 import { ownsCity, withWallet } from "./cities";
-import { payReward } from "./materials";
+import { payReward } from "./ledger";
 
 /** The kinds this game knows: the server hands out only these (a newer kind waits for a newer game). */
 export const TEAM_KINDS = ["cash", "stars", "company", "restore", "message", "rep"] as const;

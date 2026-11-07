@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { TRACKS } from "./config/racing";
-import { CUP, cupBlock, cupFloorSeconds, cupLaps, cupPrize, cupRun, cupRunsLeft, cupSent, cupTime, cupToSend, cupTrack, cupWeek, cupWeekEnd, cupWeekStart, payCupPrize } from "./engine/cup";
+import { RACE_WEIGHTS, TRACKS } from "./config/racing";
+import { CUP, cupBlock, cupFloorSeconds, cupLaps, cupPlayerFloorSeconds, cupPrize, cupRun, cupRunsLeft, cupSent, cupTime, cupToSend, cupTrack, cupWeek, cupWeekEnd, cupWeekStart, payCupPrize } from "./engine/cup";
 import { snapshot } from "./engine/economy";
 import { receiveRaceCar, rng } from "./engine/racing";
 import { cloneState, createInitialState } from "./engine/state";
@@ -161,5 +161,35 @@ describe("weekly cup: prizes", () => {
   it("an old save gets an empty cup", () => {
     const s = createInitialState(T0);
     expect(s.cup).toEqual({ week: 0, day: 0, runs: 0, best: 0, laps: [], car: "", sent: 0, claimed: 0 });
+  });
+});
+
+describe("weekly cup: the board's floor for a player's own car (migration 0027)", () => {
+  it("is never above a run the car drives, on every track and rating", () => {
+    for (const t of TRACKS) {
+      for (const rating of [50, 200, 500, 800, 1000]) {
+        const floor = cupPlayerFloorSeconds(rating, t);
+        for (let seed = 1; seed <= 400; seed++) {
+          const total = Math.max(cupFloorSeconds(t), cupLaps(rating, t, rng(seed)).reduce((a, b) => a + b, 0));
+          expect(total).toBeGreaterThan(floor);
+        }
+      }
+    }
+  });
+
+  it("refuses a time a far better car would drive", () => {
+    const t = TRACKS[0];
+    const strong = cupLaps(1000, t, rng(3)).reduce((a, b) => a + b, 0);
+    expect(strong).toBeLessThan(cupPlayerFloorSeconds(300, t));
+  });
+
+  it("is the server's formula", () => {
+    const sql = readFileSync(join(__dirname, "../../supabase/migrations/0027_cup_floor.sql"), "utf8");
+    expect(sql).toContain("0.85 * 1000 * t.ref_lap * (500 + 30) / (r.rating + 30) * (t.laps + 0.04)");
+    expect(sql).toContain("t.laps * t.ref_lap * 490");
+    expect(CUP.refRating).toBe(500);
+    // ops.ghost_rating: the circuit weights
+    expect(RACE_WEIGHTS.circuit).toEqual({ speed: 0.25, accel: 0.2, handling: 0.3, braking: 0.15, aero: 0.1 });
+    for (const w of ["0.25 * coalesce((p_ghost->'stats'->>'speed')", "0.2 * coalesce((p_ghost->'stats'->>'accel')", "0.3 * coalesce((p_ghost->'stats'->>'handling')", "0.15 * coalesce((p_ghost->'stats'->>'braking')", "0.1 * coalesce((p_ghost->'stats'->>'aero')"]) expect(sql).toContain(w);
   });
 });

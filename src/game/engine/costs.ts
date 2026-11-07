@@ -25,7 +25,7 @@ import {
   type MaterialId,
 } from "../config/economy";
 import type { ComponentId, PlantType } from "../types";
-import { unitMaterials } from "./materials";
+import { unitMaterials } from "./recipes";
 
 export interface OpRates {
   /** $/s while the plant runs. */

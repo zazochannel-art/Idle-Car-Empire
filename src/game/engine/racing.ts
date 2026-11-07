@@ -75,7 +75,7 @@ import { CAR_TECH, TECH_IDS, isTech, type TechId } from "../config/tech";
 import { DEALER_BY_ID } from "../config/dealerships";
 import { carListPrice } from "./costs";
 import { designStats } from "./design";
-import { book } from "./materials";
+import { book } from "./ledger";
 import type {
   CarId,
   ChampionshipState,

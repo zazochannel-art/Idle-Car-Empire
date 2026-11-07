@@ -16,6 +16,7 @@ const platform = process.argv[2] ?? "";
 if (platform && !["android", "ios"].includes(platform)) throw new Error(`unknown platform "${platform}" (android or ios)`);
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL) console.warn("NEXT_PUBLIC_SUPABASE_URL is not set: this build has no cloud saves (unless .env.local sets it).");
 
+execSync("node scripts/sync-version.mjs", { stdio: "inherit" });
 execSync("node scripts/app-assets.mjs", { stdio: "inherit" });
 execSync("npx next build", { stdio: "inherit" });
 // SOURCE_MAPS=1 (CI): the maps go to source-maps/ with the scripts they describe, not into the app

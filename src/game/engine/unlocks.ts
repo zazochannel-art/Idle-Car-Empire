@@ -2,8 +2,9 @@
 // is celebrated with a card and a one-off cash bonus (once per run).
 import { PLANT_TYPES } from "../config/chain";
 import type { GameState, PlantType } from "../types";
-import { hasPlant, plantLock } from "./chain";
-import { payReward } from "./materials";
+import { plantLock } from "./chain";
+import { hasPlant } from "./plants";
+import { payReward } from "./ledger";
 
 /** The bonus is this many seconds of steady income… */
 export const UNLOCK_BONUS_SECONDS = 120;

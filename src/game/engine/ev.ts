@@ -6,7 +6,7 @@
 import { CHARGING, EV_CARS, SUBSCRIPTION } from "../config/ev";
 import { DEALER_IDS } from "../config/dealerships";
 import type { CarId, DealerId, GameState } from "../types";
-import { plantsOf } from "./chain";
+import { plantsOf } from "./plants";
 
 export const chargingUnlocked = (s: GameState) => s.research.includes("charging_network");
 export const subscriptionsUnlocked = (s: GameState) => s.research.includes("ota_updates");

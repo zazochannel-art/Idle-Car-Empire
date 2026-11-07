@@ -1,6 +1,7 @@
 import type { GameState } from "../types";
 import { canOpenDealers } from "./actions";
-import { hasPlant, plantLock } from "./chain";
+import { plantLock } from "./chain";
+import { hasPlant } from "./plants";
 
 export type TipId = "start" | "engine" | "market" | "dealers";
 

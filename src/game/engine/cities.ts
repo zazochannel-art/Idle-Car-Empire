@@ -13,7 +13,8 @@ import { CITY_IDS, CITY_RULES, TRADE_ROUTE } from "../config/cities";
 import { BUYABLE_TERRITORIES } from "../config/city";
 import { setWorld, withWorld } from "../city/layout";
 import type { CityId, GameState } from "../types";
-import { createChain, plantsOf } from "./chain";
+import { createChain } from "./chain";
+import { plantsOf } from "./plants";
 import { createCity } from "./city";
 import { constructionTick } from "./construction";
 import { snapshot } from "./economy";
@@ -21,8 +22,8 @@ import { createExport, createFleet } from "./expansion";
 import { createLandmarks } from "./landmarks";
 import { createLogistics } from "./logistics";
 import { createMapBonus } from "./map-bonus";
-import { payReward } from "./materials";
-import { createDealers, createShowroom } from "./state";
+import { payReward } from "./ledger";
+import { createDealers, createShowroom } from "./defaults";
 import { payDividends } from "./stock";
 
 /** The parts of the state that belong to a city. */

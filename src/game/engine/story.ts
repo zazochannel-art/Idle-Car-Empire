@@ -5,11 +5,12 @@
 // about follow from the same count, so a save plays the same way.
 import { CHAPTERS, DILEMMA_BY_ID, DILEMMAS, STORY, type Chapter, type Dilemma, type StoryEffect } from "../config/story";
 import type { GameState } from "../types";
-import { plantsOf } from "./chain";
+import { plantsOf } from "./plants";
 import { passiveIncome, type EconomySnapshot } from "./economy";
 import { BREAKDOWN, moraleOf } from "./floor";
-import { payReward } from "./materials";
-import { conditionProgress, grantReward } from "./progress";
+import { payReward } from "./ledger";
+import { conditionProgress } from "./progress";
+import { grantReward } from "./rewards";
 
 export interface StoryState {
   /** Play time (s) at which the next decision comes (0: not scheduled yet). */

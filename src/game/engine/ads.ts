@@ -6,7 +6,7 @@ import { SHOP } from "../config/shop";
 import type { GameState } from "../types";
 import { finishNow, remainingOf } from "./construction";
 import { collectOffline } from "./offline";
-import { dateKey } from "./progress";
+import { dateKey } from "./calendar";
 
 export interface AdsState {
   /** The day (dateKey) `count` is for: rewarded ads watched that day. */

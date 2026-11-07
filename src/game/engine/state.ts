@@ -1,7 +1,6 @@
 import { createBrand } from "./brand";
 import { CARS } from "../config/cars";
 import { COMPONENTS } from "../config/chain";
-import { DEALER_IDS } from "../config/dealerships";
 import { MANAGER_IDS } from "../config/managers";
 import { START_CASH } from "../config/economy";
 import { WHATS_NEW } from "../config/whats-new";
@@ -22,7 +21,9 @@ import { createMapBonus } from "./map-bonus";
 import { createLandmarks } from "./landmarks";
 import { createIap } from "./iap";
 import { createShop } from "./shop";
-import type { CarDesign, CarId, ComponentId, DealerId, DealerState, GameState, ManagerId, ManagerState, Stats } from "../types";
+import type { CarDesign, CarId, ComponentId, GameState, ManagerId, ManagerState, Stats } from "../types";
+import { createDealers, createShowroom } from "./defaults";
+export { createDealers, createShowroom } from "./defaults";
 
 /**
  * The save format this game writes. v3: the supply-chain economy (older saves start a new
@@ -40,11 +41,6 @@ export const FIRST_CHAIN_SAVE = 3;
  */
 export const MAP_VERSION = 3;
 
-export function createDealers(): Record<DealerId, DealerState> {
-  return Object.fromEntries(DEALER_IDS.map((d) => [d, { owned: false, level: 1 }])) as Record<DealerId, DealerState>;
-}
-
-export const createShowroom = (): GameState["showroom"] => ({ campaignUntil: 0, campaigns: 0, sold: 0, revenue: 0 });
 
 export function createManagers(): Record<ManagerId, ManagerState> {
   return Object.fromEntries(

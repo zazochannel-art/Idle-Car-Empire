@@ -3,7 +3,7 @@
 // smaller thank-you. Paid as rewards: they count toward no reset.
 import type { GameState } from "../types";
 import type { EconomySnapshot } from "./economy";
-import { grantReward, rewardCash } from "./progress";
+import { grantReward, rewardCash } from "./rewards";
 
 export const GIFT = {
   /** A gift received: this many seconds of the receiver's income. */

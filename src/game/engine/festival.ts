@@ -4,7 +4,7 @@
 // spring, or a scheduled one) is new. Everything it pays is a reward: it counts toward no reset.
 import type { GameState, Reward } from "../types";
 import { passiveIncome, type EconomySnapshot } from "./economy";
-import { grantReward, rewardCash } from "./progress";
+import { grantReward, rewardCash } from "./rewards";
 import { seasonWindow, type FestivalSeason } from "./season";
 
 export type FestivalGoal = "cars" | "earned" | "wins";

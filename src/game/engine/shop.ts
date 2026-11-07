@@ -7,7 +7,8 @@ import type { GameState, Reward } from "../types";
 import { adBlock, adsToday, countAd, grantAd } from "./ads";
 import { remainingOf } from "./construction";
 import type { EconomySnapshot } from "./economy";
-import { dateKey, grantReward } from "./progress";
+import { grantReward } from "./rewards";
+import { dateKey } from "./calendar";
 
 export interface ShopState {
   /** When the last free crate was opened (ms; 0: never, the first one is ready). */

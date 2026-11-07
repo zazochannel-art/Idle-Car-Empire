@@ -63,6 +63,8 @@ export async function startNative() {
   await App.addListener("pause", () => {
     const g = useGame.getState();
     g.suspend();
+    // the save suspend() just wrote, copied to the app's storage too (lib/save-mirror.ts)
+    void import("./save-mirror").then((m) => m.flushSaveMirror()).catch(() => {});
     if (g.state.settings.notify) void scheduleAway(g.awayNotes());
   });
   await App.addListener("resume", () => {

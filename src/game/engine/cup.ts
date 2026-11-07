@@ -7,7 +7,7 @@ import { RACE_NOISE, RATING_SOFTEN, TRACKS, type TrackConfig } from "../config/r
 import type { CarId, GameState } from "../types";
 import type { EconomySnapshot } from "./economy";
 import { duelCar, duelRating } from "./ghost";
-import { grantReward, rewardCash } from "./progress";
+import { grantReward, rewardCash } from "./rewards";
 import { gauss, liveryOf, rng } from "./racing";
 
 const DAY = 86_400_000;
@@ -54,6 +54,14 @@ export const cupTrack = (week: number): TrackConfig => TRACKS[((week % TRACKS.le
 
 /** The fastest total a car can drive on a track (the best rating, the luckiest laps): the server refuses anything faster. */
 export const cupFloorSeconds = (t: TrackConfig) => t.refLap * t.laps * 0.49;
+
+/**
+ * The fastest total the board takes from a car of this rating (supabase/migrations/0027
+ * ops.cup_floor_ms, which works it out from the player's ghost): 15% under its expected laps,
+ * never under the track's floor. Kept equal to the server's, and far under any run cupLaps gives.
+ */
+export const cupPlayerFloorSeconds = (rating: number, t: TrackConfig) =>
+  Math.max(cupFloorSeconds(t), (0.85 * t.refLap * (CUP.refRating + RATING_SOFTEN) * (t.laps + 0.04)) / (Math.max(0, rating) + RATING_SOFTEN));
 
 /** A time as on a stopwatch: 3:06.40. */
 export function cupTime(seconds: number): string {

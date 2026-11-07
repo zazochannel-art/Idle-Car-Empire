@@ -6,7 +6,8 @@ import { createCity } from "./city";
 import { resetDesignLevels } from "./design";
 import { createLogistics } from "./logistics";
 import { createStock } from "./stock";
-import { createDealers, createStats, emptyCarCounts } from "./state";
+import { createStats, emptyCarCounts } from "./state";
+import { createDealers } from "./defaults";
 
 /**
  * Clears the current run (the old Reset Imperium; collecting ⭐ Stars no longer
