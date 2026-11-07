@@ -31,7 +31,9 @@ jobs:
 
   first-minutes:
     name: A new player's first minutes (browser)
-    runs-on: ubuntu-latest
+    # Playwright 1.56 installs Chromium's system libraries for Ubuntu 24.04, not for 26.04 (now
+    # ubuntu-latest); move on once playwright-core is upgraded to a version that supports it
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4

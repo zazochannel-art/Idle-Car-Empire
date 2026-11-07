@@ -27,6 +27,6 @@ enable_signup = true
 enable_anonymous_sign_ins = true
 
 [auth.email]
-enable_signup = true
+enabled = true
 # registering adds email + password at once, as on the live project without custom SMTP
 enable_confirmations = false

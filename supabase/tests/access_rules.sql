@@ -99,9 +99,14 @@ begin
   end;
   if not failed then raise exception 'FAIL names are unique'; end if;
 
-  -- B cannot write A's save directly, even naming A's id
-  update public.game_saves set data = '{"cash": 1}'::jsonb where user_id = a;
-  get diagnostics n = row_count;
+  -- B cannot write A's save directly, even naming A's id (since 0003 players have no table
+  -- writes at all, only save_game(): refused outright, or at most no row changed)
+  n := 0;
+  begin
+    update public.game_saves set data = '{"cash": 1}'::jsonb where user_id = a;
+    get diagnostics n = row_count;
+  exception when insufficient_privilege then n := 0;
+  end;
   if n <> 0 then raise exception 'FAIL B updates A''s save'; end if;
   failed := false;
   begin
