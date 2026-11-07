@@ -2217,7 +2217,7 @@ export const pt: Record<MessageKey, string> = {
   "welcome.guestLoginNote": "Entrar numa conta abre o jogo dessa conta. O jogo deste aparelho fica guardado como backup: Perfil → Backups neste aparelho.",
   "account.loadingAccount": "Carregando seu perfil…",
   "account.loadingSave": "Carregando seu jogo salvo…",
-  "account.outdated": "Seu jogo salvo na nuvem foi feito por uma versão mais nova do jogo. Recarregue para atualizar antes de jogar.",
+  "account.outdated": "Seu jogo salvo na nuvem foi feito por uma versão mais nova do jogo. Atualize o jogo para continuar: sua empresa está segura na nuvem.",
   "account.reload": "Recarregar",
   "elsewhere.title": "O jogo está aberto em outra aba ou janela",
   "elsewhere.body": "Para manter seu progresso seguro, só uma cópia do jogo roda por vez. Tudo daqui foi salvo.",

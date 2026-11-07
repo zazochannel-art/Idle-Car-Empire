@@ -154,7 +154,21 @@ export interface Report {
   sent: number;
   failed: number;
   forgotten: number;
+  /** Notes not sent for a passing reason, queued again for the next run. */
+  requeued?: number;
   error?: string;
+}
+
+/**
+ * Firebase's answer says the phone is gone: the game uninstalled (404, UNREGISTERED) or a token
+ * that is not a phone's at all (INVALID_ARGUMENT about the registration token). Any other
+ * INVALID_ARGUMENT is about the message itself: a mistake in this sender, not the phone's, so
+ * its token is kept (forgetting it would lose every phone at once).
+ */
+export function tokenGone(status: number, err: { error?: { status?: string; message?: string; details?: { errorCode?: string }[] } } | null): boolean {
+  const codes = [err?.error?.status, ...(err?.error?.details ?? []).map((d) => d.errorCode)];
+  if (status === 404 || codes.includes("UNREGISTERED")) return true;
+  return codes.includes("INVALID_ARGUMENT") && /registration token/i.test(err?.error?.message ?? "");
 }
 
 async function rpc<T>(env: Env, f: Fetch, name: string, body: Record<string, unknown> = {}): Promise<T> {
@@ -204,7 +218,12 @@ export async function runPush(env: Env, f: Fetch = fetch, now = Date.now()): Pro
 
   const notes = await rpc<TakenNote[]>(env, f, "push_take", { p_limit: BATCH });
   const gone: string[] = [];
+  // not sent for a reason that passes (no connection, Firebase busy or down): queued again
+  const again: TakenNote[] = [];
+  // Firebase asked to slow down: the rest of this run's notes wait for the next run
+  let throttled = false;
   const send = async (n: TakenNote) => {
+    if (throttled) return void again.push(n);
     const text = noteText(n.lang, n.kind, n.args ?? {});
     if (!text) return void report.failed++;
     const res = await f(`https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`, {
@@ -222,13 +241,18 @@ export async function runPush(env: Env, f: Fetch = fetch, now = Date.now()): Pro
     }).catch(() => null);
     if (res?.ok) return void report.sent++;
     report.failed++;
-    if (!res) return;
-    // the phone uninstalled the game, or the token is not a phone's: forget it
-    const err = (await res.json().catch(() => null)) as { error?: { status?: string; details?: { errorCode?: string }[] } } | null;
-    const codes = [err?.error?.status, ...(err?.error?.details ?? []).map((d) => d.errorCode)];
-    if (res.status === 404 || codes.includes("UNREGISTERED") || codes.includes("INVALID_ARGUMENT")) gone.push(n.token);
+    if (!res || res.status === 429 || res.status >= 500) {
+      if (res?.status === 429) throttled = true;
+      return void again.push(n);
+    }
+    const err = (await res.json().catch(() => null)) as { error?: { status?: string; message?: string; details?: { errorCode?: string }[] } } | null;
+    if (tokenGone(res.status, err)) gone.push(n.token);
   };
   for (let i = 0; i < notes.length; i += AT_ONCE) await Promise.all(notes.slice(i, i + AT_ONCE).map(send));
   if (gone.length) report.forgotten = await rpc<number>(env, f, "push_forget", { p_tokens: gone });
+  if (again.length) {
+    // push_requeue (migration 0023): a project without it yet only loses these notes, as before
+    report.requeued = await rpc<number>(env, f, "push_requeue", { p_tokens: again.map((n) => n.token), p_kinds: again.map((n) => n.kind) }).catch(() => 0);
+  }
   return report;
 }

@@ -8,7 +8,7 @@ import { SAVE_VERSION } from "../engine/state";
 import type { GameState } from "../types";
 import { LocalStore } from "./local";
 import { decideStart, summarize, trustedLastActive, type SaveSummary } from "./policy";
-import { migrate } from "./serialize";
+import { migrate, newerSave } from "./serialize";
 import { SupabaseBackend } from "./supabase";
 import type { Social } from "./social";
 import { CloudSync, type SyncInfo } from "./sync";
@@ -158,6 +158,9 @@ export class SaveManager {
     } catch {
       cloud = null;
     }
+    // a save from a newer version of the game (in the cloud, or here after the app went back a
+    // version) is never read nor saved over: the player updates first
+    if ((cloud && cloud.revision > 0 && newerSave(cloud.state, cloud.version)) || (own && newerSave(own.state))) return { state: null, outdated: true, mode: "cloud" };
     // a damaged cloud save is never offered: this device's copy (if any) takes over and repairs it
     if (cloud && cloud.revision > 0 && cloud.version <= SAVE_VERSION && !this.read(cloud.state, now)) {
       const fallback = own ?? legacy;
@@ -236,10 +239,11 @@ export class SaveManager {
     else this.local.remove(null);
   }
 
-  async resolveConflict(keep: "local" | "cloud", now: number): Promise<GameState | null> {
+  async resolveConflict(keep: "local" | "cloud", now: number): Promise<GameState | "outdated" | null> {
     if (!this.sync) return null;
     const res = await this.sync.resolve(keep);
     if (!res) return null;
+    if (res.outdated) return "outdated";
     const state = this.read(res.cloud.state, now);
     if (state) state.lastActiveAt = trustedLastActive(state.lastActiveAt, res.cloud, now);
     return state;

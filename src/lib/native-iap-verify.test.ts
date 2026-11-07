@@ -25,6 +25,7 @@ interface Purchase {
   purchaseState?: string;
   isAcknowledged?: boolean;
   appAccountToken?: string | null;
+  purchaseDate?: string;
 }
 let purchases: Purchase[] = [];
 let answer: () => Promise<Purchase> = async () => ({ productIdentifier: "starter_pack" });
@@ -126,6 +127,21 @@ describe("in-app purchases checked by the server", () => {
     verdicts["tok-2"] = "valid";
     expect(await iap.restorePurchases()).toBe(1);
     expect(game.state.iap.owned).toEqual(["adFree"]);
+  });
+
+  it("a paid purchase the server still can't check after two days is given before Google Play refunds it", async () => {
+    const old = new Date(Date.now() - 2 * 86_400_000 - 60_000).toISOString();
+    // a purchase from just now waits; one two days old is given and acknowledged
+    purchases = [paid("starter_pack", "tok-new", { purchaseDate: new Date().toISOString() }), paid("ad_free_rewards", "tok-old", { purchaseDate: old })];
+    expect(await iap.restorePurchases()).toBe(1);
+    expect(log).toEqual(["check starter_pack tok-new", "check ad_free_rewards tok-old", "grant adFree", "ack tok-old"]);
+    // the server's refusal still stands, however old the purchase
+    log.length = 0;
+    game = { ready: true, state: createInitialState(T0) };
+    verdicts = { "tok-old": "taken" };
+    purchases = [paid("ad_free_rewards", "tok-old", { purchaseDate: old })];
+    expect(await iap.restorePurchases()).toBe(0);
+    expect(game.state.iap.owned).toEqual([]);
   });
 
   it("a purchase the game gave already is only acknowledged, without asking the server again", async () => {

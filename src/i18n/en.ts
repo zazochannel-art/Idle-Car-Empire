@@ -2219,7 +2219,7 @@ export const en = {
   "welcome.guestLoginNote": "Signing in plays that account's game. The game on this device is kept as a backup: Profile → Backups on this device.",
   "account.loadingAccount": "Loading your profile…",
   "account.loadingSave": "Loading your save…",
-  "account.outdated": "Your cloud save was made by a newer version of the game. Reload to update before playing.",
+  "account.outdated": "Your cloud save was made by a newer version of the game. Update the game to keep playing: your company is safe in the cloud.",
   "account.reload": "Reload",
   "elsewhere.title": "The game is open in another tab or window",
   "elsewhere.body": "To keep your progress safe, only one copy of the game plays at a time. Everything here was saved.",

@@ -16,6 +16,7 @@ import { INVITE } from "@/game/engine/invites";
 import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
 import { passwordIssue } from "@/lib/password";
+import { installPlayUpdate, playApp } from "@/lib/play-update";
 import { cn } from "@/lib/utils";
 import { answerStartChoice, enterGame, useCloud } from "@/store/cloud-store";
 import { trackGate } from "@/game/save/funnel";
@@ -927,8 +928,9 @@ export function StartGate() {
     return (
       <div className="max-w-sm space-y-3 text-center">
         <p className="text-sm text-white/80">{t("account.outdated")}</p>
-        <Button variant="gold" onClick={() => window.location.reload()}>
-          <RefreshCw /> {t("account.reload")}
+        {/* the Play app updates through Play's own screen; elsewhere a reload loads the new version */}
+        <Button variant="gold" onClick={() => (playApp() ? void installPlayUpdate() : window.location.reload())}>
+          <RefreshCw /> {t(playApp() ? "update.play.update" : "account.reload")}
         </Button>
       </div>
     );

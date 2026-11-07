@@ -21,7 +21,7 @@ import { migrateCity, unlockOwnedZones } from "../engine/city";
 import { bundleOf, createCityBundle, withCity, type ParkedCity } from "../engine/cities";
 import { withWorld } from "../city/layout";
 import { CITY_IDS } from "../config/cities";
-import { createInitialState, MAP_VERSION, SAVE_VERSION } from "../engine/state";
+import { createInitialState, FIRST_CHAIN_SAVE, MAP_VERSION, SAVE_VERSION } from "../engine/state";
 import { ACHIEVEMENTS } from "../config/achievements";
 import type { CityId, GameState, Lang } from "../types";
 
@@ -127,12 +127,45 @@ function fromOldMap(raw: Json, now: number): GameState {
   return cleanSettings(state, raw.settings);
 }
 
-export function migrate(raw: unknown, now: number): GameState {
+/**
+ * The steps from each save format to the next, in order: SAVE_STEPS[v] turns a v save into a v+1
+ * one (on the raw JSON, before it is merged over the defaults). Each SAVE_VERSION raise adds
+ * its step, even an empty one, so no format is ever skipped.
+ */
+export const SAVE_STEPS: Readonly<Record<number, (raw: Json) => void>> = {
+  // 1.0.10: no field changed its shape (the new ones get their defaults); v4 keeps older games off these saves
+  3: () => {},
+};
+
+/**
+ * A save from a newer version of the game than this one: a newer format or world map, or a
+ * city this game doesn't have. It is never read (its new parts would be lost and the loss
+ * saved): the game asks for the update instead.
+ */
+export function newerSave(raw: unknown, version?: number): boolean {
+  if (!isObject(raw)) return typeof version === "number" && version > SAVE_VERSION;
+  const v = typeof version === "number" ? version : raw.version;
+  if (typeof v === "number" && v > SAVE_VERSION) return true;
+  if (typeof raw.mapVersion === "number" && raw.mapVersion > MAP_VERSION) return true;
+  return typeof raw.activeCity === "string" && !CITY_IDS.includes(raw.activeCity as CityId);
+}
+
+export class NewerSaveError extends Error {
+  constructor() {
+    super("save from a newer version of the game");
+  }
+}
+
+export function migrate(input: unknown, now: number): GameState {
   const fresh = createInitialState(now);
-  if (!isObject(raw)) return fresh;
-  if (typeof raw.version !== "number" || raw.version < SAVE_VERSION) return fromOldEconomy(raw, now);
+  if (!isObject(input)) return fresh;
+  if (newerSave(input)) throw new NewerSaveError();
+  if (typeof input.version !== "number" || input.version < FIRST_CHAIN_SAVE) return fromOldEconomy(input, now);
   // a save from an older world map: its lots don't exist on this one
-  if (raw.mapVersion !== MAP_VERSION) return fromOldMap(raw, now);
+  if (input.mapVersion !== MAP_VERSION) return fromOldMap(input, now);
+  // a shallow copy: the steps never change the caller's object
+  const raw: Json = { ...input };
+  for (let v = Math.floor(input.version); v < SAVE_VERSION; v++) SAVE_STEPS[v]?.(raw);
   const state = mergeDefaults(fresh, raw);
   // the Custom Garage is out of the game for now: a save's build and line stay as they were, for when it comes back
   if (raw.customGarageDesign != null) state.customGarageDesign = raw.customGarageDesign;

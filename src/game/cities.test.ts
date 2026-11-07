@@ -16,7 +16,7 @@ import { metric } from "./engine/progress";
 import { collectOffline, settleOffline } from "./engine/offline";
 import { createInitialState } from "./engine/state";
 import { tick } from "./engine/tick";
-import { migrate } from "./save/serialize";
+import { NewerSaveError, migrate } from "./save/serialize";
 import * as Mk from "./engine/market";
 import { nextGoals } from "./engine/insights";
 import { setPlaceNames, translate } from "@/i18n";
@@ -335,10 +335,13 @@ describe("saves", () => {
     // a parked city never holds the one being played, and an unknown one is ignored
     raw.cities.home = raw.cities.north;
     raw.cities.atlantis = raw.cities.north;
-    raw.activeCity = "atlantis";
+    raw.activeCity = "north";
     const odd = migrate(raw, T0);
-    expect(odd.activeCity).toBe("home");
-    expect(Object.keys(odd.cities)).toEqual(["north"]);
+    expect(odd.activeCity).toBe("north");
+    expect(Object.keys(odd.cities)).toEqual(["home"]);
+    // played in a city this game doesn't have: a newer game's save, never read as the first city's
+    raw.activeCity = "atlantis";
+    expect(() => migrate(raw, T0)).toThrow(NewerSaveError);
   });
 
   it("a report waiting for COLLECT keeps only the cities' money it can pay", () => {

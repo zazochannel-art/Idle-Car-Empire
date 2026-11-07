@@ -228,6 +228,8 @@ export function Game() {
     if (ready) flushErrorReports();
   }, [ready]);
 
+  // the cloud's save is from a newer version (found at the start or in a save conflict): only the update screen
+  const outdated = useCloud((c) => c.outdated);
   return (
     <>
       {/* the app's Back button and background/foreground, from the welcome page on */}
@@ -237,7 +239,7 @@ export function Game() {
         <StartScreen compact>
           <OpenElsewhere />
         </StartScreen>
-      ) : ready ? (
+      ) : ready && !outdated ? (
         <Shell />
       ) : (
         <Splash />

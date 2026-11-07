@@ -2217,7 +2217,7 @@ export const ro: Record<MessageKey, string> = {
   "welcome.guestLoginNote": "Conectarea pornește jocul acelui cont. Jocul de pe acest dispozitiv rămâne ca rezervă: Profil → Copii de rezervă pe acest dispozitiv.",
   "account.loadingAccount": "Se încarcă profilul…",
   "account.loadingSave": "Se încarcă salvarea…",
-  "account.outdated": "Salvarea din cloud a fost făcută de o versiune mai nouă a jocului. Reîncarcă pagina ca să actualizezi.",
+  "account.outdated": "Salvarea din cloud a fost făcută de o versiune mai nouă a jocului. Actualizează jocul ca să joci mai departe: compania ta e în siguranță în cloud.",
   "account.reload": "Reîncarcă",
   "elsewhere.title": "Jocul este deschis în altă filă sau fereastră",
   "elsewhere.body": "Ca progresul să nu se piardă, doar o copie a jocului rulează odată. Tot ce ai făcut aici a fost salvat.",

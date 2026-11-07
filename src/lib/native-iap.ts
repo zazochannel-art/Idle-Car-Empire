@@ -14,7 +14,8 @@
 // With the server check on (NEXT_PUBLIC_IAP_VERIFY=1, docs/android/iap.md), a purchase is
 // given only once the server has asked Google Play about it (supabase/functions/iap): a forged
 // purchase, or one given to another account already, is never given (and never acknowledged).
-// When the server can't answer, the purchase waits for the next try. And a purchase Google
+// When the server can't answer, the purchase waits for the next try, for up to two days
+// (VERIFY_GRACE_MS): then it is given, before Google Play would refund it. And a purchase Google
 // refunded since stops what it can (the ad-free rewards).
 import { App } from "@capacitor/app";
 import { NativePurchases, PURCHASE_TYPE, type Transaction } from "@capgo/native-purchases";
@@ -37,6 +38,21 @@ async function accountToken(): Promise<string | null> {
 /** The server checks every purchase before the game gives it (the build's choice). */
 const verifyOn = () => process.env.NEXT_PUBLIC_IAP_VERIFY === "1";
 
+/**
+ * How long a paid purchase waits for the server's check (ms). Google Play refunds a purchase not
+ * acknowledged within three days: one the server still couldn't check after two (the check not
+ * set up yet, an outage) is given and acknowledged as it would be without the check, so a
+ * player who paid never loses the purchase to a server problem. A forged or another account's
+ * purchase is still refused, since the server answers those ("invalid", "taken").
+ */
+export const VERIFY_GRACE_MS = 2 * 86_400_000;
+
+/** A paid purchase the server couldn't check yet: true once it waited long enough to be given anyway. */
+export function graceOver(purchaseDate: string | undefined, now = Date.now()): boolean {
+  const at = purchaseDate ? Date.parse(purchaseDate) : NaN;
+  return Number.isFinite(at) && now - at >= VERIFY_GRACE_MS;
+}
+
 /** The game is loaded (its save, for its account): a purchase given now is given to the right company. */
 const gameReady = () => useGame.getState().ready && useCloud.getState().phase === "ready";
 
@@ -57,8 +73,10 @@ async function take(t: Transaction, mine: string): Promise<GrantResult | "wait" 
     const social = useGame.getState().saves?.social;
     const verdict = social ? await social.verifyPurchase(t.productIdentifier, t.purchaseToken) : "error";
     // not paid yet, or no answer from the server now: it comes back at the next start or return to the app
-    if (verdict === "pending" || verdict === "error") return "wait";
-    if (verdict !== "valid") return null;
+    if (verdict === "pending") return "wait";
+    if (verdict === "error" && !graceOver(t.purchaseDate)) return "wait";
+    // refused (forged, another account's, refunded); "error" here is a paid purchase past its wait
+    if (verdict !== "valid" && verdict !== "error") return null;
   }
   const result = useGame.getState().iapGrant(p, key);
   // a second purchase of a product the company already owns is left alone: Google Play refunds it

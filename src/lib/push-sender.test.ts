@@ -35,6 +35,7 @@ function fakeServer(answers: { take?: unknown[]; fcm?: (token: string) => Respon
     if (url.endsWith("/rpc/push_collect")) return Response.json(1);
     if (url.endsWith("/rpc/push_waiting")) return Response.json(3);
     if (url.endsWith("/rpc/push_take")) return Response.json(answers.take ?? []);
+    if (url.endsWith("/rpc/push_requeue")) return Response.json((JSON.parse(call.body) as { p_tokens: string[] }).p_tokens.length);
     if (url.endsWith("/rpc/push_forget")) return Response.json((JSON.parse(call.body) as { p_tokens: string[] }).p_tokens.length);
     if (url === "https://oauth2.googleapis.com/token") return answers.token ?? Response.json({ access_token: "ya29.test", expires_in: 3599 });
     if (url.startsWith("https://fcm.googleapis.com/")) {
@@ -91,19 +92,22 @@ describe("push sender", () => {
         { token: "t-gone", lang: "de", kind: "cup", args: { week: 2963 } },
         { token: "t-bad", lang: "es", kind: "invite", args: {} },
         { token: "t-busy", lang: "pt", kind: "invite", args: {} },
+        { token: "t-mine", lang: "en", kind: "gift", args: { name: "Bo" } },
         { token: "t-odd", lang: "en", kind: "event", args: { event: "noSuchEvent" } },
       ],
       fcm: (token) =>
         token === "t-gone"
           ? Response.json({ error: { code: 404, status: "NOT_FOUND", details: [{ "@type": "type.googleapis.com/google.firebase.fcm.v1.FcmError", errorCode: "UNREGISTERED" }] } }, { status: 404 })
           : token === "t-bad"
-            ? Response.json({ error: { code: 400, status: "INVALID_ARGUMENT" } }, { status: 400 })
+            ? Response.json({ error: { code: 400, status: "INVALID_ARGUMENT", message: "The registration token is not a valid FCM registration token" } }, { status: 400 })
+            : token === "t-mine"
+              ? Response.json({ error: { code: 400, status: "INVALID_ARGUMENT", message: "Invalid value at 'message.android.ttl'" } }, { status: 400 })
             : token === "t-busy"
               ? Response.json({ error: { code: 503, status: "UNAVAILABLE" } }, { status: 503 })
               : (undefined as unknown as Response),
     });
     const report = await runPush(env(sa.json), server.fetch);
-    expect(report).toEqual({ configured: true, queued: 1, sent: 2, failed: 4, forgotten: 2 });
+    expect(report).toEqual({ configured: true, queued: 1, sent: 2, failed: 5, forgotten: 2, requeued: 1 });
     const take = server.calls.find((c) => c.url.endsWith("/push_take"))!;
     expect(JSON.parse(take.body)).toEqual({ p_limit: BATCH });
 
@@ -121,9 +125,23 @@ describe("push sender", () => {
     expect(msg("t-event").notification).toEqual({ title: "🎪 International Car Show", body: "The event has started. Don't miss it!" });
     // an event this sender doesn't know isn't sent at all
     expect(sent.some((c) => c.body.includes("t-odd"))).toBe(false);
-    // the uninstalled and the invalid phones are forgotten; the busy one is only a failure
+    // the uninstalled and the invalid phones are forgotten; a mistake in the message keeps the phone
     const forget = server.calls.find((c) => c.url.endsWith("/push_forget"))!;
     expect((JSON.parse(forget.body) as { p_tokens: string[] }).p_tokens.sort()).toEqual(["t-bad", "t-gone"]);
+    // the busy one is queued again for the next run
+    const requeue = server.calls.find((c) => c.url.endsWith("/push_requeue"))!;
+    expect(JSON.parse(requeue.body)).toEqual({ p_tokens: ["t-busy"], p_kinds: ["invite"] });
+  });
+
+  it("Firebase asks to slow down: nothing more is sent this run, and what wasn't sent is queued again", async () => {
+    const sa = await serviceAccount();
+    const take = Array.from({ length: 30 }, (_, i) => ({ token: `t-${i}`, lang: "en", kind: "gift", args: { name: "Ana" } }));
+    const server = fakeServer({ take, fcm: () => Response.json({ error: { code: 429, status: "RESOURCE_EXHAUSTED" } }, { status: 429 }) });
+    const report = await runPush(env(sa.json), server.fetch);
+    const sent = server.calls.filter((c) => c.url.startsWith("https://fcm.googleapis.com/")).length;
+    expect(sent).toBeLessThan(30);
+    expect(report.requeued).toBe(30);
+    expect(report.forgotten).toBe(0);
   });
 
   it("without an access token takes nothing (the notes wait for the next run)", async () => {

@@ -881,3 +881,41 @@ describe("the session kept on the device", () => {
     expect(storedAccount(null)).toBeNull();
   });
 });
+
+// ───────────────────────── saves from a newer version ─────────────────────────
+
+describe("a save from a newer version of the game", () => {
+  it("in a conflict: neither copy is played, nothing is saved over it, the game asks for the update", async () => {
+    const server = new Server();
+    server.rows.set("user-a", { data: game(10), version: SAVE_VERSION, revision: 1, updatedAt: T0 });
+    const cloud = new FakeCloud(server);
+    cloud.user = "user-a";
+    server.users.set("user-a", { email: null, password: null });
+    const infos: SyncInfo[] = [];
+    const sync = new CloudSync(cloud, new LocalStore(memoryStorage()), "user-a", 1, (i) => infos.push(i), { version: SAVE_VERSION, device: "pc", interval: 30_000, debounce: 2_000 });
+    // the same account saved meanwhile by a newer version of the game
+    server.rows.set("user-a", { data: { ...game(900), version: SAVE_VERSION + 1 }, version: SAVE_VERSION + 1, revision: 2, updatedAt: T0 + 1 });
+    sync.save(game(20), true);
+    await vi.advanceTimersByTimeAsync(2_100);
+    expect(infos.at(-1)!.status).toBe("conflict");
+    expect(await sync.resolve("local")).toMatchObject({ outdated: true });
+    sync.save(game(21), true);
+    await vi.advanceTimersByTimeAsync(40_000);
+    expect(server.rows.get("user-a")!.revision).toBe(2);
+    expect((server.rows.get("user-a")!.data as GameState).cash).toBe(900);
+  });
+
+  it("at the start: a newer world map in the cloud is never read (nor replaced as damaged)", async () => {
+    const server = new Server();
+    const pc = device(server);
+    await pc.saves.start(T0, registers(pc));
+    const id = pc.cloud.user!;
+    server.rows.set(id, { data: { ...game(900), mapVersion: 99 }, version: SAVE_VERSION, revision: 7, updatedAt: T0 });
+    pc.saves.local.write({ state: game(5), savedAt: T0, owner: id, base: 6, dirty: true });
+    const again = device(server, pc.storage);
+    again.cloud.user = id;
+    expect(await again.saves.start(T0 + 60_000, hooks())).toMatchObject({ state: null, outdated: true });
+    await vi.advanceTimersByTimeAsync(40_000);
+    expect(server.rows.get(id)!.revision).toBe(7);
+  });
+});
