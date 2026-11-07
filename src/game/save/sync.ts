@@ -123,10 +123,15 @@ export class CloudSync {
     return this.run();
   }
 
-  /** Stops saving to the cloud (logout, or another account). Local saves go on in the store. */
-  stop() {
+  /**
+   * Stops saving to the cloud (logout, or another account). Local saves go on in the store. Resolves
+   * once a request already on its way is answered: it can't be called back, and it may still land
+   * (another tab taking over waits for it before it reads the cloud).
+   */
+  stop(): Promise<void> {
     this.stopped = true;
     this.clear();
+    return this.inFlight ?? Promise.resolve();
   }
 
   private writeLocal(state: GameState, dirty: boolean, savedAt: number) {

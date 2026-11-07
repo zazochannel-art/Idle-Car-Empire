@@ -67,3 +67,4 @@ keystore.properties.txt
 
 # the Supabase CLI's own files
 supabase/.temp/
+e2e/.*.local.mjs

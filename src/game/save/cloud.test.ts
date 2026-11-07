@@ -343,6 +343,32 @@ describe("saving while playing", () => {
     expect(sync.state.revision).toBe(server.rows.get("user-a")!.revision);
   });
 
+  it("stopping waits for a save already on its way (another tab reads the cloud only after it)", async () => {
+    const server = new Server();
+    const { sync, cloud, local } = syncFor(server);
+    const send = cloud.save.bind(cloud);
+    cloud.save = async (...args) => {
+      await new Promise((r) => setTimeout(r, 1_500));
+      return send(...args);
+    };
+    sync.save(game(1), true);
+    await vi.advanceTimersByTimeAsync(2_100);
+    expect(server.rows.has("user-a")).toBe(false);
+    let done = false;
+    const stopped = sync.stop().then(() => (done = true));
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(done).toBe(false);
+    await vi.advanceTimersByTimeAsync(1_000);
+    await stopped;
+    expect(server.rows.get("user-a")!.revision).toBe(1);
+    // and nothing more from this copy, not even on this device
+    sync.save(game(2), true);
+    await vi.advanceTimersByTimeAsync(40_000);
+    expect(server.requests).toBe(1);
+    expect(local.read("user-a")).toMatchObject({ dirty: true });
+    expect(await sync.stop()).toBeUndefined();
+  });
+
   it("retries after a network failure, then catches up", async () => {
     const server = new Server();
     const { sync, cloud, infos } = syncFor(server);

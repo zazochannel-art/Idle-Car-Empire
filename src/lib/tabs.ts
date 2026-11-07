@@ -20,8 +20,15 @@ export const TABS_CHANNEL = "idle-car-empire";
 export const TABS = {
   /** Without Web Locks: how long older copies have to answer a newer one's hello (ms); alone, the start waits this long. */
   answerMs: 250,
-  /** The longest the newer copy waits for older ones' last saves (ms): a frozen tab or a cloud save that hangs doesn't hold the game up. */
+  /** The longest the newer copy waits for older ones that haven't answered (ms): a frozen tab doesn't hold the game up. */
   saveMs: 4_000,
+  /**
+   * The longest it waits once an older copy said it is saving its last state (ms, from the start): a
+   * busy page on a slow phone or connection takes more than saveMs for it, and a newer copy that
+   * read the cloud before that save landed would have its own refused; a save that hangs doesn't
+   * hold the game up for longer than this.
+   */
+  lastSaveMs: 12_000,
   /** A hello heard this long after it was said is too late for a last save (ms): it would land as the newer copy reads, or after. */
   lateMs: 3_000,
 };
@@ -61,6 +68,7 @@ export interface TabOptions {
   now?: () => number;
   answerMs?: number;
   saveMs?: number;
+  lastSaveMs?: number;
   lateMs?: number;
 }
 
@@ -101,6 +109,7 @@ export function claimTab(opts: TabOptions): TabClaim | null {
   let gone = false;
   let release = () => {};
   let settle = () => {};
+  let extend = () => {};
 
   // how many copies run already (each holds the lock while it runs), then this one holds it too
   const running = (async () => {
@@ -121,7 +130,12 @@ export function claimTab(opts: TabOptions): TabClaim | null {
   })();
 
   const ready = new Promise<void>((resolve) => {
-    const cap = setTimeout(resolve, opts.saveMs ?? TABS.saveMs);
+    let cap = setTimeout(resolve, opts.saveMs ?? TABS.saveMs);
+    // an older copy is saving its last state: it is waited for longer
+    extend = () => {
+      clearTimeout(cap);
+      cap = setTimeout(resolve, Math.max(0, me.at + (opts.lastSaveMs ?? TABS.lastSaveMs) - now()));
+    };
     /** Without locks: whether older copies may still answer. */
     let answering = true;
     void running.then((others) => {
@@ -170,7 +184,10 @@ export function claimTab(opts: TabOptions): TabClaim | null {
         gone = true;
         release();
       })();
-    } else if (m.type === "stopping" && m.to === me.id) saving.add(m.id);
+    } else if (m.type === "stopping" && m.to === me.id) {
+      saving.add(m.id);
+      extend();
+    }
     else if (m.type === "stopped") {
       saving.delete(m.id);
       stopped.add(m.id);

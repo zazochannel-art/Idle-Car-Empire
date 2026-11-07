@@ -413,8 +413,10 @@ export const useGame = create<GameStore>((set, get) => {
     for (const t of socialTimers) clearTimeout(t);
     set({ ready: false, elsewhere: true });
     if (!late) await saves?.flush();
-    // (a cloud save that failed is not retried from here: the newer copy sends this one's last state)
-    saves?.sync?.stop();
+    // (a cloud save that failed is not retried from here: the newer copy sends this one's last state);
+    // one already on its way lands first, even when the hello came late: the newer copy reads the
+    // cloud only after this, and a save landing after that read would have its first one refused
+    await saves?.sync?.stop();
   }
 
   function runTick() {
