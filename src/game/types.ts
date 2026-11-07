@@ -1,4 +1,7 @@
 import type { ContractsState } from "./engine/contracts";
+import type { SponsorsState } from "./engine/sponsors";
+import type { UsedCarsState } from "./engine/used-cars";
+import type { QcState } from "./engine/quality-check";
 import type { StarUpgradeId } from "./config/imperium";
 // Core type definitions shared by the config, the engine and the UI.
 
@@ -604,6 +607,12 @@ export interface GameState {
   history: { t: number; income: number }[];
   /** Customer contracts: one offer or one running contract at a time. */
   contracts: ContractsState;
+  /** Racing sponsors (engine/sponsors.ts): offers, or the one deal signed. */
+  sponsors: SponsorsState;
+  /** The used-car lot and the garage bay (engine/used-cars.ts). */
+  usedCars: UsedCarsState;
+  /** Quality control inspections (engine/quality-check.ts). */
+  qc: QcState;
   /** Daily login streak (1-7) and whether today's reward was taken. */
   login: { day: string; streak: number; claimed: boolean };
   /** Duels with other players' ghosts today (engine/ghost.ts): the rivals raced. */

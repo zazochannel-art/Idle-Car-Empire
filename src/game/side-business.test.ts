@@ -1,0 +1,184 @@
+import { describe, expect, it } from "vitest";
+import { CAR_BY_ID } from "./config/cars";
+import { snapshot } from "./engine/economy";
+import * as Qc from "./engine/quality-check";
+import * as Sp from "./engine/sponsors";
+import { createInitialState } from "./engine/state";
+import * as Uc from "./engine/used-cars";
+import { decodeSave, encodeSave } from "./save/serialize";
+
+const NOW = new Date(2026, 9, 12, 12).getTime();
+const H = 3_600_000;
+
+describe("sponsor deals", () => {
+  it("are offered only once racing is open: three deals, harder ones pay more", () => {
+    const s = createInitialState(NOW);
+    s.racing.unlocked = false;
+    expect(Sp.refreshSponsors(s, NOW)).toBeNull();
+    s.racing.unlocked = true;
+    expect(Sp.refreshSponsors(s, NOW)).toBe("offer");
+    expect(s.sponsors.offers).toHaveLength(3);
+    expect(new Set(s.sponsors.offers.map((o) => o.brand)).size).toBe(3);
+    const [a, b, c] = s.sponsors.offers;
+    expect(a.wins).toBeLessThan(b.wins);
+    expect(b.wins).toBeLessThan(c.wins);
+    expect(c.reward.incomeSeconds!).toBeGreaterThan(a.reward.incomeSeconds!);
+    // a reload in the same minute brings the same offers
+    const t = createInitialState(NOW);
+    t.createdAt = s.createdAt;
+    t.racing.unlocked = true;
+    Sp.refreshSponsors(t, NOW);
+    expect(t.sponsors.offers).toEqual(s.sponsors.offers);
+  });
+
+  it("count only the wins after signing and pay once, before the deadline", () => {
+    const s = createInitialState(NOW);
+    s.racing.unlocked = true;
+    s.racing.stats.wins = 7;
+    Sp.refreshSponsors(s, NOW);
+    expect(Sp.signSponsor(s, 0, NOW)).toBe(true);
+    const d = s.sponsors.active!;
+    expect(s.sponsors.offers).toEqual([]);
+    expect(d.deadline).toBe(NOW + d.hours * H);
+    expect(Sp.sponsorProgress(s, d)).toBe(0);
+    const snap = snapshot(s);
+    expect(Sp.claimSponsor(s, snap, NOW)).toBeNull();
+    s.racing.stats.wins += d.wins;
+    expect(Sp.sponsorWaiting(s)).toBe(true);
+    const cash = s.cash;
+    const money = Sp.claimSponsor(s, snap, NOW + H);
+    expect(money).toBeGreaterThan(0);
+    expect(s.cash).toBeCloseTo(cash + money!);
+    expect(s.sponsors.done).toBe(1);
+    expect(Sp.claimSponsor(s, snap, NOW + H)).toBeNull();
+    // the next offers come a little later
+    expect(Sp.refreshSponsors(s, NOW + H)).toBeNull();
+    expect(Sp.refreshSponsors(s, NOW + H + Sp.SPONSOR.afterDone)).toBe("offer");
+  });
+
+  it("run out if the wins don't come in time", () => {
+    const s = createInitialState(NOW);
+    s.racing.unlocked = true;
+    Sp.refreshSponsors(s, NOW);
+    Sp.signSponsor(s, 2, NOW);
+    const d = s.sponsors.active!;
+    expect(Sp.refreshSponsors(s, d.deadline! + 1)).toBe("expired");
+    expect(s.sponsors.active).toBeNull();
+    expect(Sp.refreshSponsors(s, d.deadline! + 2)).toBeNull();
+  });
+
+  it("can be turned down, and a save keeps them", () => {
+    const s = createInitialState(NOW);
+    s.racing.unlocked = true;
+    Sp.refreshSponsors(s, NOW);
+    expect(Sp.declineSponsors(s, NOW)).toBe(true);
+    expect(s.sponsors.offers).toEqual([]);
+    Sp.refreshSponsors(s, s.sponsors.nextAt);
+    Sp.signSponsor(s, 1, s.sponsors.nextAt);
+    const back = decodeSave(encodeSave(s), NOW);
+    expect(back.sponsors).toEqual(s.sponsors);
+    expect(Sp.migrateSponsors({ offers: [{ brand: "nope", wins: 3 }], active: "x", done: -2 })).toEqual(Sp.createSponsors());
+  });
+});
+
+function earning() {
+  const s = createInitialState(NOW);
+  return { s, snap: snapshot(s) };
+}
+
+describe("the second-hand lot", () => {
+  it("brings three worn cars every few hours, priced so a refurbished one sells at a profit", () => {
+    const { s, snap } = earning();
+    expect(Uc.refreshUsedLot(s, NOW, snap)).toBe(true);
+    expect(s.usedCars.lot).toHaveLength(Uc.USED.cars);
+    // a new company has no income yet: the floor price
+    expect(Math.min(...s.usedCars.lot.map((c) => c.sell))).toBeGreaterThanOrEqual(Uc.USED.min * 0.8 * Uc.USED.sell - 1);
+    for (const c of s.usedCars.lot) {
+      expect(Object.hasOwn(CAR_BY_ID, c.car)).toBe(true);
+      expect(c.cond).toBeGreaterThanOrEqual(0.3);
+      expect(c.cond).toBeLessThanOrEqual(0.8);
+      expect(c.sell).toBeGreaterThan(c.buy + c.fix);
+    }
+    expect(Uc.refreshUsedLot(s, NOW + H, snap)).toBe(false);
+    expect(Uc.refreshUsedLot(s, NOW + Uc.USED.every, snap)).toBe(true);
+  });
+
+  it("buy, refurbish, wait, sell: one car in the bay at a time", () => {
+    const { s, snap } = earning();
+    Uc.refreshUsedLot(s, NOW, snap);
+    const [c, d] = s.usedCars.lot;
+    s.cash = 0;
+    expect(Uc.buyBlock(s, c.id)).toBe("cash");
+    s.cash = c.buy + c.fix + d.buy;
+    expect(Uc.buyUsed(s, c.id)).toBe(true);
+    expect(s.usedCars.lot.some((x) => x.id === c.id)).toBe(false);
+    expect(Uc.buyBlock(s, d.id)).toBe("bay");
+    expect(Uc.buyBlock(s, c.id)).toBe("gone");
+    expect(Uc.sellUsed(s, NOW)).toBeNull();
+    expect(Uc.refurbishUsed(s, NOW)).toBe(true);
+    expect(Uc.usedReady(s, NOW + 60_000)).toBe(false);
+    const done = NOW + c.minutes * 60_000;
+    expect(Uc.usedReady(s, done)).toBe(true);
+    const cash = s.cash;
+    expect(Uc.sellUsed(s, done)).toBe(c.sell);
+    expect(s.cash).toBe(cash + c.sell);
+    expect(s.usedCars.bay).toBeNull();
+    expect(s.usedCars.sold).toBe(1);
+    expect(s.usedCars.profit).toBe(c.sell - c.buy - c.fix);
+  });
+
+  it("a save keeps the bay; an unknown model is dropped", () => {
+    const { s, snap } = earning();
+    Uc.refreshUsedLot(s, NOW, snap);
+    s.cash = 1e12;
+    Uc.buyUsed(s, s.usedCars.lot[0].id);
+    const back = decodeSave(encodeSave(s), NOW);
+    expect(back.usedCars).toEqual(s.usedCars);
+    const m = Uc.migrateUsedCars({ lot: [{ ...s.usedCars.lot[0], car: "rocket" }], bay: { ...s.usedCars.bay!, car: "rocket" } }, (id) => Object.hasOwn(CAR_BY_ID, id));
+    expect(m.lot).toEqual([]);
+    expect(m.bay).toBeNull();
+  });
+});
+
+describe("quality control", () => {
+  it("rolls twelve cars with a few defects", () => {
+    const s = createInitialState(NOW);
+    const round = Qc.qcRound(s);
+    expect(round).toHaveLength(Qc.QC.cars);
+    const bad = round.filter(Boolean).length;
+    expect(bad).toBeGreaterThanOrEqual(3);
+    expect(bad).toBeLessThanOrEqual(5);
+  });
+
+  it("scores the catches, minus wrong taps", () => {
+    expect(Qc.qcScore(4, 4, 0)).toBe(100);
+    expect(Qc.qcScore(4, 2, 0)).toBe(50);
+    expect(Qc.qcScore(4, 4, 2)).toBeLessThan(100);
+    expect(Qc.qcScore(4, 0, 5)).toBe(0);
+  });
+
+  it("pays for a perfect run, raises the reputation, then waits", () => {
+    const s = createInitialState(NOW);
+    const snap = snapshot(s);
+    const round = Qc.qcRound(s);
+    const bad = round.flatMap((d, i) => (d ? [i] : []));
+    s.quality.rep = 50;
+    const cash = s.cash;
+    const out = Qc.finishQc(s, round, bad, snap, NOW)!;
+    expect(out.score).toBe(100);
+    expect(out.money).toBeGreaterThan(0);
+    expect(s.cash).toBeCloseTo(cash + out.money);
+    expect(s.quality.rep).toBeCloseTo(50 + Qc.QC.rep);
+    expect(s.qc.best).toBe(100);
+    expect(Qc.qcReady(s, NOW + 60_000)).toBe(false);
+    expect(Qc.finishQc(s, round, bad, snap, NOW + 60_000)).toBeNull();
+    expect(Qc.qcReady(s, NOW + Qc.QC.cooldown)).toBe(true);
+  });
+
+  it("tapping every car does not pay like a perfect run", () => {
+    const s = createInitialState(NOW);
+    const round = Qc.qcRound(s);
+    const out = Qc.finishQc(s, round, round.map((_, i) => i), snapshot(s), NOW)!;
+    expect(out.score).toBeLessThan(100);
+  });
+});

@@ -4,6 +4,7 @@
 // repairs, liveries, sending cars from the assembly lines), racing
 // development, and the team — reputation, sponsors, automatic racing.
 import { SeasonCard } from "./live-cards";
+import { SponsorCard } from "./side-cards";
 import { useState } from "react";
 import { CAR_BY_ID } from "@/game/config/cars";
 import {
@@ -193,6 +194,7 @@ function Races() {
       )}
       {ch && <ChampionshipCard />}
       <SeasonCard />
+      <SponsorCard />
       <div className="px-1 text-[11px] font-bold uppercase tracking-wider text-white/45">{t("racing.events")}</div>
       {RACE_EVENTS.map((ev) => (
         <EventCard key={ev.id} ev={ev} />
