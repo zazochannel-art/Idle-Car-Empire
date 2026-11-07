@@ -5,7 +5,8 @@ import { receiveRaceCar } from "./engine/racing";
 import { cloneState, createInitialState } from "./engine/state";
 import type { GameState } from "./types";
 
-const T0 = Date.UTC(2026, 9, 12, 12);
+// noon on the phone's own clock: a few hours later is still the same day in every time zone
+const T0 = new Date(2026, 9, 12, 12).getTime();
 const DAY = 86_400_000;
 
 function racer(): GameState {

@@ -204,7 +204,8 @@ export function claimDaily(s: GameState, id: string): boolean {
 
 // ───────────────────────────── the daily chest ─────────────────────────────
 
-function yesterdayKey(now: number): string {
+/** The calendar day before `now`'s, on the phone's calendar (right across a daylight-saving change). */
+export function yesterdayKey(now: number): string {
   const d = new Date(now);
   d.setDate(d.getDate() - 1);
   return dateKey(d.getTime());

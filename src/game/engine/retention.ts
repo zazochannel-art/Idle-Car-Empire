@@ -2,7 +2,7 @@ import { LOGIN_REWARDS } from "../config/login";
 import { RIVALS, RIVAL_DAILY_GROWTH, type Rival } from "../config/rivals";
 import type { GameState } from "../types";
 import type { EconomySnapshot } from "./economy";
-import { dateKey, grantReward } from "./progress";
+import { dateKey, grantReward, yesterdayKey } from "./progress";
 
 // ───────────────────────────── daily login ─────────────────────────────
 
@@ -11,7 +11,8 @@ export function updateLogin(s: GameState, now: number): boolean {
   const today = dateKey(now);
   const l = s.login;
   if (l.day === today) return false;
-  const yesterday = dateKey(now - 86_400_000);
+  // the calendar's yesterday: a day with a daylight-saving change is 23 or 25 hours long
+  const yesterday = yesterdayKey(now);
   l.streak = l.day === yesterday ? (l.streak % LOGIN_REWARDS.length) + 1 : 1;
   l.day = today;
   l.claimed = false;
