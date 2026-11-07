@@ -67,6 +67,9 @@ jobs:
           done
       - name: The cloud save through the public API
         run: node scripts/cloud-e2e.mjs
+        env:
+          # the Edge Functions (push, iap) aren't served here: their own tests cover them (src/lib)
+          E2E_FUNCTIONS: "0"
       - name: Supabase's logs
         if: failure()
         run: supabase status || true
