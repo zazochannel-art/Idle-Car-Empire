@@ -7,20 +7,9 @@ import { migrate } from "@/game/save/serialize";
 import { cloneState } from "@/game/engine/state";
 import { tick as engineTick } from "@/game/engine/tick";
 import { snapshot, unlockedCarIds } from "@/game/engine/economy";
-import { checkAchievements, recordHistory, refreshDaily } from "@/game/engine/progress";
-import * as Ch from "@/game/engine/chain";
-import * as R from "@/game/engine/retention";
-import * as K from "@/game/engine/contracts";
-import * as Lv from "@/game/engine/live";
-import * as Cl from "@/game/engine/classics";
-import * as Ex from "@/game/engine/expansion";
-import * as Ps from "@/game/engine/pass";
-import * as Wt from "@/game/engine/winter";
-import * as Cn from "@/game/engine/collection";
-import * as Sy from "@/game/engine/story";
-import * as Mk from "@/game/engine/market";
+import { checkAchievements } from "@/game/engine/progress";
+import { sessionTick } from "@/game/engine/session";
 import { openPlantTypes } from "@/game/engine/unlocks";
-import { activeEvent } from "@/game/engine/events";
 import { encodeSave } from "@/game/save/serialize";
 
 const file = process.argv[2];
@@ -30,6 +19,7 @@ let state = migrate(raw.state ?? raw, now);
 state.lastActiveAt = now;
 let snap = snapshot(state);
 const N = +(process.argv[3] ?? 600);
+let autoMoney = 0;
 const parts: Record<string, number> = {};
 const time = <T>(k: string, f: () => T): T => {
   const t = performance.now();
@@ -51,29 +41,8 @@ for (let i = 0; i < N; i++) {
   now += 100;
   const prev = state;
   const next = time("clone", () => cloneState(state));
-  const events = time("engineTick", () => engineTick(next, 0.1, snap));
-  next.lastActiveAt = now;
-  time("misc", () => {
-    recordHistory(next, now, snap.incomePerSec);
-    Ch.autoUpgrade(next, snap.gm);
-    R.updateLogin(next, now);
-    R.checkRivals(next, now);
-    K.refreshContracts(next, now, snap);
-    activeEvent(now);
-    refreshDaily(next, now, snap);
-    Lv.vipTick(next, now, snap);
-    Lv.seasonTick(next, now);
-    Cl.classicsTick(next, now);
-    Ex.engineersTick(next, now, 0.1);
-    Ps.passTick(next, snap, now);
-    Wt.winterTick(next, snap, now);
-    Ex.fleetOrderTick(next, now);
-    const built = events.find((e) => e.type === "carBuilt");
-    Cn.editionTick(next, built?.type === "carBuilt" ? built.car : null, now);
-    Sy.storyTick(next, snap);
-    Mk.trendOf(next);
-    Mk.trendOf(prev);
-  });
+  // the same step the store runs (engine/session.ts)
+  time("session", () => (autoMoney = sessionTick(next, prev, 0.1, now, snap, { mapOnScreen: true, autoMoney }).autoMoney));
   // commit
   let s2 = time("snapshot", () => snapshot(next));
   const fresh = time("achievements", () => checkAchievements(next, s2));

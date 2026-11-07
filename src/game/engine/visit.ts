@@ -4,6 +4,7 @@
 // (supabase/migrations/0018). From that the map draws their island as it
 // draws the player's own, from a game state made for the visit alone (never
 // saved, never ticked). A card shows the player's first city.
+import { HOME_CITY } from "../config/cities";
 import { worldOf } from "../city/layout";
 import { SPEC_BY_ID, STRUCTURE_BY_ID, TERRITORIES, ZONES, type TerritoryId } from "../config/city";
 import { isPlantType } from "../config/chain";
@@ -50,7 +51,7 @@ export function visitState(map: VisitMap, now: number): GameState {
   s.city.buildings = {};
   let garages = 0;
   for (const b of map.buildings) {
-    const plot = worldOf("home").plotById[b.plot];
+    const plot = worldOf(HOME_CITY).plotById[b.plot];
     if (!plot || plot.kind !== "plot" || !(b.type in STRUCTURE_BY_ID)) continue;
     const type = b.type as StructureType;
     const bs: BuildingState = { type, level: b.level };

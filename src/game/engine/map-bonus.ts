@@ -3,6 +3,7 @@
 // car, a drone's crate, a limousine, a broken-down truck); a tap takes the
 // reward. They come only while the map is on screen, one at a time, and a
 // game reopened never finds one waiting.
+import { CITIES } from "../config/cities";
 import { MAP_BONUS, MAP_BONUSES, MAP_BONUS_BY_KIND, type MapBonusKind } from "../config/map-bonus";
 import type { GameState } from "../types";
 import { plantsOf } from "./plants";
@@ -60,7 +61,7 @@ function possible(s: GameState, kind: MapBonusKind): boolean {
     case "breakdown":
       return s.chain.shipments.length > 0;
     case "storm":
-      return s.activeCity === "north" && s.chain.shipments.length > 0;
+      return CITIES[s.activeCity].snowstorms && s.chain.shipments.length > 0;
     // road events need deliveries to hold up; the chase, a town with a dealership
     case "accident":
     case "jam":

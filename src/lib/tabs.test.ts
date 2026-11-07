@@ -187,9 +187,30 @@ describe("one copy of the game at a time", () => {
     expect([a.stopped, a.flushed]).toEqual([true, true]);
   });
 
-  it("a cloud save that hangs holds the newer copy up no longer than saveMs", async () => {
+  it("a last save slower than saveMs (a busy page, a slow connection) is still waited for", async () => {
+    const [open, locks] = [channels(), webLocks()];
+    const a = copy("a", open(), locks, TABS.saveMs + 2_000);
+    await vi.advanceTimersByTimeAsync(1_000);
+    const b = copy("b", open(), locks);
+    expect(await readyWithin(b.claim.ready, TABS.saveMs + 1_000)).toBe(false);
+    expect(a.flushed).toBe(false);
+    expect(await readyWithin(b.claim.ready, 1_100)).toBe(true);
+    expect(a.flushed).toBe(true);
+  });
+
+  it("a cloud save that hangs holds the newer copy up no longer than lastSaveMs", async () => {
     const [open, locks] = [channels(), webLocks()];
     copy("a", open(), locks, 60_000);
+    await vi.advanceTimersByTimeAsync(1_000);
+    const b = copy("b", open(), locks);
+    expect(await readyWithin(b.claim.ready, TABS.lastSaveMs - 1)).toBe(false);
+    expect(await readyWithin(b.claim.ready, 1)).toBe(true);
+  });
+
+  it("an older copy that never answers holds the newer one up no longer than saveMs", async () => {
+    const [open, locks] = [channels(), webLocks()];
+    // (it holds the lock but its page is frozen: no message comes back)
+    copy("a", open(60_000), locks);
     await vi.advanceTimersByTimeAsync(1_000);
     const b = copy("b", open(), locks);
     expect(await readyWithin(b.claim.ready, TABS.saveMs - 1)).toBe(false);

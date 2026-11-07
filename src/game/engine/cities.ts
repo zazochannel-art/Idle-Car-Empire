@@ -9,7 +9,7 @@
 // Everything else (Stars, research, managers, designs, the racing team, the
 // stock) belongs to the company. The racing team stays in the first city:
 // what it pays and wins goes through that city's wallet and books (withCity).
-import { CITY_IDS, CITY_RULES, TRADE_ROUTE } from "../config/cities";
+import { CITIES, CITY_IDS, CITY_RULES, HOME_CITY, TRADE_ROUTE } from "../config/cities";
 import { BUYABLE_TERRITORIES } from "../config/city";
 import { setWorld, withWorld } from "../city/layout";
 import type { CityId, GameState } from "../types";
@@ -183,11 +183,14 @@ export function switchCity(s: GameState, to: CityId, now: number): boolean {
 
 /** What still stands between the company and a new city: the first city's territories open, and its wallet. */
 export function cityUnlockStatus(s: GameState, id: CityId) {
-  const open = (s.activeCity === "home" ? s.city : s.cities.home?.city)?.territories ?? [];
+  const opens = CITIES[id].opens;
+  const after = opens?.after ?? HOME_CITY;
+  const open = (s.activeCity === after ? s.city : s.cities[after]?.city)?.territories ?? [];
   const territories = BUYABLE_TERRITORIES.filter((t) => open.includes(t.id)).length;
   const owned = ownsCity(s, id);
-  const ready = id !== "home" && !owned && territories >= BUYABLE_TERRITORIES.length && walletOf(s, "home") >= CITY_RULES.unlockCash;
-  return { owned, territories, needed: BUYABLE_TERRITORIES.length, price: CITY_RULES.unlockCash, ready };
+  const price = opens?.cash ?? 0;
+  const ready = !!opens && !owned && ownsCity(s, after) && territories >= BUYABLE_TERRITORIES.length && walletOf(s, after) >= price;
+  return { owned, territories, needed: BUYABLE_TERRITORIES.length, price, ready, after };
 }
 
 /**
@@ -196,7 +199,8 @@ export function cityUnlockStatus(s: GameState, id: CityId) {
  */
 export function unlockCity(s: GameState, id: CityId, now: number): boolean {
   if (!cityUnlockStatus(s, id).ready) return false;
-  withWallet(s, "home", () => (s.cash -= CITY_RULES.unlockCash));
+  const opens = CITIES[id].opens!;
+  withWallet(s, opens.after, () => (s.cash -= opens.cash));
   s.cities = { ...s.cities, [id]: { ...withWorld(id, createCityBundle), at: now, steady: 0 } };
   return true;
 }

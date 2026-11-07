@@ -1,3 +1,4 @@
+import { HOME_CITY } from "../config/cities";
 import { createBrand } from "./brand";
 import { CARS } from "../config/cars";
 import { COMPONENTS } from "../config/chain";
@@ -143,7 +144,7 @@ export function createInitialState(now: number): GameState {
     quality: { rep: 50, defects: 0, recall: null, scandalUntil: 0, recalls: 0 },
     settings: { buyAmount: 1, lang: "en", lowGraphics: false, sound: true, music: true, haptics: true, notify: false, saver: "auto", stats: true, hidden: [], toastsOff: [], autoRecall: "ask", autoVip: false, autoFleet: false, autoCollect: false, whatsNew: WHATS_NEW.id },
     funnel: [],
-    activeCity: "home",
+    activeCity: HOME_CITY,
     tradeRoute: 0,
     cities: {},
     createdAt: now,

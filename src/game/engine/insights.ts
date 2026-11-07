@@ -22,6 +22,7 @@ import { isPlotUnlocked, nextZone, zoneBlocker } from "./city";
 import { dealerUpgradeCost, type EconomySnapshot } from "./economy";
 import { canImperium, pendingStars } from "./imperium";
 import { cityUnlockStatus } from "./cities";
+import { CITIES, HOME_CITY, OPENABLE_CITIES } from "../config/cities";
 import type { CityId } from "../types";
 
 export type Requirement =
@@ -280,7 +281,7 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
   }
 
   // the Racing District, once there is a car to race (the racing team is in the first city)
-  if (s.chain.firstCar && s.activeCity === "home") {
+  if (s.chain.firstCar && s.activeCity === HOME_CITY) {
     const R = s.racing;
     if (!R.unlocked) goals.push({ kind: "racing", icon: "🏁", cost: racingCost(s) });
     else if (!R.cars.length && !R.orders.length && !R.arrivals.length) goals.push({ kind: "raceCar", icon: "🚛" });
@@ -301,9 +302,12 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
   }
 
   // a new city, once the first one has opened all its land
-  {
-    const north = cityUnlockStatus(s, "north");
-    if (!north.owned && s.activeCity === "home" && north.territories >= north.needed) goals.push({ kind: "city", icon: "🏔️", cost: north.price, city: "north" });
+  for (const city of OPENABLE_CITIES) {
+    const st = cityUnlockStatus(s, city);
+    if (!st.owned && s.activeCity === st.after && st.territories >= st.needed) {
+      goals.push({ kind: "city", icon: CITIES[city].emoji, cost: st.price, city });
+      break;
+    }
   }
 
   const nextManager = MANAGERS.find((m) => !s.managers[m.id].hired && isManagerUnlocked(s, m.id));

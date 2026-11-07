@@ -1,6 +1,7 @@
 // The Design studio: the player's own model on each car platform. Options
 // (engine, interior, rims, paint) are developed with money and change the
 // model's stats, its sale value and its time on the assembly line.
+import { CITIES } from "../config/cities";
 import { CAR_BY_ID, DESIGN_COLORS, DESIGN_COST, DESIGN_MAX, DESIGN_OPTIONS, NORDIC, type CarConfig, type DesignOption } from "../config/cars";
 import type { CarDesign, CarId, GameState } from "../types";
 
@@ -81,7 +82,7 @@ export function developNordic(s: GameState, id: CarId, cost: number | null): boo
 }
 
 /** What the Nordic package adds to a model sold in the city being played (1 elsewhere than Nordheim). */
-export const nordicMult = (s: GameState, id: CarId) => (s.activeCity === "north" && s.designs[id]?.nordic ? 1 + NORDIC.value : 1);
+export const nordicMult = (s: GameState, id: CarId) => (CITIES[s.activeCity].nordic && s.designs[id]?.nordic ? 1 + NORDIC.value : 1);
 
 export function renameDesign(s: GameState, id: CarId, name: string): boolean {
   const clean = name.replace(/\s+/g, " ").trim().slice(0, 24);

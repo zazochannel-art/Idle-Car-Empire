@@ -20,7 +20,7 @@ import { migrateShop } from "../engine/shop";
 import { migrateCity, unlockOwnedZones } from "../engine/city";
 import { bundleOf, createCityBundle, withCity, type ParkedCity } from "../engine/cities";
 import { withWorld } from "../city/layout";
-import { CITY_IDS } from "../config/cities";
+import { HOME_CITY, CITY_IDS } from "../config/cities";
 import { createInitialState, FIRST_CHAIN_SAVE, MAP_VERSION, SAVE_VERSION } from "../engine/state";
 import { ACHIEVEMENTS } from "../config/achievements";
 import type { CityId, GameState, Lang } from "../types";
@@ -188,7 +188,7 @@ export function migrate(input: unknown, now: number): GameState {
   // The cities have open-ended keys (plot ids), so each is validated on its own
   // map: the one being played (in the state's own fields) and the parked ones.
   // A save from before the cities is all the first city's.
-  state.activeCity = CITY_IDS.includes(raw.activeCity as CityId) ? (raw.activeCity as CityId) : "home";
+  state.activeCity = CITY_IDS.includes(raw.activeCity as CityId) ? (raw.activeCity as CityId) : HOME_CITY;
   withWorld(state.activeCity, () => migrateCityParts(state, raw));
   state.cities = {};
   const parked = isObject(raw.cities) ? raw.cities : {};
@@ -205,7 +205,7 @@ export function migrate(input: unknown, now: number): GameState {
   }
   state.racing = migrateRacing(raw.racing);
   // the racing team is in the first city: its transporters and showrooms are there
-  withCity(state, "home", () => {
+  withCity(state, HOME_CITY, () => {
     for (const rc of state.racing.cars) {
       // a car on a transporter that didn't survive the save is back at its factory lot
       if (rc.location === "transit" && !state.chain.shipments.some((sh) => !sh.back && sh.fleet?.includes(rc.id))) {

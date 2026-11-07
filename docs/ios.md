@@ -122,3 +122,27 @@ the repository.
   origin is `capacitor://localhost`). Never change `appId` or the server
   settings in `capacitor.config.ts` after release, or players lose their
   progress.
+
+## Not on iOS yet (and what it takes)
+
+- **In-app purchases.** The purchase code (`src/lib/native-iap.ts`, `@capgo/native-purchases`)
+  already speaks StoreKit, but the app starts it only on Android (`src/lib/native.ts`). For iOS:
+  create the same two non-consumable products in App Store Connect (*Monetization → In-App
+  Purchases*), sign the *Paid Apps* agreement, then start the store on iOS too with the iOS product
+  ids. The server check (`supabase/functions/iap`) asks Google Play only: an iOS purchase needs
+  Apple's App Store Server API (an *In-App Purchase* key from App Store Connect → Users and Access →
+  Integrations) before `NEXT_PUBLIC_IAP_VERIFY=1` can be used in an iOS build.
+- **Notifications from the server** (gifts, invites, the cup). The sender
+  (`supabase/functions/push`) talks to Firebase Cloud Messaging, which also reaches iPhones once
+  Firebase has the app's APNs key: Apple Developer → *Keys* → a key with *Apple Push Notifications
+  service*, uploaded in Firebase → Project settings → Cloud Messaging → the iOS app. Then add
+  `GoogleService-Info.plist` to the Xcode project, the *Push Notifications* capability, and allow
+  `pushSupported()` (`src/lib/push.ts`) on iOS.
+
+## Rewarded ads: server-side verification
+
+AdMob can call a server to confirm each rewarded ad (SSV). The game gives the reward on the phone
+(an ad's reward is a boost in the player's own company, nothing the server pays out), so a check
+on the server would change nothing yet. It is worth adding when a reward is ever granted by the
+server (Stars on the account, a cup entry): then an Edge Function that checks Google's signature
+(the keys at `https://www.gstatic.com/admob/reward/verifier-keys.json`) and grants it.
