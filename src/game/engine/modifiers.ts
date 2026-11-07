@@ -7,7 +7,7 @@ import { OFFLINE } from "../config/offline";
 import { ADS } from "../config/ads";
 import { PLANT_MAX_LEVEL, plantLevelCap } from "../config/chain";
 import { activeEvent } from "./events";
-import { SEASON_BONUS, seasonAt } from "./season";
+import { BLACK_FRIDAY, SEASON_BONUS, seasonAt } from "./season";
 import { starMods } from "./imperium";
 import { RESEARCH_BY_ID } from "../config/research";
 import type { CarId, Effect, GameState, PlantType } from "../types";
@@ -135,7 +135,13 @@ export function computeGlobalMods(s: GameState): GlobalMods {
   for (const t of BUYABLE_TERRITORIES) if (s.city.territories?.includes(t.id)) t.effects.forEach((e) => applyEffect(m, e));
 
   // Seasons (Halloween, winter holidays) add a little income.
-  if (seasonAt(s.lastActiveAt)) m.income *= 1 + SEASON_BONUS;
+  const season = seasonAt(s.lastActiveAt);
+  if (season) m.income *= 1 + SEASON_BONUS;
+  // Black Friday week: lower prices at the dealers, and many more customers.
+  if (season === "blackfriday") {
+    m.dealerCap *= BLACK_FRIDAY.dealerCap;
+    m.markup += BLACK_FRIDAY.markup;
+  }
 
   // A limited-time market event (the clock is the last tick).
   activeEvent(s.lastActiveAt)?.event.effects.forEach((e) => applyEffect(m, e));

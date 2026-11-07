@@ -2,13 +2,14 @@
 // ad, and ⭐ Star items. An ad item is granted here only once the ad network says
 // the ad was watched to the end (the ad itself is shown by the app, lib/ads.ts).
 import { ADS } from "../config/ads";
-import { SHOP, SHOP_ITEM_BY_ID, type ShopItemId } from "../config/shop";
+import { SHOP, SHOP_ITEM_BY_ID, type ShopItemId, type ShopPrice } from "../config/shop";
 import type { GameState, Reward } from "../types";
 import { adBlock, adsToday, countAd, grantAd } from "./ads";
 import { remainingOf } from "./construction";
 import type { EconomySnapshot } from "./economy";
 import { grantReward } from "./rewards";
 import { dateKey } from "./calendar";
+import { BLACK_FRIDAY, seasonAt } from "./season";
 
 export interface ShopState {
   /** When the last free crate was opened (ms; 0: never, the first one is ready). */
@@ -100,8 +101,15 @@ export function shopReward(id: ShopItemId, snap: EconomySnapshot, s?: GameState,
  */
 export type ShopBlock = "wait" | "limit" | "nothing" | "active" | "full" | "stars" | null;
 
-export function shopBlock(s: GameState, id: ShopItemId, now: number): ShopBlock {
+/** What an item costs now: during Black Friday week the Star items cost less (at least 1 ⭐). */
+export function shopPrice(id: ShopItemId, now: number): ShopPrice {
   const price = SHOP_ITEM_BY_ID[id].price;
+  if (typeof price !== "number" || seasonAt(now) !== "blackfriday") return price;
+  return Math.max(1, Math.round(price * BLACK_FRIDAY.starPrice));
+}
+
+export function shopBlock(s: GameState, id: ShopItemId, now: number): ShopBlock {
+  const price = shopPrice(id, now);
   if (typeof price === "number" && s.stars < price) return "stars";
   switch (id) {
     case "crate":
@@ -129,7 +137,7 @@ export function shopBlock(s: GameState, id: ShopItemId, now: number): ShopBlock 
  */
 export function buyShop(s: GameState, id: ShopItemId, now: number, snap: EconomySnapshot): boolean {
   if (shopBlock(s, id, now)) return false;
-  const price = SHOP_ITEM_BY_ID[id].price;
+  const price = shopPrice(id, now);
   if (id === "boost") return grantAd(s, "boost", now);
   if (id === "build") return grantAd(s, "build", now, longestJob(s));
   if (id === "boostLong") s.ads.boostLeft += SHOP.boostLong;

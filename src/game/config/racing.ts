@@ -450,9 +450,12 @@ export const SKINS: Record<string, { emoji: string; color: string; accent: strin
   // the spring and summer festivals (engine/festival.ts)
   blossom: { emoji: "🌷", color: "#fdf2f8", accent: "#be185d" },
   sunset: { emoji: "🌅", color: "#fb923c", accent: "#7c3aed" },
+  doorbuster: { emoji: "🏷️", color: "#0a0a0a", accent: "#ef4444" },
   // the season pass (config/pass.ts)
   pulse: { emoji: "💠", color: "#1d4ed8", accent: "#22d3ee" },
   legend: { emoji: "🏆", color: "#111827", accent: "#facc15" },
+  // the premium track of the season pass
+  goldrush: { emoji: "👑", color: "#facc15", accent: "#78350f" },
 };
 
 /** "Build the fastest car in the world": the goal at the end of the ladder. */

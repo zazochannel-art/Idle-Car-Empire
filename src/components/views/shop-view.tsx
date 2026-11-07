@@ -14,8 +14,9 @@ import { adsToday, buildWait } from "@/game/engine/ads";
 import { remainingOf } from "@/game/engine/construction";
 import type { EconomySnapshot } from "@/game/engine/economy";
 import { rewardCash } from "@/game/engine/progress";
-import { starterReward } from "@/game/engine/iap";
-import { crateWait, longestJob, packsToday, shopBlock, shopReward, type ShopBlock } from "@/game/engine/shop";
+import { BLACK_FRIDAY, seasonAt } from "@/game/engine/season";
+import { owns, starterReward } from "@/game/engine/iap";
+import { crateWait, longestJob, packsToday, shopBlock, shopPrice, shopReward, type ShopBlock } from "@/game/engine/shop";
 import { formatDuration, formatMoney, formatNumber } from "@/game/format";
 import type { GameState } from "@/game/types";
 import type { MessageKey } from "@/i18n";
@@ -72,6 +73,7 @@ export function ShopView() {
       <Premium />
       <Section title={t(adFree ? "shop.adsFree" : "shop.ads")} icon={adFree ? "🎟️" : "📺"} items={ads} />
       <Section title={t("shop.stars")} icon="⭐" items={stars} right={<span className="text-xs font-black text-gold">{t("shop.have", { n: formatNumber(state.stars, 0) })}</span>}>
+        {seasonAt(state.lastActiveAt) === "blackfriday" && <p className="rounded-xl bg-red-500/15 px-3 py-2 text-xs font-bold text-red-100 ring-1 ring-red-400/35">🏷️ {t("shop.blackFriday", { pct: Math.round((1 - BLACK_FRIDAY.starPrice) * 100) })}</p>}
         <p className="px-1 text-[11px] text-white/45">{t("shop.starsHow")}</p>
       </Section>
       <p className="px-1 text-center text-[11px] text-white/40">{t(iapConfigured() ? "shop.footerIap" : "shop.footer")}</p>
@@ -138,10 +140,10 @@ function CrateHero() {
  */
 function Premium() {
   const iap = useIapStatus();
-  const owned = useGame((g) => g.view.state.iap.owned);
+  const state = useGame((g) => g.view.state);
   const snap = useGame((g) => g.view.snap);
   const { t } = useT();
-  const shown = IAP_PRODUCTS.filter((p) => iap.prices[p] || owned.includes(p));
+  const shown = IAP_PRODUCTS.filter((p) => iap.prices[p] || owns(state, p));
   if (!shown.length) return null;
 
   const buy = async (p: IapProduct) => {
@@ -165,7 +167,7 @@ function Premium() {
         {t("iap.title")}
       </div>
       {shown.map((p) => {
-        const has = owned.includes(p);
+        const has = owns(state, p);
         return (
           <div key={p} className="relative flex items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-br from-violet-500/30 via-fuchsia-500/10 to-white/[0.03] p-3 ring-1 ring-violet-300/40">
             <span className="flex size-16 shrink-0 items-center justify-center rounded-2xl bg-violet-500/25 text-[40px] ring-1 ring-violet-300/45">{IAP_ICON[p]}</span>
@@ -182,7 +184,7 @@ function Premium() {
             </div>
             {has ? (
               <Button size="sm" variant="locked" disabled className="w-24 shrink-0">
-                ✓ {t("iap.owned")}
+                ✓ {t(p === "pass" ? "iap.passOwned" : "iap.owned")}
               </Button>
             ) : (
               <Button size="sm" variant="gold" disabled={!iap.ready || iap.busy} className="w-24 shrink-0 tabular-nums" onClick={() => void buy(p)}>
@@ -249,7 +251,8 @@ function buttonLabel(item: ShopItem, block: ShopBlock, ready: boolean, adFree: b
   if (block === "nothing") return t("shop.nothing");
   if (item.price === "free") return t("shop.open");
   if (item.price === "ad") return !ready ? t("shop.noAd") : adFree ? `🎟️ ${t("shop.take")}` : `📺 ${t("shop.watch")}`;
-  return `⭐ ${item.price}`;
+  const now = shopPrice(item.id, s.lastActiveAt);
+  return now !== item.price ? `🏷️ ⭐ ${now} (${item.price})` : `⭐ ${item.price}`;
 }
 
 /** What the mystery box can hold, as little icons. */

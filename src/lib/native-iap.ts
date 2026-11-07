@@ -17,10 +17,14 @@
 // When the server can't answer, the purchase waits for the next try, for up to two days
 // (VERIFY_GRACE_MS): then it is given, before Google Play would refund it. And a purchase Google
 // refunded since stops what it can (the ad-free rewards).
+//
+// The premium pass is bought again every season: once given, it is consumed (which also
+// acknowledges it), so Google Play sells it again. A consumed purchase is gone from the store's
+// list, which is why it is given and saved first, like the others.
 import { App } from "@capacitor/app";
 import { NativePurchases, PURCHASE_TYPE, type Transaction } from "@capgo/native-purchases";
-import { IAP_PRODUCTS, type IapProduct } from "@/game/config/iap";
-import { iapTokenKey, type GrantResult } from "@/game/engine/iap";
+import { IAP_CONSUMABLE, IAP_PRODUCTS, type IapProduct } from "@/game/config/iap";
+import { iapTokenKey, owns, type GrantResult } from "@/game/engine/iap";
 import { useCloud } from "@/store/cloud-store";
 import { useGame } from "@/store/game-store";
 import { IAP_IDS, registerIapDriver, setIapStatus, type BuyResult } from "./iap";
@@ -80,7 +84,11 @@ async function take(t: Transaction, mine: string): Promise<GrantResult | "wait" 
   }
   const result = useGame.getState().iapGrant(p, key);
   // a second purchase of a product the company already owns is left alone: Google Play refunds it
-  if (result !== "duplicate" && !t.isAcknowledged) await NativePurchases.acknowledgePurchase({ purchaseToken: t.purchaseToken }).catch(() => {});
+  if (result !== "duplicate") {
+    // the season's pass: consumed (and so acknowledged), to be bought again next season
+    if (IAP_CONSUMABLE.includes(p)) await NativePurchases.consumePurchase({ purchaseToken: t.purchaseToken }).catch(() => {});
+    else if (!t.isAcknowledged) await NativePurchases.acknowledgePurchase({ purchaseToken: t.purchaseToken }).catch(() => {});
+  }
   return result;
 }
 
@@ -144,7 +152,7 @@ const reason = (e: unknown) => {
 async function buy(p: IapProduct): Promise<BuyResult> {
   const mine = await accountToken();
   if (!mine || !gameReady() || buying) return "failed";
-  if (useGame.getState().state.iap.owned.includes(p)) return "owned";
+  if (owns(useGame.getState().state, p)) return "owned";
   setIapStatus({ busy: true });
   // a sync under way finishes first (its call would drop the purchase's connection)
   if (syncing) await syncing;

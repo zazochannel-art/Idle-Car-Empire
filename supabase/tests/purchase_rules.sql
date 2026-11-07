@@ -102,6 +102,17 @@ begin
   if public.my_purchases() -> 0 <> '{"product": "adFree", "state": "owned"}'::jsonb then raise exception 'FAIL bought again: owned'; end if;
   reset role;
 
+  -- the premium pass (0029): one a season, each a purchase of its own; an unknown product is refused
+  set local role service_role;
+  r := public.iap_record(repeat('4', 64), b, 'pass', 'purchased', 'GPA.4', now(), false);
+  if r <> 'new' then raise exception 'FAIL premium pass recorded: %', r; end if;
+  r := public.iap_record(repeat('5', 64), b, 'pass', 'purchased', 'GPA.5', now(), false);
+  if r <> 'new' then raise exception 'FAIL next season''s pass recorded: %', r; end if;
+  failed := false;
+  begin perform public.iap_record(repeat('6', 64), b, 'gems', 'purchased', null, null, false); exception when check_violation then failed := true; end;
+  if not failed then raise exception 'FAIL an unknown product is refused'; end if;
+  reset role;
+
   -- signed out: nothing
   perform set_config('request.jwt.claims', '', true);
   set local role anon;

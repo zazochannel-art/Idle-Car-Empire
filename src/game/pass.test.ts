@@ -115,7 +115,7 @@ describe("season pass", () => {
     expect(back.racing.cars.find((c) => c.limited)?.limited).toBe(s.pass.season);
     const raw = JSON.parse(JSON.stringify(s));
     raw.pass = { season: "x", xp: -5, claimed: [0, 3, 3, 99, "2"], week: null, weekly: [{ id: "nope" }, { id: "cars", target: 10, start: 2, done: true }], halls: ["gold", "neon"] };
-    expect(migrate(raw, NOW).pass).toEqual({ season: 0, xp: 0, claimed: [3], week: -1, weekly: [{ id: "cars", target: 10, start: 2, done: true }], halls: ["gold"] });
+    expect(migrate(raw, NOW).pass).toEqual({ season: 0, xp: 0, claimed: [3], week: -1, weekly: [{ id: "cars", target: 10, start: 2, done: true }], halls: ["gold"], premium: 0, premiumClaimed: [] });
     delete raw.pass;
     expect(migrate(raw, NOW).pass).toEqual(P.createPass());
   });

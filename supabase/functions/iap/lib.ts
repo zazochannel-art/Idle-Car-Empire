@@ -11,7 +11,7 @@
 // (src/lib/iap-server.test.ts) and Supabase runs it in Deno.
 
 /** The game's products (src/game/config/iap.ts; a test keeps them the same). */
-export const PRODUCTS = ["starter", "adFree"] as const;
+export const PRODUCTS = ["starter", "adFree", "pass"] as const;
 export type IapProduct = (typeof PRODUCTS)[number];
 
 type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
@@ -75,8 +75,8 @@ const API = "https://androidpublisher.googleapis.com/androidpublisher/v3/applica
 export const PLAY_SCOPE = "https://www.googleapis.com/auth/androidpublisher";
 
 /** Product ids from the secrets, or the ones docs/android/iap.md suggests. */
-export function productsFrom(starter: string | undefined, adFree: string | undefined): Record<string, IapProduct> {
-  return { [starter?.trim() || "starter_pack"]: "starter", [adFree?.trim() || "ad_free_rewards"]: "adFree" };
+export function productsFrom(starter: string | undefined, adFree: string | undefined, pass?: string | undefined): Record<string, IapProduct> {
+  return { [starter?.trim() || "starter_pack"]: "starter", [adFree?.trim() || "ad_free_rewards"]: "adFree", [pass?.trim() || "premium_pass"]: "pass" };
 }
 
 export async function sha256(text: string): Promise<string> {

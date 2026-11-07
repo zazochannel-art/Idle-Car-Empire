@@ -8,7 +8,7 @@ const env = {
   supabaseUrl: Deno.env.get("SUPABASE_URL") ?? "",
   serviceKey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
   packageName: Deno.env.get("PLAY_PACKAGE_NAME")?.trim() || "com.zazochannel.idlecarempire",
-  products: productsFrom(Deno.env.get("IAP_STARTER_ID"), Deno.env.get("IAP_ADFREE_ID")),
+  products: productsFrom(Deno.env.get("IAP_STARTER_ID"), Deno.env.get("IAP_ADFREE_ID"), Deno.env.get("IAP_PASS_ID")),
   cronSecret: Deno.env.get("CRON_SECRET") || undefined,
 };
 

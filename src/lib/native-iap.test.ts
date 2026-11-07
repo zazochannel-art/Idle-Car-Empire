@@ -5,9 +5,10 @@ import { grantPurchase } from "@/game/engine/iap";
 import { createInitialState } from "@/game/engine/state";
 import type { GameState } from "@/game/types";
 
-// A build with both products set up
+// A build with every product set up
 process.env.NEXT_PUBLIC_IAP_STARTER_ID = "starter_pack";
 process.env.NEXT_PUBLIC_IAP_ADFREE_ID = "ad_free_rewards";
+process.env.NEXT_PUBLIC_IAP_PASS_ID = "premium_pass";
 
 const T0 = Date.UTC(2026, 2, 1, 12);
 /** What happened, in order: the game giving a purchase, the store hearing it was acknowledged. */
@@ -57,6 +58,9 @@ vi.mock("@capgo/native-purchases", () => ({
     acknowledgePurchase: async ({ purchaseToken }: { purchaseToken: string }) => {
       log.push(`ack ${purchaseToken}`);
     },
+    consumePurchase: async ({ purchaseToken }: { purchaseToken: string }) => {
+      log.push(`consume ${purchaseToken}`);
+    },
   },
 }));
 vi.mock("@/store/cloud-store", () => ({
@@ -67,7 +71,7 @@ vi.mock("@/store/game-store", () => ({
     getState: () => ({
       ...game,
       // the store's action: the engine's grant, saved
-      iapGrant: (p: "starter" | "adFree", token: string) => {
+      iapGrant: (p: "starter" | "adFree" | "pass", token: string) => {
         const r = grantPurchase(game.state, p, token, snapshot(game.state));
         if (r === "granted") log.push(`grant ${p}`);
         return r;
@@ -91,7 +95,7 @@ beforeEach(() => {
 
 describe("in-app purchases in the app", () => {
   it("starts with the build's product ids, and nothing bought yet", async () => {
-    expect(iap.IAP_IDS).toEqual({ starter: "starter_pack", adFree: "ad_free_rewards" });
+    expect(iap.IAP_IDS).toEqual({ starter: "starter_pack", adFree: "ad_free_rewards", pass: "premium_pass" });
     expect(iap.iapConfigured()).toBe(true);
     // nothing sold until the store has answered with its prices
     expect(await iap.buyProduct("starter")).toBe("failed");
@@ -108,6 +112,19 @@ describe("in-app purchases in the app", () => {
     expect(game.state.iap.owned).toEqual(["starter"]);
     // bought for this game account, and acknowledged by the game (not by the plugin)
     expect(purchaseProduct).toHaveBeenCalledWith(expect.objectContaining({ productIdentifier: "starter_pack", appAccountToken: mine, isConsumable: false, autoAcknowledgePurchases: false }));
+  });
+
+  it("the premium pass is given for the season and consumed, so it can be bought again next season", async () => {
+    await iap.restorePurchases();
+    answer = async () => paid("premium_pass", "tok-p1");
+    expect(await iap.buyProduct("pass")).toBe("granted");
+    expect(log).toEqual(["grant pass", "consume tok-p1"]);
+    // kept on the pass for this season, never among the products owned for good
+    expect(game.state.pass.premium).toBe(game.state.pass.season);
+    expect(game.state.pass.season).toBeGreaterThan(0);
+    expect(game.state.iap.owned).toEqual([]);
+    // this season it is open already
+    expect(await iap.buyProduct("pass")).toBe("owned");
   });
 
   it("restoring gives what wasn't given yet, once, and acknowledges it", async () => {

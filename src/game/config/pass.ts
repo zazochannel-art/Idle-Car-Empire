@@ -1,4 +1,5 @@
-// The free season pass: 28-day seasons of 30 tiers. XP comes from the daily
+// The season pass: 28-day seasons of 30 tiers, free for everyone, and a premium
+// track beside it for the players who buy it for the season (config/iap.ts "pass"). XP comes from the daily
 // missions and three weekly challenges; every tier pays something, and a few
 // pay a hall style, a race livery or a limited-edition race car. All balance
 // numbers live here; engine/pass.ts runs them.
@@ -51,5 +52,20 @@ export const PASS_TIERS: PassTier[] = Array.from({ length: PASS.tiers }, (_, i) 
     tier.livery = "legend";
     tier.car = { model: "hypercar", livery: "legend" };
   }
+  return tier;
+});
+
+/**
+ * The premium track: bought for one season (the "pass" purchase), it pays a second reward at every
+ * tier reached, on top of the free one: more income and research, a Star every third tier (5 at the
+ * end), the Gold Rush livery, and a limited hypercar in it.
+ */
+export const PREMIUM_TIERS: PassTier[] = Array.from({ length: PASS.tiers }, (_, i) => {
+  const n = i + 1;
+  const reward: Reward = { incomeSeconds: 1_200 + 120 * n, rp: 80 * n };
+  if (n % 3 === 0) reward.stars = n === PASS.tiers ? 5 : 1;
+  const tier: PassTier = { reward };
+  if (n === 15) tier.livery = "goldrush";
+  if (n === 30) tier.car = { model: "hypercar", livery: "goldrush" };
   return tier;
 });

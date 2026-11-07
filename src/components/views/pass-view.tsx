@@ -4,15 +4,17 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { SKIN_BY_ID } from "@/game/config/collection";
 import { CAR_BY_ID } from "@/game/config/cars";
-import { PASS, PASS_TIERS, type PassTier, type WeeklyId } from "@/game/config/pass";
+import { PASS, PASS_TIERS, PREMIUM_TIERS, type PassTier, type WeeklyId } from "@/game/config/pass";
 import { SKINS as LIVERIES } from "@/game/config/racing";
-import { passEnd, tierOf, weekEnd, weeklyProgress } from "@/game/engine/pass";
+import { isPremium, passEnd, tierOf, weekEnd, weeklyProgress } from "@/game/engine/pass";
 import { rewardCash } from "@/game/engine/progress";
 import { formatDuration, formatMoney, formatNumber } from "@/game/format";
 import type { MessageKey } from "@/i18n";
 import { useContent } from "@/i18n/content";
 import { useT } from "@/i18n/use-t";
+import { buyProduct, useIapStatus } from "@/lib/iap";
 import { cn } from "@/lib/utils";
+import { uiEvents } from "@/store/events";
 import { useGame } from "@/store/game-store";
 import { ViewHeader } from "./section-title";
 
@@ -31,13 +33,23 @@ function tierIcon(t: PassTier): string {
 export function PassView() {
   const state = useGame((g) => g.view.state);
   const snap = useGame((g) => g.view.snap);
-  const { claimPassTier, claimPassAll, claimPassWeekly } = useGame.getState();
+  const { claimPassTier, claimPassPremium, claimPassAll, claimPassWeekly } = useGame.getState();
+  const iap = useIapStatus();
+  const premium = isPremium(state);
   const { t, lang } = useT();
   const n = useContent(lang);
   const [now] = useState(Date.now);
   const P = state.pass;
   const reached = tierOf(P.xp);
-  const ready = Array.from({ length: reached }, (_, i) => i + 1).filter((x) => !P.claimed.includes(x)).length;
+  const ready = Array.from({ length: reached }, (_, i) => i + 1).reduce((n, x) => n + (P.claimed.includes(x) ? 0 : 1) + (premium && !P.premiumClaimed.includes(x) ? 1 : 0), 0);
+  // the premium track is sold in this build (the store gave its price), or it is open already
+  const premiumShown = premium || !!iap.prices.pass;
+  const buyPremium = async () => {
+    const r = await buyProduct("pass");
+    if (r === "pending") uiEvents.emit({ type: "toast", tone: "info", icon: "⏳", title: t("iap.pending"), body: t("iap.pendingBody") });
+    else if (r === "failed") uiEvents.emit({ type: "toast", tone: "warn", icon: "🛒", title: t("iap.failed"), body: t("iap.failedBody") });
+  };
+  const premiumStars = PREMIUM_TIERS.reduce((n, x) => n + (x.reward.stars ?? 0), 0);
   const into = reached >= PASS.tiers ? PASS.xpPerTier : P.xp - reached * PASS.xpPerTier;
   // what a tier pays, in words (for its tooltip and the legend)
   const tierText = (tier: PassTier) => {
@@ -78,6 +90,22 @@ export function PassView() {
         <div className="text-[11px] tabular-nums text-white/70">{reached >= PASS.tiers ? t("pass.complete") : t("pass.next", { xp: formatNumber(into), total: formatNumber(PASS.xpPerTier), n: reached + 1 })}</div>
         <div className="text-[10px] text-white/45">{t("pass.xpHow", { daily: PASS.xp.daily, weekly: PASS.xp.weekly })}</div>
       </div>
+
+      {/* the premium track: bought for this season */}
+      {premiumShown && (
+        <div className="flex items-center gap-3 rounded-2xl bg-gradient-to-br from-gold/30 via-amber-500/10 to-transparent p-3 ring-1 ring-gold/50">
+          <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-gold/25 text-3xl ring-1 ring-gold/60">👑</span>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-black text-gold">{t("pass.premium")}</div>
+            <div className="text-[11px] leading-snug text-white/65">{premium ? t("pass.premiumOn") : t("pass.premiumPitch", { stars: premiumStars })}</div>
+          </div>
+          {!premium && (
+            <Button size="sm" variant="gold" disabled={!iap.ready || iap.busy} className="shrink-0 tabular-nums" onClick={() => void buyPremium()}>
+              {iap.prices.pass}
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* this week's challenges */}
       <div className="space-y-1.5">
@@ -140,6 +168,35 @@ export function PassView() {
             );
           })}
         </div>
+        {/* the premium track's tiers */}
+        {premiumShown && (
+          <>
+            <div className="px-1 pt-1 text-[11px] font-bold uppercase tracking-wider text-gold/80">👑 {t("pass.premiumTiers")}</div>
+            <div className="grid grid-cols-5 gap-1.5 sm:grid-cols-6">
+              {PREMIUM_TIERS.map((tier, i) => {
+                const k = i + 1;
+                const done = P.premiumClaimed.includes(k);
+                const open = premium && !done && k <= reached;
+                return (
+                  <button
+                    key={k}
+                    disabled={!open}
+                    onClick={() => claimPassPremium(k)}
+                    title={tierText(tier)}
+                    aria-label={t("pass.premiumTierLabel", { n: k })}
+                    className={cn(
+                      "relative flex aspect-square flex-col items-center justify-center gap-0.5 rounded-xl ring-1 transition",
+                      done ? "bg-emerald-500/15 ring-emerald-400/30" : open ? "animate-pulse bg-gold/30 ring-gold hover:bg-gold/40" : "bg-gold/[0.06] ring-gold/25",
+                    )}
+                  >
+                    <span className={cn("text-lg leading-none", !done && !open && "opacity-60")}>{done ? "✓" : premium ? tierIcon(tier) : "🔒"}</span>
+                    <span className={cn("text-[10px] font-black leading-none", open ? "text-gold" : "text-gold/50")}>{k}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
         {/* what the special tiers bring */}
         <div className="space-y-1 rounded-2xl bg-white/[0.03] p-3 text-[11px] ring-1 ring-white/[0.06]">
           {specials.map(({ x, n: k }) => (
@@ -150,6 +207,17 @@ export function PassView() {
               </span>
             </div>
           ))}
+          {premiumShown &&
+            PREMIUM_TIERS.map((x, i) => ({ x, k: i + 1 }))
+              .filter(({ x }) => x.car || x.livery)
+              .map(({ x, k }) => (
+                <div key={`p${k}`} className="flex gap-2">
+                  <span className="w-8 shrink-0 font-black text-gold">👑{k}</span>
+                  <span className="text-white/65">
+                    {tierIcon(x)} {tierText(x)}
+                  </span>
+                </div>
+              ))}
           <p className="pt-1 text-white/45">{t("pass.leftoverNote")}</p>
         </div>
       </div>

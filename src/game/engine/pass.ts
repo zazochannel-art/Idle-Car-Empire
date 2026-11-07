@@ -1,8 +1,10 @@
-// The free season pass (config/pass.ts): a new 28-day season starts by
+// The season pass (config/pass.ts): a new 28-day season starts by
 // itself; XP comes from the daily missions taken and three weekly challenges
 // sized to the empire; every tier reached pays when the player takes it, and
 // whatever is left untaken when a season ends is paid as the next one starts.
-import { PASS, PASS_TIERS, WEEKLY, type PassTier, type WeeklyId } from "../config/pass";
+// The premium track (bought for one season: engine/iap.ts) pays a second
+// reward at every tier, the same way.
+import { PASS, PASS_TIERS, PREMIUM_TIERS, WEEKLY, type PassTier, type WeeklyId } from "../config/pass";
 import type { SkinId } from "../config/collection";
 import type { GameState } from "../types";
 import { passiveIncome, type EconomySnapshot } from "./economy";
@@ -28,9 +30,16 @@ export interface PassState {
   weekly: WeeklyState[];
   /** Hall styles won on a pass: kept for good, through every season and reset. */
   halls: SkinId[];
+  /** The season the premium track was bought for (0: never); it is premium only while that season runs. */
+  premium: number;
+  /** Premium tiers whose reward was taken (this season). */
+  premiumClaimed: number[];
 }
 
-export const createPass = (): PassState => ({ season: 0, xp: 0, claimed: [], week: -1, weekly: [], halls: [] });
+export const createPass = (): PassState => ({ season: 0, xp: 0, claimed: [], week: -1, weekly: [], halls: [], premium: 0, premiumClaimed: [] });
+
+/** The premium track is open: bought for the season the pass is on. */
+export const isPremium = (s: GameState) => s.pass.season > 0 && s.pass.premium === s.pass.season;
 
 const DAY = 86_400_000;
 /** A local calendar day as a number (so seasons turn at local midnight). */
@@ -90,10 +99,13 @@ export function passTick(s: GameState, snap: EconomySnapshot, now: number): { se
   if (P.season !== season) {
     if (P.season > 0) {
       let left = 0;
-      for (let n = 1; n <= tierOf(P.xp); n++) if (claimTier(s, n, snap, now, true) !== null) left++;
+      for (let n = 1; n <= tierOf(P.xp); n++) {
+        if (claimTier(s, n, snap, now, true) !== null) left++;
+        if (claimPremiumTier(s, n, snap, now, true) !== null) left++;
+      }
       if (left) out.leftover = left;
     }
-    s.pass = { ...P, season, xp: 0, claimed: [], week: -1, weekly: [] };
+    s.pass = { ...s.pass, season, xp: 0, claimed: [], week: -1, weekly: [], premiumClaimed: [] };
     out.season = season;
   }
   const week = passWeek(now);
@@ -147,13 +159,26 @@ export function claimTier(s: GameState, n: number, snap: EconomySnapshot, now: n
   return money;
 }
 
-/** Takes every reached tier at once; returns how many and the money. */
+/** Takes a reached premium tier's reward (only with the premium track). Returns the money paid (null: not allowed). */
+export function claimPremiumTier(s: GameState, n: number, snap: EconomySnapshot, now: number, leftover = false): number | null {
+  if (!leftover) passTick(s, snap, now);
+  const P = s.pass;
+  if (!isPremium(s) || !Number.isInteger(n) || n < 1 || n > tierOf(P.xp) || P.premiumClaimed.includes(n)) return null;
+  const t = PREMIUM_TIERS[n - 1];
+  const money = rewardCash(t.reward, snap);
+  grantReward(s, t.reward, snap);
+  collect(s, t, P.season);
+  P.premiumClaimed.push(n);
+  return money;
+}
+
+/** Takes every reached tier at once (the premium ones too, with the premium track); returns how many and the money. */
 export function claimAllTiers(s: GameState, snap: EconomySnapshot, now: number): { tiers: number; money: number } {
   passTick(s, snap, now);
   const out = { tiers: 0, money: 0 };
   for (let n = 1; n <= tierOf(s.pass.xp); n++) {
-    const m = claimTier(s, n, snap, now, true);
-    if (m !== null) {
+    for (const m of [claimTier(s, n, snap, now, true), claimPremiumTier(s, n, snap, now, true)]) {
+      if (m === null) continue;
       out.tiers++;
       out.money += m;
     }
@@ -165,7 +190,11 @@ export function claimAllTiers(s: GameState, snap: EconomySnapshot, now: number):
 export function passWaiting(s: GameState): number {
   const P = s.pass;
   let n = 0;
-  for (let t = 1; t <= tierOf(P.xp); t++) if (!P.claimed.includes(t)) n++;
+  const premium = isPremium(s);
+  for (let t = 1; t <= tierOf(P.xp); t++) {
+    if (!P.claimed.includes(t)) n++;
+    if (premium && !P.premiumClaimed.includes(t)) n++;
+  }
   return n + P.weekly.filter((w) => !w.done && weeklyProgress(s, w) >= w.target).length;
 }
 
@@ -186,6 +215,8 @@ export function migratePass(raw: unknown): PassState {
         .map((w) => ({ id: w.id as WeeklyId, target: Math.max(1, int(w.target, 1)), start: typeof w.start === "number" && Number.isFinite(w.start) ? w.start : 0, done: w.done === true }))
     : [];
   const halls: SkinId[] = ["chrome", "gold"];
+  p.premium = int(r.premium, 0);
+  p.premiumClaimed = Array.isArray(r.premiumClaimed) ? [...new Set(r.premiumClaimed.filter((n): n is number => Number.isInteger(n) && n >= 1 && n <= PASS.tiers))] : [];
   p.halls = Array.isArray(r.halls) ? [...new Set(r.halls.filter((h): h is SkinId => halls.includes(h as SkinId)))] : [];
   return p;
 }

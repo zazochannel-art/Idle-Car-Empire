@@ -18,6 +18,7 @@ const ODDS: Record<Season | "none", Partial<Record<WeatherKind, number>>> = {
   winter: { clear: 0.35, snow: 0.55, fog: 0.1 },
   spring: { clear: 0.3, petals: 0.45, rain: 0.15, fog: 0.1 },
   summer: { clear: 0.85, rain: 0.1, fog: 0.05 },
+  blackfriday: { clear: 0.55, rain: 0.25, fog: 0.2 },
 };
 
 /** A number in [0, 1) from a block's index (the same everywhere). */
