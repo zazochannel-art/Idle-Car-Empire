@@ -40,6 +40,7 @@ import { applyLanguage, detectLanguage, loadLanguage, translate, type MessageKey
 import { contentFor } from "@/i18n/content";
 import { uiEvents } from "./events";
 import type { AwayNote } from "@/lib/notify";
+import { isNativeApp } from "@/lib/platform";
 import { pushSupported, pushToken, startPush } from "@/lib/push";
 import { useUi } from "./ui-store";
 import * as Mk from "@/game/engine/market";
@@ -769,6 +770,8 @@ export const useGame = create<GameStore>((set, get) => {
       if (!social || !get().ready) return null;
       const send = Cu.cupToSend(get().state, Date.now());
       if (!send) return null;
+      // the board holds a time to the car that drove it (its ghost: supabase/migrations/0027), so the ghost goes first
+      await get().publishGhost();
       const res = await social.cupSubmit(send.week, send.ms, send.car, send.color).catch(() => "network" as const);
       // the board has it, or never will (the week is over, a time it refuses): not sent again; "limit" waits for tomorrow
       if (res === "ok" || res === "closed" || res === "invalid") {
@@ -952,6 +955,14 @@ export const useGame = create<GameStore>((set, get) => {
       }
       await tab?.ready;
       if (replaced) return;
+      // in the app: a save the WebView lost comes back from the app's own copy (lib/save-mirror.ts)
+      if (saves && isNativeApp()) {
+        const mirror = import("@/lib/save-mirror").then(async (m) => {
+          await m.restoreSaveMirror();
+          m.startSaveMirror();
+        });
+        await Promise.race([mirror.catch(() => {}), new Promise((r) => setTimeout(r, 1_500))]);
+      }
       const now = Date.now();
       // the account and its save first: nothing starts (or gets saved) before they are known
       const start = saves

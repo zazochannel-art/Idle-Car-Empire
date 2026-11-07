@@ -36,6 +36,19 @@ export interface Backup {
   payload: SavePayload;
 }
 
+/** Every save's key starts so (the copies of accounts and the save from before accounts; not backups). */
+export const SAVE_KEY_PREFIX = "idle-car-empire:save:";
+
+/**
+ * A second place each save is copied to (the app's own storage, lib/save-mirror.ts): told of every
+ * write (the save's JSON) and removal (null). None in a browser.
+ */
+type Mirror = (key: string, value: string | null) => void;
+let mirror: Mirror | null = null;
+export function setSaveMirror(m: Mirror | null) {
+  mirror = m;
+}
+
 const keyFor = (owner: string | null) => (owner ? `${OWNER_PREFIX}${owner}` : LOCAL_SAVE_KEY);
 
 export class LocalStore {
@@ -58,7 +71,10 @@ export class LocalStore {
 
   write(copy: LocalCopy): boolean {
     try {
-      this.store?.setItem(keyFor(copy.owner ?? null), JSON.stringify(copy));
+      const key = keyFor(copy.owner ?? null);
+      const json = JSON.stringify(copy);
+      this.store?.setItem(key, json);
+      mirror?.(key, json);
       return true;
     } catch {
       // storage full or blocked (private mode): the game keeps running in memory
@@ -67,6 +83,7 @@ export class LocalStore {
   }
 
   remove(owner: string | null) {
+    mirror?.(keyFor(owner), null);
     try {
       this.store?.removeItem(keyFor(owner));
     } catch {
