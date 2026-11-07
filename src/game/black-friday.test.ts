@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { SHOP_ITEM_BY_ID } from "./config/shop";
 import { snapshot } from "./engine/economy";
 import { FESTIVAL, FESTIVAL_GOALS, claimFestivalGoal, festivalNow, festivalTick } from "./engine/festival";
+import { activeEvent } from "./engine/events";
 import { computeGlobalMods } from "./engine/modifiers";
 import { BLACK_FRIDAY, blackFriday, seasonAt, seasonWindow } from "./engine/season";
 import { buyShop, shopBlock, shopPrice } from "./engine/shop";
@@ -34,13 +35,19 @@ describe("Black Friday week", () => {
     expect(seasonAt(at(2026, 10, 10))).toBeNull();
   });
 
-  it("brings more customers to the dealers, at a small discount, on top of the season's income bonus", () => {
-    const before = createInitialState(at(2026, 10, 20));
-    const during = createInitialState(at(2026, 10, 25));
+  it("brings more customers to the dealers, at a small discount", () => {
+    // at hours without a market event (one could change the same numbers)
+    const quiet = (t: number) => {
+      while (activeEvent(t)) t += 15 * 60_000;
+      return t;
+    };
+    const before = createInitialState(quiet(at(2026, 10, 20)));
+    const during = createInitialState(quiet(at(2026, 10, 25)));
     const a = computeGlobalMods(before);
     const b = computeGlobalMods(during);
     expect(b.dealerCap).toBeCloseTo(a.dealerCap * BLACK_FRIDAY.dealerCap);
     expect(b.markup).toBeCloseTo(a.markup + BLACK_FRIDAY.markup);
+    expect(seasonAt(during.lastActiveAt)).toBe("blackfriday");
     expect(b.income).toBeGreaterThan(a.income);
   });
 
