@@ -531,7 +531,24 @@ async function renderCarThumbnail(model: (typeof CARS)[number]["id"], color: str
 
   const data = carThumbCanvas.toDataURL("image/png");
   CAR_THUMB_CACHE.set(key, data);
+  releaseThumbRendererSoon();
   return data;
+}
+
+/**
+ * The thumbnails' WebGL context is let go a few seconds after the last one is drawn (they are
+ * kept as pictures): phones allow only a few contexts at once, and the map needs one.
+ */
+let carThumbRelease: ReturnType<typeof setTimeout> | null = null;
+function releaseThumbRendererSoon() {
+  if (carThumbRelease) clearTimeout(carThumbRelease);
+  carThumbRelease = setTimeout(() => {
+    carThumbRelease = null;
+    carThumbRenderer?.dispose();
+    carThumbRenderer?.forceContextLoss();
+    carThumbRenderer = null;
+    carThumbCanvas = null;
+  }, 4_000);
 }
 
 function CarThumbnail({ model, color }: { model: (typeof CARS)[number]["id"]; color: string }) {

@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 import { uiEvents } from "@/store/events";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
-import { MapEngine } from "./world/engine";
+import type { MapEngine } from "./world/engine";
 import { Showcase } from "./showcase";
 import { HAS_INTERIOR } from "../plant/interior/layout";
 import { setLiveryOverrides } from "../three/livery";
@@ -144,7 +144,7 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
     let made: MapEngine | null = null;
     const offs: (() => void)[] = [];
     let enterTimer: ReturnType<typeof setTimeout> | null = null;
-    Promise.resolve({ MapEngine }).then(({ MapEngine }) => {
+    import("./world/engine").then(({ MapEngine }) => {
         if (!alive) return;
         const e = new MapEngine(
           canvasRef.current!,
@@ -210,10 +210,17 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
         // cars wear the colours picked in the Design studio
         const paint = (designs: GameState["designs"]) =>
           setLiveryOverrides(Object.fromEntries(Object.entries(designs).map(([id, d]) => [CAR_MODEL_FOR[id as keyof typeof CAR_MODEL_FOR], d.color])));
+        // only when a colour changed: the state is a new copy every tick
+        const colours = (designs: GameState["designs"]) => Object.values(designs).map((d) => d.color).join("|");
+        let painted = colours(useGame.getState().state.designs);
         paint(useGame.getState().state.designs);
         offs.push(
           useGame.subscribe((g, prev) => {
-            if (g.state.designs !== prev.state.designs) paint(g.state.designs);
+            const now = colours(g.state.designs);
+            if (now !== painted) {
+              painted = now;
+              paint(g.state.designs);
+            }
             if (g.state.settings.lowGraphics !== prev.state.settings.lowGraphics) e.setLowGraphics(g.state.settings.lowGraphics);
             // trucks follow the engine's shipments
             if (g.state.chain.shipments !== prev.state.chain.shipments && !visitRef.current) e.traffic.setShipments(shipViews(g.state));
@@ -543,7 +550,7 @@ function ZoneInfo({ id }: { id: ZoneId }) {
 }
 
 function TerritoryInfo({ id }: { id: TerritoryId }) {
-  const state = useGame((g) => g.state);
+  const state = useGame((g) => g.view.state);
   const lock = territoryLock(state, id);
   const unlock = useGame((g) => g.unlockTerritory);
   const { t, lang } = useT();

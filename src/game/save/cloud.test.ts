@@ -919,3 +919,22 @@ describe("a save from a newer version of the game", () => {
     expect(server.rows.get(id)!.revision).toBe(7);
   });
 });
+
+describe("a break during a game, on the server's clock", () => {
+  it("the phone's clock set forward earns only the time the server saw pass", async () => {
+    const server = new Server();
+    const pc = device(server);
+    await pc.saves.start(T0, registers(pc));
+    const id = pc.cloud.user!;
+    // the last cloud save was a minute ago by the server
+    server.rows.set(id, { data: game(5), version: SAVE_VERSION, revision: 3, updatedAt: server.clock - 60_000 });
+    const now = server.clock + 12 * 3_600_000; // the phone says 12 hours later
+    expect(await pc.saves.trustedSince(now - 12 * 3_600_000, now)).toBe(now - 60_000);
+    // a real break of 12 hours stays 12 hours
+    server.rows.set(id, { data: game(5), version: SAVE_VERSION, revision: 4, updatedAt: server.clock - 12 * 3_600_000 });
+    expect(await pc.saves.trustedSince(now - 12 * 3_600_000, now)).toBe(now - 12 * 3_600_000);
+    // no connection: the phone's own count, as at the start
+    pc.cloud.offline = true;
+    expect(await pc.saves.trustedSince(now - 5_000_000, now)).toBe(now - 5_000_000);
+  });
+});

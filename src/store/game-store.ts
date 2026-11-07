@@ -429,10 +429,28 @@ export const useGame = create<GameStore>((set, get) => {
     const next = cloneState(state);
 
     if (dt > AWAY_GAP_S) {
-      // The page was frozen: settle it like a normal absence.
-      next.lastActiveAt = now - dt * 1000;
-      settleAway(next, now);
+      // The page was frozen: settle it like a normal absence, as long as the server's clock
+      // agrees (saves.trustedSince): moving the phone's clock forward and back earns nothing.
+      const from = now - dt * 1000;
+      if (!saves?.account) {
+        next.lastActiveAt = from;
+        settleAway(next, now);
+        commit(next);
+        return;
+      }
+      // meanwhile the game goes on from now; the break is paid once the server answered
+      next.lastActiveAt = now;
       commit(next);
+      void saves.trustedSince(from, now).then((since) => {
+        const later = cloneState(get().state);
+        // only the break itself: the game played on since `now` and that time is counted already
+        const at = later.lastActiveAt;
+        later.lastActiveAt = since;
+        settleAway(later, now);
+        later.lastActiveAt = Math.max(at, later.lastActiveAt);
+        commit(later);
+        persist();
+      });
       return;
     }
 

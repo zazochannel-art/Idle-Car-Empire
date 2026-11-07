@@ -64,3 +64,6 @@ keystore.properties.txt
 /gradlew
 /gradlew.bat
 /gradle/
+
+# the Supabase CLI's own files
+supabase/.temp/

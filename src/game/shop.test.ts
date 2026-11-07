@@ -10,7 +10,8 @@ import { createInitialState } from "./engine/state";
 import { tick } from "./engine/tick";
 import { decodeSave, encodeSave } from "./save/serialize";
 
-const T0 = Date.UTC(2026, 2, 1, 12);
+// noon on the phone's own clock: a few hours later is still the same day in every time zone
+const T0 = new Date(2026, 2, 1, 12).getTime();
 const HOUR = 3600_000;
 
 describe("the shop", () => {

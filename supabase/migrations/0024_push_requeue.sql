@@ -1,7 +1,7 @@
 -- Push notes that Firebase didn't take for a passing reason (no connection, busy, down, asked
 -- to slow down) go back in the queue for the next run, instead of being lost as sent
 -- (functions/push/lib.ts). A note still expires 24 hours after it was queued (push_take).
--- Run once in the SQL editor, after 0016.
+-- Run once in the SQL editor, after 0016 (numbered 0024: 0023 is the funnel's end).
 
 create or replace function public.push_requeue(p_tokens text[], p_kinds text[])
 returns integer

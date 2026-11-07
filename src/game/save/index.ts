@@ -307,6 +307,22 @@ export class SaveManager {
     return state;
   }
 
+  /**
+   * The start of a break in play (the app away, the phone asleep) as the server's clock allows
+   * it: no further back than the time since the last cloud save, by the server. Setting the
+   * phone's clock forward during a game earns nothing more. `from` as it is when the server
+   * can't be asked (no account, no connection), as at the start.
+   */
+  async trustedSince(from: number, now: number): Promise<number> {
+    if (this.closed || !this.backend || !this.account) return from;
+    try {
+      const cloud = await timeout(this.backend.load(), CLOUD_WAIT_WITH_COPY);
+      return trustedLastActive(from, cloud, now);
+    } catch {
+      return from;
+    }
+  }
+
   /** The cloud's copy, to show it next to this device's in a conflict. */
   async peekCloud(): Promise<CloudCopy | null> {
     try {
