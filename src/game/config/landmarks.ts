@@ -33,7 +33,8 @@ export const LANDMARKS_NORTH: LandmarkConfig[] = [
 ];
 
 /** A city's landmark works (none in a city whose territories hold none). */
-export const landmarksOf = (city: CityId): LandmarkConfig[] => (city === "north" ? LANDMARKS_NORTH : LANDMARKS);
+const LANDMARKS_BY_CITY: Record<CityId, LandmarkConfig[]> = { home: LANDMARKS, north: LANDMARKS_NORTH };
+export const landmarksOf = (city: CityId): LandmarkConfig[] => LANDMARKS_BY_CITY[city];
 
 /** A city's landmark works in a territory. */
 export const landmarkIn = (city: CityId, t: TerritoryId): LandmarkConfig | undefined => landmarksOf(city).find((l) => l.territory === t);

@@ -62,6 +62,8 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
 export class CloudSync {
   private info: SyncInfo;
   private latest: GameState | null = null;
+  /** When the latest state was kept on this device (its local copy's savedAt). */
+  private latestAt = 0;
   private seq = 0;
   private sentSeq = 0;
   private inFlight: Promise<void> | null = null;
@@ -104,8 +106,9 @@ export class CloudSync {
     // stopped (logout, another account): nothing more is written for this account, not even here
     if (this.stopped) return;
     this.latest = state;
+    this.latestAt = this.o.now();
     this.seq++;
-    this.writeLocal(state, true);
+    this.writeLocal(state, true, this.latestAt);
     if (this.stopped || this.info.status === "conflict") return;
     const now = this.o.now();
     const wait = important ? this.o.debounce : Math.max(0, this.lastSent + this.o.interval - now);
@@ -126,8 +129,8 @@ export class CloudSync {
     this.clear();
   }
 
-  private writeLocal(state: GameState, dirty: boolean) {
-    this.local.write({ state, savedAt: this.o.now(), owner: this.owner, base: this.info.revision, dirty });
+  private writeLocal(state: GameState, dirty: boolean, savedAt: number) {
+    this.local.write({ state, savedAt, owner: this.owner, base: this.info.revision, dirty });
   }
 
   private clear() {
@@ -156,6 +159,7 @@ export class CloudSync {
     if (this.stopped || !this.latest || this.seq === this.sentSeq || this.info.status === "conflict") return Promise.resolve();
     const state = this.latest;
     const seq = this.seq;
+    const at = this.latestAt;
     const base = this.info.revision;
     this.set({ status: "saving" });
     this.lastSent = this.o.now();
@@ -171,9 +175,12 @@ export class CloudSync {
         this.failures = 0;
         this.sentSeq = seq;
         this.set({ status: "saved", revision: res.revision, lastSaved: res.updatedAt });
-        // this device's copy now matches the cloud (unless the game moved on meanwhile)
-        if (this.seq === seq) this.writeLocal(state, false);
-        else this.writeLocal(this.latest!, true);
+        // this device's copy now matches the cloud (unless the game moved on meanwhile); it keeps the
+        // time the state was saved, and a copy that stopped meanwhile (another tab took over, a
+        // logout) leaves the device's copy alone: the newer copy may be writing it by now
+        if (this.stopped) return;
+        if (this.seq === seq) this.writeLocal(state, false, at);
+        else this.writeLocal(this.latest!, true, this.latestAt);
       } catch {
         const offline = typeof navigator !== "undefined" && navigator.onLine === false;
         this.set({ status: offline ? "offline" : "error" });

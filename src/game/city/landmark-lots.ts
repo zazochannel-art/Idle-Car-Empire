@@ -44,7 +44,8 @@ export const LANDMARK_LOTS_NORTH: LandmarkLot[] = [
 ];
 
 /** A city's landmark lots. */
-export const landmarkLotsOf = (city: CityId): LandmarkLot[] => (city === "north" ? LANDMARK_LOTS_NORTH : LANDMARK_LOTS);
+const LOTS_BY_CITY: Record<CityId, LandmarkLot[]> = { home: LANDMARK_LOTS, north: LANDMARK_LOTS_NORTH };
+export const landmarkLotsOf = (city: CityId): LandmarkLot[] => LOTS_BY_CITY[city];
 
 /** The lot of a city's landmark works in a territory. */
 export const landmarkLotId = (city: CityId, t: TerritoryId) => landmarkLotsOf(city).find((l) => l.territory === t)?.id ?? `w:${t}`;

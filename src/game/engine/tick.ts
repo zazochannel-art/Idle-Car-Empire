@@ -1,3 +1,4 @@
+import { HOME_CITY } from "../config/cities";
 import type { GameEvent, GameState } from "../types";
 import { chainTick } from "./chain";
 import { cityTick } from "./city";
@@ -36,7 +37,7 @@ export function tick(s: GameState, dt: number, snap?: EconomySnapshot): GameEven
   constructionTick(s, dt, events);
 
   // the racing team stays in the first city: its prizes and costs go through that city's wallet
-  const race = withCity(s, "home", () => racingTick(s, dt));
+  const race = withCity(s, HOME_CITY, () => racingTick(s, dt));
   if (race) events.push({ type: "raceFinished", race: race.id });
   showroomTick(s, dt, events);
   eventGoalTick(s, s.lastActiveAt);

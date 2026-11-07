@@ -1,3 +1,4 @@
+import { HOME_CITY } from "../config/cities";
 import { createExport, createFleet } from "./expansion";
 import type { GameState } from "../types";
 import { setWorld } from "../city/layout";
@@ -17,9 +18,9 @@ import { createDealers } from "./defaults";
  */
 export function resetRun(s: GameState, now: number) {
   // the first city again, alone
-  s.activeCity = "home";
+  s.activeCity = HOME_CITY;
   s.cities = {};
-  setWorld("home");
+  setWorld(HOME_CITY);
   s.cash = 0;
   s.dealers = createDealers();
   // the charging stations stood at the old dealers

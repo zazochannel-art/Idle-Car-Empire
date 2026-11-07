@@ -1,3 +1,4 @@
+import { HOME_CITY } from "../config/cities";
 import { OFFLINE } from "../config/offline";
 import type { CityId, GameState, OfflineReport } from "../types";
 import { simulateChain } from "./chain";
@@ -95,13 +96,13 @@ function absence(s: GameState, now: number): OfflineReport {
   // the racing team keeps racing (automatic racing only), in the first city: what it
   // wins there waits for COLLECT too, for that city's wallet
   const racing =
-    s.activeCity === "home" || !s.cities.home
+    s.activeCity === HOME_CITY || !s.cities[HOME_CITY]
       ? offlineRacing(s, capped)
-      : withCity(s, "home", () => {
+      : withCity(s, HOME_CITY, () => {
           const before = s.cash;
           const out = offlineRacing(s, capped);
           if (s.cash > before) {
-            addTo(report, "home", s.cash - before);
+            addTo(report, HOME_CITY, s.cash - before);
             s.cash = before;
           }
           return out;
