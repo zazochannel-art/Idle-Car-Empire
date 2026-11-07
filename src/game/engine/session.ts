@@ -11,6 +11,8 @@ import * as Cy from "./cities";
 import * as Cl from "./classics";
 import * as Cn from "./collection";
 import * as K from "./contracts";
+import { refreshSponsors } from "./sponsors";
+import { refreshUsedLot } from "./used-cars";
 import type { EconomySnapshot } from "./economy";
 import { activeEvent } from "./events";
 import * as Ex from "./expansion";
@@ -33,6 +35,8 @@ export type News =
   | { kind: "recall"; result: NonNullable<ReturnType<typeof Ap.autoRecall>> }
   | { kind: "rival"; rival: ReturnType<typeof R.checkRivals>[number] }
   | { kind: "contract"; what: "offer" | "expired" }
+  | { kind: "sponsor"; what: "offer" | "expired" }
+  | { kind: "usedLot" }
   | { kind: "eventStarted"; event: NonNullable<ReturnType<typeof activeEvent>>["event"] }
   | { kind: "daily" }
   | { kind: "vip"; what: "autoAccepted"; client: string }
@@ -91,6 +95,11 @@ export function sessionTick(s: GameState, prev: GameState, dt: number, now: numb
   for (const rival of R.checkRivals(s, now)) news.push({ kind: "rival", rival });
   const deal = K.refreshContracts(s, now, snap);
   if (deal === "offer" || deal === "expired") news.push({ kind: "contract", what: deal });
+  const sponsor = refreshSponsors(s, now);
+  if (sponsor) news.push({ kind: "sponsor", what: sponsor });
+  // the first lot comes in quietly; the later ones say so
+  const hadLot = s.usedCars.lotAt > 0;
+  if (refreshUsedLot(s, now, snap) && hadLot) news.push({ kind: "usedLot" });
   const ev = activeEvent(now);
   if (ev && !activeEvent(prev.lastActiveAt)) news.push({ kind: "eventStarted", event: ev.event });
   if (refreshDaily(s, now, snap)) news.push({ kind: "daily" });

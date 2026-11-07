@@ -126,6 +126,20 @@ body {
 
 /* ───────────── keyframes ───────────── */
 
+/* quality control: a car rolls across the inspection bay */
+@keyframes qc-roll {
+  from {
+    transform: translateX(-120%);
+  }
+  25%,
+  75% {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(120%);
+  }
+}
+
 @keyframes shimmer {
   from {
     background-position: 0 0;

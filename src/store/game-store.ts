@@ -15,6 +15,9 @@ import * as Ch from "@/game/engine/chain";
 import * as Mat from "@/game/engine/materials";
 import { type MaterialId } from "@/game/config/economy";
 import * as K from "@/game/engine/contracts";
+import * as Sp from "@/game/engine/sponsors";
+import * as Uc from "@/game/engine/used-cars";
+import * as Qc from "@/game/engine/quality-check";
 import * as R from "@/game/engine/retention";
 import * as D from "@/game/engine/design";
 import * as L from "@/game/engine/logistics";
@@ -257,6 +260,16 @@ interface GameStore {
   dismissTip: (id: string) => void;
   claimLogin: () => void;
   acceptContract: () => void;
+  /** Racing sponsors (engine/sponsors.ts): sign an offer, turn them down, take a deal's pay. */
+  signDeal: (i: number) => void;
+  declineDeals: () => void;
+  claimDeal: () => void;
+  /** The used-car lot (engine/used-cars.ts): buy a car, refurbish it, sell it. */
+  buyUsedCar: (id: number) => void;
+  refurbishUsedCar: () => void;
+  sellUsedCar: () => void;
+  /** Ends a quality inspection (engine/quality-check.ts) with the cars tapped; returns the score. */
+  finishQc: (round: (Qc.DefectKind | null)[], tapped: number[]) => number | null;
   acceptVip: () => void;
   declineVip: () => void;
   claimVip: () => void;
@@ -1285,6 +1298,38 @@ export const useGame = create<GameStore>((set, get) => {
     acceptContract: () => {
       act((s) => K.acceptContract(s, Date.now()));
       persist(true);
+    },
+    signDeal: (i) => {
+      if (act((s) => Sp.signSponsor(s, i, Date.now()))) persist(true);
+    },
+    declineDeals: () => {
+      act((s) => Sp.declineSponsors(s, Date.now()));
+    },
+    claimDeal: () => {
+      let money: number | null = null;
+      if (!act((s) => (money = Sp.claimSponsor(s, get().snap, Date.now())) !== null)) return;
+      uiEvents.emit({ type: "toast", tone: "gold", icon: "🤝", title: tr("sponsor.paid"), body: formatMoney(money ?? 0) });
+      persist(true);
+    },
+    buyUsedCar: (id) => {
+      if (act((s) => Uc.buyUsed(s, id))) persist(true);
+    },
+    refurbishUsedCar: () => {
+      if (act((s) => Uc.refurbishUsed(s, Date.now()))) persist(true);
+    },
+    sellUsedCar: () => {
+      let price: number | null = null;
+      if (!act((s) => (price = Uc.sellUsed(s, Date.now())) !== null)) return;
+      uiEvents.emit({ type: "toast", tone: "gold", icon: "🚙", title: tr("used.soldToast"), body: formatMoney(price ?? 0) });
+      persist(true);
+    },
+    finishQc: (round, tapped) => {
+      let got: { money: number; score: number } | null = null;
+      if (!act((s) => (got = Qc.finishQc(s, round, tapped, get().snap, Date.now())) !== null)) return null;
+      const r = got as unknown as { money: number; score: number };
+      uiEvents.emit({ type: "toast", tone: "gold", icon: "🔍", title: tr("qc.doneToast", { score: r.score }), body: `+${formatMoney(r.money)}` });
+      persist(true);
+      return r.score;
     },
     declineContract: () => {
       act((s) => K.declineContract(s, Date.now()));

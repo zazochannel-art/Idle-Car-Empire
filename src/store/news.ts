@@ -80,6 +80,13 @@ export function showNews(news: readonly News[], s: GameState) {
       case "rival":
         uiEvents.emit({ type: "toast", kind: "progress", tone: "gold", icon: n.rival.emoji, title: tr("rival.beaten", { name: n.rival.name }), body: tr("rival.beatenBody", { n: n.rival.stars }) });
         break;
+      case "sponsor":
+        if (n.what === "offer") uiEvents.emit({ type: "toast", kind: "clients", tone: "info", icon: "🤝", title: tr("sponsor.offerToast"), body: tr("sponsor.offerToastBody"), action: { label: tr("toast.open"), view: "racing" } });
+        else uiEvents.emit({ type: "toast", kind: "clients", tone: "warn", icon: "⌛", title: tr("sponsor.expired") });
+        break;
+      case "usedLot":
+        uiEvents.emit({ type: "toast", kind: "clients", tone: "info", icon: "🚙", title: tr("used.lotToast"), body: tr("used.lotToastBody"), action: { label: tr("toast.open"), view: "missions" } });
+        break;
       case "contract":
         if (n.what === "offer") uiEvents.emit({ type: "toast", kind: "clients", tone: "info", icon: "📨", title: tr("contract.offerToast"), body: tr("contract.offerToastBody") });
         else uiEvents.emit({ type: "toast", kind: "clients", tone: "warn", icon: "⌛", title: tr("contract.expired") });

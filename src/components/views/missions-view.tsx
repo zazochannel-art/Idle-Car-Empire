@@ -12,6 +12,7 @@ import { MissionRow, MissionStrip, rewardLabel } from "../game/goals";
 import { EventCard, EventGoalCard } from "../game/event-chip";
 import { ContractCard } from "./contract-card";
 import { VipCard } from "./live-cards";
+import { QualityCard, UsedCarsCard } from "./side-cards";
 import { SectionTitle, ViewHeader } from "./section-title";
 
 function untilMidnight() {
@@ -56,6 +57,12 @@ export function MissionsView() {
       <section className="space-y-2">
         <SectionTitle title={t("vip.title")} subtitle={t("vip.subtitle", { n: state.vip.done })} />
         <VipCard />
+      </section>
+
+      <section className="space-y-2">
+        <SectionTitle title={t("side.title")} subtitle={t("side.subtitle")} />
+        <QualityCard />
+        <UsedCarsCard />
       </section>
 
       <section className="space-y-2">

@@ -22,6 +22,9 @@ import { createMapBonus } from "./map-bonus";
 import { createLandmarks } from "./landmarks";
 import { createIap } from "./iap";
 import { createShop } from "./shop";
+import { createSponsors } from "./sponsors";
+import { createUsedCars } from "./used-cars";
+import { createQc } from "./quality-check";
 import type { CarDesign, CarId, ComponentId, GameState, ManagerId, ManagerState, Stats } from "../types";
 import { createDealers, createShowroom } from "./defaults";
 export { createDealers, createShowroom } from "./defaults";
@@ -106,6 +109,9 @@ export function createInitialState(now: number): GameState {
     festival: { key: "", season: "", goals: [], base: null, target: null },
     rivalsBeaten: [],
     contracts: { offer: null, active: null, nextAt: 0, done: 0 },
+    sponsors: createSponsors(),
+    usedCars: createUsedCars(),
+    qc: createQc(),
     logistics: createLogistics(),
     market: { t: 0, bought: 0 },
     mapVersion: MAP_VERSION,
