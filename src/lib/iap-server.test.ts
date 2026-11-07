@@ -212,4 +212,27 @@ describe("the purchases check (functions/iap)", () => {
     res = await post({ productId: "starter_pack", token: "tok-10" }, "Bearer jwt-b");
     expect(res.status).toBe(503);
   });
+
+  it("with CRON_SECRET set, only the schedule's call (with the secret) reads the refunds", async () => {
+    const locked: Env = { ...env, cronSecret: "s3cret-from-the-owner" };
+    const post = (body: unknown, headers: Record<string, string>) =>
+      handle(new Request("https://fn.test/iap", { method: "POST", headers, body: JSON.stringify(body) }), locked, deps);
+
+    // anyone with the public key: turned away before Google Play is asked
+    let res = await post({ action: "voided" }, { Authorization: "Bearer anon-key" });
+    expect(res.status).toBe(401);
+    res = await post({ action: "voided" }, { Authorization: "Bearer anon-key", "x-cron-secret": "s3cret-from-the-owne" });
+    expect(res.status).toBe(401);
+    res = await post({ action: "voided" }, { Authorization: "Bearer anon-key", "x-cron-secret": "s3cret-from-the-owner!" });
+    expect(res.status).toBe(401);
+    expect(calls).not.toContain("iap_voided_mark");
+    // the schedule
+    res = await post({ action: "voided" }, { Authorization: "Bearer anon-key", "x-cron-secret": "s3cret-from-the-owner" });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { configured: boolean }).configured).toBe(true);
+    // a player's purchase check doesn't need it
+    play["tok-11"] = { productId: "starter_pack", purchaseState: 0, obfuscatedExternalAccountId: markOf("user-b") };
+    res = await post({ productId: "starter_pack", token: "tok-11" }, { Authorization: "Bearer jwt-b" });
+    expect([res.status, await res.json()]).toEqual([200, { verdict: "valid" }]);
+  });
 });

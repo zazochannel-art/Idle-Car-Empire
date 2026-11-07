@@ -24,8 +24,8 @@ jobs:
       - name: Call the game's API
         env:
           # the public project and key, the same the apps ship with (android.yml, ios.yml)
-          SUPABASE_URL: https://orffhhsogoymalyogfzl.supabase.co
-          SUPABASE_KEY: sb_publishable_hqGfNt6uaNbq0AgGyp0I8g_QLjjFaJ-
+          SUPABASE_URL: ${{ vars.SUPABASE_URL || 'https://orffhhsogoymalyogfzl.supabase.co' }}
+          SUPABASE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_hqGfNt6uaNbq0AgGyp0I8g_QLjjFaJ-' }}
         run: |
           for i in 1 2 3; do
             code=$(curl -sS -o body.txt -w "%{http_code}" -X POST "$SUPABASE_URL/rest/v1/rpc/track_step" \

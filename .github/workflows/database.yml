@@ -1,0 +1,75 @@
+name: Database
+
+# The database's rules, checked on a local copy of Supabase (supabase/config.toml) with every
+# migration applied from scratch, never on the players' project:
+# - every migration applies on an empty database, in order;
+# - supabase/tests/*.sql: the access, social, alliance, purchase and admin rules;
+# - scripts/cloud-e2e.mjs: the cloud save through the public API, as the game talks to it.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/**"
+      - "src/game/save/**"
+      - "scripts/cloud-e2e.mjs"
+      - ".github/workflows/database.yml"
+  pull_request:
+    paths:
+      - "supabase/**"
+      - "src/game/save/**"
+      - "scripts/cloud-e2e.mjs"
+      - ".github/workflows/database.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: database-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rules:
+    name: Migrations, access rules, cloud save (local Supabase)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Start Supabase with every migration
+        # only the database, the API and sign-in: the rest isn't used here
+        run: supabase start -x studio,imgproxy,vector,logflare,edge-runtime,realtime,storage-api,supavisor,postgres-meta
+      - name: The local project's address and public key
+        run: |
+          supabase status -o env > "$RUNNER_TEMP/sb.env"
+          set -a; . "$RUNNER_TEMP/sb.env"; set +a
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
+            echo "DB_URL=$DB_URL"
+          } >> "$GITHUB_ENV"
+      - name: The rules (supabase/tests)
+        run: |
+          set -e
+          for f in supabase/tests/*.sql; do
+            echo "::group::$f"
+            psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f "$f" 2>&1 | tee "$RUNNER_TEMP/out.txt"
+            echo "::endgroup::"
+            # each file ends by saying its checks passed (a raised FAIL stops psql above)
+            grep -qiE "passed" "$RUNNER_TEMP/out.txt" || { echo "::error::$f did not report its checks as passed"; exit 1; }
+          done
+      - name: The cloud save through the public API
+        run: node scripts/cloud-e2e.mjs
+        env:
+          # the Edge Functions (push, iap) aren't served here: their own tests cover them (src/lib)
+          E2E_FUNCTIONS: "0"
+      - name: Supabase's logs
+        if: failure()
+        run: supabase status || true

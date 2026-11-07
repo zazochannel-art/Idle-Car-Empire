@@ -416,15 +416,25 @@ check(take.error?.code === "42501", "a player can't take the notes to send", tak
 const tokensTable = await a.client.schema("ops").from("push_tokens").select("token");
 check(!!tokensTable.error, "the phones' tokens aren't reachable from the API", tokensTable.error?.code ?? "readable");
 check((await a.client.rpc("forget_push_token", { p_token: phone })).data === true, "a player forgets their own phone");
-// the sender (supabase/functions/push): no call without a key; with one it runs, and until the
-// owner sets Firebase up it sends nothing (docs/push.md)
-const sender = `${url}/functions/v1/push`;
-const noKey = await fetch(sender, { method: "POST" });
-check(noKey.status === 401, "the push sender refuses a call without a key", noKey.status);
-const session = (await a.client.auth.getSession()).data.session;
-const run = await fetch(sender, { method: "POST", headers: { apikey: key, Authorization: `Bearer ${session?.access_token}` } });
-const sent = await run.json().catch(() => null);
-check(run.ok && typeof sent?.configured === "boolean" && sent?.sent >= 0, "the push sender runs", `${run.status} ${JSON.stringify(sent)}`);
+// the sender (supabase/functions/push): no call without a key; with one, it runs until the owner
+// sets CRON_SECRET (docs/push.md, "The schedule's secret"), and from then on only for the
+// schedule, so a player's session is turned away. Until Firebase is set up it sends nothing.
+// Skipped on a local copy without the Edge Functions runtime (E2E_FUNCTIONS=0, database.yml).
+if (process.env.E2E_FUNCTIONS === "0") {
+  console.log("SKIP  the push sender (no Edge Functions here)");
+} else {
+  const sender = `${url}/functions/v1/push`;
+  const noKey = await fetch(sender, { method: "POST" });
+  check(noKey.status === 401, "the push sender refuses a call without a key", noKey.status);
+  const session = (await a.client.auth.getSession()).data.session;
+  const run = await fetch(sender, { method: "POST", headers: { apikey: key, Authorization: `Bearer ${session?.access_token}` } });
+  const sent = await run.json().catch(() => null);
+  if (run.status === 401 && sent?.error === "not allowed") {
+    check(true, "the push sender runs only for the schedule (CRON_SECRET is set)");
+  } else {
+    check(run.ok && typeof sent?.configured === "boolean" && sent?.sent >= 0, "the push sender runs", `${run.status} ${JSON.stringify(sent)}`);
+  }
+}
 
 // ── clean up: each test player deletes its own save (and so its card), then its account: no
 // test account stays on the project (they counted as players on the owner's dashboard) ──

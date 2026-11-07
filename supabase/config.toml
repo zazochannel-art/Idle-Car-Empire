@@ -1,0 +1,32 @@
+# The Supabase CLI's settings for this repository (https://supabase.com/docs/guides/local-development).
+#
+# - `supabase start` runs a local copy of the database with every migration in supabase/migrations:
+#   CI checks the access rules (supabase/tests) and the cloud save (scripts/cloud-e2e.mjs) there,
+#   never on the players' project (.github/workflows/database.yml).
+# - `supabase link --project-ref orffhhsogoymalyogfzl` then `supabase db push` applies new
+#   migrations to the live project and records which ones it has (docs/cloud-save.md, "Migrations").
+#
+# Only the local copy reads the settings below; the live project keeps its own (dashboard).
+project_id = "idle-car-empire"
+
+[db]
+port = 54322
+# the live project's Postgres (Project Settings → Infrastructure); keep them the same
+major_version = 17
+
+[db.seed]
+enabled = false
+
+[api]
+port = 54321
+
+[auth]
+site_url = "https://zazochannel-art.github.io/Idle-Car-Empire/"
+enable_signup = true
+# guests: every player starts as one (docs/cloud-save.md)
+enable_anonymous_sign_ins = true
+
+[auth.email]
+enabled = true
+# registering adds email + password at once, as on the live project without custom SMTP
+enable_confirmations = false

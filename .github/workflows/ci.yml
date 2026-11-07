@@ -17,6 +17,13 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      # known vulnerabilities in what ships in the app (not the dev tools): a warning, never a
+      # stopped build, since a fix can need an upgrade that waits for its own pull request
+      - name: Dependencies' known vulnerabilities
+        run: |
+          if ! npm audit --omit=dev --audit-level=high; then
+            echo "::warning title=npm audit::A dependency the app ships has a known high or critical vulnerability (npm audit --omit=dev above)"
+          fi
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
@@ -24,7 +31,9 @@ jobs:
 
   first-minutes:
     name: A new player's first minutes (browser)
-    runs-on: ubuntu-latest
+    # Playwright 1.56 installs Chromium's system libraries for Ubuntu 24.04, not for 26.04 (now
+    # ubuntu-latest); move on once playwright-core is upgraded to a version that supports it
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4

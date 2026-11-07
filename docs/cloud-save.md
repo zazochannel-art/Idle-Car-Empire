@@ -352,8 +352,32 @@ Functions (all for signed-in players only, `search_path` pinned):
 rights for players: they are reached only through the functions above. A trigger on `game_saves` writes the card after every save
 and removes it with the save.
 
-Apply them in the Supabase dashboard → SQL Editor (paste each file, run), or
-with the Supabase CLI (`supabase db push`).
+### Migrations
+
+Apply them with the Supabase CLI, which records on the project which ones it
+already has, so none is forgotten or run twice:
+
+```bash
+supabase login
+supabase link --project-ref orffhhsogoymalyogfzl
+supabase migration list          # what the project has, against supabase/migrations
+supabase db push                 # applies the ones it doesn't have yet, in order
+```
+
+**Once, before the first `db push`:** the migrations up to now were pasted in
+the SQL Editor, so the project has them without a record of it. Mark the ones
+it has as applied (check the latest one is really there first, e.g.
+`select to_regclass('ops.purchases');` for 0022), and `db push` then runs only
+what is new:
+
+```bash
+supabase migration repair --status applied 0001 0002 0003 0004 0005 0006 0007 0008 0009 0010 0011 0012 0013 0014 0015 0016 0017 0018 0019 0020 0021 0022
+```
+
+Every migration is first checked on an empty local database by CI
+(`.github/workflows/database.yml`). After a push, run **Actions → Cloud save
+(live check)** against the live project. Pasting a file in the SQL Editor
+still works in an emergency; then repair its version the same way.
 
 ## Setup
 
@@ -438,6 +462,11 @@ Level Security. The game doesn't need it.
   uniqueness), a guest from before registering or signing in elsewhere, an
   email still to confirm, a save from before accounts, logout/sign-in,
   offline start, a damaged cloud save.
+The `.sql` files below and `scripts/cloud-e2e.mjs` run in CI on a local copy
+of Supabase with every migration (`.github/workflows/database.yml`, on pull
+requests that touch the database or the save code). Locally: `supabase start`,
+then `psql "$(supabase status -o env | sed -n 's/^DB_URL=//p' | tr -d '"')" -f supabase/tests/access_rules.sql`.
+
 - `supabase/tests/access_rules.sql` — run in the SQL editor: creates two test
   users inside a transaction, checks every access rule as each of them and as
   a signed-out visitor, and rolls everything back. Ends with "all access
@@ -457,8 +486,8 @@ Level Security. The game doesn't need it.
   they appear on the board for a few seconds, under `e2e-…` names, until
   they delete their saves and then their accounts; a third registers with an
   email and a password, signs in with them, then deletes its account).
-  Runs in CI (`.github/workflows/cloud-e2e.yml`) on pull requests that touch
-  the save code or the database, and on demand.
+  Runs in CI on the local copy (`database.yml`), and against the live project
+  only on demand (`.github/workflows/cloud-e2e.yml`).
 
 Before October 2026 the two anonymous test players were kept, named
 `e2e-…`. To remove those left from then (SQL editor; deletes their profiles

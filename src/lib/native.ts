@@ -3,6 +3,7 @@
 // app going to the background and coming back.
 import { App } from "@capacitor/app";
 import { setAdFree } from "./ads";
+import { reportError } from "./errors";
 import { iapConfigured } from "./iap";
 import { cancelAway, scheduleAway } from "./notify";
 import { platform } from "./platform";
@@ -70,11 +71,12 @@ export async function startNative() {
   });
   void cancelAway();
   // rewarded ads, always the player's choice: the consent first, then an ad kept ready
-  void import("./native-ads").then((m) => m.startAds()).catch(() => {});
+  void import("./native-ads").then((m) => m.startAds()).catch((e) => reportError(e, "rejection"));
   // ad-free rewards, for the company that bought them (also on a phone or a build that sells nothing)
   const adFree = () => setAdFree(useGame.getState().ready && useGame.getState().state.iap.owned.includes("adFree"));
   useGame.subscribe(adFree);
   adFree();
   // in-app purchases: Google Play only, and only once the build has its products (docs/android/iap.md)
-  if (platform() === "android" && iapConfigured()) void import("./native-iap").then((m) => m.startIap()).catch(() => {});
+  // a store that fails to start sells nothing: the anonymous error reports say so
+  if (platform() === "android" && iapConfigured()) void import("./native-iap").then((m) => m.startIap()).catch((e) => reportError(e, "rejection"));
 }

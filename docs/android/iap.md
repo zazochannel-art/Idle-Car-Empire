@@ -194,14 +194,17 @@ would hold back every purchase until Google refunds it.
    select cron.schedule('iap-voided', '17 * * * *', $$
      select net.http_post(
        url := 'https://orffhhsogoymalyogfzl.supabase.co/functions/v1/iap',
-       headers := '{"Authorization": "Bearer ANON-KEY", "Content-Type": "application/json"}'::jsonb,
+       headers := '{"Authorization": "Bearer ANON-KEY", "Content-Type": "application/json", "x-cron-secret": "CRON-SECRET"}'::jsonb,
        body := '{"action": "voided"}'::jsonb,
        timeout_milliseconds := 30000
      )
    $$);
    ```
 
-   `ANON-KEY` is the project's **legacy anon key**, as for push.
+   `ANON-KEY` is the project's **legacy anon key**, as for push. `CRON-SECRET` is the value of
+   the `CRON_SECRET` Edge Function secret ([../push.md](../push.md), "The schedule's secret"):
+   once it is set, the refunds read runs only for calls that carry it, so nobody with the
+   public key can spend the Google Play API's quota and hold the hourly check back.
 6. **Turn it on in the builds.** GitHub → Settings → Secrets and variables → Actions →
    Variables → add `IAP_VERIFY` = `1`. The next `Android` and `Play publish` builds check
    every purchase.

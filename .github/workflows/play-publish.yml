@@ -75,8 +75,8 @@ jobs:
         run: npm run build:android
         env:
           # the same public values as android.yml (the store build has no test-build number)
-          NEXT_PUBLIC_SUPABASE_URL: https://orffhhsogoymalyogfzl.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_hqGfNt6uaNbq0AgGyp0I8g_QLjjFaJ-
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.SUPABASE_URL || 'https://orffhhsogoymalyogfzl.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_hqGfNt6uaNbq0AgGyp0I8g_QLjjFaJ-' }}
           NEXT_PUBLIC_ADMOB_REWARDED_ID: ${{ vars.ADMOB_REWARDED_ID }}
           NEXT_PUBLIC_IAP_STARTER_ID: ${{ vars.IAP_STARTER_ID }}
           NEXT_PUBLIC_IAP_ADFREE_ID: ${{ vars.IAP_ADFREE_ID }}

@@ -51,10 +51,16 @@ keystore.properties.txt
 # a build's source maps (SOURCE_MAPS=1, scripts/build-app.mjs)
 /source-maps
 
-# the Android project is its own repository (github.com/zazochannel-art/android)
-/android/
-# Android Studio's files when it opens this folder
+# The Android project lives in android/ and is tracked here (android.yml builds it); its own
+# android/.gitignore keeps its build outputs, the game's copied files and the keys out.
+# Android Studio's files when it opens this folder (open android/ instead):
 /.gradle/
 /.idea/
 /.kotlin/
 /local.properties
+/build.gradle.kts
+/settings.gradle.kts
+/gradle.properties
+/gradlew
+/gradlew.bat
+/gradle/

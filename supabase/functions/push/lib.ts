@@ -87,6 +87,25 @@ export function noteText(lang: unknown, kind: unknown, args: Record<string, unkn
   return null;
 }
 
+/** The header the database's schedule (pg_cron) sends with CRON_SECRET (docs/push.md, docs/android/iap.md). */
+export const CRON_HEADER = "x-cron-secret";
+
+/**
+ * Whether a call may run the schedule's work. The project's public key opens the functions to
+ * anyone, so once the owner sets the CRON_SECRET secret only a call carrying it in CRON_HEADER
+ * runs (compared in constant time). Until it is set every call does, as before, so the existing
+ * schedules keep working while the secret is added.
+ */
+export function scheduleAllowed(req: Request, secret: string | undefined): boolean {
+  if (!secret) return true;
+  const given = req.headers.get(CRON_HEADER) ?? "";
+  const a = new TextEncoder().encode(given);
+  const b = new TextEncoder().encode(secret);
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < b.length; i++) diff |= (a[i] ?? 0) ^ b[i];
+  return diff === 0;
+}
+
 /** A Google service account key (Firebase console → Project settings → Service accounts). */
 export interface ServiceAccount {
   project_id: string;
