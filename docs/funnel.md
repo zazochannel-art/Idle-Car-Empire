@@ -79,9 +79,9 @@ group by step order by array_position(analytics.funnel_order(), step);
 ## Safety
 
 - **Not reachable from the API:** the table and the report are in the `analytics` schema, which the API does not expose, and nobody but the database owner can read them.
-- **One way in:** `public.track_step()` accepts only names from the list and caps minutes at a year. It turns requests away once 600 steps arrived in the last minute (a flood, not players).
+- **One way in:** `public.track_step()` accepts only names from the list and caps minutes at a year. It turns requests away once 300 steps arrived in the last minute (a flood, not players; migration 0023).
 - **Clean test calls:** `ping` answers without writing anything. The live check (`scripts/cloud-e2e.mjs`) uses `ping` and an unknown step, so CI never adds rows.
-- **Old rows:** to keep less history, delete old rows from the SQL Editor, for example:
+- **Old rows:** steps older than a year are removed as new ones come in (0023), so a flood can't fill the database. To keep less history, delete old rows from the SQL Editor, for example:
 
   ```sql
   delete from analytics.funnel_steps where at < now() - interval '180 days';

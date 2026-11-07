@@ -81,14 +81,16 @@ Alternatives, if you'd rather not use Firebase:
    select cron.schedule('push', '*/5 * * * *', $$
      select net.http_post(
        url := 'https://orffhhsogoymalyogfzl.supabase.co/functions/v1/push',
-       headers := '{"Authorization": "Bearer ANON-KEY"}'::jsonb,
+       headers := '{"Authorization": "Bearer ANON-KEY", "x-cron-secret": "CRON-SECRET"}'::jsonb,
        body := '{}'::jsonb,
        timeout_milliseconds := 30000
      )
    $$);
    ```
 
-   Replace `ANON-KEY` with the project's **legacy anon key**: Project Settings → API Keys → Legacy API keys, the `anon` `public` one. It is a public key, the same kind the app has. The function refuses calls without a key. A player's key also works, but a call only sends sooner what is already queued.
+   Replace `ANON-KEY` with the project's **legacy anon key**: Project Settings → API Keys → Legacy API keys, the `anon` `public` one. It is a public key, the same kind the app has. The function refuses calls without a key.
+
+   Replace `CRON-SECRET` with the value of the `CRON_SECRET` secret (Edge Functions → Secrets; see "The schedule's secret" below). With it set, the sender runs only for calls that carry it: the public key alone no longer starts it.
 6. **Build and release a new app version** (Android workflow, then Play). Players get server notifications once they have that version and notifications on.
 7. **Update Play Console's Data safety** (see [android/play-store.md](android/play-store.md)). Add **Device or other IDs**:
    - collected, not shared;
@@ -117,6 +119,29 @@ Alternatives, if you'd rather not use Firebase:
   ```sql
   select ops.push_note((select id from auth.users where email = 'YOUR-EMAIL'), 'cup');
   ```
+
+## The schedule's secret
+
+The public key opens the functions to anyone who has the app. Their scheduled work (this sender,
+and the refunds read of the purchases check, [android/iap.md](android/iap.md)) therefore runs only
+for calls carrying a secret of the owner's:
+
+1. Make a long random value, for example `openssl rand -hex 32`.
+2. Supabase → Edge Functions → **Secrets** → add `CRON_SECRET` with it.
+3. Give the schedules the same value in their `x-cron-secret` header. For a schedule that already
+   runs, in the SQL Editor:
+
+   ```sql
+   select cron.unschedule('push');
+   -- then the cron.schedule(...) of step 5 above, with "x-cron-secret": "CRON-SECRET" in its headers
+   ```
+
+   and the same for `iap-voided` ([android/iap.md](android/iap.md), step 5).
+4. Check it: `select created, status_code from net._http_response order by created desc limit 5;`
+   shows 200s; a call without the header answers 401.
+
+Until `CRON_SECRET` is set the functions run for every call, as before, so adding it never
+stops a schedule that already works: set the secret and update the schedules in the same sitting.
 
 ## Turning it off
 

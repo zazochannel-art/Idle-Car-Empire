@@ -25,6 +25,12 @@ export interface Env {
   packageName: string;
   /** The game's products by their Google Play product id. */
   products: Record<string, IapProduct>;
+  /**
+   * CRON_SECRET: once set, the refunds read ({"action": "voided"}) runs only for a call that
+   * carries it in the x-cron-secret header (the database's schedule), not for anyone with the
+   * project's public key.
+   */
+  cronSecret?: string;
 }
 
 export interface Deps {
@@ -47,6 +53,21 @@ export interface Deps {
  *   other_account  bought for another game account: don't give it
  */
 export type Verdict = "valid" | "pending" | "refunded" | "invalid" | "taken" | "other_account";
+
+/**
+ * Whether a call may run the schedule's work (the refunds read): once CRON_SECRET is set, only a
+ * call with it in the x-cron-secret header, compared in constant time; until then every call, as
+ * before. The same check as the push sender's (functions/push/lib.ts): this file imports nothing,
+ * so the game's tests run it in Node and Supabase in Deno.
+ */
+export function scheduleAllowed(req: Request, secret: string | undefined): boolean {
+  if (!secret) return true;
+  const a = new TextEncoder().encode(req.headers.get("x-cron-secret") ?? "");
+  const b = new TextEncoder().encode(secret);
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < b.length; i++) diff |= (a[i] ?? 0) ^ b[i];
+  return diff === 0;
+}
 
 const API = "https://androidpublisher.googleapis.com/androidpublisher/v3/applications";
 
@@ -198,7 +219,10 @@ export async function handle(req: Request, env: Env, deps: Deps): Promise<Respon
   if (req.method !== "POST") return json({ error: "method" }, 405);
   const body = (await req.json().catch(() => null)) as { action?: unknown; productId?: unknown; token?: unknown } | null;
   try {
-    if (body?.action === "voided") return json(await readVoided(env, deps));
+    if (body?.action === "voided") {
+      if (!scheduleAllowed(req, env.cronSecret)) return json({ error: "not allowed" }, 401);
+      return json(await readVoided(env, deps));
+    }
     const user = await userOf(env, deps.fetch, req.headers.get("Authorization"));
     if (!user) return json({ error: "not signed in" }, 401);
     if (!(await deps.accessToken())) return json({ error: "not configured" }, 503);

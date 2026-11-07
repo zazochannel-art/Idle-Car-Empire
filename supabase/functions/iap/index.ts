@@ -9,6 +9,7 @@ const env = {
   serviceKey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
   packageName: Deno.env.get("PLAY_PACKAGE_NAME")?.trim() || "com.zazochannel.idlecarempire",
   products: productsFrom(Deno.env.get("IAP_STARTER_ID"), Deno.env.get("IAP_ADFREE_ID")),
+  cronSecret: Deno.env.get("CRON_SECRET") || undefined,
 };
 
 // an access token lasts an hour: kept while this instance lives, renewed 5 minutes before

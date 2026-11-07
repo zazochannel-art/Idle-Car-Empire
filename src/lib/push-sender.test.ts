@@ -8,7 +8,8 @@ import { LANGS } from "@/i18n";
 import { ptContent } from "@/i18n/pt";
 import { roContent } from "@/i18n/ro";
 import { ruContent } from "@/i18n/ru";
-import { BATCH, EVENTS, noteText, parseServiceAccount, runPush, TEXTS, type Env } from "../../supabase/functions/push/lib";
+import { BATCH, CRON_HEADER, EVENTS, noteText, parseServiceAccount, runPush, scheduleAllowed, TEXTS, type Env } from "../../supabase/functions/push/lib";
+import { scheduleAllowed as iapScheduleAllowed } from "../../supabase/functions/iap/lib";
 
 const b64 = (bytes: ArrayBuffer) => Buffer.from(bytes).toString("base64");
 const unb64url = (s: string) => Buffer.from(s.replace(/-/g, "+").replace(/_/g, "/"), "base64");
@@ -49,6 +50,21 @@ function fakeServer(answers: { take?: unknown[]; fcm?: (token: string) => Respon
 const env = (serviceAccount?: string): Env => ({ supabaseUrl: "https://orffhhsogoymalyogfzl.supabase.co/", serviceKey: "service-key", serviceAccount });
 
 describe("push sender", () => {
+  it("runs only for the schedule once CRON_SECRET is set (and the purchases check agrees)", () => {
+    const req = (secret?: string) => new Request("https://fn.test/push", { method: "POST", headers: secret === undefined ? {} : { [CRON_HEADER]: secret } });
+    for (const allowed of [scheduleAllowed, iapScheduleAllowed]) {
+      // not set yet: every call, as before
+      expect(allowed(req(), undefined)).toBe(true);
+      expect(allowed(req(), "")).toBe(true);
+      // set: the exact secret only
+      expect(allowed(req("owner-secret"), "owner-secret")).toBe(true);
+      expect(allowed(req(), "owner-secret")).toBe(false);
+      expect(allowed(req("owner-secre"), "owner-secret")).toBe(false);
+      expect(allowed(req("owner-secret2"), "owner-secret")).toBe(false);
+      expect(allowed(req("OWNER-SECRET"), "owner-secret")).toBe(false);
+    }
+  });
+
   it("until Firebase is set up: queues, counts what waits, sends nothing", async () => {
     const server = fakeServer({ take: [{ token: "t1", lang: "en", kind: "cup", args: {} }] });
     const report = await runPush(env(), server.fetch);

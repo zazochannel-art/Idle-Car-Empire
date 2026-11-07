@@ -33,8 +33,8 @@ jobs:
         run: npm run build:ios
         env:
           # the public Supabase project and key (the same as the Android app's)
-          NEXT_PUBLIC_SUPABASE_URL: https://orffhhsogoymalyogfzl.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_hqGfNt6uaNbq0AgGyp0I8g_QLjjFaJ-
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.SUPABASE_URL || 'https://orffhhsogoymalyogfzl.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_hqGfNt6uaNbq0AgGyp0I8g_QLjjFaJ-' }}
           # the iOS rewarded ad unit of the AdMob account, a repository variable (docs/ios.md);
           # unset: Google's test ads
           NEXT_PUBLIC_ADMOB_REWARDED_ID_IOS: ${{ vars.ADMOB_REWARDED_ID_IOS }}

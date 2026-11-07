@@ -17,6 +17,13 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      # known vulnerabilities in what ships in the app (not the dev tools): a warning, never a
+      # stopped build, since a fix can need an upgrade that waits for its own pull request
+      - name: Dependencies' known vulnerabilities
+        run: |
+          if ! npm audit --omit=dev --audit-level=high; then
+            echo "::warning title=npm audit::A dependency the app ships has a known high or critical vulnerability (npm audit --omit=dev above)"
+          fi
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
