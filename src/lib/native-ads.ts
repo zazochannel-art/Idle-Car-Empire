@@ -5,7 +5,7 @@
 // requires it (the EEA, the UK, Switzerland) and no ad is requested before it
 // allows. Then one ad is kept loaded, so the game offers an ad only when there
 // is one to watch.
-import { AdMob, AdmobConsentStatus, MaxAdContentRating, RewardAdPluginEvents } from "@capacitor-community/admob";
+import { AdMob, AdmobConsentDebugGeography, AdmobConsentStatus, MaxAdContentRating, RewardAdPluginEvents } from "@capacitor-community/admob";
 import { App } from "@capacitor/app";
 import { registerAdDriver, setAdStatus, type AdResult } from "./ads";
 import { platform } from "./platform";
@@ -117,8 +117,14 @@ export function startAds(): Promise<void> {
 
 async function begin() {
   registerAdDriver({ show, privacyForm });
+  // a test build (its app id ends in ".debug", like the test APK the CI emulator plays) is never real
+  // ad traffic: its consent check pretends to be outside the regulated regions. Google treats only
+  // emulators and registered test devices that way, so a phone running a test build is unaffected.
+  // Without this the emulator, run from a data centre in the EEA, waited for a consent form its
+  // browser can't show and never got to the ad (the Android workflow's "rewarded ad" check).
+  const testBuild = !!(await App.getInfo().catch(() => null))?.id.endsWith(".debug");
   try {
-    let info = await AdMob.requestConsentInfo();
+    let info = await AdMob.requestConsentInfo(testBuild ? { debugGeography: AdmobConsentDebugGeography.OTHER } : undefined);
     if (info.status === AdmobConsentStatus.REQUIRED && info.isConsentFormAvailable) info = await AdMob.showConsentForm();
     // (the plugin declares this enum but doesn't export it: compared by its value)
     setAdStatus({ privacyOptions: String(info.privacyOptionsRequirementStatus) === "REQUIRED" });
@@ -151,6 +157,6 @@ async function begin() {
   await AdMob.initialize({ maxAdContentRating: MaxAdContentRating.Teen });
   // a test build (its app id ends in ".debug", like the test APK anyone may download) shows
   // Google's test ads whatever unit it was built with: playing it is never real ad traffic
-  if ((await App.getInfo().catch(() => null))?.id.endsWith(".debug")) unit = TEST_UNIT;
+  if (testBuild) unit = TEST_UNIT;
   void load();
 }

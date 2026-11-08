@@ -5,15 +5,20 @@ const listeners = new Map<string, (data?: unknown) => void>();
 let answerShow: { resolve: (v: unknown) => void; reject: (e: unknown) => void } | null = null;
 const shows = vi.fn();
 const prepares = vi.fn();
+const consentRequests = vi.hoisted(() => vi.fn());
 // a build with a real ad unit, installed as the test app (the test APK)
 process.env.NEXT_PUBLIC_ADMOB_REWARDED_ID = "ca-app-pub-0000000000000000/0000000000";
 vi.mock("@capacitor/app", () => ({ App: { getInfo: async () => ({ id: "com.zazochannel.idlecarempire.debug" }) } }));
 vi.mock("@capacitor-community/admob", () => ({
   AdmobConsentStatus: { REQUIRED: "REQUIRED" },
+  AdmobConsentDebugGeography: { OTHER: 4 },
   MaxAdContentRating: { Teen: "Teen" },
   RewardAdPluginEvents: { Showed: "showed", Rewarded: "rewarded", Dismissed: "dismissed", FailedToShow: "failedToShow" },
   AdMob: {
-    requestConsentInfo: async () => ({ status: "NOT_REQUIRED", canRequestAds: true, privacyOptionsRequirementStatus: "NOT_REQUIRED" }),
+    requestConsentInfo: async (options?: unknown) => {
+      consentRequests(options);
+      return { status: "NOT_REQUIRED", canRequestAds: true, privacyOptionsRequirementStatus: "NOT_REQUIRED" };
+    },
     initialize: async () => {},
     addListener: async (event: string, fn: (data?: unknown) => void) => {
       listeners.set(event, fn);
@@ -48,6 +53,8 @@ afterEach(async () => {
 
 describe("rewarded ads in the app", () => {
   it("the test app shows Google's test ads, whatever unit it was built with", () => {
+    // and its consent check pretends to be outside the regulated regions (the CI emulator sits in the EEA)
+    expect(consentRequests).toHaveBeenCalledWith({ debugGeography: 4 });
     expect(prepares).toHaveBeenCalled();
     for (const [options] of prepares.mock.calls) expect(options).toEqual({ adId: "ca-app-pub-3940256099942544/5224354917", isTesting: true });
   });
