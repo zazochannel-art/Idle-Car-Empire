@@ -1,0 +1,185 @@
+{
+  "id": "02",
+  "slug": "from-zero-to-tycoon",
+  "title": "From Zero to Tycoon",
+  "category": "standard",
+  "music": {
+    "preset": "drive",
+    "bpm": 118,
+    "seed": 22
+  },
+  "hooks": [
+    "Started with **nothing**...",
+    "Every **empire** starts small.",
+    "Zero to **tycoon**. Watch this."
+  ],
+  "endings": [
+    {
+      "text": "CAN YOU BECOME A **CAR TYCOON**?"
+    },
+    {
+      "text": "START YOUR **CLIMB** TODAY"
+    },
+    {
+      "text": "GO FROM ZERO TO **TYCOON**"
+    }
+  ],
+  "captions": {
+    "A": [
+      "One small factory to start",
+      "Level 1. Small Car Body Works.",
+      "Upgrade every plant through **15 levels**",
+      "A whole **supply chain**, all yours",
+      "Design and sell **23 car models**",
+      "Late game: **$1.3B** and counting"
+    ],
+    "B": [
+      "Just a few thousand dollars",
+      "One worker. One workbench.",
+      "Level up. **Expand.** Repeat.",
+      "Factories that feed each other",
+      "From city cars to **hypercars**",
+      "Your empire never stops growing"
+    ]
+  },
+  "scenes": [
+    {
+      "source": "clip:early-factory",
+      "fallback": "early-1",
+      "dur": 5.0,
+      "layout": "phone",
+      "caption_pos": "upper"
+    },
+    {
+      "source": "clip:early-small-body-works",
+      "fallback": "early-2",
+      "dur": 4.4,
+      "layout": "phone",
+      "caption_pos": "upper",
+      "bg_variant": 1,
+      "transition": "push_left",
+      "transition_dur": 0.35
+    },
+    {
+      "source": "clip:factory-interior",
+      "fallback": "ph-factory",
+      "dur": 4.4,
+      "camera": {
+        "from": [
+          0.5,
+          0.45,
+          1.12
+        ],
+        "to": [
+          0.5,
+          0.68,
+          1.12
+        ]
+      },
+      "chip": "15 upgrade levels",
+      "transition": "wipe",
+      "transition_dur": 0.35
+    },
+    {
+      "source": "clip:map-traffic",
+      "fallback": "tab-map",
+      "dur": 4.4,
+      "camera": {
+        "from": [
+          0.28,
+          0.55,
+          1.15
+        ],
+        "to": [
+          0.72,
+          0.5,
+          1.15
+        ]
+      },
+      "transition": "zoom_punch",
+      "transition_dur": 0.4
+    },
+    {
+      "source": "clip:car-models",
+      "fallback": "ph-models",
+      "dur": 4.0,
+      "camera": {
+        "from": [
+          0.5,
+          0.5,
+          1.0
+        ],
+        "to": [
+          0.5,
+          0.5,
+          1.0
+        ]
+      },
+      "caption_pos": "upper",
+      "chip": "23 car models",
+      "chip_pos": "bottom",
+      "transition": "push_up",
+      "transition_dur": 0.35
+    },
+    {
+      "source": "clip:map-overview",
+      "fallback": "ph-map",
+      "dur": 3.6,
+      "camera": {
+        "from": [
+          0.5,
+          0.6,
+          1.0
+        ],
+        "to": [
+          0.5,
+          0.64,
+          1.14
+        ]
+      },
+      "transition": "flash",
+      "transition_dur": 0.3
+    }
+  ],
+  "endcard": {
+    "dur": 3.8,
+    "transition": "flash",
+    "transition_dur": 0.35
+  },
+  "descriptions": {
+    "tiktok": "Started with nothing… 🏭➡️🚗 Watch a small workshop grow into a car empire in Idle Car Empire. Free on Google Play – link in bio!",
+    "youtube_shorts": "From zero to tycoon in Idle Car Empire – a free idle tycoon for Android. Start with one small factory, upgrade every plant, build the supply chain and sell your own cars. Get it free on Google Play: https://play.google.com/store/apps/details?id=com.zazochannel.idlecarempire",
+    "instagram": "Started with nothing… 🚗🏭 One small workshop, a few thousand dollars and a plan. Can you become a car tycoon in Idle Car Empire? Free on Google Play – link in bio."
+  },
+  "hashtags": {
+    "common": [
+      "#IdleCarEmpire",
+      "#idlegame",
+      "#tycoongame",
+      "#carfactory",
+      "#androidgames",
+      "#mobilegaming"
+    ],
+    "tiktok": [
+      "#fyp",
+      "#gamingtok",
+      "#mobilegame",
+      "#cargame",
+      "#tycoon"
+    ],
+    "youtube_shorts": [
+      "#Shorts",
+      "#GameShorts",
+      "#IdleGames",
+      "#CarTycoon",
+      "#Tycoon"
+    ],
+    "instagram": [
+      "#reels",
+      "#gamingreels",
+      "#mobilegames",
+      "#cars",
+      "#tycoon"
+    ]
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "Idle Car Empire",
+  "slogan": "BUILD. PRODUCE. EXPAND. DOMINATE.",
+  "play_url": "https://play.google.com/store/apps/details?id=com.zazochannel.idlecarempire",
+  "package": "com.zazochannel.idlecarempire",
+  "colors": {
+    "accent_yellow": "#FFC828",
+    "ink_navy": "#0A0E1E",
+    "brand_blue": "#164696"
+  },
+  "fonts": {
+    "display": "Barlow Condensed (Black / ExtraBold / Bold), SIL OFL 1.1, same family as the game UI"
+  },
+  "logo": "assets/logos/logo-cutout.png (falls back to ../../assets/logo-cutout.webp in the game repo)",
+  "claims_allowed": [
+    "20 kinds of factories",
+    "23 car models",
+    "upgrade every plant through 15 levels",
+    "step inside your factories: machines, workers and assembly lines at work",
+    "trucks carry every part across a living 3D city",
+    "factories keep producing while you are offline",
+    "research up to electric and self-driving cars",
+    "race your cars; leaderboards, alliances, missions",
+    "free to download",
+    "English, Romanian, Russian, Spanish, Portuguese, German"
+  ],
+  "claims_note": "Copy in videos must stay inside this list (taken from fastlane/metadata/android/en-US/full_description.txt). Do not add features that are not in the game."
+}

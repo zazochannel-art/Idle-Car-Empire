@@ -1,0 +1,531 @@
+{
+  "video_id": "04",
+  "slug": "factory-expansion",
+  "title": "Factory Expansion",
+  "category": "short",
+  "platform": "tiktok",
+  "file": "video-04-factory-expansion.mp4",
+  "game": {
+    "name": "Idle Car Empire",
+    "play_url": "https://play.google.com/store/apps/details?id=com.zazochannel.idlecarempire",
+    "slogan": "BUILD. PRODUCE. EXPAND. DOMINATE."
+  },
+  "generated_at": "2026-11-08T23:18:52+00:00",
+  "tools": {
+    "ffmpeg": "ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers",
+    "python": "3.13.18",
+    "pillow": "12.3.0"
+  },
+  "rendered_variant": {
+    "hook": {
+      "index": 1,
+      "text": "One factory is never enough!"
+    },
+    "ending": {
+      "index": 1,
+      "text": "EXPAND YOUR EMPIRE"
+    },
+    "captions": {
+      "set": "A",
+      "lines": [
+        "Buy land. Build the next factory",
+        "Factory after factory",
+        "Each one feeds the next",
+        "Research unlocks new tech"
+      ]
+    }
+  },
+  "variants": {
+    "hooks": [
+      "One factory is never enough!",
+      "Why stop at one factory?",
+      "More land. More factories. More cars."
+    ],
+    "alternative_endings": [
+      "EXPAND YOUR EMPIRE",
+      "BUILD THE NEXT FACTORY",
+      "KEEP EXPANDING"
+    ],
+    "caption_variations": {
+      "A": [
+        "Buy land. Build the next factory",
+        "Factory after factory",
+        "Each one feeds the next",
+        "Research unlocks new tech"
+      ],
+      "B": [
+        "With more money, build more",
+        "A whole city of plants",
+        "Parts in, cars out",
+        "Unlock electric and self-driving"
+      ]
+    },
+    "render_another_variant": "python scripts/render.py 04 --platform tiktok --hook 2 --ending 2 --captions B"
+  },
+  "description": "One factory is never enough! 🏭🏭🏭 Buy land, build the next plant and grow a whole supply chain in Idle Car Empire. Free on Google Play – link in bio!",
+  "descriptions": {
+    "tiktok": "One factory is never enough! 🏭🏭🏭 Buy land, build the next plant and grow a whole supply chain in Idle Car Empire. Free on Google Play – link in bio!",
+    "youtube_shorts": "One factory is never enough – expand your car empire in Idle Car Empire, a free idle tycoon for Android: buy land, build new plants and upgrade every one. Get it free on Google Play: https://play.google.com/store/apps/details?id=com.zazochannel.idlecarempire",
+    "instagram": "One factory is never enough! 🏭🚗 Expand your empire in Idle Car Empire. Free on Google Play – link in bio."
+  },
+  "hashtags": {
+    "platform": [
+      "#IdleCarEmpire",
+      "#idlegame",
+      "#tycoongame",
+      "#carfactory",
+      "#androidgames",
+      "#mobilegaming",
+      "#fyp",
+      "#gamingtok",
+      "#mobilegame",
+      "#cargame",
+      "#expansion"
+    ],
+    "common": [
+      "#IdleCarEmpire",
+      "#idlegame",
+      "#tycoongame",
+      "#carfactory",
+      "#androidgames",
+      "#mobilegaming"
+    ],
+    "tiktok": [
+      "#fyp",
+      "#gamingtok",
+      "#mobilegame",
+      "#cargame",
+      "#expansion"
+    ],
+    "youtube_shorts": [
+      "#Shorts",
+      "#GameShorts",
+      "#IdleGames",
+      "#CarTycoon",
+      "#Expand"
+    ],
+    "instagram": [
+      "#reels",
+      "#gamingreels",
+      "#mobilegames",
+      "#cars",
+      "#expansion"
+    ]
+  },
+  "post_text": "One factory is never enough! 🏭🏭🏭 Buy land, build the next plant and grow a whole supply chain in Idle Car Empire. Free on Google Play – link in bio!\n\n#IdleCarEmpire #idlegame #tycoongame #carfactory #androidgames #mobilegaming #fyp #gamingtok #mobilegame #cargame #expansion",
+  "safe_zone_px": {
+    "top": 150,
+    "bottom": 480,
+    "left": 60,
+    "right": 140
+  },
+  "footage": {
+    "sources_used": [
+      "early-2",
+      "ph-map",
+      "ph-research",
+      "tab-map"
+    ],
+    "provenance": {
+      "early-2": {
+        "origin": "In-game capture of the first minutes (tutorial step 3/4 'Build more factories'), Small Car Body Works LV 1",
+        "type": "screenshot",
+        "description": "Early game: Small Car Body Works (LV 1, 1 worker at a workbench) with tutorial 'Build more factories'. Low resolution (390x844)."
+      },
+      "ph-map": {
+        "origin": "Google Play store listing screenshot (real in-game capture, fastlane/metadata/android/en-US)",
+        "type": "screenshot",
+        "description": "Map view of a late-game empire: factories, Parts Market, Materials Depot, trucks on the roads."
+      },
+      "ph-research": {
+        "origin": "Google Play store listing screenshot (real in-game capture, fastlane/metadata/android/en-US)",
+        "type": "screenshot",
+        "description": "Research Lab: Engineering, Automation and Electric technologies."
+      },
+      "tab-map": {
+        "origin": "Google Play store listing screenshot (real in-game capture, fastlane/metadata/android/en-US)",
+        "type": "screenshot",
+        "description": "10-inch capture of the map: labelled factories (Glass Factory, Parts Market, Car Body Works, Tire Factory, Engine Factory, Economy Dealer), traffic on roads."
+      }
+    },
+    "notes": [
+      "scene 1: preferred source 'clip:expansion-build' not available, using 'early-2'",
+      "scene 2: preferred source 'clip:map-traffic' not available, using 'tab-map'",
+      "scene 3: preferred source 'clip:map-overview' not available, using 'ph-map'",
+      "scene 4: preferred source 'clip:research' not available, using 'ph-research'"
+    ],
+    "statement": "Built only from registered real in-game captures; no gameplay or feature is simulated."
+  },
+  "ffmpeg_command": [
+    "ffmpeg",
+    "-y",
+    "-v",
+    "error",
+    "-f",
+    "rawvideo",
+    "-pix_fmt",
+    "rgb24",
+    "-s",
+    "1080x1920",
+    "-r",
+    "30",
+    "-i",
+    "-",
+    "-i",
+    "/home/user/idle-car-empire/marketing/video-creator/output/.cache/v04_88c92f77f08d.wav",
+    "-map",
+    "0:v:0",
+    "-map",
+    "1:a:0",
+    "-vf",
+    "scale=out_color_matrix=bt709:out_range=tv,format=yuv420p",
+    "-c:v",
+    "libx264",
+    "-preset",
+    "medium",
+    "-crf",
+    "18",
+    "-profile:v",
+    "high",
+    "-level",
+    "4.2",
+    "-pix_fmt",
+    "yuv420p",
+    "-maxrate",
+    "14M",
+    "-bufsize",
+    "28M",
+    "-g",
+    "60",
+    "-bf",
+    "2",
+    "-r",
+    "30",
+    "-colorspace",
+    "bt709",
+    "-color_primaries",
+    "bt709",
+    "-color_trc",
+    "bt709",
+    "-c:a",
+    "aac",
+    "-b:a",
+    "192k",
+    "-ar",
+    "48000",
+    "-ac",
+    "2",
+    "-t",
+    "18.050",
+    "-movflags",
+    "+faststart",
+    "-metadata",
+    "title=Factory Expansion – Idle Car Empire",
+    "-metadata",
+    "comment=https://play.google.com/store/apps/details?id=com.zazochannel.idlecarempire",
+    "/home/user/idle-car-empire/marketing/video-creator/output/tiktok/.video-04-factory-expansion.partial.mp4"
+  ],
+  "layout": {
+    "scenes": [
+      {
+        "idx": 0,
+        "start": 0.0,
+        "end": 5.0,
+        "source": "early-2",
+        "fallback": true,
+        "layout": "phone"
+      },
+      {
+        "idx": 1,
+        "start": 4.65,
+        "end": 8.85,
+        "source": "tab-map",
+        "fallback": true,
+        "layout": "full"
+      },
+      {
+        "idx": 2,
+        "start": 8.5,
+        "end": 12.1,
+        "source": "ph-map",
+        "fallback": true,
+        "layout": "full"
+      },
+      {
+        "idx": 3,
+        "start": 11.8,
+        "end": 15.0,
+        "source": "ph-research",
+        "fallback": true,
+        "layout": "full"
+      },
+      {
+        "idx": 4,
+        "start": 14.65,
+        "end": 18.05,
+        "source": "endcard",
+        "fallback": false,
+        "layout": "endcard"
+      }
+    ],
+    "text_elements": [
+      {
+        "role": "hook",
+        "text": "One factory is never enough!",
+        "font_px": 176,
+        "words": 5,
+        "box": [
+          111.5,
+          315.9,
+          888.5,
+          912.9
+        ],
+        "t0": 0.12,
+        "t1": 2.5,
+        "scene": 0
+      },
+      {
+        "role": "caption",
+        "text": "Buy land. Build the next factory",
+        "font_px": 92,
+        "words": 6,
+        "box": [
+          143.0,
+          240,
+          857.0,
+          502
+        ],
+        "t0": 2.55,
+        "t1": 4.7,
+        "scene": 0
+      },
+      {
+        "role": "caption",
+        "text": "Factory after factory",
+        "font_px": 92,
+        "words": 3,
+        "box": [
+          99.0,
+          1259,
+          901.0,
+          1410
+        ],
+        "t0": 5.175,
+        "t1": 8.55,
+        "scene": 1
+      },
+      {
+        "role": "chip",
+        "text": "20 kinds of factories",
+        "font_px": 60,
+        "words": 4,
+        "box": [
+          70,
+          160,
+          652,
+          256
+        ],
+        "t0": 5.55,
+        "t1": 8.5,
+        "scene": 1
+      },
+      {
+        "role": "caption",
+        "text": "Each one feeds the next",
+        "font_px": 92,
+        "words": 5,
+        "box": [
+          133.0,
+          1148,
+          867.0,
+          1410
+        ],
+        "t0": 9.025,
+        "t1": 11.85,
+        "scene": 2
+      },
+      {
+        "role": "caption",
+        "text": "Research unlocks new tech",
+        "font_px": 92,
+        "words": 4,
+        "box": [
+          156.0,
+          240,
+          844.0,
+          502
+        ],
+        "t0": 12.3,
+        "t1": 14.7,
+        "scene": 3
+      },
+      {
+        "role": "endcard-main",
+        "text": "endcard-main",
+        "font_px": 150,
+        "words": 0,
+        "box": [
+          119.0,
+          760,
+          881.0,
+          1104
+        ],
+        "t0": 15.15,
+        "t1": 18.05,
+        "scene": 4
+      },
+      {
+        "role": "endcard-sub",
+        "text": "endcard-sub",
+        "font_px": 70,
+        "words": 0,
+        "box": [
+          83.0,
+          1130,
+          917.0,
+          1214
+        ],
+        "t0": 15.15,
+        "t1": 18.05,
+        "scene": 4
+      },
+      {
+        "role": "endcard-button",
+        "text": "endcard-button",
+        "font_px": 0,
+        "words": 0,
+        "box": [
+          80.0,
+          1248,
+          920.0,
+          1398
+        ],
+        "t0": 15.15,
+        "t1": 18.05,
+        "scene": 4
+      }
+    ]
+  },
+  "qc": {
+    "status": "warn",
+    "checks": [
+      {
+        "name": "source_is_real_gameplay",
+        "status": "pass",
+        "detail": "4 registered real sources used: early-2, ph-map, ph-research, tab-map"
+      },
+      {
+        "name": "source_type",
+        "status": "warn",
+        "detail": "4 scene(s) use still screenshots (no screen recording registered yet)"
+      },
+      {
+        "name": "video_format",
+        "status": "pass",
+        "detail": "h264 High 1080x1920 yuv420p 30/1 fps sar 1:1"
+      },
+      {
+        "name": "aspect_ratio_9x16",
+        "status": "pass",
+        "detail": "0.5625 (9:16 = 0.5625)"
+      },
+      {
+        "name": "audio_format",
+        "status": "pass",
+        "detail": "{'codec': 'aac', 'sample_rate': 48000, 'channels': 2}"
+      },
+      {
+        "name": "duration_in_range",
+        "status": "pass",
+        "detail": "18.067s (category 'short' = 15-20s)"
+      },
+      {
+        "name": "duration_matches_plan",
+        "status": "pass",
+        "detail": "18.067s vs planned 18.05s"
+      },
+      {
+        "name": "platform_limit",
+        "status": "pass",
+        "detail": "18.067s ≤ 180s"
+      },
+      {
+        "name": "plays_back_cleanly",
+        "status": "pass",
+        "detail": "full decode rc=0, 542 frames (expected 542) "
+      },
+      {
+        "name": "av_sync_length",
+        "status": "pass",
+        "detail": "audio/video length differ by 0.017s"
+      },
+      {
+        "name": "audio_loudness",
+        "status": "pass",
+        "detail": "integrated -14.2 LUFS (target -14.0 ±1.5), LRA 2.9 LU"
+      },
+      {
+        "name": "audio_true_peak",
+        "status": "pass",
+        "detail": "true peak -2.7 dBTP (limit -1.0)"
+      },
+      {
+        "name": "no_dead_air",
+        "status": "pass",
+        "detail": "0 silent gap(s) > 0.8 s"
+      },
+      {
+        "name": "text_inside_platform_safe_zone",
+        "status": "pass",
+        "detail": "9 text elements checked against tiktok safe box [60, 150, 940, 1440]"
+      },
+      {
+        "name": "subtitle_font_size",
+        "status": "pass",
+        "detail": "min sizes {'hook': 176, 'caption': 92, 'chip': 60, 'endcard-main': 150, 'endcard-sub': 70}"
+      },
+      {
+        "name": "subtitle_reading_speed",
+        "status": "pass",
+        "detail": "all on-screen text stays ≤ 4 words/s"
+      },
+      {
+        "name": "text_vs_gameplay_overlap",
+        "status": "pass",
+        "detail": "worst case: 'Each one feeds the next' @ 9.5s covers 4% of the key area of ph-map (warn >18%, fail >30%)"
+      },
+      {
+        "name": "no_black_borders",
+        "status": "pass",
+        "detail": "edge strips of 59 sampled gameplay frames: top 10, bottom 0, left 0, right 0 black"
+      },
+      {
+        "name": "subtitle_contrast",
+        "status": "pass",
+        "detail": "6 text blocks measured on real frames, lowest 10.3:1 ('Research unlocks new tec' caption @ 14.25s); need ≥ 3.0:1 (large text)"
+      }
+    ],
+    "probe": {
+      "container": "mov,mp4,m4a,3gp,3g2,mj2",
+      "duration_s": 18.067,
+      "size_mb": 14.76,
+      "bit_rate_kbps": 6538,
+      "video": {
+        "codec": "h264",
+        "profile": "High",
+        "width": 1080,
+        "height": 1920,
+        "pix_fmt": "yuv420p",
+        "fps": "30/1",
+        "sar": "1:1",
+        "dar": "9:16",
+        "frames": 542
+      },
+      "audio": {
+        "codec": "aac",
+        "sample_rate": 48000,
+        "channels": 2
+      }
+    }
+  }
+}
