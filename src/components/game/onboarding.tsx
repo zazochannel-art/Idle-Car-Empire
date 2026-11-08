@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Check, Factory, Flag, Hammer, MapPin, Package, X } from "lucide-react";
+import { ArrowRight, Check, Factory, Hammer, MapPin, Package, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { suggestedRestock, unitsInStock, type RestockPlan } from "@/game/engine/materials";
 import { formatMoney } from "@/game/format";
@@ -22,91 +22,65 @@ type Step = {
 const STEPS: Step[] = [
   {
     icon: Factory,
-    title: { en: "Start with your factory", ro: "Începe cu fabrica ta", ru: "Начни со своей фабрики", es: "Empieza por tu fábrica", pt: "Comece pela sua fábrica", de: "Fang mit deinem Werk an" },
+    title: { en: "This is your factory", ro: "Aceasta este fabrica ta", ru: "Это твой завод", es: "Esta es tu fábrica", pt: "Esta é a sua fábrica", de: "Das ist dein Werk" },
     body: {
-      en: "Your company already owns a small Body Works. Open it first and learn what it produces, how fast it works and where the materials go.",
-      ro: "Compania ta are deja o mică fabrică de caroserii. Deschide-o și vezi ce produce, cât de repede lucrează și unde merg materialele.",
-      ru: "У твоей компании уже есть небольшой завод кузовов. Сначала открой его и посмотри, что он производит, как работает и куда идут материалы.",
-      es: "Tu empresa ya tiene una pequeña Fábrica de carrocerías. Ábrela primero y mira qué produce, a qué ritmo trabaja y adónde van los materiales.",
-      pt: "Sua empresa já tem uma pequena Fábrica de carrocerias. Abra-a primeiro e veja o que ela produz, em que ritmo trabalha e para onde vão os materiais.",
-      de: "Deine Firma besitzt schon ein kleines Karosseriewerk. Öffne es zuerst und sieh dir an, was es herstellt, wie schnell es arbeitet und wohin das Material geht.",
+      en: "It builds car bodies on its own. Let's take a look inside.",
+      ro: "Ea produce singură caroserii de mașini. Hai să vedem înăuntru.",
+      ru: "Он сам делает кузова. Давай заглянем внутрь.",
+      es: "Fabrica carrocerías por sí sola. Echemos un vistazo dentro.",
+      pt: "Ela faz carrocerias sozinha. Vamos ver por dentro.",
+      de: "Es baut ganz allein Karosserien. Sehen wir mal hinein.",
     },
     action: { en: "Open factory", ro: "Deschide fabrica", ru: "Открыть фабрику", es: "Abrir fábrica", pt: "Abrir fábrica", de: "Werk öffnen" },
   },
   {
-    icon: Factory,
-    title: { en: "Watch production", ro: "Urmărește producția", ru: "Наблюдай за производством", es: "Mira la producción", pt: "Acompanhe a produção", de: "Sieh der Produktion zu" },
-    body: {
-      en: "Production is automatic. The factory consumes materials, creates parts and sends them through the supply chain.",
-      ro: "Producția este automată. Fabrica consumă materiale, creează componente și le trimite prin lanțul de producție.",
-      ru: "Производство автоматическое. Завод использует материалы, выпускает детали и отправляет их по цепочке.",
-      es: "La producción es automática. La fábrica consume materiales, crea piezas y las envía por la cadena de suministro.",
-      pt: "A produção é automática. A fábrica consome materiais, cria peças e as envia pela cadeia de suprimentos.",
-      de: "Die Produktion läuft automatisch. Das Werk verbraucht Material, stellt Teile her und schickt sie durch die Lieferkette.",
-    },
-    action: { en: "Show factory floor", ro: "Vezi hala de producție", ru: "Открыть цех", es: "Ver la planta", pt: "Ver o chão de fábrica", de: "Werkhalle zeigen" },
-  },
-  {
     icon: Package,
-    title: { en: "Keep it supplied", ro: "Aprovizionează fabrica", ru: "Снабжай завод", es: "Mantenla abastecida", pt: "Mantenha-a abastecida", de: "Halte es versorgt" },
+    title: { en: "Give it materials", ro: "Dă-i materiale", ru: "Дай заводу материалы", es: "Dale materiales", pt: "Dê materiais", de: "Versorge es mit Material" },
     body: {
-      en: "A factory without steel stops, and the materials it started with last only a couple of minutes. Buy a few more now. Later, when the goal card asks for materials, buy them in the factory's 📦 MATERIALS menu.",
-      ro: "Fără oțel, fabrica se oprește, iar materialele de la început ajung doar câteva minute. Cumpără câteva acum. Mai târziu, când obiectivul de jos cere materiale, le cumperi din meniul 📦 MATERIALE al fabricii.",
-      ru: "Без стали завод встаёт, а стартовых материалов хватит лишь на пару минут. Купи ещё немного сейчас. Позже, когда цель внизу попросит материалы, покупай их в меню завода 📦 МАТЕРИАЛЫ.",
-      es: "Una fábrica sin acero se para, y los materiales iniciales solo duran un par de minutos. Compra algunos más ahora. Después, cuando la tarjeta de objetivo pida materiales, cómpralos en el menú 📦 MATERIALES de la fábrica.",
-      pt: "Uma fábrica sem aço para, e os materiais iniciais duram só alguns minutos. Compre mais alguns agora. Depois, quando o cartão de meta pedir materiais, compre-os no menu 📦 MATERIAIS da fábrica.",
-      de: "Ohne Stahl steht ein Werk still, und das Startmaterial reicht nur ein paar Minuten. Kauf jetzt etwas nach. Später, wenn die Zielkarte nach Material fragt, kaufst du es im Menü 📦 MATERIAL des Werks.",
+      en: "The factory stops without steel. Buy a bit now. Later, buy more in the factory's 📦 MATERIALS menu.",
+      ro: "Fără oțel, fabrica se oprește. Cumpără puțin acum. Mai târziu cumperi din meniul 📦 MATERIALE al fabricii.",
+      ru: "Без стали завод встаёт. Купи немного сейчас. Потом покупай в меню завода 📦 МАТЕРИАЛЫ.",
+      es: "Sin acero, la fábrica se para. Compra un poco ahora. Más adelante, compra más en el menú 📦 MATERIALES de la fábrica.",
+      pt: "Sem aço, a fábrica para. Compre um pouco agora. Depois, compre mais no menu 📦 MATERIAIS da fábrica.",
+      de: "Ohne Stahl steht das Werk still. Kauf jetzt etwas. Später kaufst du im Menü 📦 MATERIAL des Werks nach.",
     },
     action: { en: "Buy materials", ro: "Cumpără materiale", ru: "Купить материалы", es: "Comprar materiales", pt: "Comprar materiais", de: "Material kaufen" },
   },
   {
     icon: Hammer,
-    title: { en: "Build your next factory", ro: "Construiește următoarea fabrică", ru: "Построй следующий завод", es: "Construye tu próxima fábrica", pt: "Construa sua próxima fábrica", de: "Bau dein nächstes Werk" },
+    title: { en: "Build more factories", ro: "Construiește mai multe fabrici", ru: "Строй новые заводы", es: "Construye más fábricas", pt: "Construa mais fábricas", de: "Bau weitere Werke" },
     body: {
-      en: "Your first Body Works is only the beginning. Buy land and build the next production stage when you can afford it. New factories unlock the car supply chain.",
-      ro: "Prima fabrică este doar începutul. Cumpără teren și construiește următoarea etapă când îți permiți. Fabricile noi deschid lanțul de producție auto.",
-      ru: "Первый завод — только начало. Покупай землю и строй следующий этап, когда хватит денег. Новые заводы открывают автомобильную цепочку.",
-      es: "Tu primera Fábrica de carrocerías es solo el principio. Compra terreno y construye la siguiente etapa de producción cuando puedas pagarla. Las fábricas nuevas desbloquean la cadena de suministro del coche.",
-      pt: "Sua primeira Fábrica de carrocerias é só o começo. Compre terreno e construa a próxima etapa de produção quando puder pagar. Fábricas novas liberam a cadeia de suprimentos do carro.",
-      de: "Dein erstes Karosseriewerk ist nur der Anfang. Kauf Land und bau die nächste Produktionsstufe, sobald du sie dir leisten kannst. Neue Werke schalten die Lieferkette fürs Auto frei.",
+      en: "With more money, buy land and build the next factory. Together they make whole cars.",
+      ro: "Când ai bani, cumperi teren și construiești următoarea fabrică. Împreună fac mașini întregi.",
+      ru: "Когда хватит денег, купи землю и построй следующий завод. Вместе они делают целые машины.",
+      es: "Con más dinero, compra terreno y construye la siguiente fábrica. Juntas fabrican coches enteros.",
+      pt: "Com mais dinheiro, compre terreno e construa a próxima fábrica. Juntas, elas fazem carros inteiros.",
+      de: "Mit mehr Geld kaufst du Land und baust das nächste Werk. Zusammen bauen sie ganze Autos.",
     },
     action: { en: "Open Build", ro: "Deschide Construiește", ru: "Открыть строительство", es: "Abrir Construir", pt: "Abrir Construir", de: "Bauen öffnen" },
   },
   {
     icon: MapPin,
-    title: { en: "Grow the empire", ro: "Extinde imperiul", ru: "Расширяй империю", es: "Haz crecer el imperio", pt: "Faça o império crescer", de: "Lass das Imperium wachsen" },
+    title: { en: "Follow it on the map", ro: "Urmărește totul pe hartă", ru: "Следи за всем на карте", es: "Síguelo en el mapa", pt: "Acompanhe no mapa", de: "Verfolge alles auf der Karte" },
     body: {
-      en: "Use the map to follow materials, factories, trucks and finished products. Expand district by district instead of spending everything at once.",
-      ro: "Folosește harta pentru a urmări materialele, fabricile, camioanele și produsele finite. Extinde-te district cu district.",
-      ru: "Используй карту, чтобы следить за материалами, заводами, грузовиками и готовой продукцией. Расширяйся район за районом.",
-      es: "Usa el mapa para seguir materiales, fábricas, camiones y productos terminados. Crece distrito a distrito en lugar de gastarlo todo de golpe.",
-      pt: "Use o mapa para acompanhar materiais, fábricas, caminhões e produtos prontos. Cresça distrito por distrito em vez de gastar tudo de uma vez.",
-      de: "Verfolge auf der Karte Material, Werke, Lkw und fertige Produkte. Wachse Viertel für Viertel, statt alles auf einmal auszugeben.",
+      en: "The map shows your factories and trucks at work. Grow one step at a time.",
+      ro: "Harta îți arată fabricile și camioanele la lucru. Extinde-te pas cu pas.",
+      ru: "На карте видно, как работают твои заводы и грузовики. Расширяйся шаг за шагом.",
+      es: "El mapa muestra tus fábricas y camiones trabajando. Crece paso a paso.",
+      pt: "O mapa mostra suas fábricas e caminhões trabalhando. Cresça um passo de cada vez.",
+      de: "Die Karte zeigt deine Werke und Lkw bei der Arbeit. Wachse Schritt für Schritt.",
     },
     action: { en: "Show the map", ro: "Arată harta", ru: "Показать карту", es: "Ver el mapa", pt: "Mostrar o mapa", de: "Karte zeigen" },
-  },
-  {
-    icon: Flag,
-    title: { en: "Race when you're ready", ro: "Intră în curse când ești pregătit", ru: "Выходи на гонки, когда будешь готов", es: "Corre cuando estés listo", pt: "Corra quando estiver pronto", de: "Fahr Rennen, wenn du bereit bist" },
-    body: {
-      en: "Racing comes later. First build a stable production business, then use cars, racing and upgrades to turn your factory into an automotive empire.",
-      ro: "Cursele vin mai târziu. Mai întâi construiește o producție stabilă, apoi folosește mașinile, cursele și upgrade-urile pentru a transforma fabrica într-un imperiu auto.",
-      ru: "Гонки будут позже. Сначала создай стабильное производство, затем используй машины, гонки и улучшения, чтобы превратить завод в автоимперию.",
-      es: "Las carreras llegan más tarde. Primero crea un negocio de producción estable y luego usa coches, carreras y mejoras para convertir tu fábrica en un imperio del automóvil.",
-      pt: "As corridas vêm depois. Primeiro monte uma produção estável, depois use carros, corridas e melhorias para transformar sua fábrica num império automotivo.",
-      de: "Rennen kommen später. Bau zuerst eine stabile Produktion auf und mach dann mit Autos, Rennen und Upgrades aus deinem Werk ein Auto-Imperium.",
-    },
-    action: { en: "Start building", ro: "Începe construcția", ru: "Начать строительство", es: "Empezar a construir", pt: "Começar a construir", de: "Losbauen" },
   },
 ];
 
 const copy = {
-  en: { eyebrow: "FIRST COMPANY", title: "Welcome to Idle Car Empire", skip: "Skip tutorial", next: "Next", done: "Start my empire", progress: "Step" },
-  ro: { eyebrow: "PRIMA COMPANIE", title: "Bine ai venit în Idle Car Empire", skip: "Sari peste tutorial", next: "Următorul", done: "Începe imperiul", progress: "Pasul" },
-  ru: { eyebrow: "ПЕРВАЯ КОМПАНИЯ", title: "Добро пожаловать в Idle Car Empire", skip: "Пропустить обучение", next: "Далее", done: "Начать империю", progress: "Шаг" },
-  es: { eyebrow: "PRIMERA EMPRESA", title: "Te damos la bienvenida a Idle Car Empire", skip: "Saltar tutorial", next: "Siguiente", done: "Empezar mi imperio", progress: "Paso" },
-  pt: { eyebrow: "PRIMEIRA EMPRESA", title: "Boas-vindas ao Idle Car Empire", skip: "Pular tutorial", next: "Próximo", done: "Começar meu império", progress: "Passo" },
-  de: { eyebrow: "ERSTE FIRMA", title: "Willkommen bei Idle Car Empire", skip: "Tutorial überspringen", next: "Weiter", done: "Mein Imperium starten", progress: "Schritt" },
+  en: { eyebrow: "FIRST COMPANY", title: "Welcome to Idle Car Empire", skip: "Skip tutorial", next: "Next", progress: "Step" },
+  ro: { eyebrow: "PRIMA COMPANIE", title: "Bine ai venit în Idle Car Empire", skip: "Sari peste tutorial", next: "Următorul", progress: "Pasul" },
+  ru: { eyebrow: "ПЕРВАЯ КОМПАНИЯ", title: "Добро пожаловать в Idle Car Empire", skip: "Пропустить обучение", next: "Далее", progress: "Шаг" },
+  es: { eyebrow: "PRIMERA EMPRESA", title: "Te damos la bienvenida a Idle Car Empire", skip: "Saltar tutorial", next: "Siguiente", progress: "Paso" },
+  pt: { eyebrow: "PRIMEIRA EMPRESA", title: "Boas-vindas ao Idle Car Empire", skip: "Pular tutorial", next: "Próximo", progress: "Passo" },
+  de: { eyebrow: "ERSTE FIRMA", title: "Willkommen bei Idle Car Empire", skip: "Tutorial überspringen", next: "Weiter", progress: "Schritt" },
 } satisfies Record<Lang, Record<string, string>>;
 
 function languageOf(lang: string): Lang {
@@ -114,7 +88,7 @@ function languageOf(lang: string): Lang {
 }
 
 /** The tour step that buys the starter works its next materials. */
-const SUPPLY_STEP = 2;
+const SUPPLY_STEP = 1;
 /** Units' worth bought there on top of the stock: a couple more minutes of work, leaving cash for the Engine Factory. */
 const SUPPLY_UNITS = 2;
 
@@ -178,21 +152,16 @@ export function Onboarding() {
     const starter = starterPlot(game.state);
     if (step === 0) {
       if (starter) ui.selectPlot(starter);
-    } else if (step === 1) {
-      if (starter) ui.openFloor(starter);
     } else if (step === SUPPLY_STEP) {
       // the order the button showed (nothing if the cash can't cover it: the goal card asks again later)
       const order = starterRestock(game.state, game.snap);
       if (order) game.buyPlan(order.plot, order.plan);
-      ui.openFloor(null);
       if (starter) ui.selectPlot(starter);
-    } else if (step === 3) {
+    } else if (step === 2) {
       ui.setView("build");
-    } else if (step === 4) {
+    } else {
       ui.closeAll();
       ui.map({ kind: "home" });
-    } else {
-      ui.setView("build");
     }
 
     if (step < STEPS.length - 1) setStep((s) => s + 1);
@@ -247,7 +216,7 @@ export function Onboarding() {
               {step === STEPS.length - 1 ? <Check className="size-4" /> : <ArrowRight className="size-4" />}
               {/* the supply step's price goes under its label: side by side they don't fit a phone */}
               <span className="flex flex-col items-start leading-tight">
-                <span>{step === STEPS.length - 1 ? c.done : text.action[l]}</span>
+                <span>{text.action[l]}</span>
                 {step === SUPPLY_STEP && supplyCost > 0 && <span className="text-xs font-bold tabular-nums text-[#241900]/70">{formatMoney(supplyCost)}</span>}
               </span>
             </button>
