@@ -174,6 +174,7 @@ rating authority decides.
 | App activity → **Other user-generated content** (company and alliance names; reports sent about other players) | yes | optional | App functionality; Fraud prevention, security, and compliance |
 | App activity → **App interactions** (the days played: the dates the cloud save was updated, with the account; and the anonymous beginner steps) | yes | required when online (the days played; the beginner steps are optional: Settings → Anonymous statistics) | Analytics |
 | App info and performance → **Crash logs**, **Diagnostics** (the game's anonymous error reports: [errors.md](../errors.md)) | yes | optional (Settings → Anonymous statistics) | Analytics, App functionality |
+| Financial info → **Purchase history** (the in-app purchases checked with Google Play: product, order id, state, dates, with the account; supabase/migrations/0022_purchases.sql) | yes | optional (only when the player buys something) | App functionality, Fraud prevention, security, and compliance |
 | *AdMob:* Device or other IDs → **Device or other IDs** (advertising ID) | yes, **shared** | required (the SDK collects it when an ad is requested) | Advertising or marketing, Analytics, Fraud prevention, security, and compliance |
 | *AdMob:* Location → **Approximate location** (from the IP address) | yes, **shared** | required | Advertising or marketing, Analytics, Fraud prevention, security, and compliance |
 | *AdMob:* App activity → **App interactions** (with the ads) | yes, **shared** | required | Advertising or marketing, Analytics |
@@ -195,8 +196,8 @@ ephemerally. Until then the app doesn't load it.
 shared, optional (the player turns notifications on), App functionality. Until then the app
 doesn't collect it.
 
-Not collected: precise location, contacts, photos/files, messages, financial
-info, health, web history, audio, calendar. The "Android" device label stored
+Not collected: precise location, contacts, photos/files, messages, other financial
+info (payment details stay with Google Play), health, web history, audio, calendar. The "Android" device label stored
 with saves is a type, not an identifier.
 
 **Other declarations.** Answer each one as below. Google Play publishes apps that
