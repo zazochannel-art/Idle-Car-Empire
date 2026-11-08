@@ -95,6 +95,8 @@ android {
             // Console shows readable crashes and ANRs (Android vitals). Native debug symbols go in too where a
             // library has them (androidx.datastore's tiny one comes stripped: Play's note about it is harmless)
             minifyEnabled true
+            // drops the resources (layouts, drawables, strings) that the code R8 kept never uses: a smaller bundle
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             ndk {
                 debugSymbolLevel 'FULL'
