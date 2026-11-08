@@ -14,7 +14,8 @@ import type { CarId, Effect, GameState, PlantType } from "../types";
 import { cityEffects } from "./city";
 import { editionBonus } from "./collection";
 
-export const MAX_TIER = 10;
+/** The highest car tier (Nordheim's Northern Lights is 11): every tier has its value multiplier. */
+export const MAX_TIER = Math.max(...CARS.map((c) => c.tier));
 
 export interface GlobalMods {
   /** Value multiplier per car tier (index = tier). */
