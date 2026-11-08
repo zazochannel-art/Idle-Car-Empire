@@ -22,7 +22,12 @@ export const owns = (s: GameState, p: IapProduct) => (p === "pass" ? isPremium(s
 
 /** What the starter pack gives now (its research scales with the company, like the shop's). */
 export function starterReward(snap: EconomySnapshot): Reward {
-  return { stars: IAP.starterStars, incomeSeconds: IAP.starterIncome, rp: Math.max(IAP.starterRpMin, Math.round(snap.rpPerSec * IAP.starterRp)) };
+  return {
+    stars: IAP.starterStars,
+    incomeSeconds: IAP.starterIncome,
+    minCash: IAP.starterCashMin,
+    rp: Math.max(IAP.starterRpMin, Math.round(snap.rpPerSec * IAP.starterRp)),
+  };
 }
 
 /**

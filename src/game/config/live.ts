@@ -14,10 +14,14 @@ export const VIP = {
   /** Deadline options (minutes) and how many cars. */
   minutes: [60, 90, 120],
   cars: [2, 3, 4, 5],
-  /** Paid per car: this many times its value, plus Stars and reputation. */
+  /**
+   * Paid per car: this many times its value, plus Stars (Premium-built orders only, and at most
+   * `starsPerDay` a day: orders come every ~45 minutes of play) and reputation.
+   */
   valueMult: 4,
-  stars: 1,
-  premiumStars: 2,
+  stars: 0,
+  premiumStars: 1,
+  starsPerDay: 3,
   rep: 4,
 };
 

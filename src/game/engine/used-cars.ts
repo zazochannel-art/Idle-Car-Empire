@@ -3,7 +3,7 @@
 // is), and sell it on for more than both. One car in the bay at a time; prices are set when the
 // lot comes in (a share of the company's income), so they don't move while a car waits.
 import type { CarId, GameState } from "../types";
-import { passiveIncome, unlockedCarIds, type EconomySnapshot } from "./economy";
+import { rewardIncome, unlockedCarIds, type EconomySnapshot } from "./economy";
 import { book } from "./ledger";
 
 export interface UsedCar {
@@ -37,13 +37,18 @@ export const USED = {
   every: 4 * 3_600_000,
   cars: 3,
   /** A car's worth: seconds of the company's income (at least `min`). */
-  worthSeconds: 25 * 60,
+  worthSeconds: 20 * 60,
   min: 2_000,
-  /** Shares of its worth: buying (more for a better car), refurbishing (more for a worse one) and selling. */
+  /**
+   * Shares of its worth: buying (more for a better car), refurbishing (more for a worse one) and
+   * selling (more for a better car: a wreck stays a little worse after its refurbishment). The
+   * profit is 17% of the worth for the worst car on the lot, 30% for the best.
+   */
   buyBase: 0.25,
   buyPerCond: 0.3,
   fixPerWear: 0.35,
-  sell: 0.85,
+  sell: 0.7,
+  sellPerCond: 0.2,
   /** Refurbishment: minutes for a car in perfect condition, plus this many for a wreck. */
   minutesBase: 10,
   minutesPerWear: 40,
@@ -57,7 +62,7 @@ export function refreshUsedLot(s: GameState, now: number, snap: EconomySnapshot)
   const u = s.usedCars;
   if (u.lotAt && now < nextLotAt(s)) return false;
   // a new company with no income yet still gets cars, at the floor price
-  const income = Math.max(0, passiveIncome(snap) || 0);
+  const income = Math.max(0, rewardIncome(snap) || 0);
   // before the first assembly plant, the lot has the basic city car
   const own = [...unlockedCarIds(s, snap.gm)];
   const cars: CarId[] = own.length ? own : ["city"];
@@ -76,7 +81,7 @@ export function refreshUsedLot(s: GameState, now: number, snap: EconomySnapshot)
       cond,
       buy: Math.round(w * (USED.buyBase + USED.buyPerCond * cond)),
       fix: Math.round(w * USED.fixPerWear * (1 - cond)),
-      sell: Math.round(w * USED.sell),
+      sell: Math.round(w * (USED.sell + USED.sellPerCond * cond)),
       minutes: Math.round(USED.minutesBase + USED.minutesPerWear * (1 - cond)),
     };
   });
@@ -99,6 +104,7 @@ export function buyUsed(s: GameState, id: number): boolean {
   const u = s.usedCars;
   const c = u.lot.find((x) => x.id === id)!;
   s.cash -= c.buy;
+  book(s, "repairs", c.buy);
   u.lot = u.lot.filter((x) => x.id !== id);
   u.bay = c;
   u.readyAt = 0;
@@ -123,8 +129,10 @@ export function sellUsed(s: GameState, now: number): number | null {
   if (!usedReady(s, now) || !u.bay) return null;
   const c = u.bay;
   s.cash += c.sell;
-  s.run.moneyEarned += c.sell;
-  s.lifetime.moneyEarned += c.sell;
+  // what was made on it counts as earned (Stars, boards), not the whole price paid back
+  const made = Math.max(0, c.sell - c.buy - c.fix);
+  s.run.moneyEarned += made;
+  s.lifetime.moneyEarned += made;
   book(s, "services", c.sell);
   u.sold += 1;
   u.profit += c.sell - c.buy - c.fix;

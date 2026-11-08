@@ -27,7 +27,8 @@ const hash = (str: string) => {
   for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619);
   return h >>> 0;
 };
-const steady = (s: GameState) => Math.max(0, s.chain.steady ?? s.chain.rate);
+/** The steady income rewards are sized on (without the boosts that only last a while). */
+const steady = (s: GameState) => Math.max(0, s.chain.steadyBase ?? s.chain.steady ?? s.chain.rate);
 
 // ───────────────────────────── VIP orders ─────────────────────────────
 
@@ -55,9 +56,15 @@ export interface VipState {
   active: VipOrder | null;
   nextAt: number;
   done: number;
+  /** The day (dateKey) `starsToday` counts the Stars VIP orders paid for. */
+  starDay: string;
+  starsToday: number;
 }
 
-export const createVip = (): VipState => ({ offer: null, active: null, nextAt: 0, done: 0 });
+export const createVip = (): VipState => ({ offer: null, active: null, nextAt: 0, done: 0, starDay: "", starsToday: 0 });
+
+/** Stars VIP orders can still pay today. */
+export const vipStarsLeft = (s: GameState, now: number) => Math.max(0, VIP.starsPerDay - (s.vip.starDay === dateKey(now) ? s.vip.starsToday : 0));
 
 /** Offers, withdraws and fails VIP orders as time passes. */
 export function vipTick(s: GameState, now: number, snap: EconomySnapshot): "offer" | "failed" | "expired" | null {
@@ -95,7 +102,7 @@ export function vipTick(s: GameState, now: number, snap: EconomySnapshot): "offe
     n,
     minutes: VIP.minutes[Math.floor(r() * VIP.minutes.length)],
     pay: n * carValue(s, car, snap.gm) * VIP.valueMult,
-    stars: premium ? VIP.premiumStars : VIP.stars,
+    stars: Math.min(premium ? VIP.premiumStars : VIP.stars, vipStarsLeft(s, now)),
     expires: now + VIP.offerMs,
   };
   return "offer";
@@ -134,7 +141,11 @@ export function claimVip(s: GameState, now: number): boolean {
   payReward(s, a.pay);
   s.run.moneyEarned += a.pay;
   s.lifetime.moneyEarned += a.pay;
-  s.stars += a.stars;
+  const stars = Math.min(a.stars, vipStarsLeft(s, now));
+  s.stars += stars;
+  const day = dateKey(now);
+  s.vip.starsToday = (s.vip.starDay === day ? s.vip.starsToday : 0) + stars;
+  s.vip.starDay = day;
   s.quality.rep = Math.min(100, s.quality.rep + VIP.rep);
   s.vip.active = null;
   s.vip.done += 1;
@@ -326,7 +337,7 @@ function migrateVipOrder(raw: unknown): VipOrder | null {
 
 export function migrateLive(raw: Json, s: GameState) {
   const v = isObj(raw.vip) ? raw.vip : {};
-  s.vip = { offer: migrateVipOrder(v.offer), active: migrateVipOrder(v.active), nextAt: Math.max(0, num(v.nextAt)), done: Math.max(0, Math.floor(num(v.done))) };
+  s.vip = { offer: migrateVipOrder(v.offer), active: migrateVipOrder(v.active), nextAt: Math.max(0, num(v.nextAt)), done: Math.max(0, Math.floor(num(v.done))), starDay: typeof v.starDay === "string" ? v.starDay : "", starsToday: Math.max(0, Math.floor(num(v.starsToday))) };
   const se = isObj(raw.season) ? raw.season : {};
   const last = isObj(se.last) ? se.last : null;
   s.season = {

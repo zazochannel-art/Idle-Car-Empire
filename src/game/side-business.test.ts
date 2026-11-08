@@ -160,25 +160,120 @@ describe("quality control", () => {
   it("pays for a perfect run, raises the reputation, then waits", () => {
     const s = createInitialState(NOW);
     const snap = snapshot(s);
-    const round = Qc.qcRound(s);
+    // nothing to hand in before an inspection starts
+    expect(Qc.finishQc(s, Qc.qcRound(s), [], snap, NOW)).toBeNull();
+    const round = Qc.startQc(s, NOW)!;
+    expect(round).toHaveLength(Qc.QC.cars);
     const bad = round.flatMap((d, i) => (d ? [i] : []));
     s.quality.rep = 50;
     const cash = s.cash;
-    const out = Qc.finishQc(s, round, bad, snap, NOW)!;
+    const out = Qc.finishQc(s, round, bad, snap, NOW + 15_000)!;
     expect(out.score).toBe(100);
     expect(out.money).toBeGreaterThan(0);
     expect(s.cash).toBeCloseTo(cash + out.money);
     expect(s.quality.rep).toBeCloseTo(50 + Qc.QC.rep);
     expect(s.qc.best).toBe(100);
+    // handed in once; the break counts from the start
+    expect(Qc.finishQc(s, round, bad, snap, NOW + 20_000)).toBeNull();
     expect(Qc.qcReady(s, NOW + 60_000)).toBe(false);
-    expect(Qc.finishQc(s, round, bad, snap, NOW + 60_000)).toBeNull();
     expect(Qc.qcReady(s, NOW + Qc.QC.cooldown)).toBe(true);
+  });
+
+  it("an inspection left half-way is used up, and its round doesn't come back", () => {
+    const s = createInitialState(NOW);
+    const snap = snapshot(s);
+    const first = Qc.startQc(s, NOW)!;
+    // too late to hand it in
+    expect(Qc.finishQc(s, first, [], snap, NOW + Qc.QC.cars * Qc.QC.carMs + Qc.QC.graceMs + 1)).toBeNull();
+    expect(Qc.startQc(s, NOW + 60_000)).toBeNull();
+    const next = Qc.startQc(s, NOW + Qc.QC.cooldown);
+    expect(next).not.toBeNull();
+  });
+
+  it("a few inspections a day at most", () => {
+    const s = createInitialState(NOW);
+    let t = NOW;
+    const day = new Date(NOW).getDate();
+    let n = 0;
+    while (new Date(t).getDate() === day && Qc.startQc(s, t)) {
+      n++;
+      t += Qc.QC.cooldown;
+    }
+    if (new Date(t).getDate() === day) {
+      expect(n).toBe(Qc.QC.perDay);
+      expect(Qc.qcBlock(s, t)).toBe("limit");
+    }
+    expect(Qc.qcReady(s, NOW + 2 * 86_400_000)).toBe(true);
+    const back = migrateQcRoundTrip(s);
+    expect(back).toEqual(s.qc);
   });
 
   it("tapping every car does not pay like a perfect run", () => {
     const s = createInitialState(NOW);
-    const round = Qc.qcRound(s);
-    const out = Qc.finishQc(s, round, round.map((_, i) => i), snapshot(s), NOW)!;
+    const round = Qc.startQc(s, NOW)!;
+    const out = Qc.finishQc(s, round, round.map((_, i) => i), snapshot(s), NOW + 1_000)!;
     expect(out.score).toBeLessThan(100);
+  });
+});
+
+function migrateQcRoundTrip(s: ReturnType<typeof createInitialState>) {
+  return Qc.migrateQc(JSON.parse(JSON.stringify(s.qc)));
+}
+
+describe("the economy's limits", () => {
+  it("the partner deals pay one Star a day at most", () => {
+    const s = createInitialState(NOW);
+    const snap = snapshot(s);
+    s.racing.unlocked = true;
+    const big = Sp.SPONSOR_TIERS.length - 1;
+    const run = (t: number) => {
+      Sp.refreshSponsors(s, t);
+      expect(Sp.signSponsor(s, big, t)).toBe(true);
+      s.racing.stats.wins += Sp.SPONSOR_TIERS[big].wins;
+      const stars = s.stars;
+      expect(Sp.claimSponsor(s, snap, t + 60_000)).not.toBeNull();
+      return s.stars - stars;
+    };
+    expect(run(NOW)).toBe(Sp.SPONSOR_TIERS[big].stars);
+    expect(run(NOW + Sp.SPONSOR.afterDone + 120_000)).toBe(0);
+    expect(run(NOW + 86_400_000)).toBe(Sp.SPONSOR_TIERS[big].stars);
+  });
+
+  it("a reward in seconds of income is worth no more during the ×2 boost", () => {
+    const s = createInitialState(NOW);
+    s.chain.steady = 1_000;
+    s.chain.steadyBase = 1_000;
+    const before = snapshot(s).rewardIncomePerSec;
+    s.ads.boostLeft = 1_800;
+    // the steady average catches up with the doubled sales; the base one doesn't
+    s.chain.steady = 2_000;
+    const snap = snapshot(s);
+    expect(snap.gm.tempIncome).toBeGreaterThanOrEqual(2);
+    expect(snap.rewardIncomePerSec).toBeCloseTo(before);
+  });
+
+  it("the starter pack and the premium tiers pay a floor to a young company", async () => {
+    const { starterReward } = await import("./engine/iap");
+    const { rewardCash } = await import("./engine/rewards");
+    const { PREMIUM_TIERS } = await import("./config/pass");
+    const { IAP } = await import("./config/iap");
+    const snap = snapshot(createInitialState(NOW));
+    expect(rewardCash(starterReward(snap), snap)).toBeGreaterThanOrEqual(IAP.starterCashMin);
+    expect(rewardCash(PREMIUM_TIERS[0].reward, snap)).toBeGreaterThanOrEqual(2_000);
+  });
+
+  it("VIP orders pay Stars only when Premium-built, three a day at most", async () => {
+    const Lv = await import("./engine/live");
+    const { VIP } = await import("./config/live");
+    const s = createInitialState(NOW);
+    let got = 0;
+    for (let i = 0; i < 6; i++) {
+      s.vip.active = { id: `v${i}`, client: "ceo", car: "city", color: "red", premium: true, n: 1, made: 1, minutes: 60, pay: 1, stars: VIP.premiumStars } as never;
+      const before = s.stars;
+      expect(Lv.claimVip(s, NOW + i * 60_000)).toBe(true);
+      got += s.stars - before;
+    }
+    expect(got).toBe(VIP.starsPerDay);
+    expect(Lv.vipStarsLeft(s, NOW + 86_400_000)).toBe(VIP.starsPerDay);
   });
 });

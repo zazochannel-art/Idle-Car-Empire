@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { CAR_BY_ID } from "@/game/config/cars";
 import { unlockedCarIds } from "@/game/engine/economy";
-import { QC, qcReady, qcRound, type DefectKind } from "@/game/engine/quality-check";
+import { QC, qcBlock, type DefectKind } from "@/game/engine/quality-check";
 import { rewardCash } from "@/game/engine/rewards";
 import { sponsorProgress } from "@/game/engine/sponsors";
 import { buyBlock, nextLotAt, usedReady } from "@/game/engine/used-cars";
@@ -19,7 +19,7 @@ import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { useGame } from "@/store/game-store";
 
-const BRAND_ICON: Record<string, string> = { voltex: "⚡", rapido: "🐆", kronos: "⏱️", oceanic: "🌊", aurum: "🥇", nitro: "🔥" };
+const BRAND_ICON: Record<string, string> = { voltex: "⚡", rapido: "🐆", kronos: "⏱️", oceanic: "🌊", zenith: "🔺", nitro: "🔥" };
 
 /** Racing sponsors: three offers to pick from, or the deal signed and how far it got. */
 export function SponsorCard() {
@@ -172,9 +172,11 @@ export function QualityCard() {
   const state = useGame((g) => g.view.state);
   const snap = useGame((g) => g.view.snap);
   const finish = useGame((g) => g.finishQc);
+  const begin = useGame((g) => g.startQc);
   const { t } = useT();
   const now = state.lastActiveAt;
-  const ready = qcReady(state, now);
+  const block = qcBlock(state, now);
+  const ready = block === null;
   const [round, setRound] = useState<(DefectKind | null)[] | null>(null);
   const [i, setI] = useState(0);
   const [tapped, setTapped] = useState<number[]>([]);
@@ -195,7 +197,9 @@ export function QualityCard() {
   }, [round, i, finish]);
 
   const start = () => {
-    setRound(qcRound(state));
+    const r = begin();
+    if (!r) return;
+    setRound(r);
     setI(0);
     setTapped([]);
     tappedRef.current = [];
@@ -243,7 +247,7 @@ export function QualityCard() {
           <p className="text-xs leading-snug text-white/60">{t("qc.desc", { money: formatMoney(rewardCash({ incomeSeconds: QC.rewardSeconds }, snap)) })}</p>
           {result !== null && <p className="text-sm font-black text-gold">{t("qc.result", { score: result })}</p>}
           <Button size="sm" variant={ready ? "gold" : "locked"} disabled={!ready} className="w-full" onClick={start}>
-            {ready ? t("qc.start") : t("qc.wait", { time: formatDuration(Math.max(0, state.qc.nextAt - now) / 1000) })}
+            {ready ? t("qc.start") : block === "limit" ? t("qc.limit") : t("qc.wait", { time: formatDuration(Math.max(0, state.qc.nextAt - now) / 1000) })}
           </Button>
         </div>
       )}

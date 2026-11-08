@@ -132,6 +132,8 @@ export interface Reward {
   cash?: number;
   /** Cash expressed as N seconds of current income (scales with progress). */
   incomeSeconds?: number;
+  /** The least cash it pays in all (a young company's seconds of income are worth little). */
+  minCash?: number;
   rp?: number;
   /** Permanent +x global income (0.02 = +2%), kept through every reset. */
   boost?: number;
@@ -526,6 +528,8 @@ export interface ChainState {
   demand?: Partial<Record<ItemId, number>>;
   /** Net income per second averaged over ~10 minutes: sizes rewards, so a lucky moment doesn't. */
   steady?: number;
+  /** The same average without the boosts that only last a while (the ×2 ad boost, market events). */
+  steadyBase?: number;
   /** Market time (s) of the last supplier rescue. */
   rescueT?: number;
   /** Market time (s) of the last restructuring (the last resort of a stuck company). */

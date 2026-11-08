@@ -22,6 +22,11 @@ export interface GlobalMods {
   speed: number;
   delivery: number;
   income: number;
+  /**
+   * The part of `income` that only lasts a while and can be timed (the ×2 boost, a market event's
+   * income): rewards sized in seconds of income leave it out (economy.ts rewardIncomePerSec).
+   */
+  tempIncome: number;
   /** Offline efficiency (0.6 = 60% of live production): offlineShare of offlineRaw. */
   offline: number;
   /** The offline bonuses added up, before offlineShare (a plant adds its automation and manager to it). */
@@ -111,6 +116,7 @@ export function computeGlobalMods(s: GameState): GlobalMods {
     speed: 1,
     delivery: 1,
     income: 1,
+    tempIncome: 1,
     offline: OFFLINE.baseEfficiency,
     offlineRaw: OFFLINE.baseEfficiency,
     offlineCapHours: OFFLINE.baseCapHours,
@@ -136,6 +142,7 @@ export function computeGlobalMods(s: GameState): GlobalMods {
 
   // Seasons (Halloween, winter holidays) add a little income.
   const season = seasonAt(s.lastActiveAt);
+  // (a season lasts weeks: rewards keep its bonus, so tempIncome leaves it in)
   if (season) m.income *= 1 + SEASON_BONUS;
   // Black Friday week: lower prices at the dealers, and many more customers.
   if (season === "blackfriday") {
@@ -144,7 +151,10 @@ export function computeGlobalMods(s: GameState): GlobalMods {
   }
 
   // A limited-time market event (the clock is the last tick).
-  activeEvent(s.lastActiveAt)?.event.effects.forEach((e) => applyEffect(m, e));
+  activeEvent(s.lastActiveAt)?.event.effects.forEach((e) => {
+    applyEffect(m, e);
+    if (e.kind === "income") m.tempIncome *= e.mult;
+  });
 
   // ⭐ Star upgrades from Reset Imperium.
   const star = starMods(s);
@@ -213,7 +223,10 @@ export function computeGlobalMods(s: GameState): GlobalMods {
   m.income *= 1 + s.boost;
   m.income *= 1 + editionBonus(s);
   // the ×2 sales boost of a rewarded ad
-  if (s.ads?.boostLeft > 0) m.income *= ADS.boostMult;
+  if (s.ads?.boostLeft > 0) {
+    m.income *= ADS.boostMult;
+    m.tempIncome *= ADS.boostMult;
+  }
   m.offline = offlineShare(m.offlineRaw);
   return m;
 }

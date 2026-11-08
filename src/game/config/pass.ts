@@ -62,7 +62,8 @@ export const PASS_TIERS: PassTier[] = Array.from({ length: PASS.tiers }, (_, i) 
  */
 export const PREMIUM_TIERS: PassTier[] = Array.from({ length: PASS.tiers }, (_, i) => {
   const n = i + 1;
-  const reward: Reward = { incomeSeconds: 1_200 + 120 * n, rp: 80 * n };
+  // at least $2,000 a tier, so a young company that buys the pass gets something it can feel
+  const reward: Reward = { incomeSeconds: 1_200 + 120 * n, minCash: 2_000, rp: 80 * n };
   if (n % 3 === 0) reward.stars = n === PASS.tiers ? 5 : 1;
   const tier: PassTier = { reward };
   if (n === 15) tier.livery = "goldrush";

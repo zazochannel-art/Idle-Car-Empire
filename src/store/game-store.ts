@@ -269,6 +269,7 @@ interface GameStore {
   refurbishUsedCar: () => void;
   sellUsedCar: () => void;
   /** Ends a quality inspection (engine/quality-check.ts) with the cars tapped; returns the score. */
+  startQc: () => (Qc.DefectKind | null)[] | null;
   finishQc: (round: (Qc.DefectKind | null)[], tapped: number[]) => number | null;
   acceptVip: () => void;
   declineVip: () => void;
@@ -1062,7 +1063,7 @@ export const useGame = create<GameStore>((set, get) => {
       return ok;
     },
     sendTradeConvoy: () => {
-      const got = act((s) => Cy.sendTradeConvoy(s, Date.now(), get().snap.steadyIncomePerSec));
+      const got = act((s) => Cy.sendTradeConvoy(s, Date.now(), get().snap.rewardIncomePerSec));
       if (got > 0) uiEvents.emit({ type: "toast", tone: "gold", icon: "🚢", title: tr("trade.toast"), body: tr("trade.toastBody", { money: formatMoney(got) }) });
       return got;
     },
@@ -1322,6 +1323,12 @@ export const useGame = create<GameStore>((set, get) => {
       if (!act((s) => (price = Uc.sellUsed(s, Date.now())) !== null)) return;
       uiEvents.emit({ type: "toast", tone: "gold", icon: "🚙", title: tr("used.soldToast"), body: formatMoney(price ?? 0) });
       persist(true);
+    },
+    startQc: () => {
+      let round: (Qc.DefectKind | null)[] | null = null;
+      if (!act((s) => (round = Qc.startQc(s, Date.now())) !== null)) return null;
+      persist(true);
+      return round;
     },
     finishQc: (round, tapped) => {
       let got: { money: number; score: number } | null = null;

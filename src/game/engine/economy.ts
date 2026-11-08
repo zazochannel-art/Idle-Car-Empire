@@ -64,6 +64,11 @@ export interface EconomySnapshot {
   incomePerSec: number;
   /** Passive income: the chain's net averaged over ~10 minutes plus the garages (rewards are sized on it, never below 0). */
   steadyIncomePerSec: number;
+  /**
+   * The steady income without the boosts that only last a while (the ×2 ad boost, a market
+   * event): rewards in seconds of income are sized on it, so saving them for a boost pays nothing.
+   */
+  rewardIncomePerSec: number;
   rpPerSec: number;
   city: CitySnapshot;
 }
@@ -81,6 +86,7 @@ export function snapshot(s: GameState): EconomySnapshot {
     carsPerSec: chain.carsPerSec,
     incomePerSec: ledgerNet(s.chain.ledger.rate) + (s.chain.goodsRate ?? 0),
     steadyIncomePerSec: Math.max(0, s.chain.steady ?? s.chain.rate) + city.incomePerSec,
+    rewardIncomePerSec: Math.max(0, s.chain.steadyBase ?? (s.chain.steady ?? s.chain.rate) / gm.tempIncome) + city.incomePerSec / gm.tempIncome,
     rpPerSec,
     city,
   };
@@ -89,4 +95,9 @@ export function snapshot(s: GameState): EconomySnapshot {
 /** Income that keeps running on its own — used to size rewards (averaged, so timing a claim doesn't pay). */
 export function passiveIncome(snap: EconomySnapshot): number {
   return snap.steadyIncomePerSec;
+}
+
+/** The income rewards are sized on: the steady income without the boosts that only last a while. */
+export function rewardIncome(snap: EconomySnapshot): number {
+  return snap.rewardIncomePerSec;
 }

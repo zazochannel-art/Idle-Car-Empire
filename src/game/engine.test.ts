@@ -864,10 +864,10 @@ describe("reset imperium", () => {
     s.lifetime.moneyEarned = 1e14;
     const plants = Object.keys(s.city.buildings).length;
     expect(I.canImperium(s)).toBe(true);
-    expect(I.pendingStars(s)).toBe(15);
+    expect(I.pendingStars(s)).toBe(25);
     const gained = I.imperium(s);
-    expect(gained).toBe(15);
-    expect(s.stars).toBe(15);
+    expect(gained).toBe(25);
+    expect(s.stars).toBe(25);
     expect(s.imperiumCount).toBe(1);
     // nothing is reset
     expect(s.research).toEqual(["x"]);
@@ -882,7 +882,7 @@ describe("reset imperium", () => {
     const speed = snapshot(s).gm.speed;
     expect(I.buyStarUpgrade(s, "production")).toBe(true);
     expect(I.buyStarUpgrade(s, "production")).toBe(true);
-    expect(s.stars).toBe(12);
+    expect(s.stars).toBe(22);
     expect(snapshot(s).gm.speed).toBeCloseTo(speed * 1.2);
   });
 
@@ -901,8 +901,9 @@ describe("reset imperium", () => {
     expect(total).toBe(I.starsAt(once.lifetime.moneyEarned));
     // none before the first threshold, then a few for every tenfold
     expect(I.starsAt(IMPERIUM.minRunEarnings - 1)).toBe(0);
-    expect(I.starsAt(IMPERIUM.minRunEarnings)).toBe(3);
-    expect(I.starsAt(1e12)).toBe(9);
+    expect(I.starsAt(IMPERIUM.minRunEarnings)).toBe(6);
+    expect(I.starsAt(1e11)).toBe(10);
+    expect(I.starsAt(1e12)).toBe(15);
   });
 });
 

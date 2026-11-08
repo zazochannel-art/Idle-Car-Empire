@@ -124,7 +124,7 @@ export function landmarkNews(s: GameState): LandmarkNews {
   for (const l of landmarksOf(s.activeCity)) {
     if (!L.rewarded.includes(l.territory) && lineBuilt(s, l) > 0) {
       const R = LANDMARK.firstCar;
-      const cash = Math.max(R.minCash, Math.max(0, s.chain.steady ?? s.chain.rate) * R.incomeSeconds);
+      const cash = Math.max(R.minCash, Math.max(0, s.chain.steadyBase ?? s.chain.steady ?? s.chain.rate) * R.incomeSeconds);
       payReward(s, cash);
       s.stars += R.stars;
       L.rewarded.push(l.territory);

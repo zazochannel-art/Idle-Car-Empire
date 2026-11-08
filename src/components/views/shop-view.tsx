@@ -14,9 +14,9 @@ import { adsToday, buildWait } from "@/game/engine/ads";
 import { remainingOf } from "@/game/engine/construction";
 import type { EconomySnapshot } from "@/game/engine/economy";
 import { rewardCash } from "@/game/engine/progress";
-import { BLACK_FRIDAY, seasonAt } from "@/game/engine/season";
+import { seasonAt } from "@/game/engine/season";
 import { owns, starterReward } from "@/game/engine/iap";
-import { crateWait, longestJob, packsToday, shopBlock, shopPrice, shopReward, type ShopBlock } from "@/game/engine/shop";
+import { blackFridayCut, crateWait, longestJob, packsToday, shopBlock, shopPrice, shopReward, type ShopBlock } from "@/game/engine/shop";
 import { formatDuration, formatMoney, formatNumber } from "@/game/format";
 import type { GameState } from "@/game/types";
 import type { MessageKey } from "@/i18n";
@@ -73,7 +73,7 @@ export function ShopView() {
       <Premium />
       <Section title={t(adFree ? "shop.adsFree" : "shop.ads")} icon={adFree ? "🎟️" : "📺"} items={ads} />
       <Section title={t("shop.stars")} icon="⭐" items={stars} right={<span className="text-xs font-black text-gold">{t("shop.have", { n: formatNumber(state.stars, 0) })}</span>}>
-        {seasonAt(state.lastActiveAt) === "blackfriday" && <p className="rounded-xl bg-red-500/15 px-3 py-2 text-xs font-bold text-red-100 ring-1 ring-red-400/35">🏷️ {t("shop.blackFriday", { pct: Math.round((1 - BLACK_FRIDAY.starPrice) * 100) })}</p>}
+        {seasonAt(state.lastActiveAt) === "blackfriday" && <p className="rounded-xl bg-red-500/15 px-3 py-2 text-xs font-bold text-red-100 ring-1 ring-red-400/35">🏷️ {t("shop.blackFriday", { pct: blackFridayCut() })}</p>}
         <p className="px-1 text-[11px] text-white/45">{t("shop.starsHow")}</p>
       </Section>
       <p className="px-1 text-center text-[11px] text-white/40">{t(iapConfigured() ? "shop.footerIap" : "shop.footer")}</p>

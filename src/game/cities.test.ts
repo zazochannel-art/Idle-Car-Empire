@@ -163,7 +163,8 @@ describe("switching cities", () => {
   it("each city keeps its wallet, lots and chain; the map follows", () => {
     const s = withNorth();
     s.chain.steady = 2_000;
-    const homeSteady = snapshot(s).steadyIncomePerSec;
+    // a parked city keeps its steady income without the boosts that only last a while (a season)
+    const homeSteady = snapshot(s).rewardIncomePerSec;
     const homeCash = s.cash;
     const homeCity = s.city;
     expect(Cy.switchCity(s, "north", T0 + MIN)).toBe(true);
@@ -202,12 +203,15 @@ describe("switching cities", () => {
     const s = withNorth();
     s.chain.steady = 1_000;
     const value = St.companyValue(s, snapshot(s));
+    const home = snapshot(s);
     // the first plant of each city
     expect(metric(s, "factoriesOwned")).toBe(2);
     Cy.switchCity(s, "north", T0);
     expect(metric(s, "factoriesOwned")).toBe(2);
     // the first city is worth what it made when it was left, Nordheim what it makes now
-    expect(St.companyValue(s, snapshot(s))).toBeCloseTo(value + Math.max(0, snapshot(s).steadyIncomePerSec) * St.STOCK.valueSeconds);
+    // (without the boosts that only last a while: the season running)
+    const parkedDiff = (home.rewardIncomePerSec - home.steadyIncomePerSec) * St.STOCK.valueSeconds;
+    expect(St.companyValue(s, snapshot(s))).toBeCloseTo(value + parkedDiff + Math.max(0, snapshot(s).steadyIncomePerSec) * St.STOCK.valueSeconds);
   });
 });
 
@@ -215,7 +219,7 @@ describe("the city not being played", () => {
   it("brings in its share of steady income, into its own wallet, and pays the shareholders their part", () => {
     const s = withNorth();
     s.chain.steady = 1_000;
-    const steady = snapshot(s).steadyIncomePerSec;
+    const steady = snapshot(s).rewardIncomePerSec;
     Cy.switchCity(s, "north", T0);
     const home = s.cities.home!.cash;
     const north = s.cash;
@@ -239,7 +243,7 @@ describe("the city not being played", () => {
   it("what it brought in while the game was closed waits in the report, for its own wallet", () => {
     const s = withNorth();
     s.chain.steady = 1_000;
-    const steady = snapshot(s).steadyIncomePerSec;
+    const steady = snapshot(s).rewardIncomePerSec;
     Cy.switchCity(s, "north", T0);
     s.lastActiveAt = T0;
     const home = s.cities.home!.cash;
