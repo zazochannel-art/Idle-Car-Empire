@@ -1,4 +1,4 @@
-What's new in 1.0.10:
+What's new in 1.1.1:
 • A livelier map: lit windows and street lamps at night, shadows, sun on the water, steam from the plants
 • Cars lean in turns and show brake lights
 • Glossier buttons and cards
