@@ -1,0 +1,5 @@
+Neu in 1.0.10:
+• Eine lebendigere Karte: beleuchtete Fenster und Straßenlaternen bei Nacht, Schatten, Sonne auf dem Wasser, Dampf aus den Werken
+• Autos neigen sich in Kurven und zeigen Bremslichter
+• Glänzendere Schaltflächen und Karten
+• Korrekturen und Stabilität
