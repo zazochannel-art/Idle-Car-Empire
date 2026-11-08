@@ -102,3 +102,9 @@ Production build, headless Chromium on a phone profile (390×844, CPU slowed 4×
 | One tick (engine, Node, bundled) | 1.22 ms | 0.57 ms |
 | Settling 20 h away (Node, bundled) | ~0.98 s | ~0.64 s |
 | React renders per second on the map | ~300 | ~60 |
+
+## Night and UI round (round 3)
+- Street-lamp light pools: one additive `InstancedMesh` (one draw call), hidden by day.
+- Window glow on model glass (plants, dealers, garages) is a shader term on the shared glass material, no extra lights or draw calls.
+- Sea sun glitter is a shader term on the sea material only.
+- The UI gloss (buttons, cards, dialogs) is CSS only (gradients and inset shadows).

@@ -9,10 +9,10 @@ const buttonVariants = cva(
     variants: {
       variant: {
         // flat bright slabs with a short darker lip, like the racing game's buttons
-        default: "bg-electric text-white shadow-[0_3px_0_0_#1747b8] active:shadow-[0_1px_0_0_#1747b8] hover:brightness-110",
-        gold: "bg-gold text-[#2a1d00] shadow-[0_3px_0_0_#c48300] active:shadow-[0_1px_0_0_#c48300] hover:brightness-105",
-        go: "bg-go text-white shadow-[0_3px_0_0_#168a30] active:shadow-[0_1px_0_0_#168a30] hover:brightness-105",
-        secondary: "bg-[#4b4b50] text-white shadow-[0_3px_0_0_#1f1f22] active:shadow-[0_1px_0_0_#1f1f22] hover:bg-[#55555a]",
+        default: "bg-electric text-white shadow-[0_3px_0_0_#1747b8,inset_0_1px_0_0_rgba(255,255,255,0.32)] active:shadow-[0_1px_0_0_#1747b8,inset_0_1px_0_0_rgba(255,255,255,0.2)] bg-linear-to-b from-white/[0.16] from-0% to-transparent to-55% hover:brightness-110",
+        gold: "bg-gold text-[#2a1d00] shadow-[0_3px_0_0_#c48300,inset_0_1px_0_0_rgba(255,255,255,0.32)] active:shadow-[0_1px_0_0_#c48300,inset_0_1px_0_0_rgba(255,255,255,0.2)] bg-linear-to-b from-white/[0.16] from-0% to-transparent to-55% hover:brightness-105",
+        go: "bg-go text-white shadow-[0_3px_0_0_#168a30,inset_0_1px_0_0_rgba(255,255,255,0.32)] active:shadow-[0_1px_0_0_#168a30,inset_0_1px_0_0_rgba(255,255,255,0.2)] bg-linear-to-b from-white/[0.16] from-0% to-transparent to-55% hover:brightness-105",
+        secondary: "bg-[#4b4b50] text-white shadow-[0_3px_0_0_#1f1f22,inset_0_1px_0_0_rgba(255,255,255,0.32)] active:shadow-[0_1px_0_0_#1f1f22,inset_0_1px_0_0_rgba(255,255,255,0.2)] bg-linear-to-b from-white/[0.16] from-0% to-transparent to-55% hover:bg-[#55555a]",
         ghost: "text-white/80 hover:bg-white/[0.08] hover:text-white",
         outline: "ring-2 ring-white/25 text-white hover:bg-white/[0.08]",
         locked: "bg-[#4a4a4e] text-white/45 shadow-[0_3px_0_0_#1f1f22]",

@@ -454,6 +454,18 @@ function withShore(m: THREE.MeshStandardMaterial, ground: Ground, time: { value:
   diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9, 0.96, 1.0), foam);
   diffuseColor.a = max(diffuseColor.a, foam * 0.9);
 }`,
+      )
+      // sun glitter: the sun's reflection breaks into bright sparkles on the ripples
+      .replace(
+        "#include <emissivemap_fragment>",
+        `#include <emissivemap_fragment>
+#if NUM_DIR_LIGHTS > 0
+{
+  vec3 rf = reflect(-normalize(vViewPosition), normal);
+  float sp = max(dot(rf, directionalLights[0].direction), 0.0);
+  totalEmissiveRadiance += directionalLights[0].color * (pow(sp, 40.0) * 0.12 + pow(sp, 400.0) * 1.6);
+}
+#endif`,
       );
   };
   m.customProgramCacheKey = () => "sea-shore";

@@ -250,6 +250,7 @@ export class MapEngine {
   /** Where the arrow to an off-screen bonus is drawn (CSS px), to tap it. */
   private bonusArrow: [number, number] | null = null;
   private glows: THREE.Points | null = null;
+  private pools: THREE.InstancedMesh | null = null;
   private roadMarks: THREE.Group | null = null;
   private areaIds: Uint8Array | null = null;
   private areaSize: [number, number] = [1, 1];
@@ -386,6 +387,8 @@ export class MapEngine {
     this.scene.add(roads.root);
     this.glows = lampGlows(this.scenery.lamps);
     this.scene.add(this.glows);
+    this.pools = lampPools(this.scenery.lamps);
+    this.scene.add(this.pools);
     this.plots = new PlotLayer(ground);
     this.plots.onFinished = (plot, text) => this.banners.push({ plot, text, age: 0 });
     this.scene.add(this.plots.root);
@@ -944,6 +947,10 @@ export class MapEngine {
       const k = smoothstep(0.55, 0.9, dark);
       (this.glows.material as THREE.PointsMaterial).opacity = k;
       this.glows.visible = k > 0.01;
+      if (this.pools) {
+        (this.pools.material as THREE.MeshBasicMaterial).opacity = k * 0.5;
+        this.pools.visible = k > 0.01;
+      }
     }
   }
 
@@ -1708,6 +1715,45 @@ function blur(a: Float32Array, W: number, H: number, r: number): Float32Array {
     }
   }
   return out;
+}
+
+/** The warm pools of light the street lamps lay on the road and pavement below (shown at night, one draw call). */
+function lampPools(lamps: [number, number, number, number][]) {
+  const plane = new THREE.PlaneGeometry(1, 1);
+  plane.rotateX(-Math.PI / 2);
+  const cv = document.createElement("canvas");
+  cv.width = cv.height = 64;
+  const c = cv.getContext("2d")!;
+  const grad = c.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, "rgba(255,214,140,0.95)");
+  grad.addColorStop(0.45, "rgba(255,190,110,0.4)");
+  grad.addColorStop(1, "rgba(255,170,90,0)");
+  c.fillStyle = grad;
+  c.fillRect(0, 0, 64, 64);
+  const m = new THREE.MeshBasicMaterial({
+    map: new THREE.CanvasTexture(cv),
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    opacity: 0,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
+    fog: false,
+  });
+  const mesh = new THREE.InstancedMesh(plane, m, Math.max(1, lamps.length));
+  mesh.count = lamps.length;
+  const d = new THREE.Object3D();
+  lamps.forEach(([x, z, a, y], i) => {
+    d.position.set(x - 0.2 * Math.cos(a), y + 0.025, z + 0.2 * Math.sin(a));
+    d.scale.set(1.5, 1, 1.5);
+    d.updateMatrix();
+    mesh.setMatrixAt(i, d.matrix);
+  });
+  mesh.frustumCulled = false;
+  mesh.visible = false;
+  mesh.renderOrder = 4;
+  return mesh;
 }
 
 /** Warm glows over the street lamps (shown at night). */

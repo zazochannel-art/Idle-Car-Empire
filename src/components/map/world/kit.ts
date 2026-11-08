@@ -380,6 +380,16 @@ function makeFacades(anisotropy: number): Record<FacadeKind, THREE.CanvasTexture
       }
       g.fillStyle = "#cfd3d8";
       g.fillRect(0, T * 0.9, T, T * 0.1);
+      // a band of high factory windows (they stay lit at night, see `hala` below)
+      for (let k = 0; k < 8; k++) {
+        const x = (k * T) / 8 + T * 0.012, w = T / 8 - T * 0.024;
+        g.fillStyle = "#6f8fae";
+        g.fillRect(x, T * 0.38, w, T * 0.24);
+        g.fillStyle = "rgba(255,255,255,0.35)";
+        g.fillRect(x, T * 0.38, w, T * 0.05);
+        g.fillStyle = "#e3e6ea";
+        g.fillRect(x + w / 2 - 1, T * 0.38, 2, T * 0.24);
+      }
     }, 512, "#ffffff", anisotropy),
     lemn: facadeTexture((g, T, rr, ix) => {
       g.fillStyle = "#8a5a36";
@@ -619,7 +629,16 @@ if (uSnow > 0.001 || uWet > 0.001) {
         .replace("#include <common>", "#include <common>\nuniform float uNight;\nuniform vec2 uGlass;\nuniform float uWinAcross;\nuniform float uWinShare;")
         .replace(
           "#include <emissivemap_fragment>",
-          `#include <emissivemap_fragment>
+          lit.across === 0
+            ? // an untextured pane (a model's glass): a warm glow over its panes, some darker
+              `#include <emissivemap_fragment>
+if (uNight > 0.02) {
+  vec2 cell = floor(vLockUv * uLockSize / 0.22);
+  float h = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
+  float on = step(h, uWinShare) * smoothstep(0.0, 0.2, uNight - (1.0 - fract(h * 91.7)) * 0.3);
+  totalEmissiveRadiance += mix(vec3(1.0, 0.6, 0.28), vec3(1.0, 0.84, 0.52), fract(h * 37.1)) * on * 0.9;
+}`
+            : `#include <emissivemap_fragment>
 #ifdef USE_MAP
 if (uNight > 0.02) {
   vec3 tx = texture2D(map, vMapUv).rgb;
@@ -639,7 +658,8 @@ if (uNight > 0.02) {
         );
     }
   };
-  m.customProgramCacheKey = () => (lit ? "hazed-lit" : "hazed");
+  const key = lit ? (lit.across === 0 ? "hazed-glow" : "hazed-lit") : "hazed";
+  m.customProgramCacheKey = () => key;
   return m;
 }
 
@@ -776,7 +796,7 @@ export function mapMaterials(anisotropy: number): MapMaterials {
       bloc: std({ map: facades.bloc, roughness: 0.7, envMapIntensity: 0.7 }, { glass: GLASS, across: 1, share: 0.55 }),
       birou: std({ map: facades.birou, roughness: 0.45, metalness: 0.15, envMapIntensity: 1.0 }, { glass: GLASS, across: 4, share: 0.5 }),
       sticla: std({ map: facades.sticla, roughness: 0.12, metalness: 0.55, envMapIntensity: 1.4 }, { glass: [0.015, 0.05], across: 4, share: 0.45 }),
-      hala: std({ map: facades.hala, roughness: 0.75, envMapIntensity: 0.6 }),
+      hala: std({ map: facades.hala, roughness: 0.75, envMapIntensity: 0.6 }, { glass: GLASS, across: 2, share: 0.8 }),
       lemn: std({ map: facades.lemn, roughness: 0.85, envMapIntensity: 0.5 }, { glass: GLASS, across: 1, share: 0.5 }),
       adobe: std({ map: facades.adobe, roughness: 0.92, envMapIntensity: 0.5 }, { glass: GLASS, across: 1, share: 0.5 }),
       clasic: std({ map: facades.clasic, roughness: 0.6, envMapIntensity: 0.7 }, { glass: GLASS, across: 1, share: 0.5 }),

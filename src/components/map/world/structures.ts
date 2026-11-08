@@ -14,7 +14,15 @@ import { ALB, C, box, cone, cylinder, gableRoof, hazeAll, hazed, paint, plainUv,
 import { carGeometry } from "./scenery";
 
 let KIT: MaterialKit | null = null;
-const kit = () => (KIT ??= materialKit(THREE));
+const kit = () => {
+  if (!KIT) {
+    KIT = materialKit(THREE);
+    // the models' glass lights up at night (most panes warm, some dark)
+    hazed(KIT.glass, { glass: [0, 0], across: 0, share: 0.7 });
+    KIT.glass.userData.hazed = true;
+  }
+  return KIT;
+};
 
 const plain = hazed(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, metalness: 0.05, envMapIntensity: 0.6 }));
 const metal = hazed(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, metalness: 0.55, envMapIntensity: 1.1 }));
