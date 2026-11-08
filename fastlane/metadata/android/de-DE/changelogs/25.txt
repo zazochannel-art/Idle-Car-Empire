@@ -1,7 +1,8 @@
 Neu in 1.0.9:
-• Nordheims eigene Werke: sechs nordische Modellreihen (Ore Hauler, Fjord Wagon, Snow Crawler, Aurora GT, Ice Rally, Polar Shuttle) und das Flaggschiff Northern Lights
-• Nordpaket im Designstudio
-• Handelsroute zwischen deinen Städten
-• Schneestürme in Nordheim
-• Käufe mit Google Play geprüft
-• Fehlerbehebungen und mehr Stabilität
+• Nordheim: sechs nordische Modellreihen und das Flaggschiff Northern Lights
+• Nordisches Paket im Designstudio
+• Handelsroute zwischen deinen Städten und Schneestürme in Nordheim
+• Black-Friday-Woche: schnellere Kunden, Sterne-Angebote und eine neue Lackierung
+• Sponsorendeals, ein Gebrauchtwagenhof und ein Qualitätskontrolle-Minispiel
+• Käufe werden mit Google Play geprüft
+• Fehlerbehebungen, bessere Balance und Stabilität

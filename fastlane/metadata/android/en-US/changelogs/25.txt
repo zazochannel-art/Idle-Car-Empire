@@ -1,7 +1,8 @@
 What's new in 1.0.9:
-• Nordheim's own landmark works: six Nordic car lines (Ore Hauler, Fjord Wagon, Snow Crawler, Aurora GT, Ice Rally, Polar Shuttle) and the Northern Lights flagship
+• Nordheim: six Nordic car lines and the Northern Lights flagship
 • Nordic package in the Design studio
-• Trade route between your cities
-• Snowstorms in Nordheim
+• Trade route between your cities and snowstorms in Nordheim
+• Black Friday week: faster customers, Star deals and a new livery
+• Sponsor deals, a second-hand car lot and a quality control mini-game
 • Purchases checked with Google Play
-• Fixes and better stability
+• Fixes, better balance and stability
