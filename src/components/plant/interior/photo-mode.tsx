@@ -8,6 +8,7 @@ import { skinUnlocked } from "@/game/engine/collection";
 import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
 import { cue } from "@/lib/feedback";
+import { sharePicture } from "@/lib/share-card";
 import { cn } from "@/lib/utils";
 import { useGame } from "@/store/game-store";
 import { uiEvents } from "@/store/events";
@@ -97,29 +98,6 @@ export async function takePhoto(canvas: HTMLCanvasElement, filter: PhotoFilter, 
   return new Promise((resolve) => out.toBlob((b) => resolve(b), "image/png"));
 }
 
-/** Shares the picture where the device can (phones), or saves it as a file. */
-async function sharePhoto(blob: Blob, name: string): Promise<"shared" | "saved"> {
-  const file = new File([blob], `${name}.png`, { type: "image/png" });
-  const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
-  if (nav.share && nav.canShare?.({ files: [file] })) {
-    try {
-      await nav.share({ files: [file], title: name });
-      return "shared";
-    } catch {
-      // cancelled: save it instead
-    }
-  }
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${name}.png`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 4000);
-  return "saved";
-}
-
 /**
  * Photo mode: everything else is hidden, the hall can still be panned and
  * zoomed, a filter colours it, and the shutter saves or shares the picture.
@@ -137,7 +115,7 @@ export function PhotoMode({ getCanvas, title, filter, onFilter, onClose }: { get
     try {
       const blob = await takePhoto(canvas, filter, title);
       if (!blob) return;
-      const how = await sharePhoto(blob, title.replace(/[^\p{L}\p{N}]+/gu, "-").toLowerCase() || "factory");
+      const how = await sharePicture(blob, title.replace(/[^\p{L}\p{N}]+/gu, "-").toLowerCase() || "factory");
       uiEvents.emit({ type: "toast", tone: "success", icon: "📸", title: t(how === "shared" ? "photo.shared" : "photo.saved") });
     } finally {
       setBusy(false);

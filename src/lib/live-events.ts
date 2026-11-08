@@ -3,6 +3,7 @@
 // and handed to the event schedule (game/engine/events.ts) and the seasons
 // (game/engine/season.ts). Kept in memory only; offline, the regular schedule and the
 // calendar's seasons go on as always. The owner's announcements (0020) come the same way.
+import { parseBalance, setBalance } from "@/game/engine/balance";
 import { setScheduledEvents } from "@/game/engine/events";
 import { setScheduledSeasons } from "@/game/engine/season";
 
@@ -119,9 +120,11 @@ async function rpc(name: string): Promise<unknown> {
 
 /** Asks the server for the scheduled events, seasons and announcements; on any failure that list is left as it was. */
 export async function refreshLiveEvents(now = Date.now()): Promise<boolean> {
-  const [events, seasons, news] = await Promise.allSettled([rpc("live_events"), rpc("live_seasons"), rpc("live_announcements")]);
+  const [events, seasons, news, knobs] = await Promise.allSettled([rpc("live_events"), rpc("live_seasons"), rpc("live_announcements"), rpc("live_balance")]);
   if (events.status === "fulfilled") setScheduledEvents(parseLiveEvents(events.value, now));
   if (seasons.status === "fulfilled") setScheduledSeasons(parseLiveSeasons(seasons.value, now));
   if (news.status === "fulfilled") announcements = parseAnnouncements(news.value, now);
+  // economy knobs (0030): an answer replaces the last one (no row left: all as built); no answer keeps it
+  if (knobs.status === "fulfilled") setBalance(parseBalance(knobs.value));
   return events.status === "fulfilled";
 }

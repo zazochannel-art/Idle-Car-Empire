@@ -5,6 +5,7 @@
 // uses the inspection: leaving the game half-way doesn't bring the same round back.
 import type { GameState } from "../types";
 import type { EconomySnapshot } from "./economy";
+import { balance } from "./balance";
 import { grantReward, rewardCash } from "./rewards";
 import { dateKey } from "./calendar";
 
@@ -96,7 +97,7 @@ export function finishQc(s: GameState, round: (DefectKind | null)[], tapped: num
   const defects = round.filter(Boolean).length;
   const caught = taps.filter((i) => round[i]).length;
   const score = qcScore(defects, caught, taps.length - caught);
-  const reward = { incomeSeconds: Math.round((QC.rewardSeconds * score) / 100) };
+  const reward = { incomeSeconds: Math.round((QC.rewardSeconds * score * balance("qc")) / 100) };
   const money = rewardCash(reward, snap);
   grantReward(s, reward, snap);
   s.quality.rep = Math.min(100, s.quality.rep + (QC.rep * score) / 100);

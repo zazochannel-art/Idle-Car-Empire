@@ -4,6 +4,7 @@
 // lot comes in (a share of the company's income), so they don't move while a car waits.
 import type { CarId, GameState } from "../types";
 import { rewardIncome, unlockedCarIds, type EconomySnapshot } from "./economy";
+import { balance } from "./balance";
 import { book } from "./ledger";
 
 export interface UsedCar {
@@ -81,7 +82,7 @@ export function refreshUsedLot(s: GameState, now: number, snap: EconomySnapshot)
       cond,
       buy: Math.round(w * (USED.buyBase + USED.buyPerCond * cond)),
       fix: Math.round(w * USED.fixPerWear * (1 - cond)),
-      sell: Math.round(w * (USED.sell + USED.sellPerCond * cond)),
+      sell: Math.round(w * (USED.sell + USED.sellPerCond * cond) * balance("usedSell")),
       minutes: Math.round(USED.minutesBase + USED.minutesPerWear * (1 - cond)),
     };
   });

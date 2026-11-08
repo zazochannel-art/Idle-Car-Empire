@@ -106,6 +106,8 @@ jobs:
         working-directory: android
         env:
           ADMOB_APP_ID: ${{ vars.ADMOB_APP_ID }}
+          # the Play Games project id (not a secret): the PLAY_GAMES_APP_ID variable if set, else the game's own (docs/android/play-games.md)
+          PLAY_GAMES_APP_ID: ${{ vars.PLAY_GAMES_APP_ID || '297022434236' }}
         run: |
           # a wrong AdMob app id would fall back to Google's test one: not in a release for players
           if [ -n "$ADMOB_APP_ID" ] && ! echo "$ADMOB_APP_ID" | grep -qE '^ca-app-pub-[0-9]+~[0-9]+$'; then

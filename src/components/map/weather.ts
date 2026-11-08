@@ -55,3 +55,13 @@ export function weatherAt(now: number, season: Season | null): Weather {
   const k = kind === "clear" ? 0 : Math.min(up, down);
   return { kind, k: k * k * (3 - 2 * k), snowCover: season === "winter" ? 0.75 + (kind === "snow" ? 0.25 * k : 0) : 0 };
 }
+
+/** When the weather of `now` changes to another kind (ms): the end of its spell, which may run over several blocks. */
+export function weatherChangesAt(now: number, season: Season | null): number {
+  const block = Math.floor(now / WEATHER_BLOCK_MS);
+  const kind = kindOf(block, season);
+  let next = block + 1;
+  // a spell is at most a few blocks long in practice; the limit only guards the loop
+  while (next < block + 24 && kindOf(next, season) === kind) next++;
+  return next * WEATHER_BLOCK_MS;
+}

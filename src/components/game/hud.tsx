@@ -14,6 +14,7 @@ import { CITIES } from "@/game/config/cities";
 import { useGame } from "@/store/game-store";
 import { useInbox } from "@/store/inbox";
 import { EventChip } from "./event-chip";
+import { WeatherChip } from "./weather-chip";
 import { AdBoostChip } from "./ad-buttons";
 import { useUi } from "@/store/ui-store";
 import { AnimatedNumber } from "./animated-number";
@@ -59,6 +60,7 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
         <div className="pointer-events-auto flex shrink-0 flex-col gap-1.5 md:flex-row">
           <ProfileButton />
           <TimeButton />
+          <WeatherChip />
           <div className="hidden md:block"><LanguageSwitch /></div>
           <button
             onClick={onSettings}
