@@ -158,33 +158,26 @@ try {
 
   await step("enter the game", async () => {
     await page.getByRole("button", { name: "Enter the game" }).click();
-    await page.getByText("Start with your factory").waitFor({ timeout: 60_000 });
+    await page.getByText("This is your factory").waitFor({ timeout: 60_000 });
   });
 
   await step("tutorial: open the factory", async () => {
     await tutorial.getByRole("button", { name: "Open factory" }).click();
-    await page.getByText("Watch production").waitFor();
-  });
-
-  await step("tutorial: the factory floor", async () => {
-    await tutorial.getByRole("button", { name: "Show factory floor" }).click();
-    await page.getByText("Keep it supplied").waitFor();
+    await page.getByText("Give it materials").waitFor();
   });
 
   await step("tutorial: buy materials", async () => {
     await tutorial.getByRole("button", { name: "Buy materials" }).click();
-    await page.getByText("Build your next factory").waitFor();
+    await page.getByText("Build more factories").waitFor();
   });
 
   await step("tutorial: the build menu", async () => {
     await tutorial.getByRole("button", { name: "Open Build" }).click();
-    await page.getByText("Grow the empire").waitFor();
+    await page.getByText("Follow it on the map").waitFor();
   });
 
   await step("tutorial: the map, then the end", async () => {
     await tutorial.getByRole("button", { name: "Show the map" }).click();
-    await page.getByText("Race when you're ready").waitFor();
-    await tutorial.getByRole("button", { name: "Start my empire" }).click();
     await tutorial.waitFor({ state: "detached" });
   });
 
