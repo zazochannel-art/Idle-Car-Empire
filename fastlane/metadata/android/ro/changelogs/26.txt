@@ -1,5 +1,0 @@
-Noutăți în 1.0.10:
-• O hartă mai vie: ferestre luminate și felinare noaptea, umbre, soare pe apă, abur la fabrici
-• Mașinile se înclină în viraje și își arată stopurile
-• Butoane și carduri mai lucioase
-• Reparații și stabilitate
