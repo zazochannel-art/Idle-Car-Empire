@@ -76,17 +76,19 @@ body {
 
 @utility glass {
   /* flat charcoal cards with a faint top light and a short drop */
-  background: #3b3b3f;
+  background: linear-gradient(180deg, #424247, #38383c);
   border: 0;
   box-shadow:
-    0 1px 0 0 rgba(255, 255, 255, 0.07) inset,
+    0 1px 0 0 rgba(255, 255, 255, 0.1) inset,
     0 3px 0 0 rgba(0, 0, 0, 0.32);
 }
 
 @utility glass-strong {
-  background: #2b2b2e;
+  background: linear-gradient(180deg, #323236, #2a2a2d);
   border: 0;
-  box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.75);
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.09) inset,
+    0 30px 60px -20px rgba(0, 0, 0, 0.75);
 }
 
 /* the light grey showroom cards of the garage, dark lettering on top */
