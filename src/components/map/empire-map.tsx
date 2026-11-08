@@ -393,6 +393,8 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
     <div className="absolute inset-0 bg-[#bfe3f7]">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none select-none" aria-label={t("map.nav.map")} />
       <canvas ref={labelsRef} className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden />
+      {/* a soft lens vignette: the eye settles on the middle of the scene (one static gradient, no per-frame cost) */}
+      <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(ellipse 85% 75% at 50% 48%, transparent 58%, rgba(10,18,46,0.2) 100%)" }} />
       <div ref={overlayRef} className="pointer-events-none absolute inset-0 overflow-hidden">
         {/* from far away: the names of the districts and territories already open */}
         {ZONES.filter((z) => areas.has(z.id)).map((z) => (

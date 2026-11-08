@@ -3,7 +3,7 @@
 // the sea floor beyond the map. Heights are in metres; the scene draws them
 // 1.5× taller than life (EXAG) so the relief reads from far away.
 import * as THREE from "three";
-import { hazed, noiseLayer } from "./kit";
+import { LOCK, hazed, noiseLayer } from "./kit";
 
 export const EXAG = 1.5;
 /** Terrain tiles across and down (one 2048 px texture each). */
@@ -248,20 +248,69 @@ function detailTexture(px = 256) {
 }
 
 /**
+ * Contact shadows: a soft dark halo on the ground round every building and tree, painted once into a
+ * small texture (lighter halos stacked, so no blur filter is needed) that the ground reads at its position.
+ * It grounds things that would otherwise float over the grass, and costs one texture read per ground pixel.
+ */
+function contactTexture(data: WorldJson) {
+  const [SX, SZ] = data.size;
+  const W = 1024;
+  const k = W / SX;
+  const cv = document.createElement("canvas");
+  cv.width = W;
+  cv.height = Math.round(SZ * k);
+  const g = cv.getContext("2d")!;
+  g.fillStyle = "#000";
+  g.fillRect(0, 0, cv.width, cv.height);
+  g.scale(k, k);
+  g.translate(SX / 2, SZ / 2);
+  g.fillStyle = "rgba(255,255,255,0.14)";
+  // the halos grow outwards in steps: the nearer the wall, the darker
+  for (const b of data.cladiri) {
+    const w = Math.max(b.w, 0.35), d = Math.max(b.d, 0.35);
+    g.save();
+    g.translate(b.x, b.z);
+    g.rotate(-b.r);
+    for (let s = 0; s < 6; s++) {
+      const e = 0.07 + s * 0.09;
+      g.fillRect(-w / 2 - e, -d / 2 - e, w + 2 * e, d + 2 * e);
+    }
+    g.restore();
+  }
+  for (const tr of data.copaci) {
+    const r = 0.16 * (tr[2] || 1);
+    for (let s = 0; s < 4; s++) {
+      g.beginPath();
+      g.arc(tr[0], tr[1], r + 0.05 + s * 0.06, 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.NoColorSpace;
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  t.anisotropy = 2;
+  return t;
+}
+
+/**
  * Adds the close-range ground detail to a (hazed) terrain material: grass
  * gets blades, clumps and drier or lusher patches; sand, rock and paving a
  * finer grain. Far away the detail averages out to the painted colour.
  */
-function withDetail(m: THREE.MeshStandardMaterial, detail: THREE.Texture) {
+function withDetail(m: THREE.MeshStandardMaterial, detail: THREE.Texture, contact: THREE.Texture, size: [number, number]) {
   const prev = m.onBeforeCompile;
   m.onBeforeCompile = (sh, r) => {
     prev.call(m, sh, r);
     sh.uniforms.uDetail = { value: detail };
+    sh.uniforms.uContact = { value: contact };
+    sh.uniforms.uCloud = LOCK.uniforms.uCloud;
+    sh.uniforms.uWind = LOCK.uniforms.uWind;
+    sh.uniforms.uContactSize = { value: new THREE.Vector2(size[0], size[1]) };
     sh.vertexShader = sh.vertexShader
       .replace("#include <common>", "#include <common>\nvarying vec2 vDetXZ;")
       .replace("#include <project_vertex>", "#include <project_vertex>\nvDetXZ = (modelMatrix * vec4(transformed, 1.0)).xz;");
     sh.fragmentShader = sh.fragmentShader
-      .replace("#include <common>", "#include <common>\nvarying vec2 vDetXZ;\nuniform sampler2D uDetail;")
+      .replace("#include <common>", "#include <common>\nvarying vec2 vDetXZ;\nuniform sampler2D uDetail;\nuniform sampler2D uContact;\nuniform vec2 uContactSize;\nuniform float uCloud;\nuniform float uWind;")
       .replace(
         "#include <map_fragment>",
         `#include <map_fragment>
@@ -299,10 +348,20 @@ function withDetail(m: THREE.MeshStandardMaterial, detail: THREE.Texture) {
     float far = smoothstep(0.12, 0.35, max(w.x, w.y));
     diffuseColor.rgb = mix(diffuseColor.rgb, mix(slabs, laid * 0.96, far), pave);
   }
+  // contact shadows at the foot of walls and trunks
+  float cs = texture2D(uContact, vDetXZ / uContactSize + 0.5).r;
+  diffuseColor.rgb *= 1.0 - 0.5 * smoothstep(0.0, 0.85, cs);
+  // the shadows of clouds drifting over the land
+  if (uCloud > 0.01) {
+    float cl = texture2D(uDetail, vDetXZ * 0.0055 + vec2(uWind * 0.0035, uWind * 0.0012)).b;
+    float cl2 = texture2D(uDetail, vDetXZ * 0.011 - vec2(uWind * 0.002, 0.0)).b;
+    float shade = smoothstep(0.52, 0.78, cl * 0.7 + cl2 * 0.3) * uCloud;
+    diffuseColor.rgb *= 1.0 - 0.2 * shade;
+  }
 }`,
       );
   };
-  m.customProgramCacheKey = () => "hazed-detail";
+  m.customProgramCacheKey = () => "hazed-detail-contact";
   return m;
 }
 
@@ -311,16 +370,105 @@ export interface TerrainParts {
   sea: THREE.Mesh;
   floor: THREE.Mesh;
   waves: THREE.Texture;
+  /** The sea's clock (seconds): the foam laps the shore by it. */
+  seaTime: { value: number };
+}
+
+/** How many grid cells out from the land the sea shades from shallows to deep. */
+const SHORE_CELLS = 10;
+/**
+ * How far every spot of the sea is from the coast, as a texture (0 = land or the waterline, 1 = ten
+ * cells out and beyond). The heights drop off a cliff at the coast, so the distance, not the depth, tells the shallows.
+ */
+function shoreTexture(ground: Ground) {
+  const { GW, GH, m } = ground;
+  const dist = new Float32Array(GW * GH);
+  for (let i = 0; i < dist.length; i++) dist[i] = m[i] >= 0.33 ? 0 : 1e4;
+  // two sweeps of a chamfer distance (1 for a side, √2 for a corner)
+  const R = Math.SQRT2;
+  for (let j = 0; j < GH; j++)
+    for (let i = 0; i < GW; i++) {
+      const k = j * GW + i;
+      let v = dist[k];
+      if (i > 0) v = Math.min(v, dist[k - 1] + 1);
+      if (j > 0) {
+        v = Math.min(v, dist[k - GW] + 1);
+        if (i > 0) v = Math.min(v, dist[k - GW - 1] + R);
+        if (i < GW - 1) v = Math.min(v, dist[k - GW + 1] + R);
+      }
+      dist[k] = v;
+    }
+  for (let j = GH - 1; j >= 0; j--)
+    for (let i = GW - 1; i >= 0; i--) {
+      const k = j * GW + i;
+      let v = dist[k];
+      if (i < GW - 1) v = Math.min(v, dist[k + 1] + 1);
+      if (j < GH - 1) {
+        v = Math.min(v, dist[k + GW] + 1);
+        if (i < GW - 1) v = Math.min(v, dist[k + GW + 1] + R);
+        if (i > 0) v = Math.min(v, dist[k + GW - 1] + R);
+      }
+      dist[k] = v;
+    }
+  const d = new Uint8Array(GW * GH);
+  for (let i = 0; i < d.length; i++) d[i] = Math.round(Math.min(1, dist[i] / SHORE_CELLS) * 255);
+  const t = new THREE.DataTexture(d, GW, GH, THREE.RedFormat, THREE.UnsignedByteType);
+  t.magFilter = THREE.LinearFilter;
+  t.minFilter = THREE.LinearFilter;
+  t.generateMipmaps = false;
+  t.needsUpdate = true;
+  return t;
+}
+
+/**
+ * The sea reads its own distance from the coast: clear turquoise shallows over the sand, deeper blue beyond, and foam
+ * that laps the shore in slow rings. One more texture read on one plane; no extra draw.
+ */
+function withShore(m: THREE.MeshStandardMaterial, ground: Ground, time: { value: number }) {
+  const shore = shoreTexture(ground);
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uShore = { value: shore };
+    sh.uniforms.uSeaSize = { value: new THREE.Vector2(ground.SX, ground.SZ) };
+    sh.uniforms.uSeaTime = time;
+    sh.vertexShader = sh.vertexShader
+      .replace("#include <common>", "#include <common>\nvarying vec2 vSeaXZ;")
+      .replace("#include <project_vertex>", "#include <project_vertex>\nvSeaXZ = (modelMatrix * vec4(transformed, 1.0)).xz;");
+    sh.fragmentShader = sh.fragmentShader
+      .replace("#include <common>", "#include <common>\nvarying vec2 vSeaXZ;\nuniform sampler2D uShore;\nuniform vec2 uSeaSize;\nuniform float uSeaTime;")
+      .replace(
+        "#include <color_fragment>",
+        `#include <color_fragment>
+{
+  vec2 suv = vSeaXZ / uSeaSize + 0.5;
+  float inMap = step(0.0, suv.x) * step(suv.x, 1.0) * step(0.0, suv.y) * step(suv.y, 1.0);
+  float d = mix(1.0, texture2D(uShore, suv).r, inMap);
+  // the shallows: turquoise and clear, so the sand shows through; deeper water takes the blue
+  float shal = 1.0 - smoothstep(0.08, 0.85, d);
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.1, 0.62, 0.62), shal * 0.75);
+  diffuseColor.a = mix(diffuseColor.a, 0.3, shal);
+  // foam: a ragged line at the water's edge and slow rings that run in and fade
+  float rag = 0.5 + 0.5 * sin(vSeaXZ.x * 2.7 + uSeaTime * 0.6) * sin(vSeaXZ.y * 3.3 - uSeaTime * 0.45);
+  float edge = 1.0 - smoothstep(0.04, 0.2 + 0.1 * rag, d);
+  float ring = smoothstep(0.5, 1.0, sin(d * 30.0 - uSeaTime * 1.0 + rag * 1.8)) * (1.0 - smoothstep(0.25, 0.7, d)) * smoothstep(0.12, 0.3, d);
+  float foam = clamp(edge * 0.95 + ring * 0.5, 0.0, 1.0) * inMap;
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9, 0.96, 1.0), foam);
+  diffuseColor.a = max(diffuseColor.a, foam * 0.9);
+}`,
+      );
+  };
+  m.customProgramCacheKey = () => "sea-shore";
+  return m;
 }
 
 /** The six tiles (their textures load in the background), the sea and the floor beyond. */
-export function buildTerrain(ground: Ground, textures: THREE.Texture[]): TerrainParts {
+export function buildTerrain(ground: Ground, textures: THREE.Texture[], data: WorldJson): TerrainParts {
   const tiles: THREE.Mesh[] = [];
   const segX = (ground.GW - 1) / NTX, segY = (ground.GH - 1) / NTY;
   const detail = detailTexture();
+  const contact = contactTexture(data);
   for (let ty = 0; ty < NTY; ty++)
     for (let tx = 0; tx < NTX; tx++) {
-      const mat = withDetail(hazed(new THREE.MeshStandardMaterial({ map: textures[ty * NTX + tx], roughness: 0.92, metalness: 0, envMapIntensity: 0.45 })), detail);
+      const mat = withDetail(hazed(new THREE.MeshStandardMaterial({ map: textures[ty * NTX + tx], roughness: 0.92, metalness: 0, envMapIntensity: 0.45 })), detail, contact, data.size);
       const m = ground.tile(tx * segX, ty * segY, segX, segY, mat);
       m.receiveShadow = true;
       m.castShadow = true;
@@ -331,12 +479,13 @@ export function buildTerrain(ground: Ground, textures: THREE.Texture[]): Terrain
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = -3.2 * EXAG - 0.05;
   const waves = waveTexture();
+  const seaTime = { value: 0 };
   const sea = new THREE.Mesh(
     new THREE.PlaneGeometry(3000, 3000),
-    new THREE.MeshStandardMaterial({ color: "#3a9be0", transparent: true, opacity: 0.6, roughness: 0.08, metalness: 0, normalMap: waves, normalScale: new THREE.Vector2(0.38, 0.38), envMapIntensity: 1.25 }),
+    withShore(new THREE.MeshStandardMaterial({ color: "#3a9be0", transparent: true, opacity: 0.6, roughness: 0.08, metalness: 0, normalMap: waves, normalScale: new THREE.Vector2(0.38, 0.38), envMapIntensity: 1.25 }), ground, seaTime),
   );
   sea.rotation.x = -Math.PI / 2;
   sea.position.y = 0.05;
   sea.receiveShadow = true;
-  return { tiles, sea, floor, waves };
+  return { tiles, sea, floor, waves, seaTime };
 }

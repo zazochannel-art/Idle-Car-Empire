@@ -584,7 +584,7 @@ function BottomDock() {
                   ? "bg-electric text-white shadow-[0_3px_0_0_#1747b8]"
                   : d.id === "build"
                     ? "bg-gold text-[#2a1d00] shadow-[0_3px_0_0_#c48300]"
-                    : "bg-[#5a5a5f] text-white shadow-[0_3px_0_0_#2f2f33] hover:bg-[#646469]",
+                    : "bg-[#5a5a5f] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_3px_0_0_#2f2f33] hover:bg-[#646469]",
               )}
             >
               <span className="flex skew-x-[9deg] flex-col items-center gap-0.5">

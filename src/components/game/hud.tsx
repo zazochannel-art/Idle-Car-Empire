@@ -38,7 +38,7 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
           <InboxButton />
           <CityButton />
         </div>
-        <div className="pointer-events-auto flex min-w-0 flex-1 flex-wrap items-center gap-1.5 rounded-2xl bg-[rgba(36,104,214,0.82)] p-1.5 shadow-[0_3px_0_0_rgba(10,40,110,0.35)] md:flex-nowrap md:gap-2 md:bg-[rgba(36,104,214,0.62)] md:p-2 md:hud-bar">
+        <div className="pointer-events-auto flex min-w-0 flex-1 flex-wrap items-center gap-1.5 rounded-2xl bg-[rgba(36,104,214,0.82)] bg-linear-to-b from-white/20 from-0% to-transparent to-55% p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.4),0_3px_0_0_rgba(10,40,110,0.35)] md:flex-nowrap md:gap-2 md:bg-[rgba(36,104,214,0.62)] md:p-2 md:hud-bar">
           {/* the cash never gives way to the other figures */}
           <div className="relative flex shrink-0 items-center gap-2 pl-1 pr-2">
             <CashCounter label={t("hud.cash")} />
@@ -64,7 +64,7 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
           <div className="hidden md:block"><LanguageSwitch /></div>
           <button
             onClick={onSettings}
-            className="flex size-10 items-center justify-center rounded-full bg-[#5b5b60]/85 text-white shadow-[0_3px_0_0_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:brightness-110"
+            className="flex size-10 items-center justify-center rounded-full bg-[#5b5b60]/85 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_3px_0_0_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:brightness-110"
             aria-label={t("settings.title")}
           >
             <Settings className="size-5" />
@@ -83,7 +83,7 @@ function InboxButton() {
   return (
     <button
       onClick={() => setView("inbox")}
-      className="pointer-events-auto relative flex size-10 shrink-0 items-center justify-center rounded-full bg-[#5b5b60]/85 text-white shadow-[0_3px_0_0_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:brightness-110 md:size-12"
+      className="pointer-events-auto relative flex size-10 shrink-0 items-center justify-center rounded-full bg-[#5b5b60]/85 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_3px_0_0_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:brightness-110 md:size-12"
       aria-label={t("nav.inbox")}
     >
       <Bell className="size-5 md:size-6" />
@@ -106,7 +106,7 @@ function CityButton() {
   return (
     <button
       onClick={() => setView("world")}
-      className="pointer-events-auto relative flex size-10 shrink-0 items-center justify-center rounded-full bg-[#5b5b60]/85 text-xl shadow-[0_3px_0_0_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:brightness-110 md:size-12 md:text-2xl"
+      className="pointer-events-auto relative flex size-10 shrink-0 items-center justify-center rounded-full bg-[#5b5b60]/85 text-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_3px_0_0_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:brightness-110 md:size-12 md:text-2xl"
       aria-label={`${t("nav.world")}: ${t(`city.${city}`)}`}
     >
       {CITIES[city].emoji}
@@ -191,7 +191,7 @@ function LanguageSwitch() {
     <div className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex h-10 items-center gap-1.5 rounded-full bg-[#5b5b60]/85 px-3 text-xs font-bold text-white shadow-[0_3px_0_0_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:brightness-110"
+        className="flex h-10 items-center gap-1.5 rounded-full bg-[#5b5b60]/85 px-3 text-xs font-bold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_3px_0_0_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:brightness-110"
         aria-label="Language"
         aria-expanded={open}
       >
@@ -268,7 +268,7 @@ function TimeButton() {
   return (
     <button
       onClick={() => setTimeMode(TIME_MODES[(TIME_MODES.indexOf(mode) + 1) % TIME_MODES.length])}
-      className="flex size-10 items-center justify-center rounded-full bg-[#5b5b60]/85 text-gold shadow-[0_3px_0_0_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:brightness-110"
+      className="flex size-10 items-center justify-center rounded-full bg-[#5b5b60]/85 text-gold shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_3px_0_0_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:brightness-110"
       aria-label={t(`time.${mode}`)}
       title={t(`time.${mode}`)}
     >
