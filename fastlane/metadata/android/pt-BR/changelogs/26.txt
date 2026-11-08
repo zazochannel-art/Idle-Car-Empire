@@ -1,5 +1,0 @@
-Novidades na 1.0.10:
-• Um mapa mais vivo: janelas iluminadas e postes à noite, sombras, sol na água, vapor nas fábricas
-• Os carros se inclinam nas curvas e mostram as luzes de freio
-• Botões e cartões mais brilhantes
-• Correções e estabilidade

@@ -1,5 +1,0 @@
-Novedades en 1.0.10:
-• Un mapa más vivo: ventanas iluminadas y farolas de noche, sombras, sol sobre el agua, vapor en las fábricas
-• Los coches se inclinan en las curvas y muestran las luces de freno
-• Botones y tarjetas más brillantes
-• Correcciones y estabilidad
