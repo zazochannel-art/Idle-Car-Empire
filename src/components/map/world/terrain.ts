@@ -311,6 +311,94 @@ export interface TerrainParts {
   sea: THREE.Mesh;
   floor: THREE.Mesh;
   waves: THREE.Texture;
+  /** The sea's clock (seconds): the foam laps the shore by it. */
+  seaTime: { value: number };
+}
+
+/** How many grid cells out from the land the sea shades from shallows to deep. */
+const SHORE_CELLS = 10;
+/**
+ * How far every spot of the sea is from the coast, as a texture (0 = land or the waterline, 1 = ten
+ * cells out and beyond). The heights drop off a cliff at the coast, so the distance, not the depth, tells the shallows.
+ */
+function shoreTexture(ground: Ground) {
+  const { GW, GH, m } = ground;
+  const dist = new Float32Array(GW * GH);
+  for (let i = 0; i < dist.length; i++) dist[i] = m[i] >= 0.33 ? 0 : 1e4;
+  // two sweeps of a chamfer distance (1 for a side, √2 for a corner)
+  const R = Math.SQRT2;
+  for (let j = 0; j < GH; j++)
+    for (let i = 0; i < GW; i++) {
+      const k = j * GW + i;
+      let v = dist[k];
+      if (i > 0) v = Math.min(v, dist[k - 1] + 1);
+      if (j > 0) {
+        v = Math.min(v, dist[k - GW] + 1);
+        if (i > 0) v = Math.min(v, dist[k - GW - 1] + R);
+        if (i < GW - 1) v = Math.min(v, dist[k - GW + 1] + R);
+      }
+      dist[k] = v;
+    }
+  for (let j = GH - 1; j >= 0; j--)
+    for (let i = GW - 1; i >= 0; i--) {
+      const k = j * GW + i;
+      let v = dist[k];
+      if (i < GW - 1) v = Math.min(v, dist[k + 1] + 1);
+      if (j < GH - 1) {
+        v = Math.min(v, dist[k + GW] + 1);
+        if (i < GW - 1) v = Math.min(v, dist[k + GW + 1] + R);
+        if (i > 0) v = Math.min(v, dist[k + GW - 1] + R);
+      }
+      dist[k] = v;
+    }
+  const d = new Uint8Array(GW * GH);
+  for (let i = 0; i < d.length; i++) d[i] = Math.round(Math.min(1, dist[i] / SHORE_CELLS) * 255);
+  const t = new THREE.DataTexture(d, GW, GH, THREE.RedFormat, THREE.UnsignedByteType);
+  t.magFilter = THREE.LinearFilter;
+  t.minFilter = THREE.LinearFilter;
+  t.generateMipmaps = false;
+  t.needsUpdate = true;
+  return t;
+}
+
+/**
+ * The sea reads its own distance from the coast: clear turquoise shallows over the sand, deeper blue beyond, and foam
+ * that laps the shore in slow rings. One more texture read on one plane; no extra draw.
+ */
+function withShore(m: THREE.MeshStandardMaterial, ground: Ground, time: { value: number }) {
+  const shore = shoreTexture(ground);
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uShore = { value: shore };
+    sh.uniforms.uSeaSize = { value: new THREE.Vector2(ground.SX, ground.SZ) };
+    sh.uniforms.uSeaTime = time;
+    sh.vertexShader = sh.vertexShader
+      .replace("#include <common>", "#include <common>\nvarying vec2 vSeaXZ;")
+      .replace("#include <project_vertex>", "#include <project_vertex>\nvSeaXZ = (modelMatrix * vec4(transformed, 1.0)).xz;");
+    sh.fragmentShader = sh.fragmentShader
+      .replace("#include <common>", "#include <common>\nvarying vec2 vSeaXZ;\nuniform sampler2D uShore;\nuniform vec2 uSeaSize;\nuniform float uSeaTime;")
+      .replace(
+        "#include <color_fragment>",
+        `#include <color_fragment>
+{
+  vec2 suv = vSeaXZ / uSeaSize + 0.5;
+  float inMap = step(0.0, suv.x) * step(suv.x, 1.0) * step(0.0, suv.y) * step(suv.y, 1.0);
+  float d = mix(1.0, texture2D(uShore, suv).r, inMap);
+  // the shallows: turquoise and clear, so the sand shows through; deeper water takes the blue
+  float shal = 1.0 - smoothstep(0.08, 0.85, d);
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.1, 0.62, 0.62), shal * 0.75);
+  diffuseColor.a = mix(diffuseColor.a, 0.3, shal);
+  // foam: a ragged line at the water's edge and slow rings that run in and fade
+  float rag = 0.5 + 0.5 * sin(vSeaXZ.x * 2.7 + uSeaTime * 0.6) * sin(vSeaXZ.y * 3.3 - uSeaTime * 0.45);
+  float edge = 1.0 - smoothstep(0.04, 0.2 + 0.1 * rag, d);
+  float ring = smoothstep(0.5, 1.0, sin(d * 30.0 - uSeaTime * 1.0 + rag * 1.8)) * (1.0 - smoothstep(0.25, 0.7, d)) * smoothstep(0.12, 0.3, d);
+  float foam = clamp(edge * 0.95 + ring * 0.5, 0.0, 1.0) * inMap;
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9, 0.96, 1.0), foam);
+  diffuseColor.a = max(diffuseColor.a, foam * 0.9);
+}`,
+      );
+  };
+  m.customProgramCacheKey = () => "sea-shore";
+  return m;
 }
 
 /** The six tiles (their textures load in the background), the sea and the floor beyond. */
@@ -331,12 +419,13 @@ export function buildTerrain(ground: Ground, textures: THREE.Texture[]): Terrain
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = -3.2 * EXAG - 0.05;
   const waves = waveTexture();
+  const seaTime = { value: 0 };
   const sea = new THREE.Mesh(
     new THREE.PlaneGeometry(3000, 3000),
-    new THREE.MeshStandardMaterial({ color: "#3a9be0", transparent: true, opacity: 0.6, roughness: 0.08, metalness: 0, normalMap: waves, normalScale: new THREE.Vector2(0.38, 0.38), envMapIntensity: 1.25 }),
+    withShore(new THREE.MeshStandardMaterial({ color: "#3a9be0", transparent: true, opacity: 0.6, roughness: 0.08, metalness: 0, normalMap: waves, normalScale: new THREE.Vector2(0.38, 0.38), envMapIntensity: 1.25 }), ground, seaTime),
   );
   sea.rotation.x = -Math.PI / 2;
   sea.position.y = 0.05;
   sea.receiveShadow = true;
-  return { tiles, sea, floor, waves };
+  return { tiles, sea, floor, waves, seaTime };
 }

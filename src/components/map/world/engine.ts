@@ -821,6 +821,7 @@ export class MapEngine {
 
     // time of day
     worldClock.t += dt;
+    LOCK.uniforms.uWind.value = this.t;
     const sky = skyAt(this.timeMode, worldClock.t);
     this.applySky(sky.dark);
     // the sun moves on (its shadows with it) once it has turned a little
@@ -857,6 +858,7 @@ export class MapEngine {
       const waves = this.terrain!.waves;
       waves.offset.x = (waves.offset.x + dt * 0.004) % 1;
       waves.offset.y = (waves.offset.y + dt * 0.0025) % 1;
+      this.terrain!.seaTime.value = this.t;
     }
     if (this.fx && this.weather) {
       this.fx.update(dt);
@@ -917,6 +919,8 @@ export class MapEngine {
     this.hemi.intensity = 0.6 - dark * 0.3;
     this.hemi.color.copy(this.hemiDay).lerp(this.hemiNight, dark);
     this.scene.environmentIntensity = 0.25 * (1 - dark * 0.5);
+    // the windows light up as the evening comes on
+    LOCK.uniforms.uNight.value = smoothstep(0.35, 0.8, dark);
     if (this.glows) {
       const k = smoothstep(0.55, 0.9, dark);
       (this.glows.material as THREE.PointsMaterial).opacity = k;

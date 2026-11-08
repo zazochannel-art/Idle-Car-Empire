@@ -498,8 +498,53 @@ export const LOCK = {
     /** Snow lying on what faces up (0–1), and rain on it (0–1): the weather (weather-fx.ts). */
     uSnow: { value: 0 },
     uWet: { value: 0 },
+    /** How dark it is for the windows (0 = day … 1 = night): lit windows glow from dusk (see `LitWindows`). */
+    uNight: { value: 0 },
+    /** Seconds on the map's clock: the trees' sway. */
+    uWind: { value: 0 },
   },
 };
+
+/**
+ * Where a facade's glass is in its texture (a blue tint over red, in texels' colour) and how many
+ * lit-or-dark windows a bay holds across: night lights those windows (hazed's `lit` option).
+ */
+export interface LitWindows {
+  /** The blue-over-red range that counts as glass (from none to all of it). */
+  glass: [number, number];
+  /** Windows across one bay (a lit one is a whole pane). */
+  across: number;
+  /** The share of windows that are lit at night (0–1). */
+  share: number;
+}
+
+/** Lets the leaves bend in the wind: the crown moves more the higher it is, each tree out of step with its neighbours. */
+export function windy<M extends THREE.Material>(m: M): M {
+  const prev = m.onBeforeCompile;
+  m.onBeforeCompile = (sh, r) => {
+    prev.call(m, sh, r);
+    sh.uniforms.uWind = LOCK.uniforms.uWind;
+    sh.vertexShader = sh.vertexShader
+      .replace("#include <common>", "#include <common>\nuniform float uWind;")
+      .replace(
+        "#include <begin_vertex>",
+        `#include <begin_vertex>
+{
+  float top = clamp(transformed.y, 0.0, 1.2);
+  vec2 at = vec2(0.0);
+#ifdef USE_INSTANCING
+  at = instanceMatrix[3].xz;
+#endif
+  float ph = at.x * 0.7 + at.y * 0.45;
+  float gust = 0.6 + 0.4 * sin(uWind * 0.37 + at.x * 0.05);
+  transformed.x += (sin(uWind * 1.35 + ph) + 0.35 * sin(uWind * 3.1 + ph * 2.3)) * 0.016 * top * top * gust;
+  transformed.z += cos(uWind * 1.1 + ph * 1.2) * 0.011 * top * top * gust;
+}`,
+      );
+  };
+  m.customProgramCacheKey = () => "hazed-windy";
+  return m;
+}
 
 /**
  * Lets a material fade under the locked-land haze, and take snow and rain
@@ -507,9 +552,14 @@ export const LOCK = {
  * material's userData.snowK, 0–1, says how much snow stays on it: less on
  * the roads).
  */
-export function hazed<M extends THREE.Material>(m: M): M {
+export function hazed<M extends THREE.Material>(m: M, lit: LitWindows | null = null): M {
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, LOCK.uniforms);
+    if (lit) {
+      sh.uniforms.uGlass = { value: new THREE.Vector2(lit.glass[0], lit.glass[1]) };
+      sh.uniforms.uWinAcross = { value: lit.across };
+      sh.uniforms.uWinShare = { value: lit.share };
+    }
     sh.uniforms.uSnowK = { value: typeof m.userData.snowK === "number" ? m.userData.snowK : 1 };
     sh.vertexShader = sh.vertexShader
       .replace("#include <common>", "#include <common>\nvarying vec2 vLockUv;\nuniform vec2 uLockSize;")
@@ -561,8 +611,33 @@ if (uSnow > 0.001 || uWet > 0.001) {
   }
 }`,
       );
+    if (lit) {
+      // night: the glass of a facade glows where a window is lit, warm lamps and the odd cool screen
+      sh.fragmentShader = sh.fragmentShader
+        .replace("#include <common>", "#include <common>\nuniform float uNight;\nuniform vec2 uGlass;\nuniform float uWinAcross;\nuniform float uWinShare;")
+        .replace(
+          "#include <emissivemap_fragment>",
+          `#include <emissivemap_fragment>
+#ifdef USE_MAP
+if (uNight > 0.02) {
+  vec3 tx = texture2D(map, vMapUv).rgb;
+  float glass = smoothstep(uGlass.x, uGlass.y, tx.b - tx.r) * smoothstep(0.05, 0.14, tx.b);
+  if (glass > 0.0) {
+    vec2 cell = floor(vec2(vMapUv.x * 4.0 * uWinAcross, vMapUv.y * 4.0));
+    vec2 block = floor(vLockUv * uLockSize / 2.5);
+    float h = fract(sin(dot(cell + block * 7.31, vec2(12.9898, 78.233))) * 43758.5453);
+    float h2 = fract(h * 91.7);
+    float on = step(h, uWinShare) * smoothstep(0.0, 0.2, uNight - (1.0 - h2) * 0.35);
+    vec3 warm = mix(vec3(1.0, 0.62, 0.28), vec3(1.0, 0.84, 0.52), h2);
+    vec3 glow = mix(warm, vec3(0.62, 0.8, 1.0), step(0.86, h2));
+    totalEmissiveRadiance += glow * glass * on * (0.75 + 0.5 * tx.b) * 1.5;
+  }
+}
+#endif`,
+        );
+    }
   };
-  m.customProgramCacheKey = () => "hazed";
+  m.customProgramCacheKey = () => (lit ? "hazed-lit" : "hazed");
   return m;
 }
 
@@ -690,23 +765,24 @@ export interface MapMaterials {
 
 export function mapMaterials(anisotropy: number): MapMaterials {
   const facades = makeFacades(anisotropy);
-  const std = (p: THREE.MeshStandardMaterialParameters) => hazed(new THREE.MeshStandardMaterial({ vertexColors: true, ...p }));
+  const std = (p: THREE.MeshStandardMaterialParameters, lit: LitWindows | null = null) => hazed(new THREE.MeshStandardMaterial({ vertexColors: true, ...p }), lit);
+  const GLASS: [number, number] = [0.05, 0.12];
   return {
     facades,
     byKind: {
-      casa: std({ map: facades.casa, roughness: 0.85, envMapIntensity: 0.6 }),
-      bloc: std({ map: facades.bloc, roughness: 0.7, envMapIntensity: 0.7 }),
-      birou: std({ map: facades.birou, roughness: 0.45, metalness: 0.15, envMapIntensity: 1.0 }),
-      sticla: std({ map: facades.sticla, roughness: 0.12, metalness: 0.55, envMapIntensity: 1.4 }),
+      casa: std({ map: facades.casa, roughness: 0.85, envMapIntensity: 0.6 }, { glass: GLASS, across: 1, share: 0.5 }),
+      bloc: std({ map: facades.bloc, roughness: 0.7, envMapIntensity: 0.7 }, { glass: GLASS, across: 1, share: 0.55 }),
+      birou: std({ map: facades.birou, roughness: 0.45, metalness: 0.15, envMapIntensity: 1.0 }, { glass: GLASS, across: 4, share: 0.5 }),
+      sticla: std({ map: facades.sticla, roughness: 0.12, metalness: 0.55, envMapIntensity: 1.4 }, { glass: [0.015, 0.05], across: 4, share: 0.45 }),
       hala: std({ map: facades.hala, roughness: 0.75, envMapIntensity: 0.6 }),
-      lemn: std({ map: facades.lemn, roughness: 0.85, envMapIntensity: 0.5 }),
-      adobe: std({ map: facades.adobe, roughness: 0.92, envMapIntensity: 0.5 }),
-      clasic: std({ map: facades.clasic, roughness: 0.6, envMapIntensity: 0.7 }),
+      lemn: std({ map: facades.lemn, roughness: 0.85, envMapIntensity: 0.5 }, { glass: GLASS, across: 1, share: 0.5 }),
+      adobe: std({ map: facades.adobe, roughness: 0.92, envMapIntensity: 0.5 }, { glass: GLASS, across: 1, share: 0.5 }),
+      clasic: std({ map: facades.clasic, roughness: 0.6, envMapIntensity: 0.7 }, { glass: GLASS, across: 1, share: 0.5 }),
       plain: std({ roughness: 0.78, metalness: 0.02, envMapIntensity: 0.6 }),
       metal: std({ roughness: 0.32, metalness: 0.55, envMapIntensity: 1.1 }),
       roof: std({ map: roofTexture(anisotropy), roughness: 0.78, envMapIntensity: 0.6, side: THREE.DoubleSide }),
     },
-    leaves: std({ roughness: 0.86, envMapIntensity: 0.45 }),
+    leaves: windy(std({ roughness: 0.86, envMapIntensity: 0.45 })),
     car: std({ roughness: 0.35, metalness: 0.35, envMapIntensity: 1.0 }),
   };
 }
