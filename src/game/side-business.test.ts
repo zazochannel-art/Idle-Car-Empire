@@ -277,3 +277,17 @@ describe("the economy's limits", () => {
     expect(Lv.vipStarsLeft(s, NOW + 86_400_000)).toBe(VIP.starsPerDay);
   });
 });
+
+describe("car tiers", () => {
+  it("every car has a value multiplier for its tier (Northern Lights is tier 11)", async () => {
+    const { CARS } = await import("./config/cars");
+    const { computeGlobalMods } = await import("./engine/modifiers");
+    const { carValue } = await import("./engine/chain");
+    const s = createInitialState(NOW);
+    const gm = computeGlobalMods(s);
+    for (const c of CARS) {
+      expect(Number.isFinite(gm.value[c.tier]), c.id).toBe(true);
+      expect(Number.isFinite(carValue(s, c, gm)), c.id).toBe(true);
+    }
+  });
+});
