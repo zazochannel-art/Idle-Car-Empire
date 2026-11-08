@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { WEATHER_BLOCK_MS, weatherAt, type WeatherKind } from "./weather";
+import { WEATHER_BLOCK_MS, weatherAt, weatherChangesAt, type WeatherKind } from "./weather";
 
 const T0 = Date.UTC(2026, 9, 24, 12);
 
@@ -45,5 +45,17 @@ describe("map weather", () => {
   it("keeps snow on the ground all through winter", () => {
     expect(weatherAt(T0, "winter").snowCover).toBeGreaterThanOrEqual(0.75);
     expect(weatherAt(T0, null).snowCover).toBe(0);
+  });
+
+  it("says when the weather changes, over blocks of the same kind", () => {
+    for (let b = 0; b < 300; b++) {
+      const now = T0 + b * WEATHER_BLOCK_MS + 1000;
+      const end = weatherChangesAt(now, null);
+      expect(end).toBeGreaterThan(now);
+      expect(end % WEATHER_BLOCK_MS).toBe(0);
+      // the same weather right up to the change, another right after it
+      expect(weatherAt(end - 1, null).kind).toBe(weatherAt(now, null).kind);
+      expect(weatherAt(end + 1, null).kind).not.toBe(weatherAt(now, null).kind);
+    }
   });
 });

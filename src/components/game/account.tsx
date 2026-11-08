@@ -16,6 +16,7 @@ import { INVITE } from "@/game/engine/invites";
 import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
 import { passwordIssue } from "@/lib/password";
+import { cardBlob, sharePicture, shareCardData, STORE_URL } from "@/lib/share-card";
 import { installPlayUpdate, playApp } from "@/lib/play-update";
 import { cn } from "@/lib/utils";
 import { answerStartChoice, enterGame, useCloud } from "@/store/cloud-store";
@@ -637,6 +638,7 @@ function BackupsCard() {
 /** The player's invite code to give friends, and a friend's code to use (a new account only). */
 function InviteCard() {
   const saves = useGame((g) => g.saves);
+  const gameState = useGame((g) => g.state);
   const claim = useGame((g) => g.claimInviteRewards);
   const redeem = useGame((g) => g.redeemInvite);
   const mode = useCloud((c) => c.mode);
@@ -672,6 +674,19 @@ function InviteCard() {
     }
   };
   const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+  const shareCard = async () => {
+    if (!info) return;
+    setBusy(true);
+    try {
+      const labels = { cars: t("card.cars"), earned: t("card.earned"), stars: t("card.stars"), achievements: t("card.achievements"), useCode: t("card.useCode"), get: t("card.get") };
+      const blob = await cardBlob(shareCardData(gameState, info.code), labels);
+      if (!blob) return;
+      const how = await sharePicture(blob, "idle-car-empire", `${share} ${STORE_URL}`);
+      uiEvents.emit({ type: "toast", tone: "success", icon: "🪪", title: t(how === "shared" ? "card.shared" : "card.saved") });
+    } finally {
+      setBusy(false);
+    }
+  };
   const use = async () => {
     setBusy(true);
     setMsg(null);
@@ -707,11 +722,14 @@ function InviteCard() {
               {t("invite.copy")}
             </Button>
             {canShare && (
-              <Button size="sm" variant="gold" onClick={() => void navigator.share({ text: share }).catch(() => {})}>
+              <Button size="sm" variant="gold" onClick={() => void navigator.share({ text: `${share} ${STORE_URL}` }).catch(() => {})}>
                 {t("invite.share")}
               </Button>
             )}
           </div>
+          <Button size="sm" variant="secondary" className="w-full" disabled={busy} onClick={() => void shareCard()}>
+            🪪 {t("invite.card")}
+          </Button>
           <div className="flex justify-between text-[11px] text-white/60">
             <span>{t("invite.friends", { n: formatNumber(info.friends) })}</span>
             <span>{t("invite.rewardedCount", { n: formatNumber(info.rewarded), max: formatNumber(info.max) })}</span>

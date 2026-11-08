@@ -196,3 +196,83 @@ export class FactoryAmbience {
     this.master = null;
   }
 }
+
+/**
+ * Rain over the Empire Map, synthesised: a soft hiss of filtered noise and, in the heavy
+ * spells, a deeper rumble under it. It fades in and out with the weather and is silent
+ * when sound is off, the game is in the background, or the factory floor is open.
+ */
+export class RainSound {
+  private a: AudioContext | null = null;
+  private master: GainNode | null = null;
+  private hiss: GainNode | null = null;
+  private sources: AudioScheduledSourceNode[] = [];
+
+  /** `level` 0–1: how hard it rains; 0 fades it out. Starts the sound on the first call above 0. */
+  set(level: number, muted = false) {
+    const on = level > 0.01 && !muted && soundOn() && typeof document !== "undefined" && !document.hidden;
+    if (!this.a && on) this.start();
+    const a = this.a;
+    if (!a || !this.master || !this.hiss) return;
+    this.master.gain.setTargetAtTime(on ? 1 : 0, a.currentTime, 0.8);
+    this.hiss.gain.setTargetAtTime(0.012 + 0.03 * Math.max(0, Math.min(1, level)), a.currentTime, 0.8);
+  }
+
+  private start() {
+    const a = audio();
+    if (!a) return;
+    this.a = a;
+    const master = (this.master = a.createGain());
+    master.gain.value = 0;
+    master.connect(a.destination);
+    const hiss = (this.hiss = a.createGain());
+    hiss.gain.value = 0;
+    hiss.connect(master);
+    // the drops: white noise, high-passed and rounded off
+    const drops = a.createBufferSource();
+    drops.buffer = noise(a, 4, false);
+    drops.loop = true;
+    const hp = a.createBiquadFilter();
+    hp.type = "highpass";
+    hp.frequency.value = 1400;
+    const lp = a.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 7000;
+    drops.connect(hp).connect(lp).connect(hiss);
+    // the rooftops and the road under it: brown noise
+    const body = a.createBufferSource();
+    body.buffer = noise(a, 4, true);
+    body.loop = true;
+    const bl = a.createBiquadFilter();
+    bl.type = "lowpass";
+    bl.frequency.value = 500;
+    const bg = a.createGain();
+    bg.gain.value = 0.5;
+    body.connect(bl).connect(bg).connect(hiss);
+    for (const s of [drops, body]) s.start();
+    this.sources.push(drops, body);
+  }
+
+  stop() {
+    const a = this.a;
+    const master = this.master;
+    if (a && master) {
+      master.gain.setTargetAtTime(0, a.currentTime, 0.1);
+      const sources = this.sources;
+      setTimeout(() => {
+        for (const s of sources) {
+          try {
+            s.stop();
+          } catch {
+            // already stopped
+          }
+        }
+        master.disconnect();
+      }, 500);
+    }
+    this.sources = [];
+    this.a = null;
+    this.master = null;
+    this.hiss = null;
+  }
+}
