@@ -78,6 +78,8 @@ export async function startNative() {
   const adFree = () => setAdFree(useGame.getState().ready && useGame.getState().state.iap.owned.includes("adFree"));
   useGame.subscribe(adFree);
   adFree();
+  // Google Play Games (achievements, a leaderboard): Android only, and only when the build has its project id
+  if (platform() === "android") void import("./native-play-games").then((m) => m.startPlayGames()).catch((e) => reportError(e, "rejection"));
   // in-app purchases: Google Play only, and only once the build has its products (docs/android/iap.md)
   // a store that fails to start sells nothing: the anonymous error reports say so
   if (platform() === "android" && iapConfigured()) void import("./native-iap").then((m) => m.startIap()).catch((e) => reportError(e, "rejection"));

@@ -24,3 +24,6 @@
 # their constructors, or the release app stops at launch ("Failed to create an instance of
 # androidx.work.impl.WorkDatabase").
 -keep class * extends androidx.room.RoomDatabase { <init>(); }
+
+# the game's own Capacitor plugin (Google Play Games): found by reflection, never shrunk
+-keep class com.zazochannel.idlecarempire.PlayGamesPlugin { *; }

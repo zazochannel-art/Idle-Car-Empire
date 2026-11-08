@@ -41,6 +41,13 @@ def admobAppIdGiven = (project.findProperty('admobAppId') ?: System.getenv('ADMO
 def admobAppIdValid = admobAppIdGiven ==~ /ca-app-pub-\d+~\d+/
 def admobAppId = admobAppIdValid ? admobAppIdGiven : admobSampleAppId
 
+// Google Play Games Services (achievements, a leaderboard): the numeric project id from Play Console >
+// Play Games Services > Configuration, as -PplayGamesAppId=… or the PLAY_GAMES_APP_ID variable
+// (docs/android/play-games.md). Without a valid one the id is "0" and the game's plugin does nothing.
+def playGamesAppIdGiven = (project.findProperty('playGamesAppId') ?: System.getenv('PLAY_GAMES_APP_ID') ?: '') as String
+def playGamesAppIdValid = playGamesAppIdGiven ==~ /\d{6,20}/
+def playGamesAppId = playGamesAppIdValid ? playGamesAppIdGiven : '0'
+
 android {
     namespace = "com.zazochannel.idlecarempire"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -51,6 +58,7 @@ android {
         versionCode appVersionCode
         versionName appVersionName
         manifestPlaceholders = [admobAppId: admobAppId]
+        resValue "string", "game_services_project_id", playGamesAppId
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -122,6 +130,12 @@ if (admobAppIdGiven && !admobAppIdValid) {
     logger.lifecycle("No AdMob app id (ADMOB_APP_ID or -PadmobAppId): this build shows Google's test ads only.")
 }
 
+if (playGamesAppIdGiven && !playGamesAppIdValid) {
+    logger.warn("PLAY_GAMES_APP_ID is not a Play Games project id (digits only, Play Console > Play Games Services > Configuration): '${playGamesAppIdGiven}'. This build has no Play Games.")
+} else if (!playGamesAppIdValid) {
+    logger.lifecycle("No Play Games project id (PLAY_GAMES_APP_ID or -PplayGamesAppId): this build has no Play Games.")
+}
+
 if (!canSignRelease) {
     logger.lifecycle("No upload key configured (android/keystore.properties or ANDROID_KEYSTORE_* variables): release builds will be unsigned.")
 }
@@ -138,6 +152,7 @@ dependencies {
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
+    implementation "com.google.android.gms:play-services-games-v2:$playGamesVersion"
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"

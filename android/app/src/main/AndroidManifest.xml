@@ -47,6 +47,13 @@
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="${admobAppId}" />
 
+        <!-- Google Play Games Services project id: set by the build (PLAY_GAMES_APP_ID, see
+             android/app/build.gradle and docs/android/play-games.md); "0" until then, and the
+             plugin does nothing -->
+        <meta-data
+            android:name="com.google.android.gms.games.APP_ID"
+            android:value="@string/game_services_project_id" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

@@ -4,11 +4,39 @@ import { Progress } from "@/components/ui/progress";
 import { ACHIEVEMENTS, ACHIEVEMENT_INCOME_BONUS } from "@/game/config/achievements";
 import { conditionProgress } from "@/game/engine/progress";
 import { formatMoney, formatNumber, formatPercent } from "@/game/format";
+import { playGamesAchievements, playGamesLeaderboard, playGamesSignIn, usePlayGames } from "@/lib/play-games";
 import { cn } from "@/lib/utils";
 import { useContent } from "@/i18n/content";
 import { useT } from "@/i18n/use-t";
 import { useGame } from "@/store/game-store";
+import { Button } from "@/components/ui/button";
 import { ViewHeader } from "./section-title";
+
+/** Google Play Games (the Android app, once the build has it): sign in, or open its achievements and the cars board. */
+function PlayGamesCard() {
+  const { t } = useT();
+  const pg = usePlayGames();
+  if (!pg.configured) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/10">
+      <div className="min-w-0 flex-1 text-sm font-bold">🎮 {t("playgames.title")}</div>
+      {pg.signedIn ? (
+        <>
+          <Button size="sm" variant="secondary" onClick={() => void playGamesAchievements()}>
+            {t("playgames.achievements")}
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => void playGamesLeaderboard()}>
+            {t("playgames.leaderboard")}
+          </Button>
+        </>
+      ) : (
+        <Button size="sm" variant="gold" onClick={() => void playGamesSignIn()}>
+          {t("playgames.signIn")}
+        </Button>
+      )}
+    </div>
+  );
+}
 
 export function AchievementsView() {
   const state = useGame((g) => g.view.state);
@@ -26,6 +54,7 @@ export function AchievementsView() {
       >
         <Progress value={(count / ACHIEVEMENTS.length) * 100} indicatorClassName="from-gold to-amber-300" />
       </ViewHeader>
+      <PlayGamesCard />
       <div className="grid gap-2 @sm:grid-cols-2 @3xl:grid-cols-3">
         {ACHIEVEMENTS.map((a) => {
           const unlocked = state.achievements.includes(a.id);

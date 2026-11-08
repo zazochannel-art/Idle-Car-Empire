@@ -1,6 +1,7 @@
 package com.zazochannel.idlecarempire;
 
 import android.content.Intent;
+import android.os.Bundle;
 import android.util.Log;
 import android.view.ViewGroup;
 import android.webkit.WebView;
@@ -9,6 +10,13 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
 
     private static final String TAG = "idlecarempire";
+
+    /** The game's own plugin (Google Play Games), registered before the bridge starts. */
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(PlayGamesPlugin.class);
+        super.onCreate(savedInstanceState);
+    }
 
     /**
      * Capacitor destroys its WebView when the activity's window goes away (onDetachedFromWindow).

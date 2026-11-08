@@ -19,6 +19,7 @@ Other documents: [signing.md](signing.md) (the upload key),
 [play-store.md](play-store.md) (listing, forms, publication, what is left to
 do), [ads.md](ads.md) (rewarded ads: AdMob, consent, what you set up),
 [iap.md](iap.md) (in-app purchases, off until you set up the products),
+[play-games.md](play-games.md) (Google Play Games: achievements and a leaderboard, off until you set it up),
 [../moderation.md](../moderation.md) (players' reports and names).
 
 ## Why Capacitor
