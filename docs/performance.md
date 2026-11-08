@@ -49,7 +49,11 @@ What keeps the game light, and how to measure it.
   texture; which windows glow is a hash of the bay and building, no extra texture); the trees'
   sway is a vertex offset in the leaves' material; the sea reads one small texture (the distance
   from the coast, made once at load) for its turquoise shallows and foam. No extra draw calls, no
-  per-frame work on the main thread. Before/after: `docs/graphics/before-after-2026-11-08.jpg`.
+  per-frame work on the main thread. Round two: contact shadows round buildings and trees and the
+  clouds' drifting shadows are two more reads in the ground's shader (the halos are painted once into a
+  small texture at load); the cars' lean and nose-dip are two Euler angles eased per car on each tick;
+  brake lights are a colour change; steam is a few puffs a second from the plants' roofs, only when the
+  camera is close (fewer on low graphics). Before/after: `docs/graphics/before-after-2026-11-08.jpg`.
 - **Absence**: the offline settlement simulates the chain step by step; recipes, unit materials
   and road distances are worked out once, so it runs about a third faster with the same results.
 - The battery saver (`docs/battery-saver.md`) lowers frames and ticks further.

@@ -367,7 +367,7 @@ export class MapEngine {
     this.ground = ground;
     this.ty = ground.at(this.cam.x, this.cam.z);
     this.mats = mapMaterials(aniso);
-    this.terrain = buildTerrain(ground, tiles);
+    this.terrain = buildTerrain(ground, tiles, data);
     this.scene.add(...this.terrain.tiles, this.terrain.sea, this.terrain.floor);
     // the junctions that are roundabouts: the scenery keeps off them, the roads draw them, the traffic drives round them
     const rings = roundabouts(WORLD_MAP, data.cladiri);
@@ -790,6 +790,21 @@ export class MapEngine {
     return out;
   }
 
+  private steamAcc = 0;
+  /** Steam over the plants' roofs, only where the camera is looking close (a few puffs a second in all). */
+  private steam(dt: number) {
+    if (!this.fx || !this.plots || this.cam.dist > CLOSE_VIEW * 1.3) return;
+    this.steamAcc += dt;
+    if (this.steamAcc < (this.low ? 0.8 : 0.45)) return;
+    this.steamAcc = 0;
+    const reach = this.cam.dist * 0.9;
+    let n = 0;
+    for (const v of this.plots.vents()) {
+      if (Math.hypot(v.x - this.cam.x, v.z - this.cam.z) > reach || n++ >= 10) continue;
+      this.fx.smoke(v.x, v.y + 0.03, v.z, 0.78);
+    }
+  }
+
   private render(dt: number) {
     this.t += dt;
     const live = this.live();
@@ -840,6 +855,7 @@ export class MapEngine {
         }
       }
       this.plots!.frame(this.t, live.state);
+      this.steam(dt);
       // in steps of at most 0.1 s, as at full speed: the saver's rarer frames keep the same yielding and turns
       for (let left = dt; left > 1e-6; left -= 0.1) {
         const step = Math.min(0.1, left);
@@ -918,7 +934,10 @@ export class MapEngine {
     this.sun.color.copy(this.sunWarm).lerp(this.sunNight, Math.min(1, dark * 1.4) * 0.6);
     this.hemi.intensity = 0.6 - dark * 0.3;
     this.hemi.color.copy(this.hemiDay).lerp(this.hemiNight, dark);
-    this.scene.environmentIntensity = 0.25 * (1 - dark * 0.5);
+    // wet ground and rain-washed colours catch more of the sky's light: the streets shine
+    this.scene.environmentIntensity = 0.25 * (1 - dark * 0.5) + 0.3 * LOCK.uniforms.uWet.value * (1 - dark * 0.4);
+    // clouds drift over the land by day, less under a grey sky
+    LOCK.uniforms.uCloud.value = (1 - smoothstep(0.3, 0.8, dark)) * (1 - 0.6 * over);
     // the windows light up as the evening comes on
     LOCK.uniforms.uNight.value = smoothstep(0.35, 0.8, dark);
     if (this.glows) {

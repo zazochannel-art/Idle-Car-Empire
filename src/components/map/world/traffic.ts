@@ -8,6 +8,7 @@ import { WORLD_MAP, along, plotOf, roadOpen, roadRoute, roadsBetween, type Entry
 import { buildCar, buildCarrier, buildTruck, loadHeroes, materialKit, type MaterialKit } from "../../three/car-models";
 import type { ShipView, Site, VehiclePick } from "../map-types";
 import { CAR_COLORS, type CarModel } from "../vehicles";
+import type { Lamp } from "./street-lights";
 
 /** Simple unbranded commuter traffic only. Hero/special cars stay reserved for the player, showroom and events. */
 const TRAFFIC_MODELS: readonly CarModel[] = ["city", "compact", "sedan", "wagon", "minivan"];
@@ -121,6 +122,11 @@ interface RoadCar {
   own?: boolean;
   /** A bonus on the map (the golden car, the VIP's limousine): it drives until it is let go. */
   special?: { finish: "metallic" | "gloss" | "matte"; stretch: number };
+  /** The body's lean in a turn and its dip when braking (radians), and what they were worked out from. */
+  roll: number;
+  pitch: number;
+  vPrev: number;
+  yawPrev: number;
   /** Cached road segment to avoid a binary search every rendered frame. */
   seg: number;
   /** Last visual alpha scale applied; avoids redundant matrix updates every frame. */
@@ -448,8 +454,8 @@ export class Traffic3D {
   }
 
   /** Every vehicle on the roads now, for the headlights: position, heading, half its length and half its width. */
-  *lamps(): Generator<[number, number, number, number, number, number, number]> {
-    for (const c of this.cars) if (c.alpha > 0.05) yield [c.x, c.y, c.z, c.yaw, c.half, 0.1 * c.scale, c.alpha];
+  *lamps(): Generator<Lamp> {
+    for (const c of this.cars) if (c.alpha > 0.05) yield [c.x, c.y, c.z, c.yaw, c.half, 0.1 * c.scale, c.alpha, c.v < this.cruise(c) * 0.7 ? 1 : 0];
     for (const t of this.trucks.values()) {
       const size = (t.size ??= modelSize(t.obj));
       yield [t.x, t.y, t.z, t.yaw, size.x / 2, size.z / 2, t.gone > 0 ? Math.max(0, 1 - t.gone / 0.8) : 1];
@@ -683,8 +689,10 @@ export class Traffic3D {
       plan: null,
       half: 0.28 * scale,
       color: new THREE.Color(hex), hex, model, x: 0, y: 0, z: 0, yaw: 0,
-      alpha: life ? 0 : 1, life, scale, paint, visual: new THREE.Group(), seg: 0, visualScale: -1,
+      alpha: life ? 0 : 1, life, scale, paint, visual: new THREE.Group(), seg: 0, visualScale: -1, roll: 0, pitch: 0, vPrev: 0, yawPrev: 0,
     };
+    // yaw first, then lean about the car's own long axis and dip about its cross axis
+    c.visual.rotation.order = "YXZ";
     c.visual.name = `traffic-car-${model}`;
     this.root.add(c.visual);
     this.refreshCarVisual(c);
@@ -854,7 +862,7 @@ export class Traffic3D {
       const yaw = Math.atan2(-p.ty, p.tx);
       c.yaw = k >= 1 ? yaw : c.yaw + angle(yaw - c.yaw) * k;
       c.visual.position.set(c.x, c.y, c.z);
-      c.visual.rotation.y = c.yaw;
+      c.visual.rotation.set(c.roll, c.yaw, c.pitch);
       c.visual.visible = c.alpha > 0.01;
       return;
     }
@@ -871,7 +879,7 @@ export class Traffic3D {
     const yaw = Math.atan2(-dz, dx);
     c.yaw = k >= 1 ? yaw : c.yaw + angle(yaw - c.yaw) * k;
     c.visual.position.set(c.x, c.y, c.z);
-    c.visual.rotation.y = c.yaw;
+    c.visual.rotation.set(c.roll, c.yaw, c.pitch);
     c.visual.visible = c.alpha > 0.01;
   }
 
@@ -1112,6 +1120,16 @@ export class Traffic3D {
       const pace = this.cruise(c) * room;
       c.v = pace < c.v ? pace : Math.min(pace, c.v + ACCEL * dt);
       c.wait = c.v < 0.05 ? c.wait + dt : 0;
+      // the body leans out of a turn and dips its nose when it brakes, eased so it never snaps
+      if (dt > 0) {
+        const acc = Math.max(-1, Math.min(0.6, (c.v - c.vPrev) / dt / ACCEL));
+        const rate = Math.max(-1.5, Math.min(1.5, angle(c.yaw - c.yawPrev) / dt));
+        const e = Math.min(1, dt * 6);
+        c.pitch += (acc * 0.035 - c.pitch) * e;
+        c.roll += (rate * 0.03 - c.roll) * e;
+        c.vPrev = c.v;
+        c.yawPrev = c.yaw;
+      }
     }
     for (const c of this.cars) {
       if (extra > 0 && !c.life && !c.special && c.alpha >= 1) {

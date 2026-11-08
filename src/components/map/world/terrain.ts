@@ -3,7 +3,7 @@
 // the sea floor beyond the map. Heights are in metres; the scene draws them
 // 1.5× taller than life (EXAG) so the relief reads from far away.
 import * as THREE from "three";
-import { hazed, noiseLayer } from "./kit";
+import { LOCK, hazed, noiseLayer } from "./kit";
 
 export const EXAG = 1.5;
 /** Terrain tiles across and down (one 2048 px texture each). */
@@ -248,20 +248,69 @@ function detailTexture(px = 256) {
 }
 
 /**
+ * Contact shadows: a soft dark halo on the ground round every building and tree, painted once into a
+ * small texture (lighter halos stacked, so no blur filter is needed) that the ground reads at its position.
+ * It grounds things that would otherwise float over the grass, and costs one texture read per ground pixel.
+ */
+function contactTexture(data: WorldJson) {
+  const [SX, SZ] = data.size;
+  const W = 1024;
+  const k = W / SX;
+  const cv = document.createElement("canvas");
+  cv.width = W;
+  cv.height = Math.round(SZ * k);
+  const g = cv.getContext("2d")!;
+  g.fillStyle = "#000";
+  g.fillRect(0, 0, cv.width, cv.height);
+  g.scale(k, k);
+  g.translate(SX / 2, SZ / 2);
+  g.fillStyle = "rgba(255,255,255,0.14)";
+  // the halos grow outwards in steps: the nearer the wall, the darker
+  for (const b of data.cladiri) {
+    const w = Math.max(b.w, 0.35), d = Math.max(b.d, 0.35);
+    g.save();
+    g.translate(b.x, b.z);
+    g.rotate(-b.r);
+    for (let s = 0; s < 6; s++) {
+      const e = 0.07 + s * 0.09;
+      g.fillRect(-w / 2 - e, -d / 2 - e, w + 2 * e, d + 2 * e);
+    }
+    g.restore();
+  }
+  for (const tr of data.copaci) {
+    const r = 0.16 * (tr[2] || 1);
+    for (let s = 0; s < 4; s++) {
+      g.beginPath();
+      g.arc(tr[0], tr[1], r + 0.05 + s * 0.06, 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.NoColorSpace;
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  t.anisotropy = 2;
+  return t;
+}
+
+/**
  * Adds the close-range ground detail to a (hazed) terrain material: grass
  * gets blades, clumps and drier or lusher patches; sand, rock and paving a
  * finer grain. Far away the detail averages out to the painted colour.
  */
-function withDetail(m: THREE.MeshStandardMaterial, detail: THREE.Texture) {
+function withDetail(m: THREE.MeshStandardMaterial, detail: THREE.Texture, contact: THREE.Texture, size: [number, number]) {
   const prev = m.onBeforeCompile;
   m.onBeforeCompile = (sh, r) => {
     prev.call(m, sh, r);
     sh.uniforms.uDetail = { value: detail };
+    sh.uniforms.uContact = { value: contact };
+    sh.uniforms.uCloud = LOCK.uniforms.uCloud;
+    sh.uniforms.uWind = LOCK.uniforms.uWind;
+    sh.uniforms.uContactSize = { value: new THREE.Vector2(size[0], size[1]) };
     sh.vertexShader = sh.vertexShader
       .replace("#include <common>", "#include <common>\nvarying vec2 vDetXZ;")
       .replace("#include <project_vertex>", "#include <project_vertex>\nvDetXZ = (modelMatrix * vec4(transformed, 1.0)).xz;");
     sh.fragmentShader = sh.fragmentShader
-      .replace("#include <common>", "#include <common>\nvarying vec2 vDetXZ;\nuniform sampler2D uDetail;")
+      .replace("#include <common>", "#include <common>\nvarying vec2 vDetXZ;\nuniform sampler2D uDetail;\nuniform sampler2D uContact;\nuniform vec2 uContactSize;\nuniform float uCloud;\nuniform float uWind;")
       .replace(
         "#include <map_fragment>",
         `#include <map_fragment>
@@ -299,10 +348,20 @@ function withDetail(m: THREE.MeshStandardMaterial, detail: THREE.Texture) {
     float far = smoothstep(0.12, 0.35, max(w.x, w.y));
     diffuseColor.rgb = mix(diffuseColor.rgb, mix(slabs, laid * 0.96, far), pave);
   }
+  // contact shadows at the foot of walls and trunks
+  float cs = texture2D(uContact, vDetXZ / uContactSize + 0.5).r;
+  diffuseColor.rgb *= 1.0 - 0.5 * smoothstep(0.0, 0.85, cs);
+  // the shadows of clouds drifting over the land
+  if (uCloud > 0.01) {
+    float cl = texture2D(uDetail, vDetXZ * 0.0055 + vec2(uWind * 0.0035, uWind * 0.0012)).b;
+    float cl2 = texture2D(uDetail, vDetXZ * 0.011 - vec2(uWind * 0.002, 0.0)).b;
+    float shade = smoothstep(0.52, 0.78, cl * 0.7 + cl2 * 0.3) * uCloud;
+    diffuseColor.rgb *= 1.0 - 0.2 * shade;
+  }
 }`,
       );
   };
-  m.customProgramCacheKey = () => "hazed-detail";
+  m.customProgramCacheKey = () => "hazed-detail-contact";
   return m;
 }
 
@@ -402,13 +461,14 @@ function withShore(m: THREE.MeshStandardMaterial, ground: Ground, time: { value:
 }
 
 /** The six tiles (their textures load in the background), the sea and the floor beyond. */
-export function buildTerrain(ground: Ground, textures: THREE.Texture[]): TerrainParts {
+export function buildTerrain(ground: Ground, textures: THREE.Texture[], data: WorldJson): TerrainParts {
   const tiles: THREE.Mesh[] = [];
   const segX = (ground.GW - 1) / NTX, segY = (ground.GH - 1) / NTY;
   const detail = detailTexture();
+  const contact = contactTexture(data);
   for (let ty = 0; ty < NTY; ty++)
     for (let tx = 0; tx < NTX; tx++) {
-      const mat = withDetail(hazed(new THREE.MeshStandardMaterial({ map: textures[ty * NTX + tx], roughness: 0.92, metalness: 0, envMapIntensity: 0.45 })), detail);
+      const mat = withDetail(hazed(new THREE.MeshStandardMaterial({ map: textures[ty * NTX + tx], roughness: 0.92, metalness: 0, envMapIntensity: 0.45 })), detail, contact, data.size);
       const m = ground.tile(tx * segX, ty * segY, segX, segY, mat);
       m.receiveShadow = true;
       m.castShadow = true;

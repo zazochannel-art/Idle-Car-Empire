@@ -187,7 +187,7 @@ export class SignalLamps {
 }
 
 /** One vehicle as the lights see it: position, heading, half its length and width, and how much it shows (0–1). */
-export type Lamp = [number, number, number, number, number, number, number];
+export type Lamp = [number, number, number, number, number, number, number, number?];
 
 /** Headlights and tail lights from dusk, with the light they throw on the road ahead. */
 export class Headlights {
@@ -228,7 +228,7 @@ export class Headlights {
     const bc = this.back.geometry.getAttribute("color") as THREE.BufferAttribute;
     const beams = !far && !this.low;
     let n = 0;
-    for (const [x, y, z, yaw, half, side, alpha] of vehicles) {
+    for (const [x, y, z, yaw, half, side, alpha, brake = 0] of vehicles) {
       if (n >= this.cap) break;
       const fx = Math.cos(yaw);
       const fz = -Math.sin(yaw);
@@ -241,7 +241,9 @@ export class Headlights {
         fp.setXYZ(n * 2 + j, x + fx * half * 0.98 + sx * w * sd, y + 0.08, z + fz * half * 0.98 + sz * w * sd);
         fc.setXYZ(n * 2 + j, this.white.r * alpha, this.white.g * alpha, this.white.b * alpha);
         bp.setXYZ(n * 2 + j, x - fx * half * 0.98 + sx * w * sd, y + 0.09, z - fz * half * 0.98 + sz * w * sd);
-        bc.setXYZ(n * 2 + j, this.red.r * alpha, this.red.g * alpha, this.red.b * alpha);
+        // tail lights glow dimly; braking they flare brighter and whiter
+        const tl = alpha * (0.55 + 0.6 * brake);
+        bc.setXYZ(n * 2 + j, this.red.r * tl, (this.red.g + 0.25 * brake) * tl, (this.red.b + 0.2 * brake) * tl);
       }
       if (beams) {
         const d = this.dummy;

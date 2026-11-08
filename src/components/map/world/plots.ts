@@ -120,6 +120,8 @@ interface Lot {
   /** Height of the building's top above the lot (labels sit there). */
   top: number;
   anim: { start: number; upgrade: boolean; announce?: string } | null;
+  /** Over a plant's roof, where its steam rises (world point). */
+  vent: THREE.Vector3 | null;
 }
 
 const STATUS_FILL: Record<PlotStatus, string> = { available: "#4ade80", owned: "#38bdf8", construction: "#facc15", operational: "#ffffff", locked: "#64748b" };
@@ -164,7 +166,7 @@ export class PlotLayer {
       root.position.set(plot.x, this.groundY(plot), plot.y);
       root.rotation.y = plot.rot;
       this.root.add(root);
-      this.lots.set(plot.id, { plot, seed: seedOf(plot), root, content: null, view: null, site: null, works: null, top: 0.4, anim: null });
+      this.lots.set(plot.id, { plot, seed: seedOf(plot), root, content: null, view: null, site: null, works: null, top: 0.4, anim: null, vent: null });
     }
     this.root.add(this.markers);
   }
@@ -199,6 +201,7 @@ export class PlotLayer {
     if (lot.site) lot.root.remove(lot.site.root);
     lot.content = null;
     lot.site = null;
+    lot.vent = null;
     if (v.look.kind === "site") {
       lot.site = siteModel(lot.plot.w, lot.plot.d, !!lot.plot.big, lot.seed);
       lot.root.add(lot.site.root);
@@ -214,7 +217,14 @@ export class PlotLayer {
       lot.root.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(m);
       lot.top = Math.max(0.3, box.max.y - lot.root.position.y);
+      // a working plant breathes steam over the middle of its roof, a little back from the front
+      if (v.look.kind === "plant") lot.vent = new THREE.Vector3((box.min.x + box.max.x) / 2, box.max.y, box.min.z + (box.max.z - box.min.z) * 0.38);
     }
+  }
+
+  /** The points over the plants' roofs where steam rises (see the engine's steam). */
+  *vents(): Generator<THREE.Vector3> {
+    for (const lot of this.lots.values()) if (lot.vent && lot.view?.look.kind === "plant") yield lot.vent;
   }
 
   private setWorks(lot: Lot, on: boolean) {

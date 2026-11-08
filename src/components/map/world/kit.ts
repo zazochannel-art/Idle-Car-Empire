@@ -502,6 +502,8 @@ export const LOCK = {
     uNight: { value: 0 },
     /** Seconds on the map's clock: the trees' sway. */
     uWind: { value: 0 },
+    /** How strongly the clouds' shadows drift over the ground (0 at night, under a grey sky). */
+    uCloud: { value: 0 },
   },
 };
 
@@ -593,7 +595,7 @@ if (uSnow > 0.001 || uWet > 0.001) {
     float wet = smoothstep(0.3, 0.8, up) * uWet;
     diffuseColor.rgb *= 1.0 - 0.22 * wet;
 #ifdef STANDARD
-    roughnessFactor = mix(roughnessFactor, roughnessFactor * 0.45, wet);
+    roughnessFactor = mix(roughnessFactor, roughnessFactor * 0.3, wet);
 #endif
   }
 }`,
