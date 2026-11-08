@@ -51,6 +51,10 @@ def playGamesAppId = playGamesAppIdValid ? playGamesAppIdGiven : '0'
 android {
     namespace = "com.zazochannel.idlecarempire"
     compileSdk = rootProject.ext.compileSdkVersion
+    buildFeatures {
+        // the Play Games project id is a string resource made by the build (resValue below)
+        resValues = true
+    }
     defaultConfig {
         applicationId "com.zazochannel.idlecarempire"
         minSdkVersion rootProject.ext.minSdkVersion
