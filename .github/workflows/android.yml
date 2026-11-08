@@ -119,8 +119,8 @@ jobs:
         env:
           # the AdMob app id, a repository variable (unset: Google's sample id, test ads only)
           ADMOB_APP_ID: ${{ vars.ADMOB_APP_ID }}
-          # the Play Games project id, a repository variable (unset: no Play Games, docs/android/play-games.md)
-          PLAY_GAMES_APP_ID: ${{ vars.PLAY_GAMES_APP_ID }}
+          # the Play Games project id (not a secret): the PLAY_GAMES_APP_ID variable if set, else the game's own (docs/android/play-games.md)
+          PLAY_GAMES_APP_ID: ${{ vars.PLAY_GAMES_APP_ID || '297022434236' }}
         # lint for the app only (its report is the one kept below): the Capacitor libraries in
         # node_modules lint themselves with warnings as errors, and the Android Gradle plugin 9's
         # lint has new warnings about their own build files, code that isn't ours
@@ -129,8 +129,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           ADMOB_APP_ID: ${{ vars.ADMOB_APP_ID }}
-          # the Play Games project id, a repository variable (unset: no Play Games, docs/android/play-games.md)
-          PLAY_GAMES_APP_ID: ${{ vars.PLAY_GAMES_APP_ID }}
+          # the Play Games project id (not a secret): the PLAY_GAMES_APP_ID variable if set, else the game's own (docs/android/play-games.md)
+          PLAY_GAMES_APP_ID: ${{ vars.PLAY_GAMES_APP_ID || '297022434236' }}
         run: |
           set -e
           BT="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
@@ -294,8 +294,8 @@ jobs:
         env:
           # the same AdMob app id as the published test APK, so a wrong one shows here too
           ADMOB_APP_ID: ${{ vars.ADMOB_APP_ID }}
-          # the Play Games project id, a repository variable (unset: no Play Games, docs/android/play-games.md)
-          PLAY_GAMES_APP_ID: ${{ vars.PLAY_GAMES_APP_ID }}
+          # the Play Games project id (not a secret): the PLAY_GAMES_APP_ID variable if set, else the game's own (docs/android/play-games.md)
+          PLAY_GAMES_APP_ID: ${{ vars.PLAY_GAMES_APP_ID || '297022434236' }}
         run: ./gradlew --no-daemon assembleDebug
       - name: Enable KVM (hardware-accelerated emulator)
         run: |

@@ -26,9 +26,10 @@ game account or the cloud save changes.
    uses 850). Copy each achievement's id (`CgkI…`).
 4. **Leaderboards**: create one, "Cars built", *Larger is better*, *Integer*. Copy its id.
 5. In the same Configuration page, copy the **project id** (a number such as `123456789012`).
-6. GitHub → Settings → Secrets and variables → Actions → **Variables**: add `PLAY_GAMES_APP_ID`
-   with that number. (A value that is not digits only is ignored with a warning in the build log.)
-7. Write the ids in `src/game/config/play-games.ts`: each Play Games achievement id next to the
+6. The project id is `297022434236`; the Android workflows use it by default (it is not a secret). To
+   use another one, add the `PLAY_GAMES_APP_ID` repository variable (GitHub → Settings → Secrets and
+   variables → Actions → Variables). A value that is not digits only is ignored with a warning in the build log.
+7. The ids are written in `src/game/config/play-games.ts` (done for the 29 achievements and the leaderboard): each Play Games achievement id next to the
    game's own id (first column below) in `PLAY_GAMES_ACHIEVEMENTS`, and the leaderboard id in
    `PLAY_GAMES_LEADERBOARD_CARS`. A test checks that every key is a real achievement and no id is used twice.
 8. **Publish** the game services (Configuration → Publish) before the first public release; until
