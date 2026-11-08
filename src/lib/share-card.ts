@@ -124,7 +124,7 @@ export function drawShareCard(canvas: HTMLCanvasElement, d: ShareCardData, label
     c.roundRect(W / 2 - 300, 1045, 600, 130, 30);
     c.fill();
     c.fillStyle = "#0b0b0e";
-    c.font = "900 92px ui-monospace, 'SFMono-Regular', Menlo, monospace";
+    c.font = "900 78px ui-monospace, 'SFMono-Regular', Menlo, monospace";
     c.fillText(d.code.split("").join(" "), W / 2, 1140);
   }
   c.fillStyle = "rgba(255,255,255,0.75)";
