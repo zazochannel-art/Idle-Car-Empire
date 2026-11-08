@@ -153,3 +153,26 @@ The rules live on the server (`supabase/migrations/0014_seasons.sql`) and in the
   - Players' words (names in reports, error messages) are always shown as text, never run as code.
   - The page may only talk to the game's Supabase project (its Content Security Policy).
   - The sign-in lasts as long as the browser tab.
+
+## Economy knobs (migration 0030)
+
+Three multipliers of the game's own numbers can be turned from the SQL editor, with no new app
+version; every player's game picks the change up within half an hour (or when the app comes back):
+
+| key | what it scales | range |
+|-----|----------------|-------|
+| `rewards` | everything paid as a share of the income (missions, pass, sponsors, daily chest…) | 0.5 – 2 |
+| `usedSell` | what the second-hand lot pays for a refurbished car (lots already on offer keep their price) | 0.8 – 1.25 |
+| `qc` | what the quality control pays (on top of `rewards`) | 0.5 – 2 |
+
+```sql
+insert into ops.balance (key, value) values ('rewards', 0.9)
+on conflict (key) do update set value = excluded.value, updated_at = now();
+-- back to as built:
+delete from ops.balance where key = 'rewards';
+-- what is set now:
+select * from ops.balance;
+```
+
+The server refuses a number outside the range, and the game ignores one too. No row means the
+game's own number.
