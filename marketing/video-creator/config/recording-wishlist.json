@@ -1,0 +1,25 @@
+{
+  "_comment": "Screen recordings the videos would use if they existed. Until a clip with this id is registered (scripts/register_source.py) every scene falls back to the real screenshot named in its 'fallback' field.",
+  "clips": {
+    "early-factory":        {"seconds": 8,  "show": "First launch: the tutorial card 'This is your factory', tap Open factory, the first Small Car Body Works producing, first money ticking up.", "used_by": ["01", "02", "06"]},
+    "early-small-body-works": {"seconds": 8, "show": "The Small Car Body Works panel (LV 1): buy steel, 'Producing' status, first cars made.", "used_by": ["02"]},
+    "expansion-build":      {"seconds": 12, "show": "Real expansion: Build menu → buy land → place a new factory → it starts producing. Then upgrade a plant (level up).", "used_by": ["04", "06"]},
+    "factory-interior":     {"seconds": 12, "show": "Inside the Car Assembly Plant in portrait: slow camera along the conveyor, workers moving, cars appearing. Use the TOUR button if it gives a nice camera.", "used_by": ["01", "02", "03", "05", "06"]},
+    "factory-interior-2":   {"seconds": 12, "show": "A second pass through a plant (landscape or portrait): Body store → Powertrain marriage → Trim line → Wheels → Paint and finish.", "used_by": ["01", "03", "05", "06"]},
+    "factory-finished":     {"seconds": 8,  "show": "The end of the line: Quality control → Finished cars, '+8' pop-ups.", "used_by": ["03", "06"]},
+    "map-traffic":          {"seconds": 15, "show": "The city map: trucks driving between plants, day or night, slow camera drift. Try one daytime and one night take.", "used_by": ["01", "02", "04", "05", "06"]},
+    "map-overview":         {"seconds": 10, "show": "Zoom out to the whole empire: many factories, floating income numbers (+$17.2K).", "used_by": ["01", "02", "04", "05", "06"]},
+    "map-dealers":          {"seconds": 8,  "show": "Dealers on the map and cash popping up.", "used_by": ["03"]},
+    "car-models":           {"seconds": 10, "show": "Models & Design: scroll models, change paint / open the garage.", "used_by": ["02", "03", "06"]},
+    "racing":               {"seconds": 10, "show": "A race in the Racing District (or the race list scrolling).", "used_by": ["06"]},
+    "research":             {"seconds": 8,  "show": "Research Lab: buy a technology, scroll to Electric.", "used_by": ["04", "06"]}
+  },
+  "how_to_record": [
+    "Use a real phone or the Android emulator. Portrait, 1080x1920 (or the phone's native 9:16).",
+    "Android 11+: swipe down → 'Screen record'. Or from a PC: adb shell screenrecord --size 1080x1920 --bit-rate 16000000 --time-limit 30 /sdcard/clip.mp4 && adb pull /sdcard/clip.mp4",
+    "Turn on Do Not Disturb, hide notifications and personal data (use a clean save). Keep the game's own sound off – the pipeline adds its own music.",
+    "Record 2-3 seconds longer than needed at the start and end; move the camera slowly.",
+    "Save as assets/gameplay/clips/<clip id>.mp4, then: python scripts/register_source.py assets/gameplay/clips/<clip id>.mp4 --id <clip id> --real --description \"...\"",
+    "Re-run python scripts/render.py all – scenes automatically use the registered clip instead of the screenshot."
+  ]
+}

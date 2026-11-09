@@ -1,0 +1,220 @@
+{
+  "_comment": "",
+  "sources": {
+    "ph-map": {
+      "path": "../../fastlane/metadata/android/en-US/images/phoneScreenshots/1.jpg",
+      "type": "screenshot",
+      "real": true,
+      "origin": "Google Play store listing screenshot (real in-game capture, fastlane/metadata/android/en-US)",
+      "description": "Map view of a late-game empire: factories, Parts Market, Materials Depot, trucks on the roads.",
+      "sha256": "35ed7939af140e4dbe6506d40458fda36a4f1d93bba6a228fe9169e8534ffa42",
+      "registered": "2026-11-08",
+      "focus": [
+        [
+          0.2,
+          0.33,
+          0.92,
+          0.62
+        ]
+      ],
+      "tags": [
+        "map",
+        "factories",
+        "late-game"
+      ]
+    },
+    "ph-factory": {
+      "path": "../../fastlane/metadata/android/en-US/images/phoneScreenshots/2.jpg",
+      "type": "screenshot",
+      "real": true,
+      "origin": "Google Play store listing screenshot (real in-game capture, fastlane/metadata/android/en-US)",
+      "description": "Inside the Car Assembly Plant (LV 13): conveyors, workers, Trim line / Wheels / Paint and finish stations.",
+      "sha256": "958a8dea97f1bebe8cc874b4c1e9bd45f51794211ec32b2165d1bd435ed7e5b9",
+      "registered": "2026-11-08",
+      "focus": [
+        [
+          0.05,
+          0.38,
+          1.0,
+          0.72
+        ]
+      ],
+      "tags": [
+        "factory",
+        "production",
+        "interior"
+      ]
+    },
+    "ph-models": {
+      "path": "../../fastlane/metadata/android/en-US/images/phoneScreenshots/3.jpg",
+      "type": "screenshot",
+      "real": true,
+      "origin": "Google Play store listing screenshot (real in-game capture, fastlane/metadata/android/en-US)",
+      "description": "Models & Design screen: MC-01 and MC-02 with stats and paint/design options.",
+      "sha256": "4d9091e63353867236350732d5c547016b6eba43c38ff6c84d6beef74c8f8a70",
+      "registered": "2026-11-08",
+      "focus": [
+        [
+          0.0,
+          0.3,
+          1.0,
+          0.95
+        ]
+      ],
+      "tags": [
+        "cars",
+        "models"
+      ]
+    },
+    "ph-racing": {
+      "path": "../../fastlane/metadata/android/en-US/images/phoneScreenshots/4.jpg",
+      "type": "screenshot",
+      "real": true,
+      "origin": "Google Play store listing screenshot (real in-game capture, fastlane/metadata/android/en-US)",
+      "description": "Racing District screen: reputation, trophies, race list, special events.",
+      "sha256": "ac5ffcca129c9399d4828acfe341e8a1a08c41a72c9ee4e93792ac2f22779b32",
+      "registered": "2026-11-08",
+      "focus": [
+        [
+          0.0,
+          0.3,
+          1.0,
+          0.95
+        ]
+      ],
+      "tags": [
+        "racing"
+      ]
+    },
+    "ph-research": {
+      "path": "../../fastlane/metadata/android/en-US/images/phoneScreenshots/7.jpg",
+      "type": "screenshot",
+      "real": true,
+      "origin": "Google Play store listing screenshot (real in-game capture, fastlane/metadata/android/en-US)",
+      "description": "Research Lab: Engineering, Automation and Electric technologies.",
+      "sha256": "d9dce4466d1d2a1f9d1e4899a6825a7a7bf297c96003562adde6dd673762ee9b",
+      "registered": "2026-11-08",
+      "focus": [
+        [
+          0.0,
+          0.3,
+          1.0,
+          0.95
+        ]
+      ],
+      "tags": [
+        "research"
+      ]
+    },
+    "ph-missions": {
+      "path": "../../fastlane/metadata/android/en-US/images/phoneScreenshots/8.jpg",
+      "type": "screenshot",
+      "real": true,
+      "origin": "Google Play store listing screenshot (real in-game capture, fastlane/metadata/android/en-US)",
+      "description": "Missions and contracts screen.",
+      "sha256": "2eed8b41361a6e9cedb64c525f8a7fd1d956dfa200c42b3157de27a25142e9a6",
+      "registered": "2026-11-08",
+      "focus": [
+        [
+          0.0,
+          0.3,
+          1.0,
+          0.95
+        ]
+      ],
+      "tags": [
+        "missions",
+        "contracts"
+      ]
+    },
+    "tab-map": {
+      "path": "../../fastlane/metadata/android/en-US/images/tenInchScreenshots/1.jpg",
+      "type": "screenshot",
+      "real": true,
+      "origin": "Google Play store listing screenshot (real in-game capture, fastlane/metadata/android/en-US)",
+      "description": "10-inch capture of the map: labelled factories (Glass Factory, Parts Market, Car Body Works, Tire Factory, Engine Factory, Economy Dealer), traffic on roads.",
+      "sha256": "2843f26fc911d5f3873ab2282983f7431faec9431a7c2ef03f30e1ce12ce1522",
+      "registered": "2026-11-08",
+      "focus": [],
+      "tags": [
+        "map",
+        "factories",
+        "hires"
+      ]
+    },
+    "tab-factory": {
+      "path": "../../fastlane/metadata/android/en-US/images/tenInchScreenshots/2.jpg",
+      "type": "screenshot",
+      "real": true,
+      "origin": "Google Play store listing screenshot (real in-game capture, fastlane/metadata/android/en-US)",
+      "description": "10-inch capture inside the Car Assembly Plant: Body store, Powertrain marriage, Trim line, Wheels, Paint and finish, Quality control, Finished cars.",
+      "sha256": "e0b71380ed44eeec95c973d10db6e6fadf8e146fc5fdb2b70ebb188fb0dc51d4",
+      "registered": "2026-11-08",
+      "focus": [],
+      "tags": [
+        "factory",
+        "production",
+        "interior",
+        "hires"
+      ]
+    },
+    "tab-racing": {
+      "path": "../../fastlane/metadata/android/en-US/images/tenInchScreenshots/3.jpg",
+      "type": "screenshot",
+      "real": true,
+      "origin": "Google Play store listing screenshot (real in-game capture, fastlane/metadata/android/en-US)",
+      "description": "10-inch capture of the map with the Racing District panel open.",
+      "sha256": "a2813a4f06b419b9fce15a711baecdfca9a9b9d0b999257eed991930505e690d",
+      "registered": "2026-11-08",
+      "focus": [],
+      "tags": [
+        "racing",
+        "hires"
+      ]
+    },
+    "early-1": {
+      "path": "assets/gameplay/screenshots/early-game-1.png",
+      "type": "screenshot",
+      "real": true,
+      "origin": "In-game capture of the first minutes (tutorial step 1/4 'This is your factory'), $9,983 cash, 1 factory",
+      "description": "Early game: the first factory, tutorial card 'This is your factory'. Low resolution (390x844) – only used inside the phone frame.",
+      "sha256": "d659db854b572a2c6c2789a5ca66bb13ca4a7a1c09206fd2d380659652195add",
+      "registered": "2026-11-08",
+      "focus": [
+        [
+          0.03,
+          0.56,
+          0.97,
+          0.93
+        ]
+      ],
+      "tags": [
+        "early",
+        "tutorial",
+        "low-res"
+      ]
+    },
+    "early-2": {
+      "path": "assets/gameplay/screenshots/early-game-2.png",
+      "type": "screenshot",
+      "real": true,
+      "origin": "In-game capture of the first minutes (tutorial step 3/4 'Build more factories'), Small Car Body Works LV 1",
+      "description": "Early game: Small Car Body Works (LV 1, 1 worker at a workbench) with tutorial 'Build more factories'. Low resolution (390x844).",
+      "sha256": "254fe221a6604dcafa020eb0e8e8c78aee006142108af65a3b49c7d43869f4be",
+      "registered": "2026-11-08",
+      "focus": [
+        [
+          0.03,
+          0.3,
+          0.97,
+          0.93
+        ]
+      ],
+      "tags": [
+        "early",
+        "tutorial",
+        "low-res"
+      ]
+    }
+  }
+}

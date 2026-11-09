@@ -1,0 +1,11 @@
+# Rendered videos and caches are build output – regenerate with `python scripts/render.py all`.
+# (The small metadata .json files next to the videos ARE kept.)
+output/**/*.mp4
+output/.cache/
+output/last-run.json
+output/qc-report.md
+__pycache__/
+*.pyc
+# Large raw screen recordings stay local; register them with scripts/register_source.py
+assets/gameplay/clips/*
+!assets/gameplay/clips/README.md

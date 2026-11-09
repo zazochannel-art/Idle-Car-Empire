@@ -1,0 +1,183 @@
+{
+  "id": "03",
+  "slug": "car-factory-simulator",
+  "title": "Car Factory Simulator",
+  "category": "standard",
+  "music": {
+    "preset": "energy",
+    "bpm": 126,
+    "seed": 33
+  },
+  "hooks": [
+    "Ever wanted to run your own **car factory**?",
+    "Ever wondered how **cars** get made?",
+    "Run the **whole factory**. Every step."
+  ],
+  "endings": [
+    {
+      "text": "PLAY **IDLE CAR EMPIRE**"
+    },
+    {
+      "text": "RUN YOUR OWN **CAR FACTORY**"
+    },
+    {
+      "text": "START YOUR **FACTORY** TODAY"
+    }
+  ],
+  "captions": {
+    "A": [
+      "Step inside the **production line**",
+      "Body, powertrain, trim, wheels, paint",
+      "Quality control, then **finished cars**",
+      "Name, paint and develop your **models**",
+      "Sell them through your **dealers**"
+    ],
+    "B": [
+      "Machines and workers, **hard at work**",
+      "Every station feeds the next",
+      "Cars roll off the **assembly line**",
+      "Design cars you're proud of",
+      "Trucks deliver, **dealers sell**"
+    ]
+  },
+  "scenes": [
+    {
+      "source": "clip:factory-interior-2",
+      "fallback": "tab-factory",
+      "dur": 5.2,
+      "camera": {
+        "from": [
+          0.22,
+          0.52,
+          1.1
+        ],
+        "to": [
+          0.6,
+          0.52,
+          1.1
+        ]
+      },
+      "chip": "Step inside your factories",
+      "caption_pos": "lower"
+    },
+    {
+      "source": "clip:factory-interior",
+      "fallback": "ph-factory",
+      "dur": 4.0,
+      "camera": {
+        "from": [
+          0.5,
+          0.42,
+          1.12
+        ],
+        "to": [
+          0.5,
+          0.7,
+          1.12
+        ]
+      },
+      "transition": "push_left",
+      "transition_dur": 0.35
+    },
+    {
+      "source": "clip:factory-finished",
+      "fallback": "tab-factory",
+      "dur": 4.2,
+      "camera": {
+        "from": [
+          0.68,
+          0.6,
+          1.1
+        ],
+        "to": [
+          0.9,
+          0.62,
+          1.1
+        ]
+      },
+      "transition": "zoom_punch",
+      "transition_dur": 0.4
+    },
+    {
+      "source": "clip:car-models",
+      "fallback": "ph-models",
+      "dur": 3.8,
+      "camera": {
+        "from": [
+          0.5,
+          0.5,
+          1.0
+        ],
+        "to": [
+          0.5,
+          0.5,
+          1.0
+        ]
+      },
+      "caption_pos": "upper",
+      "transition": "wipe",
+      "transition_dur": 0.35
+    },
+    {
+      "source": "clip:map-dealers",
+      "fallback": "tab-map",
+      "dur": 3.8,
+      "camera": {
+        "from": [
+          0.88,
+          0.6,
+          1.15
+        ],
+        "to": [
+          0.6,
+          0.62,
+          1.15
+        ]
+      },
+      "transition": "flash",
+      "transition_dur": 0.3
+    }
+  ],
+  "endcard": {
+    "dur": 3.6,
+    "transition": "flash",
+    "transition_dur": 0.35
+  },
+  "descriptions": {
+    "tiktok": "Ever wanted to run your own car factory? 🏭🔧 Step inside the production line, watch every station feed the next and sell the finished cars in Idle Car Empire. Free on Google Play – link in bio!",
+    "youtube_shorts": "A car factory simulator you can play in short bursts: Idle Car Empire lets you step inside your plants, run the assembly line and sell finished cars. Get it free on Google Play: https://play.google.com/store/apps/details?id=com.zazochannel.idlecarempire",
+    "instagram": "Ever wanted to run your own car factory? 🏭🚗 Machines, workers and assembly lines – all yours in Idle Car Empire. Free on Google Play – link in bio."
+  },
+  "hashtags": {
+    "common": [
+      "#IdleCarEmpire",
+      "#idlegame",
+      "#tycoongame",
+      "#carfactory",
+      "#androidgames",
+      "#mobilegaming"
+    ],
+    "tiktok": [
+      "#fyp",
+      "#gamingtok",
+      "#mobilegame",
+      "#cargame",
+      "#factorygame",
+      "#simulator"
+    ],
+    "youtube_shorts": [
+      "#Shorts",
+      "#GameShorts",
+      "#IdleGames",
+      "#CarTycoon",
+      "#FactorySimulator"
+    ],
+    "instagram": [
+      "#reels",
+      "#gamingreels",
+      "#mobilegames",
+      "#cars",
+      "#simulator"
+    ]
+  }
+}

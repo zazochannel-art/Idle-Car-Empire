@@ -1,0 +1,162 @@
+{
+  "id": "05",
+  "slug": "satisfying-gameplay",
+  "title": "Satisfying Gameplay",
+  "category": "standard",
+  "music": {
+    "preset": "satisfy",
+    "bpm": 104,
+    "seed": 55
+  },
+  "hooks": [
+    "This is how an automotive **empire** is built.",
+    "Pure **satisfying** factory vibes.",
+    "Watch an **empire** run itself."
+  ],
+  "endings": [
+    {
+      "text": "BUILD. PRODUCE. **EXPAND.**"
+    },
+    {
+      "text": "BUILD. PRODUCE. EXPAND. **DOMINATE.**",
+      "slogan": true
+    },
+    {
+      "text": "WATCH YOUR **EMPIRE** GROW"
+    }
+  ],
+  "captions": {
+    "A": [
+      "Watch the **line** roll",
+      "Station by station",
+      "Trucks keep the parts **moving**",
+      "Even while you're away"
+    ],
+    "B": [
+      "Every car takes **shape**",
+      "Smooth, steady, **satisfying**",
+      "A city that never sleeps",
+      "**Offline** income keeps rolling"
+    ]
+  },
+  "scenes": [
+    {
+      "source": "clip:factory-interior-2",
+      "fallback": "tab-factory",
+      "dur": 5.4,
+      "camera": {
+        "from": [
+          0.2,
+          0.52,
+          1.05
+        ],
+        "to": [
+          0.8,
+          0.55,
+          1.15
+        ]
+      },
+      "ease": "linear"
+    },
+    {
+      "source": "clip:factory-interior",
+      "fallback": "ph-factory",
+      "dur": 4.2,
+      "camera": {
+        "from": [
+          0.5,
+          0.4,
+          1.1
+        ],
+        "to": [
+          0.5,
+          0.7,
+          1.1
+        ]
+      },
+      "transition": "flash",
+      "transition_dur": 0.3
+    },
+    {
+      "source": "clip:map-traffic",
+      "fallback": "tab-map",
+      "dur": 4.6,
+      "camera": {
+        "from": [
+          0.25,
+          0.55,
+          1.1
+        ],
+        "to": [
+          0.85,
+          0.55,
+          1.1
+        ]
+      },
+      "transition": "push_up",
+      "transition_dur": 0.4
+    },
+    {
+      "source": "clip:map-overview",
+      "fallback": "ph-map",
+      "dur": 4.0,
+      "camera": {
+        "from": [
+          0.5,
+          0.6,
+          1.0
+        ],
+        "to": [
+          0.5,
+          0.64,
+          1.16
+        ]
+      },
+      "chip": "Earns while you're away",
+      "transition": "flash",
+      "transition_dur": 0.3
+    }
+  ],
+  "endcard": {
+    "dur": 3.8,
+    "transition": "flash",
+    "transition_dur": 0.35
+  },
+  "descriptions": {
+    "tiktok": "This is how an automotive empire is built. 🏭✨ Pure satisfying factory vibes in Idle Car Empire. Free on Google Play – link in bio!",
+    "youtube_shorts": "Satisfying idle gameplay: watch conveyors, workers and trucks build a car empire in Idle Car Empire, free on Android. Get it free on Google Play: https://play.google.com/store/apps/details?id=com.zazochannel.idlecarempire",
+    "instagram": "This is how an automotive empire is built ✨🏭 Satisfying factory vibes in Idle Car Empire. Free on Google Play – link in bio."
+  },
+  "hashtags": {
+    "common": [
+      "#IdleCarEmpire",
+      "#idlegame",
+      "#tycoongame",
+      "#carfactory",
+      "#androidgames",
+      "#mobilegaming"
+    ],
+    "tiktok": [
+      "#fyp",
+      "#gamingtok",
+      "#mobilegame",
+      "#cargame",
+      "#satisfying",
+      "#oddlysatisfying"
+    ],
+    "youtube_shorts": [
+      "#Shorts",
+      "#GameShorts",
+      "#IdleGames",
+      "#CarTycoon",
+      "#Satisfying"
+    ],
+    "instagram": [
+      "#reels",
+      "#gamingreels",
+      "#mobilegames",
+      "#cars",
+      "#satisfying"
+    ]
+  }
+}

@@ -1,0 +1,151 @@
+{
+  "id": "04",
+  "slug": "factory-expansion",
+  "title": "Factory Expansion",
+  "category": "short",
+  "music": {
+    "preset": "energy",
+    "bpm": 128,
+    "seed": 44
+  },
+  "hooks": [
+    "One factory is never **enough**!",
+    "Why stop at **one factory**?",
+    "More land. More factories. **More cars.**"
+  ],
+  "endings": [
+    {
+      "text": "EXPAND YOUR **EMPIRE**"
+    },
+    {
+      "text": "BUILD THE **NEXT FACTORY**"
+    },
+    {
+      "text": "KEEP **EXPANDING**"
+    }
+  ],
+  "captions": {
+    "A": [
+      "Buy land. **Build** the next factory",
+      "Factory after **factory**",
+      "Each one feeds the **next**",
+      "Research unlocks **new tech**"
+    ],
+    "B": [
+      "With more money, **build more**",
+      "A whole city of plants",
+      "Parts in, **cars out**",
+      "Unlock electric and **self-driving**"
+    ]
+  },
+  "scenes": [
+    {
+      "source": "clip:expansion-build",
+      "fallback": "early-2",
+      "dur": 5.0,
+      "layout": "phone",
+      "caption_pos": "upper",
+      "bg_variant": 1
+    },
+    {
+      "source": "clip:map-traffic",
+      "fallback": "tab-map",
+      "dur": 4.2,
+      "camera": {
+        "from": [
+          0.28,
+          0.52,
+          1.15
+        ],
+        "to": [
+          0.8,
+          0.55,
+          1.15
+        ]
+      },
+      "chip": "20 kinds of factories",
+      "transition": "push_left",
+      "transition_dur": 0.35
+    },
+    {
+      "source": "clip:map-overview",
+      "fallback": "ph-map",
+      "dur": 3.6,
+      "camera": {
+        "from": [
+          0.5,
+          0.62,
+          1.0
+        ],
+        "to": [
+          0.5,
+          0.66,
+          1.14
+        ]
+      },
+      "transition": "zoom_punch",
+      "transition_dur": 0.35
+    },
+    {
+      "source": "clip:research",
+      "fallback": "ph-research",
+      "dur": 3.2,
+      "camera": {
+        "from": [
+          0.5,
+          0.5,
+          1.0
+        ],
+        "to": [
+          0.5,
+          0.5,
+          1.0
+        ]
+      },
+      "caption_pos": "upper",
+      "transition": "wipe",
+      "transition_dur": 0.3
+    }
+  ],
+  "endcard": {
+    "dur": 3.4,
+    "transition": "flash",
+    "transition_dur": 0.35
+  },
+  "descriptions": {
+    "tiktok": "One factory is never enough! 🏭🏭🏭 Buy land, build the next plant and grow a whole supply chain in Idle Car Empire. Free on Google Play – link in bio!",
+    "youtube_shorts": "One factory is never enough – expand your car empire in Idle Car Empire, a free idle tycoon for Android: buy land, build new plants and upgrade every one. Get it free on Google Play: https://play.google.com/store/apps/details?id=com.zazochannel.idlecarempire",
+    "instagram": "One factory is never enough! 🏭🚗 Expand your empire in Idle Car Empire. Free on Google Play – link in bio."
+  },
+  "hashtags": {
+    "common": [
+      "#IdleCarEmpire",
+      "#idlegame",
+      "#tycoongame",
+      "#carfactory",
+      "#androidgames",
+      "#mobilegaming"
+    ],
+    "tiktok": [
+      "#fyp",
+      "#gamingtok",
+      "#mobilegame",
+      "#cargame",
+      "#expansion"
+    ],
+    "youtube_shorts": [
+      "#Shorts",
+      "#GameShorts",
+      "#IdleGames",
+      "#CarTycoon",
+      "#Expand"
+    ],
+    "instagram": [
+      "#reels",
+      "#gamingreels",
+      "#mobilegames",
+      "#cars",
+      "#expansion"
+    ]
+  }
+}
