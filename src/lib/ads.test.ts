@@ -53,7 +53,7 @@ describe("watching an ad", () => {
 
 describe("full-screen ads (no reward)", () => {
   const status: AdStatus = { ready: true, showing: false, privacyOptions: false, adFree: false, interstitialReady: true };
-  const ctx: InterstitialContext = { now: 10_000_000, playTime: INTERSTITIAL.minPlayTime, today: 0, lastAdAt: 0, openedAt: 0 };
+  const ctx: InterstitialContext = { now: 10_000_000, playTime: INTERSTITIAL.minPlayTime, firstCar: true, today: 0, lastAdAt: 0, openedAt: 0 };
 
   it("may show when everything allows", () => {
     expect(interstitialBlock(status, ctx)).toBeNull();
@@ -67,6 +67,8 @@ describe("full-screen ads (no reward)", () => {
 
   it("not in a young game or a just-opened app", () => {
     expect(interstitialBlock(status, { ...ctx, playTime: INTERSTITIAL.minPlayTime - 1 })).toBe("young");
+    // an hour of play but no car built yet: still young
+    expect(interstitialBlock(status, { ...ctx, firstCar: false })).toBe("young");
     expect(interstitialBlock(status, { ...ctx, openedAt: ctx.now - INTERSTITIAL.minOpenMs + 1 })).toBe("young");
   });
 

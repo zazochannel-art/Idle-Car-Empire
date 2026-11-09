@@ -35,7 +35,8 @@ and then, with no reward**. It never shows in the middle of something:
   tap on "close" can never land on the ad;
 - never over the tour, a race, a factory, the offline report, a visit or the
   first-car celebration;
-- not in the first 15 minutes of a company, nor in the first 3 minutes after
+- not in the first hour of a company, and not before its first car is built (a new
+  company makes it at about 45 minutes), nor in the first 3 minutes after
   the app opens;
 - a break of 8 minutes after **any** ad (a rewarded one counts), at most 5 a
   day, and only half of the eligible closes show one;

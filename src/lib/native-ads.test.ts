@@ -152,12 +152,12 @@ describe("full-screen ads in the app", () => {
     interstitialShows.mockClear();
     interstitialPrepares.mockClear();
     setAdStatus({ interstitialReady: true });
-    const shown = maybeShowInterstitial(INTERSTITIAL.minPlayTime, 0);
+    const shown = maybeShowInterstitial(INTERSTITIAL.minPlayTime, true, 0);
     await vi.advanceTimersByTimeAsync(0);
     expect(interstitialShows).toHaveBeenCalledTimes(1);
     expect(getAdStatus().showing).toBe(true);
     // nothing else starts over it (and the next one waits for the pause)
-    expect(await maybeShowInterstitial(INTERSTITIAL.minPlayTime, 0)).toBe(false);
+    expect(await maybeShowInterstitial(INTERSTITIAL.minPlayTime, true, 0)).toBe(false);
     expect(await watchAd(vi.fn())).toBe("failed");
     expect(interstitialShows).toHaveBeenCalledTimes(1);
     emit("interstitialDismissed");

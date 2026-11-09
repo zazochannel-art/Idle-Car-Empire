@@ -93,8 +93,11 @@ export async function watchAd(onReward: () => void): Promise<AdResult> {
 // starts the pause), only a few a day, and never with the ad-free rewards purchase.
 
 export const INTERSTITIAL = {
-  /** Lifetime seconds of play before the first one. */
-  minPlayTime: 15 * 60,
+  /**
+   * Lifetime seconds of play before the first one, and never before the first car is built (a new
+   * company makes it at about 45 minutes): the first hour is for getting hooked, not for ads.
+   */
+  minPlayTime: 60 * 60,
   /** The app open for this long (ms) before the first one of a run. */
   minOpenMs: 3 * 60_000,
   /** The pause after any ad (ms). */
@@ -131,6 +134,8 @@ export interface InterstitialContext {
   now: number;
   /** The company's lifetime seconds of play. */
   playTime: number;
+  /** The company has built its first car. */
+  firstCar: boolean;
   /** Ads shown today. */
   today: number;
   lastAdAt: number;
@@ -141,7 +146,7 @@ export interface InterstitialContext {
 export function interstitialBlock(a: AdStatus, c: InterstitialContext): "adFree" | "notReady" | "young" | "pause" | "limit" | null {
   if (a.adFree) return "adFree";
   if (!a.interstitialReady || a.showing) return "notReady";
-  if (c.playTime < INTERSTITIAL.minPlayTime || c.now - c.openedAt < INTERSTITIAL.minOpenMs) return "young";
+  if (!c.firstCar || c.playTime < INTERSTITIAL.minPlayTime || c.now - c.openedAt < INTERSTITIAL.minOpenMs) return "young";
   if (c.now - c.lastAdAt < INTERSTITIAL.gapMs) return "pause";
   if (c.today >= INTERSTITIAL.perDay) return "limit";
   return null;
@@ -149,12 +154,13 @@ export function interstitialBlock(a: AdStatus, c: InterstitialContext): "adFree"
 
 /**
  * At a natural break: maybe shows a full-screen ad (by chance, within the limits above).
- * `playTime` is the company's seconds of play. True if one was shown.
+ * `playTime` is the company's seconds of play, `firstCar` whether it has built its first car.
+ * True if one was shown.
  */
-export async function maybeShowInterstitial(playTime: number, rand: number = Math.random()): Promise<boolean> {
+export async function maybeShowInterstitial(playTime: number, firstCar: boolean, rand: number = Math.random()): Promise<boolean> {
   const now = Date.now();
   const day = dateKey(now);
-  if (interstitialBlock(status, { now, playTime, today: shownOn(day), lastAdAt, openedAt }) || rand >= INTERSTITIAL.chance || !driver) return false;
+  if (interstitialBlock(status, { now, playTime, firstCar, today: shownOn(day), lastAdAt, openedAt }) || rand >= INTERSTITIAL.chance || !driver) return false;
   lastAdAt = now;
   countInterstitial(day);
   const shown = await driver.showInterstitial().catch(() => false);
