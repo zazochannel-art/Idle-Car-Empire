@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { LOGIN_REWARDS } from "@/game/config/login";
 import { rewardCash } from "@/game/engine/progress";
+import { LoginAdButton } from "./ad-buttons";
 import { formatMoney } from "@/game/format";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
@@ -65,6 +66,7 @@ function LoginBody() {
         <Button variant="gold" size="lg" className="mt-4 w-full" onClick={claimLogin}>
           {t("login.claim", { reward })}
         </Button>
+        {!r.stars && <LoginAdButton amount={rewardCash(r, snap)} />}
         <p className="mt-2 text-center text-[11px] text-white/45">{t("login.hint")}</p>
     </>
   );

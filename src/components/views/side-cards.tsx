@@ -5,6 +5,7 @@
 // and engine/quality-check.ts.
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { QcAdButton } from "@/components/game/ad-buttons";
 import { Progress } from "@/components/ui/progress";
 import { CAR_BY_ID } from "@/game/config/cars";
 import { unlockedCarIds } from "@/game/engine/economy";
@@ -249,6 +250,7 @@ export function QualityCard() {
           <Button size="sm" variant={ready ? "gold" : "locked"} disabled={!ready} className="w-full" onClick={start}>
             {ready ? t("qc.start") : block === "limit" ? t("qc.limit") : t("qc.wait", { time: formatDuration(Math.max(0, state.qc.nextAt - now) / 1000) })}
           </Button>
+          {block === "wait" && <QcAdButton />}
         </div>
       )}
     </div>

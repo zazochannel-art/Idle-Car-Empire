@@ -11,6 +11,8 @@ iOS app shows the same offers ([../ios.md](../ios.md)).
 | Offline report ("Welcome back") | the money earned while away, ×2 | once per report |
 | A construction or an upgrade in progress | finished at once | then a 10-minute pause before the next |
 | The HUD chip "📺 ×2 profit" (asks first) | ×2 margin on every sale for **30 minutes of play** (the time waits while the game is closed) | one at a time |
+| Daily login reward (money days only, not the Star days) | the day's money ×2, next to the normal "Claim" button | once a day |
+| Quality control, during the break between two inspections | the wait skipped (never more than the day's 6 inspections) | as the break |
 | The shop (🛒 top left): mystery box | one prize, fixed for the day: 1 h of income (40%), 1 h of research (30%), 3 h of income (20%) or 1 ⭐ Star (10%) | once a day |
 | The shop: cash pack | 30 minutes of income | 5 a day |
 | The shop: research pack | 30 minutes of research output (at least 25 RP) | 5 a day |

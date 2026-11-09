@@ -5,7 +5,10 @@ import { ADS, type AdReward } from "../config/ads";
 import { SHOP } from "../config/shop";
 import type { GameState } from "../types";
 import { finishNow, remainingOf } from "./construction";
+import type { EconomySnapshot } from "./economy";
 import { collectOffline } from "./offline";
+import { qcBlock } from "./quality-check";
+import { claimLogin, loginDoublable } from "./retention";
 import { dateKey } from "./calendar";
 
 export interface AdsState {
@@ -23,7 +26,10 @@ export const createAds = (): AdsState => ({ day: "", count: 0, boostLeft: 0, bui
 /** Rewarded ads watched today. */
 export const adsToday = (s: GameState, now: number) => (s.ads.day === dateKey(now) ? s.ads.count : 0);
 
-/** Why a reward can't be had now: today's limit, nothing to give, a boost already running, the pause after an instant build. */
+/**
+ * Why a reward can't be had now: today's limit, nothing to give (no report, no job, a Star day's
+ * login, no break to skip), a boost already running, the pause after an instant build.
+ */
 export type AdBlock = "limit" | "nothing" | "active" | "wait" | null;
 
 export function adBlock(s: GameState, reward: AdReward, now: number, plot?: string): AdBlock {
@@ -36,6 +42,11 @@ export function adBlock(s: GameState, reward: AdReward, now: number, plot?: stri
     case "build":
       if (!plot || remainingOf(s, plot) <= 0) return "nothing";
       return now < s.ads.buildAt + ADS.buildCooldown ? "wait" : null;
+    case "login":
+      return loginDoublable(s) ? null : "nothing";
+    case "qc":
+      // only the break between two inspections is skipped; the day's inspections stay the same
+      return qcBlock(s, now) === "wait" ? null : "nothing";
   }
 }
 
@@ -44,13 +55,17 @@ export const buildWait = (s: GameState, now: number) => Math.max(0, s.ads.buildA
 
 /**
  * Grants the reward of one watched ad: the offline money ×2 (collected now),
- * the job on `plot` finished, or the ×2 sales boost. False when it can't be had
- * (then nothing changes).
+ * the job on `plot` finished, the ×2 sales boost, today's login reward ×2 (needs
+ * `snap`) or the break before the next quality inspection skipped. False when it
+ * can't be had (then nothing changes).
  */
-export function grantAd(s: GameState, reward: AdReward, now: number, plot?: string): boolean {
+export function grantAd(s: GameState, reward: AdReward, now: number, plot?: string, snap?: EconomySnapshot): boolean {
   if (adBlock(s, reward, now, plot)) return false;
   if (reward === "offline") collectOffline(s, ADS.offlineMult);
   else if (reward === "boost") s.ads.boostLeft = ADS.boostSeconds;
+  else if (reward === "login") {
+    if (!snap || !claimLogin(s, snap, ADS.loginMult)) return false;
+  } else if (reward === "qc") s.qc.nextAt = now;
   else if (!finishNow(s, plot!)) return false;
   else s.ads.buildAt = now;
   countAd(s, now);
