@@ -1,6 +1,6 @@
 import { LOGIN_REWARDS } from "../config/login";
 import { RIVALS, RIVAL_DAILY_GROWTH, type Rival } from "../config/rivals";
-import type { GameState } from "../types";
+import type { GameState, Reward } from "../types";
 import type { EconomySnapshot } from "./economy";
 import { grantReward } from "./rewards";
 import { dateKey, yesterdayKey } from "./calendar";
@@ -24,9 +24,18 @@ export function loginReward(s: GameState) {
   return LOGIN_REWARDS[Math.max(0, s.login.streak - 1) % LOGIN_REWARDS.length];
 }
 
-export function claimLogin(s: GameState, snap: EconomySnapshot): boolean {
+/** A reward with its money and Research Points multiplied (Stars and the permanent boost are never). */
+function scaled(r: Reward, mult: number): Reward {
+  if (mult === 1) return r;
+  return { ...r, cash: r.cash && r.cash * mult, incomeSeconds: r.incomeSeconds && r.incomeSeconds * mult, minCash: r.minCash && r.minCash * mult, rp: r.rp && r.rp * mult };
+}
+
+/** Today's login reward can be doubled by an ad only if it is money (not Stars). */
+export const loginDoublable = (s: GameState) => !s.login.claimed && !!s.login.day && !loginReward(s).stars;
+
+export function claimLogin(s: GameState, snap: EconomySnapshot, mult = 1): boolean {
   if (s.login.claimed || !s.login.day) return false;
-  grantReward(s, loginReward(s), snap);
+  grantReward(s, scaled(loginReward(s), mult), snap);
   s.login.claimed = true;
   return true;
 }

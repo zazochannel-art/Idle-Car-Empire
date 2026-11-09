@@ -1169,9 +1169,11 @@ export const useGame = create<GameStore>((set, get) => {
     },
     adReward: (reward, plot) => {
       const cash = get().state.cash;
-      const ok = act((s) => grantAd(s, reward, Date.now(), plot));
+      const ok = act((s) => grantAd(s, reward, Date.now(), plot, get().snap));
       if (!ok) return false;
-      if (reward === "offline") uiEvents.emit({ type: "toast", tone: "gold", icon: "💰", title: tr("toast.collected", { amount: formatMoney(get().state.cash - cash) }), body: tr("toast.collectedBody") });
+      if (reward === "login") uiEvents.emit({ type: "toast", tone: "gold", icon: "🎁", title: tr("toast.collected", { amount: formatMoney(get().state.cash - cash) }), body: tr("ad.loginBody") });
+      else if (reward === "qc") uiEvents.emit({ type: "toast", tone: "info", icon: "🔍", title: tr("ad.qcStarted"), body: tr("ad.qcStartedBody") });
+      else if (reward === "offline") uiEvents.emit({ type: "toast", tone: "gold", icon: "💰", title: tr("toast.collected", { amount: formatMoney(get().state.cash - cash) }), body: tr("toast.collectedBody") });
       else if (reward === "boost") uiEvents.emit({ type: "toast", tone: "gold", icon: "📈", title: tr("ad.boostStarted"), body: tr("ad.boostStartedBody") });
       persist(true);
       return true;

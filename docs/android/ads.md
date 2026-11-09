@@ -11,6 +11,8 @@ iOS app shows the same offers ([../ios.md](../ios.md)).
 | Offline report ("Welcome back") | the money earned while away, ×2 | once per report |
 | A construction or an upgrade in progress | finished at once | then a 10-minute pause before the next |
 | The HUD chip "📺 ×2 profit" (asks first) | ×2 margin on every sale for **30 minutes of play** (the time waits while the game is closed) | one at a time |
+| Daily login reward (money days only, not the Star days) | the day's money ×2, next to the normal "Claim" button | once a day |
+| Quality control, during the break between two inspections | the wait skipped (never more than the day's 6 inspections) | as the break |
 | The shop (🛒 top left): mystery box | one prize, fixed for the day: 1 h of income (40%), 1 h of research (30%), 3 h of income (20%) or 1 ⭐ Star (10%) | once a day |
 | The shop: cash pack | 30 minutes of income | 5 a day |
 | The shop: research pack | 30 minutes of research output (at least 25 RP) | 5 a day |
@@ -22,6 +24,33 @@ profit up to 4 h in all, and a tycoon pack of 8 h of income and research for a
 Star less than the two): no ad and no real money for those. Its numbers live in
 `src/game/config/shop.ts`, its rules in `src/game/engine/shop.ts` (tested in
 `src/game/shop.test.ts`).
+
+## Full-screen ads (no reward)
+
+Besides the rewarded offers, the app shows a **full-screen (interstitial) ad now
+and then, with no reward**. It never shows in the middle of something:
+
+- only when the player **closes a screen** and is back on the map (not the
+  shop, the build/upgrade sheets or the pass), and ~1.2 s after the close, so a
+  tap on "close" can never land on the ad;
+- never over the tour, a race, a factory, the offline report, a visit or the
+  first-car celebration;
+- not in the first hour of a company, and not before its first car is built (a new
+  company makes it at about 45 minutes), nor in the first 3 minutes after
+  the app opens;
+- a break of 8 minutes after **any** ad (a rewarded one counts), at most 5 a
+  day, and only half of the eligible closes show one;
+- **never with the ad-free rewards purchase**.
+
+The limits live in `INTERSTITIAL` in `src/lib/ads.ts`; the plugin side is in
+`src/lib/native-ads.ts`; the trigger is `InterstitialBridge`
+(`src/components/game/interstitial-bridge.tsx`). It uses its own ad unit:
+create an **Interstitial** unit in AdMob (Ad units → Add ad unit →
+Interstitial) and put its id in the GitHub variable `ADMOB_INTERSTITIAL_ID`
+(iOS: `ADMOB_INTERSTITIAL_ID_IOS`). Until it is set the build uses Google's
+sample interstitial unit (`ca-app-pub-3940256099942544/1033173712`), which
+shows test ads and pays nothing. Same rules as above: the consent comes first
+and the content rating is Teen.
 
 At most **20 rewarded ads a day**, all kinds together. The numbers live in
 `src/game/config/ads.ts`; the rules in `src/game/engine/ads.ts` (tested in

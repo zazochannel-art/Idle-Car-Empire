@@ -2,9 +2,9 @@
  * Rewarded ads (the Android app only): the player chooses to watch one and gets
  * a reward. Nothing in the game needs one.
  */
-export type AdReward = "offline" | "build" | "boost";
+export type AdReward = "offline" | "build" | "boost" | "login" | "qc";
 
-export const AD_REWARDS: AdReward[] = ["offline", "build", "boost"];
+export const AD_REWARDS: AdReward[] = ["offline", "build", "boost", "login", "qc"];
 
 export const ADS = {
   /** The money waiting in the offline report, multiplied. */
@@ -14,6 +14,8 @@ export const ADS = {
   boostSeconds: 30 * 60,
   /** Instant build: an ad finishes a construction or an upgrade; then a pause before the next one (ms). */
   buildCooldown: 10 * 60_000,
+  /** The daily login reward, multiplied (money days only: the Star days are not doubled). */
+  loginMult: 2,
   /** Most rewarded ads a day, all kinds together. */
   perDay: 20,
 };

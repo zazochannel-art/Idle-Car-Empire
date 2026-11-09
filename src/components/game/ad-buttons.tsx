@@ -47,6 +47,30 @@ export function OfflineAdButton({ amount }: { amount: number }) {
   );
 }
 
+/** Daily login reward: take twice the money for an ad (not on a Star day), next to the plain claim. */
+export function LoginAdButton({ amount }: { amount: number }) {
+  const { t } = useT();
+  const { ready, free, block } = useAdOffer("login");
+  if (!ready || block) return null;
+  return (
+    <Button variant="go" size="lg" className="mt-2 w-full" onClick={() => void watch("login", t)}>
+      {free ? "🎟️" : "📺"} {t(free ? "ad.loginFree" : "ad.login", { amount: formatMoney(amount * ADS.loginMult) })}
+    </Button>
+  );
+}
+
+/** Quality control during its break: skip the wait for an ad (the day's inspections stay as they are). */
+export function QcAdButton() {
+  const { t } = useT();
+  const { ready, free, block } = useAdOffer("qc");
+  if (!ready || block) return null;
+  return (
+    <Button variant="go" size="sm" className="w-full" onClick={() => void watch("qc", t)}>
+      {t(free ? "ad.qcFree" : "ad.qc")}
+    </Button>
+  );
+}
+
 /** A construction or an upgrade: finish it for an ad (then a pause before the next). */
 export function BuildAdButton({ plot, size }: { plot: string; size?: ButtonProps["size"] }) {
   const { t } = useT();

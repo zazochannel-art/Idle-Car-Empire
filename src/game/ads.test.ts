@@ -3,8 +3,12 @@ import { ADS } from "./config/ads";
 import { SHOP } from "./config/shop";
 import * as A from "./engine/ads";
 import * as Co from "./engine/construction";
+import * as R from "./engine/retention";
 import { snapshot } from "./engine/economy";
 import { computeOffline, settleOffline } from "./engine/offline";
+import { dateKey } from "./engine/calendar";
+import { qcBlock } from "./engine/quality-check";
+import { updateLogin } from "./engine/retention";
 import { createInitialState } from "./engine/state";
 import { tick } from "./engine/tick";
 import { encodeSave, decodeSave } from "./save/serialize";
@@ -56,6 +60,60 @@ describe("rewarded ads", () => {
     expect(A.buildWait(s2, T0 + 60_000)).toBe(ADS.buildCooldown - 60_000);
     expect(A.grantAd(s2, "build", T0 + 60_000, ENGINE)).toBe(false);
     expect(A.adBlock(s2, "build", T0 + ADS.buildCooldown, ENGINE)).toBeNull();
+  });
+
+  it("an ad doubles today's login money, once, but not a Star day", () => {
+    const s = createInitialState(T0);
+    updateLogin(s, T0);
+    const snap = snapshot(s);
+    const plain = structuredClone(s);
+    expect(A.grantAd(plain, "login", T0)).toBe(false); // needs the economy snapshot
+    // the plain claim, for what it pays
+    const base = structuredClone(s);
+    const c0 = base.cash;
+    R.claimLogin(base, snap);
+    const paid = base.cash - c0;
+    expect(paid).toBeGreaterThan(0);
+    const c1 = s.cash;
+    expect(A.adBlock(s, "login", T0)).toBeNull();
+    expect(A.grantAd(s, "login", T0, undefined, snap)).toBe(true);
+    expect(s.cash - c1).toBeCloseTo(paid * ADS.loginMult);
+    expect(s.login.claimed).toBe(true);
+    expect(A.adsToday(s, T0)).toBe(1);
+    // claimed: a repeated reward gives nothing
+    expect(A.adBlock(s, "login", T0)).toBe("nothing");
+    expect(A.grantAd(s, "login", T0, undefined, snap)).toBe(false);
+    expect(s.cash - c1).toBeCloseTo(paid * ADS.loginMult);
+    // a Star day is never doubled
+    const star = createInitialState(T0);
+    updateLogin(star, T0);
+    star.login.streak = 4;
+    expect(A.adBlock(star, "login", T0)).toBe("nothing");
+    const stars = star.stars;
+    expect(A.grantAd(star, "login", T0, undefined, snap)).toBe(false);
+    expect(star.stars).toBe(stars);
+    expect(star.login.claimed).toBe(false);
+  });
+
+  it("an ad skips the break between two inspections, not the day's limit", () => {
+    const s = createInitialState(T0);
+    // no break running: nothing to skip
+    expect(A.adBlock(s, "qc", T0)).toBe("nothing");
+    s.qc.nextAt = T0 + 3600_000;
+    s.qc.today = 1;
+    s.qc.day = dateKey(T0);
+    expect(qcBlock(s, T0)).toBe("wait");
+    expect(A.adBlock(s, "qc", T0)).toBeNull();
+    expect(A.grantAd(s, "qc", T0)).toBe(true);
+    expect(qcBlock(s, T0)).toBeNull();
+    expect(s.qc.today).toBe(1);
+    // the day's inspections used up: an ad can't give another
+    s.qc.today = 99;
+    s.qc.nextAt = T0 + 3600_000;
+    expect(qcBlock(s, T0)).toBe("limit");
+    expect(A.adBlock(s, "qc", T0)).toBe("nothing");
+    expect(A.grantAd(s, "qc", T0)).toBe(false);
+    expect(s.qc.nextAt).toBe(T0 + 3600_000);
   });
 
   it("the sales boost doubles the margin for 30 minutes of play", () => {
