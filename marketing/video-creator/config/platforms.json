@@ -1,0 +1,48 @@
+{
+  "defaults": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "container": "mp4",
+    "video_codec": "libx264",
+    "profile": "high",
+    "pix_fmt": "yuv420p",
+    "crf": 18,
+    "preset": "medium",
+    "maxrate": "14M",
+    "bufsize": "28M",
+    "gop": 60,
+    "audio_codec": "aac",
+    "audio_bitrate": "192k",
+    "audio_rate": 48000,
+    "audio_channels": 2,
+    "loudness_target_lufs": -14.0,
+    "true_peak_db": -2.0
+  },
+  "platforms": {
+    "tiktok": {
+      "label": "TikTok",
+      "dir": "tiktok",
+      "safe": { "top": 150, "bottom": 480, "left": 60, "right": 140 },
+      "safe_note": "Bottom ~25% is covered by caption/music UI, right edge by the like/comment/share rail.",
+      "cta_hint": "FREE on Google Play · Link in bio",
+      "max_duration": 180
+    },
+    "youtube-shorts": {
+      "label": "YouTube Shorts",
+      "dir": "youtube-shorts",
+      "safe": { "top": 180, "bottom": 400, "left": 60, "right": 140 },
+      "safe_note": "Bottom ~20% holds channel name + title + subscribe, right edge the action rail.",
+      "cta_hint": "FREE on Google Play · Link in description",
+      "max_duration": 60
+    },
+    "instagram-reels": {
+      "label": "Instagram Reels",
+      "dir": "instagram-reels",
+      "safe": { "top": 250, "bottom": 380, "left": 60, "right": 130 },
+      "safe_note": "Top ~13% is covered by the Reels header, bottom by caption + audio row, right edge by the action rail.",
+      "cta_hint": "FREE on Google Play · Link in bio",
+      "max_duration": 90
+    }
+  }
+}

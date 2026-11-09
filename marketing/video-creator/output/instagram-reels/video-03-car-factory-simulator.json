@@ -1,0 +1,559 @@
+{
+  "video_id": "03",
+  "slug": "car-factory-simulator",
+  "title": "Car Factory Simulator",
+  "category": "standard",
+  "platform": "instagram-reels",
+  "file": "video-03-car-factory-simulator.mp4",
+  "game": {
+    "name": "Idle Car Empire",
+    "play_url": "https://play.google.com/store/apps/details?id=com.zazochannel.idlecarempire",
+    "slogan": "BUILD. PRODUCE. EXPAND. DOMINATE."
+  },
+  "generated_at": "2026-11-08T23:11:23+00:00",
+  "tools": {
+    "ffmpeg": "ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers",
+    "python": "3.13.18",
+    "pillow": "12.3.0"
+  },
+  "rendered_variant": {
+    "hook": {
+      "index": 1,
+      "text": "Ever wanted to run your own car factory?"
+    },
+    "ending": {
+      "index": 1,
+      "text": "PLAY IDLE CAR EMPIRE"
+    },
+    "captions": {
+      "set": "A",
+      "lines": [
+        "Step inside the production line",
+        "Body, powertrain, trim, wheels, paint",
+        "Quality control, then finished cars",
+        "Name, paint and develop your models",
+        "Sell them through your dealers"
+      ]
+    }
+  },
+  "variants": {
+    "hooks": [
+      "Ever wanted to run your own car factory?",
+      "Ever wondered how cars get made?",
+      "Run the whole factory. Every step."
+    ],
+    "alternative_endings": [
+      "PLAY IDLE CAR EMPIRE",
+      "RUN YOUR OWN CAR FACTORY",
+      "START YOUR FACTORY TODAY"
+    ],
+    "caption_variations": {
+      "A": [
+        "Step inside the production line",
+        "Body, powertrain, trim, wheels, paint",
+        "Quality control, then finished cars",
+        "Name, paint and develop your models",
+        "Sell them through your dealers"
+      ],
+      "B": [
+        "Machines and workers, hard at work",
+        "Every station feeds the next",
+        "Cars roll off the assembly line",
+        "Design cars you're proud of",
+        "Trucks deliver, dealers sell"
+      ]
+    },
+    "render_another_variant": "python scripts/render.py 03 --platform instagram-reels --hook 2 --ending 2 --captions B"
+  },
+  "description": "Ever wanted to run your own car factory? 🏭🚗 Machines, workers and assembly lines – all yours in Idle Car Empire. Free on Google Play – link in bio.",
+  "descriptions": {
+    "tiktok": "Ever wanted to run your own car factory? 🏭🔧 Step inside the production line, watch every station feed the next and sell the finished cars in Idle Car Empire. Free on Google Play – link in bio!",
+    "youtube_shorts": "A car factory simulator you can play in short bursts: Idle Car Empire lets you step inside your plants, run the assembly line and sell finished cars. Get it free on Google Play: https://play.google.com/store/apps/details?id=com.zazochannel.idlecarempire",
+    "instagram": "Ever wanted to run your own car factory? 🏭🚗 Machines, workers and assembly lines – all yours in Idle Car Empire. Free on Google Play – link in bio."
+  },
+  "hashtags": {
+    "platform": [
+      "#IdleCarEmpire",
+      "#idlegame",
+      "#tycoongame",
+      "#carfactory",
+      "#androidgames",
+      "#mobilegaming",
+      "#reels",
+      "#gamingreels",
+      "#mobilegames",
+      "#cars",
+      "#simulator"
+    ],
+    "common": [
+      "#IdleCarEmpire",
+      "#idlegame",
+      "#tycoongame",
+      "#carfactory",
+      "#androidgames",
+      "#mobilegaming"
+    ],
+    "tiktok": [
+      "#fyp",
+      "#gamingtok",
+      "#mobilegame",
+      "#cargame",
+      "#factorygame",
+      "#simulator"
+    ],
+    "youtube_shorts": [
+      "#Shorts",
+      "#GameShorts",
+      "#IdleGames",
+      "#CarTycoon",
+      "#FactorySimulator"
+    ],
+    "instagram": [
+      "#reels",
+      "#gamingreels",
+      "#mobilegames",
+      "#cars",
+      "#simulator"
+    ]
+  },
+  "post_text": "Ever wanted to run your own car factory? 🏭🚗 Machines, workers and assembly lines – all yours in Idle Car Empire. Free on Google Play – link in bio.\n\n#IdleCarEmpire #idlegame #tycoongame #carfactory #androidgames #mobilegaming #reels #gamingreels #mobilegames #cars #simulator",
+  "safe_zone_px": {
+    "top": 250,
+    "bottom": 380,
+    "left": 60,
+    "right": 130
+  },
+  "footage": {
+    "sources_used": [
+      "ph-factory",
+      "ph-models",
+      "tab-factory",
+      "tab-map"
+    ],
+    "provenance": {
+      "ph-factory": {
+        "origin": "Google Play store listing screenshot (real in-game capture, fastlane/metadata/android/en-US)",
+        "type": "screenshot",
+        "description": "Inside the Car Assembly Plant (LV 13): conveyors, workers, Trim line / Wheels / Paint and finish stations."
+      },
+      "ph-models": {
+        "origin": "Google Play store listing screenshot (real in-game capture, fastlane/metadata/android/en-US)",
+        "type": "screenshot",
+        "description": "Models & Design screen: MC-01 and MC-02 with stats and paint/design options."
+      },
+      "tab-factory": {
+        "origin": "Google Play store listing screenshot (real in-game capture, fastlane/metadata/android/en-US)",
+        "type": "screenshot",
+        "description": "10-inch capture inside the Car Assembly Plant: Body store, Powertrain marriage, Trim line, Wheels, Paint and finish, Quality control, Finished cars."
+      },
+      "tab-map": {
+        "origin": "Google Play store listing screenshot (real in-game capture, fastlane/metadata/android/en-US)",
+        "type": "screenshot",
+        "description": "10-inch capture of the map: labelled factories (Glass Factory, Parts Market, Car Body Works, Tire Factory, Engine Factory, Economy Dealer), traffic on roads."
+      }
+    },
+    "notes": [
+      "scene 1: preferred source 'clip:factory-interior-2' not available, using 'tab-factory'",
+      "scene 2: preferred source 'clip:factory-interior' not available, using 'ph-factory'",
+      "scene 3: preferred source 'clip:factory-finished' not available, using 'tab-factory'",
+      "scene 4: preferred source 'clip:car-models' not available, using 'ph-models'",
+      "scene 5: preferred source 'clip:map-dealers' not available, using 'tab-map'"
+    ],
+    "statement": "Built only from registered real in-game captures; no gameplay or feature is simulated."
+  },
+  "ffmpeg_command": [
+    "ffmpeg",
+    "-y",
+    "-v",
+    "error",
+    "-f",
+    "rawvideo",
+    "-pix_fmt",
+    "rgb24",
+    "-s",
+    "1080x1920",
+    "-r",
+    "30",
+    "-i",
+    "-",
+    "-i",
+    "/home/user/idle-car-empire/marketing/video-creator/output/.cache/v03_df332c14c7d6.wav",
+    "-map",
+    "0:v:0",
+    "-map",
+    "1:a:0",
+    "-vf",
+    "scale=out_color_matrix=bt709:out_range=tv,format=yuv420p",
+    "-c:v",
+    "libx264",
+    "-preset",
+    "medium",
+    "-crf",
+    "18",
+    "-profile:v",
+    "high",
+    "-level",
+    "4.2",
+    "-pix_fmt",
+    "yuv420p",
+    "-maxrate",
+    "14M",
+    "-bufsize",
+    "28M",
+    "-g",
+    "60",
+    "-bf",
+    "2",
+    "-r",
+    "30",
+    "-colorspace",
+    "bt709",
+    "-color_primaries",
+    "bt709",
+    "-color_trc",
+    "bt709",
+    "-c:a",
+    "aac",
+    "-b:a",
+    "192k",
+    "-ar",
+    "48000",
+    "-ac",
+    "2",
+    "-t",
+    "22.850",
+    "-movflags",
+    "+faststart",
+    "-metadata",
+    "title=Car Factory Simulator – Idle Car Empire",
+    "-metadata",
+    "comment=https://play.google.com/store/apps/details?id=com.zazochannel.idlecarempire",
+    "/home/user/idle-car-empire/marketing/video-creator/output/instagram-reels/.video-03-car-factory-simulator.partial.mp4"
+  ],
+  "layout": {
+    "scenes": [
+      {
+        "idx": 0,
+        "start": 0.0,
+        "end": 5.2,
+        "source": "tab-factory",
+        "fallback": true,
+        "layout": "full"
+      },
+      {
+        "idx": 1,
+        "start": 4.85,
+        "end": 8.85,
+        "source": "ph-factory",
+        "fallback": true,
+        "layout": "full"
+      },
+      {
+        "idx": 2,
+        "start": 8.45,
+        "end": 12.65,
+        "source": "tab-factory",
+        "fallback": true,
+        "layout": "full"
+      },
+      {
+        "idx": 3,
+        "start": 12.3,
+        "end": 16.1,
+        "source": "ph-models",
+        "fallback": true,
+        "layout": "full"
+      },
+      {
+        "idx": 4,
+        "start": 15.8,
+        "end": 19.6,
+        "source": "tab-map",
+        "fallback": true,
+        "layout": "full"
+      },
+      {
+        "idx": 5,
+        "start": 19.25,
+        "end": 22.85,
+        "source": "endcard",
+        "fallback": false,
+        "layout": "endcard"
+      }
+    ],
+    "text_elements": [
+      {
+        "role": "hook",
+        "text": "Ever wanted to run your own car factory?",
+        "font_px": 176,
+        "words": 8,
+        "box": [
+          91.5,
+          316.4,
+          918.5,
+          1112.4
+        ],
+        "t0": 0.12,
+        "t1": 2.65,
+        "scene": 0
+      },
+      {
+        "role": "caption",
+        "text": "Step inside the production line",
+        "font_px": 92,
+        "words": 5,
+        "box": [
+          208.0,
+          1248,
+          802.0,
+          1510
+        ],
+        "t0": 2.7,
+        "t1": 4.9,
+        "scene": 0
+      },
+      {
+        "role": "chip",
+        "text": "Step inside your factories",
+        "font_px": 60,
+        "words": 4,
+        "box": [
+          70,
+          260,
+          781,
+          356
+        ],
+        "t0": 3.25,
+        "t1": 4.85,
+        "scene": 0
+      },
+      {
+        "role": "caption",
+        "text": "Body, powertrain, trim, wheels, paint",
+        "font_px": 92,
+        "words": 5,
+        "box": [
+          145.0,
+          1248,
+          865.0,
+          1510
+        ],
+        "t0": 5.375,
+        "t1": 8.5,
+        "scene": 1
+      },
+      {
+        "role": "caption",
+        "text": "Quality control, then finished cars",
+        "font_px": 92,
+        "words": 5,
+        "box": [
+          118.0,
+          1248,
+          892.0,
+          1510
+        ],
+        "t0": 9.0,
+        "t1": 12.35,
+        "scene": 2
+      },
+      {
+        "role": "caption",
+        "text": "Name, paint and develop your models",
+        "font_px": 92,
+        "words": 6,
+        "box": [
+          111.0,
+          340,
+          899.0,
+          602
+        ],
+        "t0": 12.825,
+        "t1": 15.85,
+        "scene": 3
+      },
+      {
+        "role": "caption",
+        "text": "Sell them through your dealers",
+        "font_px": 92,
+        "words": 5,
+        "box": [
+          162.5,
+          1248,
+          847.5,
+          1510
+        ],
+        "t0": 16.3,
+        "t1": 19.3,
+        "scene": 4
+      },
+      {
+        "role": "endcard-main",
+        "text": "endcard-main",
+        "font_px": 150,
+        "words": 0,
+        "box": [
+          98.0,
+          860,
+          912.0,
+          1204
+        ],
+        "t0": 19.75,
+        "t1": 22.85,
+        "scene": 5
+      },
+      {
+        "role": "endcard-sub",
+        "text": "endcard-sub",
+        "font_px": 70,
+        "words": 0,
+        "box": [
+          88.0,
+          1230,
+          922.0,
+          1314
+        ],
+        "t0": 19.75,
+        "t1": 22.85,
+        "scene": 5
+      },
+      {
+        "role": "endcard-button",
+        "text": "endcard-button",
+        "font_px": 0,
+        "words": 0,
+        "box": [
+          80.0,
+          1348,
+          930.0,
+          1498
+        ],
+        "t0": 19.75,
+        "t1": 22.85,
+        "scene": 5
+      }
+    ]
+  },
+  "qc": {
+    "status": "warn",
+    "checks": [
+      {
+        "name": "source_is_real_gameplay",
+        "status": "pass",
+        "detail": "4 registered real sources used: ph-factory, ph-models, tab-factory, tab-map"
+      },
+      {
+        "name": "source_type",
+        "status": "warn",
+        "detail": "5 scene(s) use still screenshots (no screen recording registered yet)"
+      },
+      {
+        "name": "video_format",
+        "status": "pass",
+        "detail": "h264 High 1080x1920 yuv420p 30/1 fps sar 1:1"
+      },
+      {
+        "name": "aspect_ratio_9x16",
+        "status": "pass",
+        "detail": "0.5625 (9:16 = 0.5625)"
+      },
+      {
+        "name": "audio_format",
+        "status": "pass",
+        "detail": "{'codec': 'aac', 'sample_rate': 48000, 'channels': 2}"
+      },
+      {
+        "name": "duration_in_range",
+        "status": "pass",
+        "detail": "22.867s (category 'standard' = 20-30s)"
+      },
+      {
+        "name": "duration_matches_plan",
+        "status": "pass",
+        "detail": "22.867s vs planned 22.85s"
+      },
+      {
+        "name": "platform_limit",
+        "status": "pass",
+        "detail": "22.867s ≤ 90s"
+      },
+      {
+        "name": "plays_back_cleanly",
+        "status": "pass",
+        "detail": "full decode rc=0, 686 frames (expected 686) "
+      },
+      {
+        "name": "av_sync_length",
+        "status": "pass",
+        "detail": "audio/video length differ by 0.017s"
+      },
+      {
+        "name": "audio_loudness",
+        "status": "pass",
+        "detail": "integrated -14.2 LUFS (target -14.0 ±1.5), LRA 3.0 LU"
+      },
+      {
+        "name": "audio_true_peak",
+        "status": "pass",
+        "detail": "true peak -1.8 dBTP (limit -1.0)"
+      },
+      {
+        "name": "no_dead_air",
+        "status": "pass",
+        "detail": "0 silent gap(s) > 0.8 s"
+      },
+      {
+        "name": "text_inside_platform_safe_zone",
+        "status": "pass",
+        "detail": "10 text elements checked against instagram-reels safe box [60, 250, 950, 1540]"
+      },
+      {
+        "name": "subtitle_font_size",
+        "status": "pass",
+        "detail": "min sizes {'hook': 176, 'caption': 92, 'chip': 60, 'endcard-main': 150, 'endcard-sub': 70}"
+      },
+      {
+        "name": "subtitle_reading_speed",
+        "status": "pass",
+        "detail": "all on-screen text stays ≤ 4 words/s"
+      },
+      {
+        "name": "text_vs_gameplay_overlap",
+        "status": "warn",
+        "detail": "worst case: 'Body, powertrain, trim, ' @ 6.0s covers 22% of the key area of ph-factory (warn >18%, fail >30%)"
+      },
+      {
+        "name": "no_black_borders",
+        "status": "pass",
+        "detail": "edge strips of 77 sampled gameplay frames: top 14, bottom 0, left 0, right 0 black"
+      },
+      {
+        "name": "subtitle_contrast",
+        "status": "pass",
+        "detail": "7 text blocks measured on real frames, lowest 10.8:1 ('Step inside your factori' chip @ 4.0s); need ≥ 3.0:1 (large text)"
+      }
+    ],
+    "probe": {
+      "container": "mov,mp4,m4a,3gp,3g2,mj2",
+      "duration_s": 22.867,
+      "size_mb": 16.63,
+      "bit_rate_kbps": 5818,
+      "video": {
+        "codec": "h264",
+        "profile": "High",
+        "width": 1080,
+        "height": 1920,
+        "pix_fmt": "yuv420p",
+        "fps": "30/1",
+        "sar": "1:1",
+        "dar": "9:16",
+        "frames": 686
+      },
+      "audio": {
+        "codec": "aac",
+        "sample_rate": 48000,
+        "channels": 2
+      }
+    }
+  }
+}

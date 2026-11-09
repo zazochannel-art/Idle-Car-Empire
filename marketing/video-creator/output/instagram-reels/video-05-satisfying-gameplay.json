@@ -1,0 +1,532 @@
+{
+  "video_id": "05",
+  "slug": "satisfying-gameplay",
+  "title": "Satisfying Gameplay",
+  "category": "standard",
+  "platform": "instagram-reels",
+  "file": "video-05-satisfying-gameplay.mp4",
+  "game": {
+    "name": "Idle Car Empire",
+    "play_url": "https://play.google.com/store/apps/details?id=com.zazochannel.idlecarempire",
+    "slogan": "BUILD. PRODUCE. EXPAND. DOMINATE."
+  },
+  "generated_at": "2026-11-08T23:13:19+00:00",
+  "tools": {
+    "ffmpeg": "ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers",
+    "python": "3.13.18",
+    "pillow": "12.3.0"
+  },
+  "rendered_variant": {
+    "hook": {
+      "index": 1,
+      "text": "This is how an automotive empire is built."
+    },
+    "ending": {
+      "index": 1,
+      "text": "BUILD. PRODUCE. EXPAND."
+    },
+    "captions": {
+      "set": "A",
+      "lines": [
+        "Watch the line roll",
+        "Station by station",
+        "Trucks keep the parts moving",
+        "Even while you're away"
+      ]
+    }
+  },
+  "variants": {
+    "hooks": [
+      "This is how an automotive empire is built.",
+      "Pure satisfying factory vibes.",
+      "Watch an empire run itself."
+    ],
+    "alternative_endings": [
+      "BUILD. PRODUCE. EXPAND.",
+      "BUILD. PRODUCE. EXPAND. DOMINATE.",
+      "WATCH YOUR EMPIRE GROW"
+    ],
+    "caption_variations": {
+      "A": [
+        "Watch the line roll",
+        "Station by station",
+        "Trucks keep the parts moving",
+        "Even while you're away"
+      ],
+      "B": [
+        "Every car takes shape",
+        "Smooth, steady, satisfying",
+        "A city that never sleeps",
+        "Offline income keeps rolling"
+      ]
+    },
+    "render_another_variant": "python scripts/render.py 05 --platform instagram-reels --hook 2 --ending 2 --captions B"
+  },
+  "description": "This is how an automotive empire is built ✨🏭 Satisfying factory vibes in Idle Car Empire. Free on Google Play – link in bio.",
+  "descriptions": {
+    "tiktok": "This is how an automotive empire is built. 🏭✨ Pure satisfying factory vibes in Idle Car Empire. Free on Google Play – link in bio!",
+    "youtube_shorts": "Satisfying idle gameplay: watch conveyors, workers and trucks build a car empire in Idle Car Empire, free on Android. Get it free on Google Play: https://play.google.com/store/apps/details?id=com.zazochannel.idlecarempire",
+    "instagram": "This is how an automotive empire is built ✨🏭 Satisfying factory vibes in Idle Car Empire. Free on Google Play – link in bio."
+  },
+  "hashtags": {
+    "platform": [
+      "#IdleCarEmpire",
+      "#idlegame",
+      "#tycoongame",
+      "#carfactory",
+      "#androidgames",
+      "#mobilegaming",
+      "#reels",
+      "#gamingreels",
+      "#mobilegames",
+      "#cars",
+      "#satisfying"
+    ],
+    "common": [
+      "#IdleCarEmpire",
+      "#idlegame",
+      "#tycoongame",
+      "#carfactory",
+      "#androidgames",
+      "#mobilegaming"
+    ],
+    "tiktok": [
+      "#fyp",
+      "#gamingtok",
+      "#mobilegame",
+      "#cargame",
+      "#satisfying",
+      "#oddlysatisfying"
+    ],
+    "youtube_shorts": [
+      "#Shorts",
+      "#GameShorts",
+      "#IdleGames",
+      "#CarTycoon",
+      "#Satisfying"
+    ],
+    "instagram": [
+      "#reels",
+      "#gamingreels",
+      "#mobilegames",
+      "#cars",
+      "#satisfying"
+    ]
+  },
+  "post_text": "This is how an automotive empire is built ✨🏭 Satisfying factory vibes in Idle Car Empire. Free on Google Play – link in bio.\n\n#IdleCarEmpire #idlegame #tycoongame #carfactory #androidgames #mobilegaming #reels #gamingreels #mobilegames #cars #satisfying",
+  "safe_zone_px": {
+    "top": 250,
+    "bottom": 380,
+    "left": 60,
+    "right": 130
+  },
+  "footage": {
+    "sources_used": [
+      "ph-factory",
+      "ph-map",
+      "tab-factory",
+      "tab-map"
+    ],
+    "provenance": {
+      "ph-factory": {
+        "origin": "Google Play store listing screenshot (real in-game capture, fastlane/metadata/android/en-US)",
+        "type": "screenshot",
+        "description": "Inside the Car Assembly Plant (LV 13): conveyors, workers, Trim line / Wheels / Paint and finish stations."
+      },
+      "ph-map": {
+        "origin": "Google Play store listing screenshot (real in-game capture, fastlane/metadata/android/en-US)",
+        "type": "screenshot",
+        "description": "Map view of a late-game empire: factories, Parts Market, Materials Depot, trucks on the roads."
+      },
+      "tab-factory": {
+        "origin": "Google Play store listing screenshot (real in-game capture, fastlane/metadata/android/en-US)",
+        "type": "screenshot",
+        "description": "10-inch capture inside the Car Assembly Plant: Body store, Powertrain marriage, Trim line, Wheels, Paint and finish, Quality control, Finished cars."
+      },
+      "tab-map": {
+        "origin": "Google Play store listing screenshot (real in-game capture, fastlane/metadata/android/en-US)",
+        "type": "screenshot",
+        "description": "10-inch capture of the map: labelled factories (Glass Factory, Parts Market, Car Body Works, Tire Factory, Engine Factory, Economy Dealer), traffic on roads."
+      }
+    },
+    "notes": [
+      "scene 1: preferred source 'clip:factory-interior-2' not available, using 'tab-factory'",
+      "scene 2: preferred source 'clip:factory-interior' not available, using 'ph-factory'",
+      "scene 3: preferred source 'clip:map-traffic' not available, using 'tab-map'",
+      "scene 4: preferred source 'clip:map-overview' not available, using 'ph-map'"
+    ],
+    "statement": "Built only from registered real in-game captures; no gameplay or feature is simulated."
+  },
+  "ffmpeg_command": [
+    "ffmpeg",
+    "-y",
+    "-v",
+    "error",
+    "-f",
+    "rawvideo",
+    "-pix_fmt",
+    "rgb24",
+    "-s",
+    "1080x1920",
+    "-r",
+    "30",
+    "-i",
+    "-",
+    "-i",
+    "/home/user/idle-car-empire/marketing/video-creator/output/.cache/v05_3739f179e624.wav",
+    "-map",
+    "0:v:0",
+    "-map",
+    "1:a:0",
+    "-vf",
+    "scale=out_color_matrix=bt709:out_range=tv,format=yuv420p",
+    "-c:v",
+    "libx264",
+    "-preset",
+    "medium",
+    "-crf",
+    "18",
+    "-profile:v",
+    "high",
+    "-level",
+    "4.2",
+    "-pix_fmt",
+    "yuv420p",
+    "-maxrate",
+    "14M",
+    "-bufsize",
+    "28M",
+    "-g",
+    "60",
+    "-bf",
+    "2",
+    "-r",
+    "30",
+    "-colorspace",
+    "bt709",
+    "-color_primaries",
+    "bt709",
+    "-color_trc",
+    "bt709",
+    "-c:a",
+    "aac",
+    "-b:a",
+    "192k",
+    "-ar",
+    "48000",
+    "-ac",
+    "2",
+    "-t",
+    "20.650",
+    "-movflags",
+    "+faststart",
+    "-metadata",
+    "title=Satisfying Gameplay – Idle Car Empire",
+    "-metadata",
+    "comment=https://play.google.com/store/apps/details?id=com.zazochannel.idlecarempire",
+    "/home/user/idle-car-empire/marketing/video-creator/output/instagram-reels/.video-05-satisfying-gameplay.partial.mp4"
+  ],
+  "layout": {
+    "scenes": [
+      {
+        "idx": 0,
+        "start": 0.0,
+        "end": 5.4,
+        "source": "tab-factory",
+        "fallback": true,
+        "layout": "full"
+      },
+      {
+        "idx": 1,
+        "start": 5.1,
+        "end": 9.3,
+        "source": "ph-factory",
+        "fallback": true,
+        "layout": "full"
+      },
+      {
+        "idx": 2,
+        "start": 8.9,
+        "end": 13.5,
+        "source": "tab-map",
+        "fallback": true,
+        "layout": "full"
+      },
+      {
+        "idx": 3,
+        "start": 13.2,
+        "end": 17.2,
+        "source": "ph-map",
+        "fallback": true,
+        "layout": "full"
+      },
+      {
+        "idx": 4,
+        "start": 16.85,
+        "end": 20.65,
+        "source": "endcard",
+        "fallback": false,
+        "layout": "endcard"
+      }
+    ],
+    "text_elements": [
+      {
+        "role": "hook",
+        "text": "This is how an automotive empire is built.",
+        "font_px": 151,
+        "words": 8,
+        "box": [
+          78.0,
+          457.9,
+          932.0,
+          970.9
+        ],
+        "t0": 0.12,
+        "t1": 2.65,
+        "scene": 0
+      },
+      {
+        "role": "caption",
+        "text": "Watch the line roll",
+        "font_px": 92,
+        "words": 4,
+        "box": [
+          154.0,
+          1359,
+          856.0,
+          1510
+        ],
+        "t0": 2.7,
+        "t1": 5.15,
+        "scene": 0
+      },
+      {
+        "role": "caption",
+        "text": "Station by station",
+        "font_px": 92,
+        "words": 3,
+        "box": [
+          161.5,
+          1359,
+          848.5,
+          1510
+        ],
+        "t0": 5.6,
+        "t1": 8.95,
+        "scene": 1
+      },
+      {
+        "role": "caption",
+        "text": "Trucks keep the parts moving",
+        "font_px": 92,
+        "words": 5,
+        "box": [
+          88.0,
+          1248,
+          922.0,
+          1510
+        ],
+        "t0": 9.45,
+        "t1": 13.25,
+        "scene": 2
+      },
+      {
+        "role": "caption",
+        "text": "Even while you're away",
+        "font_px": 92,
+        "words": 4,
+        "box": [
+          166.0,
+          1248,
+          844.0,
+          1510
+        ],
+        "t0": 13.7,
+        "t1": 16.9,
+        "scene": 3
+      },
+      {
+        "role": "chip",
+        "text": "Earns while you're away",
+        "font_px": 60,
+        "words": 4,
+        "box": [
+          70,
+          260,
+          734,
+          356
+        ],
+        "t0": 14.1,
+        "t1": 16.85,
+        "scene": 3
+      },
+      {
+        "role": "endcard-main",
+        "text": "endcard-main",
+        "font_px": 129,
+        "words": 0,
+        "box": [
+          106.5,
+          860,
+          903.5,
+          1156
+        ],
+        "t0": 17.35,
+        "t1": 20.65,
+        "scene": 4
+      },
+      {
+        "role": "endcard-sub",
+        "text": "endcard-sub",
+        "font_px": 70,
+        "words": 0,
+        "box": [
+          88.0,
+          1182,
+          922.0,
+          1266
+        ],
+        "t0": 17.35,
+        "t1": 20.65,
+        "scene": 4
+      },
+      {
+        "role": "endcard-button",
+        "text": "endcard-button",
+        "font_px": 0,
+        "words": 0,
+        "box": [
+          80.0,
+          1300,
+          930.0,
+          1450
+        ],
+        "t0": 17.35,
+        "t1": 20.65,
+        "scene": 4
+      }
+    ]
+  },
+  "qc": {
+    "status": "warn",
+    "checks": [
+      {
+        "name": "source_is_real_gameplay",
+        "status": "pass",
+        "detail": "4 registered real sources used: ph-factory, ph-map, tab-factory, tab-map"
+      },
+      {
+        "name": "source_type",
+        "status": "warn",
+        "detail": "4 scene(s) use still screenshots (no screen recording registered yet)"
+      },
+      {
+        "name": "video_format",
+        "status": "pass",
+        "detail": "h264 High 1080x1920 yuv420p 30/1 fps sar 1:1"
+      },
+      {
+        "name": "aspect_ratio_9x16",
+        "status": "pass",
+        "detail": "0.5625 (9:16 = 0.5625)"
+      },
+      {
+        "name": "audio_format",
+        "status": "pass",
+        "detail": "{'codec': 'aac', 'sample_rate': 48000, 'channels': 2}"
+      },
+      {
+        "name": "duration_in_range",
+        "status": "pass",
+        "detail": "20.667s (category 'standard' = 20-30s)"
+      },
+      {
+        "name": "duration_matches_plan",
+        "status": "pass",
+        "detail": "20.667s vs planned 20.65s"
+      },
+      {
+        "name": "platform_limit",
+        "status": "pass",
+        "detail": "20.667s ≤ 90s"
+      },
+      {
+        "name": "plays_back_cleanly",
+        "status": "pass",
+        "detail": "full decode rc=0, 620 frames (expected 620) "
+      },
+      {
+        "name": "av_sync_length",
+        "status": "pass",
+        "detail": "audio/video length differ by 0.017s"
+      },
+      {
+        "name": "audio_loudness",
+        "status": "pass",
+        "detail": "integrated -14.2 LUFS (target -14.0 ±1.5), LRA 3.5 LU"
+      },
+      {
+        "name": "audio_true_peak",
+        "status": "pass",
+        "detail": "true peak -3.2 dBTP (limit -1.0)"
+      },
+      {
+        "name": "no_dead_air",
+        "status": "pass",
+        "detail": "0 silent gap(s) > 0.8 s"
+      },
+      {
+        "name": "text_inside_platform_safe_zone",
+        "status": "pass",
+        "detail": "9 text elements checked against instagram-reels safe box [60, 250, 950, 1540]"
+      },
+      {
+        "name": "subtitle_font_size",
+        "status": "pass",
+        "detail": "min sizes {'hook': 151, 'caption': 92, 'chip': 60, 'endcard-main': 129, 'endcard-sub': 70}"
+      },
+      {
+        "name": "subtitle_reading_speed",
+        "status": "pass",
+        "detail": "all on-screen text stays ≤ 4 words/s"
+      },
+      {
+        "name": "text_vs_gameplay_overlap",
+        "status": "pass",
+        "detail": "worst case: 'Station by station' @ 6.0s covers 13% of the key area of ph-factory (warn >18%, fail >30%)"
+      },
+      {
+        "name": "no_black_borders",
+        "status": "pass",
+        "detail": "edge strips of 67 sampled gameplay frames: top 1, bottom 0, left 0, right 0 black"
+      },
+      {
+        "name": "subtitle_contrast",
+        "status": "pass",
+        "detail": "6 text blocks measured on real frames, lowest 10.8:1 ('Earns while you're away' chip @ 16.25s); need ≥ 3.0:1 (large text)"
+      }
+    ],
+    "probe": {
+      "container": "mov,mp4,m4a,3gp,3g2,mj2",
+      "duration_s": 20.667,
+      "size_mb": 19.95,
+      "bit_rate_kbps": 7723,
+      "video": {
+        "codec": "h264",
+        "profile": "High",
+        "width": 1080,
+        "height": 1920,
+        "pix_fmt": "yuv420p",
+        "fps": "30/1",
+        "sar": "1:1",
+        "dar": "9:16",
+        "frames": 620
+      },
+      "audio": {
+        "codec": "aac",
+        "sample_rate": 48000,
+        "channels": 2
+      }
+    }
+  }
+}

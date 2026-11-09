@@ -1,0 +1,272 @@
+{
+  "id": "06",
+  "slug": "official-trailer",
+  "title": "Official Game Trailer",
+  "category": "trailer",
+  "music": {
+    "preset": "epic",
+    "bpm": 96,
+    "seed": 66
+  },
+  "hooks": [
+    "The **car empire** you've always wanted.",
+    "One workshop. 20 kinds of factories. **One empire.**",
+    "It's time to build **your empire**."
+  ],
+  "endings": [
+    {
+      "text": "BUILD. PRODUCE. EXPAND. **DOMINATE.**",
+      "slogan": true,
+      "sub": null
+    },
+    {
+      "text": "YOUR **EMPIRE** AWAITS"
+    },
+    {
+      "text": "PLAY **IDLE CAR EMPIRE** FREE"
+    }
+  ],
+  "captions": {
+    "A": [
+      "It all starts with **one workshop**",
+      "**Construct.** Upgrade. Repeat.",
+      "**Produce** every part",
+      "Machines, workers, assembly lines",
+      "Parts become **finished cars**",
+      "**23 car models**, ready to sell",
+      "**Expand** across a living city",
+      "**Race** your cars",
+      "Research up to **electric** and **self-driving**",
+      "Build your **legacy**"
+    ],
+    "B": [
+      "Every empire has a **beginning**",
+      "Buy land. **Build** big.",
+      "Bodies, engines, paint",
+      "Step inside your **factories**",
+      "Watch every car take **shape**",
+      "From city cars to **hypercars**",
+      "Trucks, dealers, **profit**",
+      "Take on the **circuit**",
+      "The future is **electric**",
+      "Make it **yours**"
+    ]
+  },
+  "scenes": [
+    {
+      "source": "clip:early-factory",
+      "fallback": "early-1",
+      "dur": 5.2,
+      "layout": "phone",
+      "caption_pos": "upper"
+    },
+    {
+      "source": "clip:expansion-build",
+      "fallback": "early-2",
+      "dur": 3.6,
+      "layout": "phone",
+      "caption_pos": "upper",
+      "bg_variant": 1,
+      "transition": "push_left",
+      "transition_dur": 0.35
+    },
+    {
+      "source": "clip:factory-interior",
+      "fallback": "ph-factory",
+      "dur": 3.8,
+      "camera": {
+        "from": [
+          0.5,
+          0.42,
+          1.12
+        ],
+        "to": [
+          0.5,
+          0.68,
+          1.12
+        ]
+      },
+      "transition": "wipe",
+      "transition_dur": 0.35
+    },
+    {
+      "source": "clip:factory-interior-2",
+      "fallback": "tab-factory",
+      "dur": 4.0,
+      "camera": {
+        "from": [
+          0.22,
+          0.52,
+          1.1
+        ],
+        "to": [
+          0.62,
+          0.52,
+          1.1
+        ]
+      },
+      "transition": "zoom_punch",
+      "transition_dur": 0.4
+    },
+    {
+      "source": "clip:factory-finished",
+      "fallback": "tab-factory",
+      "dur": 3.6,
+      "camera": {
+        "from": [
+          0.7,
+          0.6,
+          1.1
+        ],
+        "to": [
+          0.92,
+          0.62,
+          1.1
+        ]
+      },
+      "transition": "flash",
+      "transition_dur": 0.3
+    },
+    {
+      "source": "clip:car-models",
+      "fallback": "ph-models",
+      "dur": 3.2,
+      "camera": {
+        "from": [
+          0.5,
+          0.5,
+          1.0
+        ],
+        "to": [
+          0.5,
+          0.5,
+          1.0
+        ]
+      },
+      "caption_pos": "upper",
+      "transition": "push_up",
+      "transition_dur": 0.35
+    },
+    {
+      "source": "clip:map-traffic",
+      "fallback": "tab-map",
+      "dur": 3.8,
+      "camera": {
+        "from": [
+          0.25,
+          0.55,
+          1.15
+        ],
+        "to": [
+          0.75,
+          0.48,
+          1.15
+        ]
+      },
+      "transition": "zoom_punch",
+      "transition_dur": 0.4
+    },
+    {
+      "source": "clip:racing",
+      "fallback": "tab-racing",
+      "dur": 3.2,
+      "camera": {
+        "from": [
+          0.2,
+          0.55,
+          1.1
+        ],
+        "to": [
+          0.82,
+          0.55,
+          1.1
+        ]
+      },
+      "transition": "push_left",
+      "transition_dur": 0.3
+    },
+    {
+      "source": "clip:research",
+      "fallback": "ph-research",
+      "dur": 3.0,
+      "camera": {
+        "from": [
+          0.5,
+          0.5,
+          1.0
+        ],
+        "to": [
+          0.5,
+          0.5,
+          1.0
+        ]
+      },
+      "caption_pos": "upper",
+      "transition": "wipe",
+      "transition_dur": 0.3
+    },
+    {
+      "source": "clip:map-overview",
+      "fallback": "ph-map",
+      "dur": 3.2,
+      "camera": {
+        "from": [
+          0.5,
+          0.62,
+          1.0
+        ],
+        "to": [
+          0.5,
+          0.66,
+          1.15
+        ]
+      },
+      "transition": "flash",
+      "transition_dur": 0.3
+    }
+  ],
+  "endcard": {
+    "dur": 5.0,
+    "transition": "flash",
+    "transition_dur": 0.4
+  },
+  "descriptions": {
+    "tiktok": "Official trailer 🏭🚗 BUILD. PRODUCE. EXPAND. DOMINATE. Idle Car Empire – build your car empire from one small workshop to a global operation. Free on Google Play – link in bio!",
+    "youtube_shorts": "Official trailer for Idle Car Empire – a free idle car-factory tycoon for Android. Build factories, run the supply chain, sell your cars and dominate the market. Get it free on Google Play: https://play.google.com/store/apps/details?id=com.zazochannel.idlecarempire",
+    "instagram": "Official trailer 🚗🏭 BUILD. PRODUCE. EXPAND. DOMINATE. Idle Car Empire is out now on Google Play. Free on Google Play – link in bio."
+  },
+  "hashtags": {
+    "common": [
+      "#IdleCarEmpire",
+      "#idlegame",
+      "#tycoongame",
+      "#carfactory",
+      "#androidgames",
+      "#mobilegaming"
+    ],
+    "tiktok": [
+      "#fyp",
+      "#gamingtok",
+      "#mobilegame",
+      "#cargame",
+      "#gametrailer",
+      "#newgame"
+    ],
+    "youtube_shorts": [
+      "#Shorts",
+      "#GameShorts",
+      "#IdleGames",
+      "#CarTycoon",
+      "#GameTrailer",
+      "#NewGame"
+    ],
+    "instagram": [
+      "#reels",
+      "#gamingreels",
+      "#mobilegames",
+      "#cars",
+      "#gametrailer",
+      "#newgame"
+    ]
+  }
+}

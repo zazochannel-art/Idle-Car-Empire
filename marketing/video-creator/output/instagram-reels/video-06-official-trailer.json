@@ -1,0 +1,712 @@
+{
+  "video_id": "06",
+  "slug": "official-trailer",
+  "title": "Official Game Trailer",
+  "category": "trailer",
+  "platform": "instagram-reels",
+  "file": "video-06-official-trailer.mp4",
+  "game": {
+    "name": "Idle Car Empire",
+    "play_url": "https://play.google.com/store/apps/details?id=com.zazochannel.idlecarempire",
+    "slogan": "BUILD. PRODUCE. EXPAND. DOMINATE."
+  },
+  "generated_at": "2026-11-08T23:16:17+00:00",
+  "tools": {
+    "ffmpeg": "ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers",
+    "python": "3.13.18",
+    "pillow": "12.3.0"
+  },
+  "rendered_variant": {
+    "hook": {
+      "index": 1,
+      "text": "The car empire you've always wanted."
+    },
+    "ending": {
+      "index": 1,
+      "text": "BUILD. PRODUCE. EXPAND. DOMINATE."
+    },
+    "captions": {
+      "set": "A",
+      "lines": [
+        "It all starts with one workshop",
+        "Construct. Upgrade. Repeat.",
+        "Produce every part",
+        "Machines, workers, assembly lines",
+        "Parts become finished cars",
+        "23 car models, ready to sell",
+        "Expand across a living city",
+        "Race your cars",
+        "Research up to electric and self-driving",
+        "Build your legacy"
+      ]
+    }
+  },
+  "variants": {
+    "hooks": [
+      "The car empire you've always wanted.",
+      "One workshop. 20 kinds of factories. One empire.",
+      "It's time to build your empire."
+    ],
+    "alternative_endings": [
+      "BUILD. PRODUCE. EXPAND. DOMINATE.",
+      "YOUR EMPIRE AWAITS",
+      "PLAY IDLE CAR EMPIRE FREE"
+    ],
+    "caption_variations": {
+      "A": [
+        "It all starts with one workshop",
+        "Construct. Upgrade. Repeat.",
+        "Produce every part",
+        "Machines, workers, assembly lines",
+        "Parts become finished cars",
+        "23 car models, ready to sell",
+        "Expand across a living city",
+        "Race your cars",
+        "Research up to electric and self-driving",
+        "Build your legacy"
+      ],
+      "B": [
+        "Every empire has a beginning",
+        "Buy land. Build big.",
+        "Bodies, engines, paint",
+        "Step inside your factories",
+        "Watch every car take shape",
+        "From city cars to hypercars",
+        "Trucks, dealers, profit",
+        "Take on the circuit",
+        "The future is electric",
+        "Make it yours"
+      ]
+    },
+    "render_another_variant": "python scripts/render.py 06 --platform instagram-reels --hook 2 --ending 2 --captions B"
+  },
+  "description": "Official trailer 🚗🏭 BUILD. PRODUCE. EXPAND. DOMINATE. Idle Car Empire is out now on Google Play. Free on Google Play – link in bio.",
+  "descriptions": {
+    "tiktok": "Official trailer 🏭🚗 BUILD. PRODUCE. EXPAND. DOMINATE. Idle Car Empire – build your car empire from one small workshop to a global operation. Free on Google Play – link in bio!",
+    "youtube_shorts": "Official trailer for Idle Car Empire – a free idle car-factory tycoon for Android. Build factories, run the supply chain, sell your cars and dominate the market. Get it free on Google Play: https://play.google.com/store/apps/details?id=com.zazochannel.idlecarempire",
+    "instagram": "Official trailer 🚗🏭 BUILD. PRODUCE. EXPAND. DOMINATE. Idle Car Empire is out now on Google Play. Free on Google Play – link in bio."
+  },
+  "hashtags": {
+    "platform": [
+      "#IdleCarEmpire",
+      "#idlegame",
+      "#tycoongame",
+      "#carfactory",
+      "#androidgames",
+      "#mobilegaming",
+      "#reels",
+      "#gamingreels",
+      "#mobilegames",
+      "#cars",
+      "#gametrailer",
+      "#newgame"
+    ],
+    "common": [
+      "#IdleCarEmpire",
+      "#idlegame",
+      "#tycoongame",
+      "#carfactory",
+      "#androidgames",
+      "#mobilegaming"
+    ],
+    "tiktok": [
+      "#fyp",
+      "#gamingtok",
+      "#mobilegame",
+      "#cargame",
+      "#gametrailer",
+      "#newgame"
+    ],
+    "youtube_shorts": [
+      "#Shorts",
+      "#GameShorts",
+      "#IdleGames",
+      "#CarTycoon",
+      "#GameTrailer",
+      "#NewGame"
+    ],
+    "instagram": [
+      "#reels",
+      "#gamingreels",
+      "#mobilegames",
+      "#cars",
+      "#gametrailer",
+      "#newgame"
+    ]
+  },
+  "post_text": "Official trailer 🚗🏭 BUILD. PRODUCE. EXPAND. DOMINATE. Idle Car Empire is out now on Google Play. Free on Google Play – link in bio.\n\n#IdleCarEmpire #idlegame #tycoongame #carfactory #androidgames #mobilegaming #reels #gamingreels #mobilegames #cars #gametrailer #newgame",
+  "safe_zone_px": {
+    "top": 250,
+    "bottom": 380,
+    "left": 60,
+    "right": 130
+  },
+  "footage": {
+    "sources_used": [
+      "early-1",
+      "early-2",
+      "ph-factory",
+      "ph-map",
+      "ph-models",
+      "ph-research",
+      "tab-factory",
+      "tab-map",
+      "tab-racing"
+    ],
+    "provenance": {
+      "early-1": {
+        "origin": "In-game capture of the first minutes (tutorial step 1/4 'This is your factory'), $9,983 cash, 1 factory",
+        "type": "screenshot",
+        "description": "Early game: the first factory, tutorial card 'This is your factory'. Low resolution (390x844) – only used inside the phone frame."
+      },
+      "early-2": {
+        "origin": "In-game capture of the first minutes (tutorial step 3/4 'Build more factories'), Small Car Body Works LV 1",
+        "type": "screenshot",
+        "description": "Early game: Small Car Body Works (LV 1, 1 worker at a workbench) with tutorial 'Build more factories'. Low resolution (390x844)."
+      },
+      "ph-factory": {
+        "origin": "Google Play store listing screenshot (real in-game capture, fastlane/metadata/android/en-US)",
+        "type": "screenshot",
+        "description": "Inside the Car Assembly Plant (LV 13): conveyors, workers, Trim line / Wheels / Paint and finish stations."
+      },
+      "ph-map": {
+        "origin": "Google Play store listing screenshot (real in-game capture, fastlane/metadata/android/en-US)",
+        "type": "screenshot",
+        "description": "Map view of a late-game empire: factories, Parts Market, Materials Depot, trucks on the roads."
+      },
+      "ph-models": {
+        "origin": "Google Play store listing screenshot (real in-game capture, fastlane/metadata/android/en-US)",
+        "type": "screenshot",
+        "description": "Models & Design screen: MC-01 and MC-02 with stats and paint/design options."
+      },
+      "ph-research": {
+        "origin": "Google Play store listing screenshot (real in-game capture, fastlane/metadata/android/en-US)",
+        "type": "screenshot",
+        "description": "Research Lab: Engineering, Automation and Electric technologies."
+      },
+      "tab-factory": {
+        "origin": "Google Play store listing screenshot (real in-game capture, fastlane/metadata/android/en-US)",
+        "type": "screenshot",
+        "description": "10-inch capture inside the Car Assembly Plant: Body store, Powertrain marriage, Trim line, Wheels, Paint and finish, Quality control, Finished cars."
+      },
+      "tab-map": {
+        "origin": "Google Play store listing screenshot (real in-game capture, fastlane/metadata/android/en-US)",
+        "type": "screenshot",
+        "description": "10-inch capture of the map: labelled factories (Glass Factory, Parts Market, Car Body Works, Tire Factory, Engine Factory, Economy Dealer), traffic on roads."
+      },
+      "tab-racing": {
+        "origin": "Google Play store listing screenshot (real in-game capture, fastlane/metadata/android/en-US)",
+        "type": "screenshot",
+        "description": "10-inch capture of the map with the Racing District panel open."
+      }
+    },
+    "notes": [
+      "scene 1: preferred source 'clip:early-factory' not available, using 'early-1'",
+      "scene 2: preferred source 'clip:expansion-build' not available, using 'early-2'",
+      "scene 3: preferred source 'clip:factory-interior' not available, using 'ph-factory'",
+      "scene 4: preferred source 'clip:factory-interior-2' not available, using 'tab-factory'",
+      "scene 5: preferred source 'clip:factory-finished' not available, using 'tab-factory'",
+      "scene 6: preferred source 'clip:car-models' not available, using 'ph-models'",
+      "scene 7: preferred source 'clip:map-traffic' not available, using 'tab-map'",
+      "scene 8: preferred source 'clip:racing' not available, using 'tab-racing'",
+      "scene 9: preferred source 'clip:research' not available, using 'ph-research'",
+      "scene 10: preferred source 'clip:map-overview' not available, using 'ph-map'"
+    ],
+    "statement": "Built only from registered real in-game captures; no gameplay or feature is simulated."
+  },
+  "ffmpeg_command": [
+    "ffmpeg",
+    "-y",
+    "-v",
+    "error",
+    "-f",
+    "rawvideo",
+    "-pix_fmt",
+    "rgb24",
+    "-s",
+    "1080x1920",
+    "-r",
+    "30",
+    "-i",
+    "-",
+    "-i",
+    "/home/user/idle-car-empire/marketing/video-creator/output/.cache/v06_aae8a7a13f9c.wav",
+    "-map",
+    "0:v:0",
+    "-map",
+    "1:a:0",
+    "-vf",
+    "scale=out_color_matrix=bt709:out_range=tv,format=yuv420p",
+    "-c:v",
+    "libx264",
+    "-preset",
+    "medium",
+    "-crf",
+    "18",
+    "-profile:v",
+    "high",
+    "-level",
+    "4.2",
+    "-pix_fmt",
+    "yuv420p",
+    "-maxrate",
+    "14M",
+    "-bufsize",
+    "28M",
+    "-g",
+    "60",
+    "-bf",
+    "2",
+    "-r",
+    "30",
+    "-colorspace",
+    "bt709",
+    "-color_primaries",
+    "bt709",
+    "-color_trc",
+    "bt709",
+    "-c:a",
+    "aac",
+    "-b:a",
+    "192k",
+    "-ar",
+    "48000",
+    "-ac",
+    "2",
+    "-t",
+    "38.150",
+    "-movflags",
+    "+faststart",
+    "-metadata",
+    "title=Official Game Trailer – Idle Car Empire",
+    "-metadata",
+    "comment=https://play.google.com/store/apps/details?id=com.zazochannel.idlecarempire",
+    "/home/user/idle-car-empire/marketing/video-creator/output/instagram-reels/.video-06-official-trailer.partial.mp4"
+  ],
+  "layout": {
+    "scenes": [
+      {
+        "idx": 0,
+        "start": 0.0,
+        "end": 5.2,
+        "source": "early-1",
+        "fallback": true,
+        "layout": "phone"
+      },
+      {
+        "idx": 1,
+        "start": 4.85,
+        "end": 8.45,
+        "source": "early-2",
+        "fallback": true,
+        "layout": "phone"
+      },
+      {
+        "idx": 2,
+        "start": 8.1,
+        "end": 11.9,
+        "source": "ph-factory",
+        "fallback": true,
+        "layout": "full"
+      },
+      {
+        "idx": 3,
+        "start": 11.5,
+        "end": 15.5,
+        "source": "tab-factory",
+        "fallback": true,
+        "layout": "full"
+      },
+      {
+        "idx": 4,
+        "start": 15.2,
+        "end": 18.8,
+        "source": "tab-factory",
+        "fallback": true,
+        "layout": "full"
+      },
+      {
+        "idx": 5,
+        "start": 18.45,
+        "end": 21.65,
+        "source": "ph-models",
+        "fallback": true,
+        "layout": "full"
+      },
+      {
+        "idx": 6,
+        "start": 21.25,
+        "end": 25.05,
+        "source": "tab-map",
+        "fallback": true,
+        "layout": "full"
+      },
+      {
+        "idx": 7,
+        "start": 24.75,
+        "end": 27.95,
+        "source": "tab-racing",
+        "fallback": true,
+        "layout": "full"
+      },
+      {
+        "idx": 8,
+        "start": 27.65,
+        "end": 30.65,
+        "source": "ph-research",
+        "fallback": true,
+        "layout": "full"
+      },
+      {
+        "idx": 9,
+        "start": 30.35,
+        "end": 33.55,
+        "source": "ph-map",
+        "fallback": true,
+        "layout": "full"
+      },
+      {
+        "idx": 10,
+        "start": 33.15,
+        "end": 38.15,
+        "source": "endcard",
+        "fallback": false,
+        "layout": "endcard"
+      }
+    ],
+    "text_elements": [
+      {
+        "role": "hook",
+        "text": "The car empire you've always wanted.",
+        "font_px": 163,
+        "words": 6,
+        "box": [
+          72.0,
+          346.4,
+          938.0,
+          1082.4
+        ],
+        "t0": 0.12,
+        "t1": 2.5,
+        "scene": 0
+      },
+      {
+        "role": "caption",
+        "text": "It all starts with one workshop",
+        "font_px": 92,
+        "words": 6,
+        "box": [
+          118.5,
+          340,
+          891.5,
+          602
+        ],
+        "t0": 2.55,
+        "t1": 4.9,
+        "scene": 0
+      },
+      {
+        "role": "caption",
+        "text": "Construct. Upgrade. Repeat.",
+        "font_px": 92,
+        "words": 3,
+        "box": [
+          124.5,
+          340,
+          885.5,
+          602
+        ],
+        "t0": 5.375,
+        "t1": 8.15,
+        "scene": 1
+      },
+      {
+        "role": "caption",
+        "text": "Produce every part",
+        "font_px": 92,
+        "words": 3,
+        "box": [
+          136.0,
+          1359,
+          874.0,
+          1510
+        ],
+        "t0": 8.625,
+        "t1": 11.55,
+        "scene": 2
+      },
+      {
+        "role": "caption",
+        "text": "Machines, workers, assembly lines",
+        "font_px": 92,
+        "words": 4,
+        "box": [
+          134.0,
+          1248,
+          876.0,
+          1510
+        ],
+        "t0": 12.05,
+        "t1": 15.25,
+        "scene": 3
+      },
+      {
+        "role": "caption",
+        "text": "Parts become finished cars",
+        "font_px": 92,
+        "words": 4,
+        "box": [
+          80.5,
+          1248,
+          929.5,
+          1510
+        ],
+        "t0": 15.7,
+        "t1": 18.5,
+        "scene": 4
+      },
+      {
+        "role": "caption",
+        "text": "23 car models, ready to sell",
+        "font_px": 92,
+        "words": 6,
+        "box": [
+          104.5,
+          340,
+          905.5,
+          602
+        ],
+        "t0": 18.975,
+        "t1": 21.3,
+        "scene": 5
+      },
+      {
+        "role": "caption",
+        "text": "Expand across a living city",
+        "font_px": 92,
+        "words": 5,
+        "box": [
+          181.5,
+          1248,
+          828.5,
+          1510
+        ],
+        "t0": 21.8,
+        "t1": 24.8,
+        "scene": 6
+      },
+      {
+        "role": "caption",
+        "text": "Race your cars",
+        "font_px": 92,
+        "words": 3,
+        "box": [
+          207.0,
+          1359,
+          803.0,
+          1510
+        ],
+        "t0": 25.25,
+        "t1": 27.7,
+        "scene": 7
+      },
+      {
+        "role": "caption",
+        "text": "Research up to electric and self-driving",
+        "font_px": 92,
+        "words": 6,
+        "box": [
+          207.5,
+          340,
+          802.5,
+          713
+        ],
+        "t0": 28.15,
+        "t1": 30.4,
+        "scene": 8
+      },
+      {
+        "role": "caption",
+        "text": "Build your legacy",
+        "font_px": 92,
+        "words": 3,
+        "box": [
+          171.5,
+          1359,
+          838.5,
+          1510
+        ],
+        "t0": 30.85,
+        "t1": 33.2,
+        "scene": 9
+      },
+      {
+        "role": "endcard-main",
+        "text": "endcard-main",
+        "font_px": 110,
+        "words": 0,
+        "box": [
+          100.5,
+          860,
+          909.5,
+          1112
+        ],
+        "t0": 33.65,
+        "t1": 38.15,
+        "scene": 10
+      },
+      {
+        "role": "endcard-sub",
+        "text": "endcard-sub",
+        "font_px": 70,
+        "words": 0,
+        "box": [
+          88.0,
+          1138,
+          922.0,
+          1222
+        ],
+        "t0": 33.65,
+        "t1": 38.15,
+        "scene": 10
+      },
+      {
+        "role": "endcard-button",
+        "text": "endcard-button",
+        "font_px": 0,
+        "words": 0,
+        "box": [
+          80.0,
+          1256,
+          930.0,
+          1406
+        ],
+        "t0": 33.65,
+        "t1": 38.15,
+        "scene": 10
+      }
+    ]
+  },
+  "qc": {
+    "status": "warn",
+    "checks": [
+      {
+        "name": "source_is_real_gameplay",
+        "status": "pass",
+        "detail": "9 registered real sources used: early-1, early-2, ph-factory, ph-map, ph-models, ph-research, tab-factory, tab-map, tab-racing"
+      },
+      {
+        "name": "source_type",
+        "status": "warn",
+        "detail": "10 scene(s) use still screenshots (no screen recording registered yet)"
+      },
+      {
+        "name": "video_format",
+        "status": "pass",
+        "detail": "h264 High 1080x1920 yuv420p 30/1 fps sar 1:1"
+      },
+      {
+        "name": "aspect_ratio_9x16",
+        "status": "pass",
+        "detail": "0.5625 (9:16 = 0.5625)"
+      },
+      {
+        "name": "audio_format",
+        "status": "pass",
+        "detail": "{'codec': 'aac', 'sample_rate': 48000, 'channels': 2}"
+      },
+      {
+        "name": "duration_in_range",
+        "status": "pass",
+        "detail": "38.15s (category 'trailer' = 30-45s)"
+      },
+      {
+        "name": "duration_matches_plan",
+        "status": "pass",
+        "detail": "38.15s vs planned 38.15s"
+      },
+      {
+        "name": "platform_limit",
+        "status": "pass",
+        "detail": "38.15s ≤ 90s"
+      },
+      {
+        "name": "plays_back_cleanly",
+        "status": "pass",
+        "detail": "full decode rc=0, 1144 frames (expected 1144) "
+      },
+      {
+        "name": "av_sync_length",
+        "status": "pass",
+        "detail": "audio/video length differ by 0.000s"
+      },
+      {
+        "name": "audio_loudness",
+        "status": "pass",
+        "detail": "integrated -14.5 LUFS (target -14.0 ±1.5), LRA 2.9 LU"
+      },
+      {
+        "name": "audio_true_peak",
+        "status": "pass",
+        "detail": "true peak -1.5 dBTP (limit -1.0)"
+      },
+      {
+        "name": "no_dead_air",
+        "status": "pass",
+        "detail": "0 silent gap(s) > 0.8 s"
+      },
+      {
+        "name": "text_inside_platform_safe_zone",
+        "status": "pass",
+        "detail": "14 text elements checked against instagram-reels safe box [60, 250, 950, 1540]"
+      },
+      {
+        "name": "subtitle_font_size",
+        "status": "pass",
+        "detail": "min sizes {'hook': 163, 'caption': 92, 'chip': 0, 'endcard-main': 110, 'endcard-sub': 70}"
+      },
+      {
+        "name": "subtitle_reading_speed",
+        "status": "pass",
+        "detail": "all on-screen text stays ≤ 4 words/s"
+      },
+      {
+        "name": "text_vs_gameplay_overlap",
+        "status": "pass",
+        "detail": "worst case: 'Produce every part' @ 9.25s covers 12% of the key area of ph-factory (warn >18%, fail >30%)"
+      },
+      {
+        "name": "no_black_borders",
+        "status": "pass",
+        "detail": "edge strips of 133 sampled gameplay frames: top 22, bottom 0, left 0, right 0 black"
+      },
+      {
+        "name": "subtitle_contrast",
+        "status": "pass",
+        "detail": "11 text blocks measured on real frames, lowest 12.1:1 ('Expand across a living c' caption @ 24.25s); need ≥ 3.0:1 (large text)"
+      }
+    ],
+    "probe": {
+      "container": "mov,mp4,m4a,3gp,3g2,mj2",
+      "duration_s": 38.15,
+      "size_mb": 31.0,
+      "bit_rate_kbps": 6501,
+      "video": {
+        "codec": "h264",
+        "profile": "High",
+        "width": 1080,
+        "height": 1920,
+        "pix_fmt": "yuv420p",
+        "fps": "30/1",
+        "sar": "1:1",
+        "dar": "9:16",
+        "frames": 1144
+      },
+      "audio": {
+        "codec": "aac",
+        "sample_rate": 48000,
+        "channels": 2
+      }
+    }
+  }
+}
