@@ -51,6 +51,25 @@ sample interstitial unit (`ca-app-pub-3940256099942544/1033173712`), which
 shows test ads and pays nothing. Same rules as above: the consent comes first
 and the content rating is Teen.
 
+## App Open ads
+
+An **App Open** ad can show when the player comes back to the game:
+
+- from another app or the Home screen after **at least 10 minutes** away (a
+  quick app switch shows nothing), or as the game opens if the ad is ready
+  within 4 seconds;
+- never in a company with under 15 minutes of play (so never on the first
+  opens or over the tour), never over a race;
+- the same 8-minute pause after any ad as above, inside the same daily total
+  of 5 full-screen ads, and at most 2 App Open ads a day;
+- **never with the ad-free rewards purchase**, and only after the consent.
+
+The code is `maybeShowAppOpen` in `src/lib/ads.ts` (the limits are in
+`APP_OPEN`), called from `src/lib/native.ts`. It uses its own ad unit: create an
+**App open** unit in AdMob and set the GitHub variable `ADMOB_APP_OPEN_ID`
+(iOS: `ADMOB_APP_OPEN_ID_IOS`). Until it is set the build uses Google's sample
+unit (`ca-app-pub-3940256099942544/9257395921`), which pays nothing.
+
 At most **20 rewarded ads a day**, all kinds together. The numbers live in
 `src/game/config/ads.ts`; the rules in `src/game/engine/ads.ts` (tested in
 `src/game/ads.test.ts`).

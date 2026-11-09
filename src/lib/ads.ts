@@ -18,6 +18,8 @@ export interface AdStatus {
   adFree: boolean;
   /** A full-screen (interstitial) ad is loaded. */
   interstitialReady: boolean;
+  /** An App Open ad is loaded. */
+  appOpenReady: boolean;
 }
 
 /** What the Android app's ad code does for the game. */
@@ -28,12 +30,14 @@ export interface AdDriver {
   privacyForm(): Promise<void>;
   /** Shows the loaded full-screen ad (true: it was shown and closed). */
   showInterstitial(): Promise<boolean>;
+  /** Shows the loaded App Open ad (true: it was shown and closed). */
+  showAppOpen(): Promise<boolean>;
 }
 
 /** Rewarded (the reward was given), closed early (none), or the ad couldn't be shown. */
 export type AdResult = "rewarded" | "closed" | "failed";
 
-let status: AdStatus = { ready: false, showing: false, privacyOptions: false, adFree: false, interstitialReady: false };
+let status: AdStatus = { ready: false, showing: false, privacyOptions: false, adFree: false, interstitialReady: false, appOpenReady: false };
 let driver: AdDriver | null = null;
 const listeners = new Set<() => void>();
 
@@ -62,7 +66,7 @@ const current = () => status;
 
 /** The ad status now (outside a screen). */
 export const getAdStatus = () => status;
-const SERVER: AdStatus = { ready: false, showing: false, privacyOptions: false, adFree: false, interstitialReady: false };
+const SERVER: AdStatus = { ready: false, showing: false, privacyOptions: false, adFree: false, interstitialReady: false, appOpenReady: false };
 
 /** The ad status, for a screen that offers an ad. */
 export function useAdStatus(): AdStatus {
@@ -110,22 +114,37 @@ const openedAt = Date.now();
 let lastAdAt = 0;
 const STORE = "ice.interstitial";
 
-function shownOn(day: string): number {
+/** What was shown today (full-screen and App Open together), and when the last ad of any kind began: kept on the phone. */
+interface Shown {
+  /** Ads of both kinds shown today. */
+  today: number;
+  /** App Open ads shown today. */
+  appOpenToday: number;
+  last: number;
+}
+
+function readShown(day: string): Shown {
   try {
-    const v = JSON.parse(localStorage.getItem(STORE) ?? "null") as { day?: string; count?: number } | null;
-    return v?.day === day && typeof v.count === "number" ? Math.max(0, Math.floor(v.count)) : 0;
+    const v = JSON.parse(localStorage.getItem(STORE) ?? "null") as { day?: string; count?: number; open?: number; last?: number } | null;
+    const n = (x: unknown) => (typeof x === "number" && Number.isFinite(x) && x > 0 ? Math.floor(x) : 0);
+    return { today: v?.day === day ? n(v.count) : 0, appOpenToday: v?.day === day ? n(v.open) : 0, last: n(v?.last) };
   } catch {
-    return 0;
+    return { today: 0, appOpenToday: 0, last: 0 };
   }
 }
 
-function countInterstitial(day: string) {
+/** One more ad (an App Open one if `appOpen`) begins now. */
+function countShown(day: string, now: number, appOpen: boolean) {
+  const v = readShown(day);
   try {
-    localStorage.setItem(STORE, JSON.stringify({ day, count: shownOn(day) + 1 }));
+    localStorage.setItem(STORE, JSON.stringify({ day, count: v.today + 1, open: v.appOpenToday + (appOpen ? 1 : 0), last: now }));
   } catch {
     // no storage: the pause between ads still limits them
   }
 }
+
+/** The last ad of any kind began at this time (this run, or an earlier one). */
+const lastAd = (day: string) => Math.max(lastAdAt, readShown(day).last);
 
 export interface InterstitialContext {
   now: number;
@@ -154,10 +173,66 @@ export function interstitialBlock(a: AdStatus, c: InterstitialContext): "adFree"
 export async function maybeShowInterstitial(playTime: number, rand: number = Math.random()): Promise<boolean> {
   const now = Date.now();
   const day = dateKey(now);
-  if (interstitialBlock(status, { now, playTime, today: shownOn(day), lastAdAt, openedAt }) || rand >= INTERSTITIAL.chance || !driver) return false;
+  const seen = readShown(day);
+  if (interstitialBlock(status, { now, playTime, today: seen.today, lastAdAt: lastAd(day), openedAt }) || rand >= INTERSTITIAL.chance || !driver) return false;
   lastAdAt = now;
-  countInterstitial(day);
+  countShown(day, now, false);
   const shown = await driver.showInterstitial().catch(() => false);
+  lastAdAt = Date.now();
+  return shown;
+}
+
+// ───────────────────────────── App Open ads ─────────────────────────────
+//
+// When the player comes back to the game: from another app or the Home screen after a while
+// away, or as it opens if the ad is ready within a few seconds. Never in a young company
+// (so never on the first opens, nor over the tour), never over a race, after the same pause
+// as the other ads, inside the same daily total, and never with the ad-free rewards purchase.
+
+export const APP_OPEN = {
+  /** Away from the game for this long (ms) before coming back shows one: switching apps for a moment doesn't. */
+  minAwayMs: 10 * 60_000,
+  /** App Open ads a day (they count in the daily total of INTERSTITIAL.perDay too). */
+  perDay: 2,
+  /** As the game opens, how long (ms) to wait for the ad to be ready. */
+  openWaitMs: 4_000,
+};
+
+export interface AppOpenContext extends InterstitialContext {
+  /** App Open ads shown today. */
+  appOpenToday: number;
+  /** Ms the game was away (null: it is opening). */
+  awayMs: number | null;
+}
+
+/** Why an App Open ad can't show now (null: it may). */
+export function appOpenBlock(a: AdStatus, c: AppOpenContext): "adFree" | "notReady" | "young" | "short" | "pause" | "limit" | null {
+  if (a.adFree) return "adFree";
+  if (!a.appOpenReady || a.showing) return "notReady";
+  if (c.playTime < INTERSTITIAL.minPlayTime) return "young";
+  if (c.awayMs !== null && c.awayMs < APP_OPEN.minAwayMs) return "short";
+  if (c.now - c.lastAdAt < INTERSTITIAL.gapMs) return "pause";
+  if (c.today >= INTERSTITIAL.perDay || c.appOpenToday >= APP_OPEN.perDay) return "limit";
+  return null;
+}
+
+const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/**
+ * The player is back in the game (`awayMs`: how long it was away; null: it is opening).
+ * `busy` says whether a tour or a race is on screen. True if an App Open ad was shown.
+ */
+export async function maybeShowAppOpen(playTime: number, awayMs: number | null, busy: () => boolean): Promise<boolean> {
+  // as the game opens, the ad may still be loading
+  if (awayMs === null) for (let t = 0; t < APP_OPEN.openWaitMs && !status.appOpenReady; t += 250) await wait(250);
+  const now = Date.now();
+  const day = dateKey(now);
+  const seen = readShown(day);
+  const ctx: AppOpenContext = { now, playTime, today: seen.today, appOpenToday: seen.appOpenToday, lastAdAt: lastAd(day), openedAt, awayMs };
+  if (appOpenBlock(status, ctx) || busy() || !driver) return false;
+  lastAdAt = now;
+  countShown(day, now, true);
+  const shown = await driver.showAppOpen().catch(() => false);
   lastAdAt = Date.now();
   return shown;
 }

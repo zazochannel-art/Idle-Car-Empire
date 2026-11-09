@@ -7,6 +7,8 @@ const shows = vi.fn();
 const prepares = vi.fn();
 const interstitialPrepares = vi.fn();
 const interstitialShows = vi.fn();
+const appOpenLoads = vi.fn();
+const appOpenShows = vi.fn();
 const consentRequests = vi.hoisted(() => vi.fn());
 // a build with a real ad unit, installed as the test app (the test APK)
 process.env.NEXT_PUBLIC_ADMOB_REWARDED_ID = "ca-app-pub-0000000000000000/0000000000";
@@ -15,6 +17,7 @@ vi.mock("@capacitor-community/admob", () => ({
   AdmobConsentStatus: { REQUIRED: "REQUIRED" },
   AdmobConsentDebugGeography: { OTHER: 4 },
   MaxAdContentRating: { Teen: "Teen" },
+  AppOpenAdPluginEvents: { Closed: "appOpenClosed", FailedToShow: "appOpenFailedToShow" },
   InterstitialAdPluginEvents: { Dismissed: "interstitialDismissed", FailedToShow: "interstitialFailedToShow" },
   RewardAdPluginEvents: { Showed: "showed", Rewarded: "rewarded", Dismissed: "dismissed", FailedToShow: "failedToShow" },
   AdMob: {
@@ -26,6 +29,14 @@ vi.mock("@capacitor-community/admob", () => ({
     addListener: async (event: string, fn: (data?: unknown) => void) => {
       listeners.set(event, fn);
       return { remove: async () => listeners.delete(event) };
+    },
+    loadAppOpen: async (options: unknown) => {
+      appOpenLoads(options);
+      return { adUnitId: "test" };
+    },
+    showAppOpen: () => {
+      appOpenShows();
+      return new Promise(() => {});
     },
     prepareInterstitial: async (options: unknown) => {
       interstitialPrepares(options);
@@ -68,6 +79,9 @@ describe("rewarded ads in the app", () => {
     expect(consentRequests).toHaveBeenCalledWith({ debugGeography: 4 });
     expect(prepares).toHaveBeenCalled();
     for (const [options] of prepares.mock.calls) expect(options).toEqual({ adId: "ca-app-pub-3940256099942544/5224354917", isTesting: true });
+    // the App Open ads too
+    expect(appOpenLoads).toHaveBeenCalled();
+    for (const [options] of appOpenLoads.mock.calls) expect(options).toEqual({ adId: "ca-app-pub-3940256099942544/9257395921" });
     // the full-screen ads too
     expect(interstitialPrepares).toHaveBeenCalled();
     for (const [options] of interstitialPrepares.mock.calls) expect(options).toEqual({ adId: "ca-app-pub-3940256099942544/1033173712", isTesting: true });
@@ -165,5 +179,36 @@ describe("full-screen ads in the app", () => {
     expect(getAdStatus().showing).toBe(false);
     await vi.advanceTimersByTimeAsync(0);
     expect(interstitialPrepares).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("App Open ads in the app", () => {
+  it("shows one when the player is back, then loads the next; nothing starts over it", async () => {
+    const { getAdStatus, maybeShowAppOpen, maybeShowInterstitial, INTERSTITIAL, APP_OPEN } = await import("./ads");
+    // (each test's fake clock starts at the real time: far enough past the earlier tests' ads)
+    await vi.advanceTimersByTimeAsync(24 * 3600_000);
+    appOpenShows.mockClear();
+    appOpenLoads.mockClear();
+    setAdStatus({ appOpenReady: true, interstitialReady: true });
+    const shown = maybeShowAppOpen(INTERSTITIAL.minPlayTime, APP_OPEN.minAwayMs, () => false);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(appOpenShows).toHaveBeenCalledTimes(1);
+    expect(getAdStatus().showing).toBe(true);
+    expect(await maybeShowInterstitial(INTERSTITIAL.minPlayTime, 0)).toBe(false);
+    expect(await watchAd(vi.fn())).toBe("failed");
+    emit("appOpenClosed");
+    expect(await shown).toBe(true);
+    expect(getAdStatus().showing).toBe(false);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(appOpenLoads).toHaveBeenCalledTimes(1);
+  });
+
+  it("not over a tour or a race", async () => {
+    const { maybeShowAppOpen, INTERSTITIAL, APP_OPEN } = await import("./ads");
+    await vi.advanceTimersByTimeAsync(24 * 3600_000);
+    appOpenShows.mockClear();
+    setAdStatus({ appOpenReady: true });
+    expect(await maybeShowAppOpen(INTERSTITIAL.minPlayTime, APP_OPEN.minAwayMs, () => true)).toBe(false);
+    expect(appOpenShows).not.toHaveBeenCalled();
   });
 });

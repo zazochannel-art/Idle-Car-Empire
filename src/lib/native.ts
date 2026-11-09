@@ -2,7 +2,7 @@
 // components/game/native-app.tsx): the system Back button (Android), and the
 // app going to the background and coming back.
 import { App } from "@capacitor/app";
-import { setAdFree } from "./ads";
+import { maybeShowAppOpen, setAdFree } from "./ads";
 import { reportError } from "./errors";
 import { iapConfigured } from "./iap";
 import { cancelAway, scheduleAway } from "./notify";
@@ -49,6 +49,12 @@ function back() {
   target.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", keyCode: 27, bubbles: true, cancelable: true }));
 }
 
+/** A tour or a race is on screen: no App Open ad over it. */
+const appOpenBusy = () => {
+  const u = useUi.getState();
+  return u.tutorial || !!u.race;
+};
+
 let started = false;
 
 export async function startNative() {
@@ -60,7 +66,9 @@ export async function startNative() {
   // game uses no battery. Coming back settles the time away like any absence.
   // With notifications on, the phone is told when something will be waiting (a building
   // finished, the offline limit reached); back in the game, those are taken back.
+  let pausedAt = 0;
   await App.addListener("pause", () => {
+    pausedAt = Date.now();
     const g = useGame.getState();
     g.suspend();
     // the save suspend() just wrote, copied to the app's storage too (lib/save-mirror.ts)
@@ -70,10 +78,23 @@ export async function startNative() {
   await App.addListener("resume", () => {
     void cancelAway();
     useGame.getState().resume();
+    // back after a while: an App Open ad, if the rules in lib/ads.ts allow (the report of the time away waits under it)
+    if (pausedAt) void maybeShowAppOpen(useGame.getState().state.lifetime.playTime, Date.now() - pausedAt, appOpenBusy).catch(() => {});
   });
   void cancelAway();
   // rewarded ads, always the player's choice: the consent first, then an ad kept ready
   void import("./native-ads").then((m) => m.startAds()).catch((e) => reportError(e, "rejection"));
+  // as the game opens: an App Open ad if one is ready within a few seconds (never in a young company)
+  const opening = () => {
+    if (!useGame.getState().ready) return false;
+    void maybeShowAppOpen(useGame.getState().state.lifetime.playTime, null, appOpenBusy).catch(() => {});
+    return true;
+  };
+  if (!opening()) {
+    const stop = useGame.subscribe(() => {
+      if (opening()) stop();
+    });
+  }
   // ad-free rewards, for the company that bought them (also on a phone or a build that sells nothing)
   const adFree = () => setAdFree(useGame.getState().ready && useGame.getState().state.iap.owned.includes("adFree"));
   useGame.subscribe(adFree);
