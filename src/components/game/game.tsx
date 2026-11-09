@@ -35,6 +35,7 @@ import { StartScreen } from "./start-screen";
 import { useCloud } from "@/store/cloud-store";
 import { Coach } from "./coach";
 import { FeedbackBridge } from "./feedback-bridge";
+import { InterstitialBridge } from "./interstitial-bridge";
 import { MusicBridge } from "./music-bridge";
 import { LiveEvents } from "./live-events";
 import { NativeApp } from "./native-app";
@@ -389,6 +390,7 @@ function Shell() {
       <Toasts />
       <FeedbackBridge />
       <MusicBridge />
+      <InterstitialBridge />
       <LiveEvents />
       <LoginDialog />
       <WhatsNewDialog onSettings={() => setSettings(true)} />

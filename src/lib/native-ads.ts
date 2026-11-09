@@ -5,7 +5,7 @@
 // requires it (the EEA, the UK, Switzerland) and no ad is requested before it
 // allows. Then one ad is kept loaded, so the game offers an ad only when there
 // is one to watch.
-import { AdMob, AdmobConsentDebugGeography, AdmobConsentStatus, MaxAdContentRating, RewardAdPluginEvents } from "@capacitor-community/admob";
+import { AdMob, AdmobConsentDebugGeography, AdmobConsentStatus, InterstitialAdPluginEvents, MaxAdContentRating, RewardAdPluginEvents } from "@capacitor-community/admob";
 import { App } from "@capacitor/app";
 import { registerAdDriver, setAdStatus, type AdResult } from "./ads";
 import { platform } from "./platform";
@@ -20,6 +20,11 @@ const TEST_UNIT = platform() === "ios" ? "ca-app-pub-3940256099942544/1712485313
 const UNIT = (platform() === "ios" ? process.env.NEXT_PUBLIC_ADMOB_REWARDED_ID_IOS : process.env.NEXT_PUBLIC_ADMOB_REWARDED_ID) || TEST_UNIT;
 /** The unit the ads load from: UNIT, or the test one in a test build (begin()). */
 let unit = UNIT;
+
+/** The same for the full-screen ads (NEXT_PUBLIC_ADMOB_INTERSTITIAL_ID / _IOS); Google's sample units until set. */
+const TEST_INTERSTITIAL = platform() === "ios" ? "ca-app-pub-3940256099942544/4411468910" : "ca-app-pub-3940256099942544/1033173712";
+const INTERSTITIAL_UNIT = (platform() === "ios" ? process.env.NEXT_PUBLIC_ADMOB_INTERSTITIAL_ID_IOS : process.env.NEXT_PUBLIC_ADMOB_INTERSTITIAL_ID) || TEST_INTERSTITIAL;
+let interstitialUnit = INTERSTITIAL_UNIT;
 
 let started = false;
 let loading = false;
@@ -40,6 +45,48 @@ async function load() {
   } finally {
     loading = false;
   }
+}
+
+let interstitialLoading = false;
+let interstitialFailures = 0;
+/** A full-screen ad is on screen, and the show waiting for it to close. */
+let interstitialSettle: ((shown: boolean) => void) | null = null;
+
+/** Loads the next full-screen ad; no fill or no network: again later, waiting longer each time (up to 10 minutes). */
+async function loadInterstitial() {
+  if (interstitialLoading) return;
+  interstitialLoading = true;
+  try {
+    await AdMob.prepareInterstitial({ adId: interstitialUnit, isTesting: interstitialUnit === TEST_INTERSTITIAL });
+    interstitialFailures = 0;
+    setAdStatus({ interstitialReady: true });
+  } catch {
+    setAdStatus({ interstitialReady: false });
+    interstitialFailures = Math.min(interstitialFailures + 1, 5);
+    setTimeout(() => void loadInterstitial(), Math.min(600, 30 * 2 ** interstitialFailures) * 1000);
+  } finally {
+    interstitialLoading = false;
+  }
+}
+
+/** The full-screen ad closed (or couldn't show): the screen is the game's again, the next ad loads. */
+function interstitialClosed(shown: boolean) {
+  const settle = interstitialSettle;
+  if (!settle) return;
+  interstitialSettle = null;
+  setAdStatus({ showing: false, interstitialReady: false });
+  settle(shown);
+  void loadInterstitial();
+}
+
+/** Shows the loaded full-screen ad (never over a rewarded one). It gives nothing; true once it was shown and closed. */
+function showInterstitial(): Promise<boolean> {
+  if (open || interstitialSettle) return Promise.resolve(false);
+  setAdStatus({ showing: true });
+  return new Promise<boolean>((settle) => {
+    interstitialSettle = settle;
+    AdMob.showInterstitial().catch(() => interstitialClosed(false));
+  });
 }
 
 /** The latest ad shown: its reward, given once, and the watch waiting for it to close. */
@@ -116,7 +163,7 @@ export function startAds(): Promise<void> {
 }
 
 async function begin() {
-  registerAdDriver({ show, privacyForm });
+  registerAdDriver({ show, privacyForm, showInterstitial });
   // a test build (its app id ends in ".debug", like the test APK the CI emulator plays) is never real
   // ad traffic: its consent check pretends to be outside the regulated regions. Google treats only
   // emulators and registered test devices that way, so a phone running a test build is unaffected.
@@ -157,6 +204,12 @@ async function begin() {
   await AdMob.initialize({ maxAdContentRating: MaxAdContentRating.Teen });
   // a test build (its app id ends in ".debug", like the test APK anyone may download) shows
   // Google's test ads whatever unit it was built with: playing it is never real ad traffic
-  if (testBuild) unit = TEST_UNIT;
+  if (testBuild) {
+    unit = TEST_UNIT;
+    interstitialUnit = TEST_INTERSTITIAL;
+  }
+  await AdMob.addListener(InterstitialAdPluginEvents.Dismissed, () => interstitialClosed(true));
+  await AdMob.addListener(InterstitialAdPluginEvents.FailedToShow, () => interstitialClosed(false));
   void load();
+  void loadInterstitial();
 }

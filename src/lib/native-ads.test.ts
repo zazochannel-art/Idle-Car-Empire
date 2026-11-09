@@ -5,6 +5,8 @@ const listeners = new Map<string, (data?: unknown) => void>();
 let answerShow: { resolve: (v: unknown) => void; reject: (e: unknown) => void } | null = null;
 const shows = vi.fn();
 const prepares = vi.fn();
+const interstitialPrepares = vi.fn();
+const interstitialShows = vi.fn();
 const consentRequests = vi.hoisted(() => vi.fn());
 // a build with a real ad unit, installed as the test app (the test APK)
 process.env.NEXT_PUBLIC_ADMOB_REWARDED_ID = "ca-app-pub-0000000000000000/0000000000";
@@ -13,6 +15,7 @@ vi.mock("@capacitor-community/admob", () => ({
   AdmobConsentStatus: { REQUIRED: "REQUIRED" },
   AdmobConsentDebugGeography: { OTHER: 4 },
   MaxAdContentRating: { Teen: "Teen" },
+  InterstitialAdPluginEvents: { Dismissed: "interstitialDismissed", FailedToShow: "interstitialFailedToShow" },
   RewardAdPluginEvents: { Showed: "showed", Rewarded: "rewarded", Dismissed: "dismissed", FailedToShow: "failedToShow" },
   AdMob: {
     requestConsentInfo: async (options?: unknown) => {
@@ -23,6 +26,14 @@ vi.mock("@capacitor-community/admob", () => ({
     addListener: async (event: string, fn: (data?: unknown) => void) => {
       listeners.set(event, fn);
       return { remove: async () => listeners.delete(event) };
+    },
+    prepareInterstitial: async (options: unknown) => {
+      interstitialPrepares(options);
+      return { adUnitId: "test" };
+    },
+    showInterstitial: () => {
+      interstitialShows();
+      return new Promise(() => {});
     },
     prepareRewardVideoAd: async (options: unknown) => {
       prepares(options);
@@ -57,6 +68,9 @@ describe("rewarded ads in the app", () => {
     expect(consentRequests).toHaveBeenCalledWith({ debugGeography: 4 });
     expect(prepares).toHaveBeenCalled();
     for (const [options] of prepares.mock.calls) expect(options).toEqual({ adId: "ca-app-pub-3940256099942544/5224354917", isTesting: true });
+    // the full-screen ads too
+    expect(interstitialPrepares).toHaveBeenCalled();
+    for (const [options] of interstitialPrepares.mock.calls) expect(options).toEqual({ adId: "ca-app-pub-3940256099942544/1033173712", isTesting: true });
   });
 
   it("rewards once when the ad is watched to the end (event and show answer both say so)", async () => {
@@ -127,5 +141,29 @@ describe("rewarded ads in the app", () => {
     await vi.advanceTimersByTimeAsync(2000);
     expect(await result).toBe("failed");
     expect(reward).not.toHaveBeenCalled();
+  });
+});
+
+describe("full-screen ads in the app", () => {
+  it("shows one, blocks the rewarded offers meanwhile, and loads the next when it closes", async () => {
+    const { getAdStatus, maybeShowInterstitial, INTERSTITIAL } = await import("./ads");
+    // the app has been open a while, and the last ad is long ago
+    await vi.advanceTimersByTimeAsync(INTERSTITIAL.gapMs + INTERSTITIAL.minOpenMs);
+    interstitialShows.mockClear();
+    interstitialPrepares.mockClear();
+    setAdStatus({ interstitialReady: true });
+    const shown = maybeShowInterstitial(INTERSTITIAL.minPlayTime, 0);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(interstitialShows).toHaveBeenCalledTimes(1);
+    expect(getAdStatus().showing).toBe(true);
+    // nothing else starts over it (and the next one waits for the pause)
+    expect(await maybeShowInterstitial(INTERSTITIAL.minPlayTime, 0)).toBe(false);
+    expect(await watchAd(vi.fn())).toBe("failed");
+    expect(interstitialShows).toHaveBeenCalledTimes(1);
+    emit("interstitialDismissed");
+    expect(await shown).toBe(true);
+    expect(getAdStatus().showing).toBe(false);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(interstitialPrepares).toHaveBeenCalledTimes(1);
   });
 });

@@ -25,6 +25,32 @@ Star less than the two): no ad and no real money for those. Its numbers live in
 `src/game/config/shop.ts`, its rules in `src/game/engine/shop.ts` (tested in
 `src/game/shop.test.ts`).
 
+## Full-screen ads (no reward)
+
+Besides the rewarded offers, the app shows a **full-screen (interstitial) ad now
+and then, with no reward**. It never shows in the middle of something:
+
+- only when the player **closes a screen** and is back on the map (not the
+  shop, the build/upgrade sheets or the pass), and ~1.2 s after the close, so a
+  tap on "close" can never land on the ad;
+- never over the tour, a race, a factory, the offline report, a visit or the
+  first-car celebration;
+- not in the first 15 minutes of a company, nor in the first 3 minutes after
+  the app opens;
+- a break of 8 minutes after **any** ad (a rewarded one counts), at most 5 a
+  day, and only half of the eligible closes show one;
+- **never with the ad-free rewards purchase**.
+
+The limits live in `INTERSTITIAL` in `src/lib/ads.ts`; the plugin side is in
+`src/lib/native-ads.ts`; the trigger is `InterstitialBridge`
+(`src/components/game/interstitial-bridge.tsx`). It uses its own ad unit:
+create an **Interstitial** unit in AdMob (Ad units → Add ad unit →
+Interstitial) and put its id in the GitHub variable `ADMOB_INTERSTITIAL_ID`
+(iOS: `ADMOB_INTERSTITIAL_ID_IOS`). Until it is set the build uses Google's
+sample interstitial unit (`ca-app-pub-3940256099942544/1033173712`), which
+shows test ads and pays nothing. Same rules as above: the consent comes first
+and the content rating is Teen.
+
 At most **20 rewarded ads a day**, all kinds together. The numbers live in
 `src/game/config/ads.ts`; the rules in `src/game/engine/ads.ts` (tested in
 `src/game/ads.test.ts`).
