@@ -23,7 +23,7 @@ export function InterstitialBridge() {
         const g = useGame.getState();
         // still on the map, nothing else going on
         if (!g.ready || ui.view || ui.tutorial || ui.race || ui.floor || ui.garage || ui.visit || ui.celebrate || g.state.pendingOffline) return;
-        void maybeShowInterstitial(g.state.lifetime.playTime);
+        void maybeShowInterstitial(g.state.lifetime.playTime, g.state.chain.firstCar);
       }, INTERSTITIAL.delayMs);
     });
     return () => {

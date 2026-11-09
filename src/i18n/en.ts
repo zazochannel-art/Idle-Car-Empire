@@ -2814,7 +2814,7 @@ export const en = {
   "iap.item.starter": "Starter pack",
   "iap.item.adFree": "Ad-free rewards",
   "iap.desc.starter": "Once per account: ⭐ {stars} Stars, 8 hours of income and 8 hours of research.",
-  "iap.desc.adFree": "Every ad reward without the ad: the same rewards and daily limits, no video. Yours for good.",
+  "iap.desc.adFree": "Every ad reward without the ad: the same rewards and daily limits, no video. Also no full-screen ads. Yours for good.",
   "iap.owned": "Owned",
   "iap.restore": "Restore purchases",
   "iap.thanks": "Thank you! You got: {name}",

@@ -79,7 +79,7 @@ export async function startNative() {
     void cancelAway();
     useGame.getState().resume();
     // back after a while: an App Open ad, if the rules in lib/ads.ts allow (the report of the time away waits under it)
-    if (pausedAt) void maybeShowAppOpen(useGame.getState().state.lifetime.playTime, Date.now() - pausedAt, appOpenBusy).catch(() => {});
+    if (pausedAt) void maybeShowAppOpen(useGame.getState().state.lifetime.playTime, useGame.getState().state.chain.firstCar, Date.now() - pausedAt, appOpenBusy).catch(() => {});
   });
   void cancelAway();
   // rewarded ads, always the player's choice: the consent first, then an ad kept ready
@@ -87,7 +87,7 @@ export async function startNative() {
   // as the game opens: an App Open ad if one is ready within a few seconds (never in a young company)
   const opening = () => {
     if (!useGame.getState().ready) return false;
-    void maybeShowAppOpen(useGame.getState().state.lifetime.playTime, null, appOpenBusy).catch(() => {});
+    void maybeShowAppOpen(useGame.getState().state.lifetime.playTime, useGame.getState().state.chain.firstCar, null, appOpenBusy).catch(() => {});
     return true;
   };
   if (!opening()) {

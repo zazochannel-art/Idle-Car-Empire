@@ -35,7 +35,8 @@ and then, with no reward**. It never shows in the middle of something:
   tap on "close" can never land on the ad;
 - never over the tour, a race, a factory, the offline report, a visit or the
   first-car celebration;
-- not in the first 15 minutes of a company, nor in the first 3 minutes after
+- not in the first hour of a company, and not before its first car is built (a new
+  company makes it at about 45 minutes), nor in the first 3 minutes after
   the app opens;
 - a break of 8 minutes after **any** ad (a rewarded one counts), at most 5 a
   day, and only half of the eligible closes show one;
@@ -58,7 +59,7 @@ An **App Open** ad can show when the player comes back to the game:
 - from another app or the Home screen after **at least 10 minutes** away (a
   quick app switch shows nothing), or as the game opens if the ad is ready
   within 4 seconds;
-- never in a company with under 15 minutes of play (so never on the first
+- never in a company with under an hour of play or before its first car (so never on the first
   opens or over the tour), never over a race;
 - the same 8-minute pause after any ad as above, inside the same daily total
   of 5 full-screen ads, and at most 2 App Open ads a day;

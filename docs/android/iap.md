@@ -8,7 +8,7 @@ Play Console declaration changes.
 | Product | Suggested id | Play Console type | What the player gets |
 | --- | --- | --- | --- |
 | Starter pack 🧰 | `starter_pack` | One-time product | Once per game account: ⭐ 10 Stars, 8 hours of income and 8 hours of research (`IAP` in `src/game/config/iap.ts`). |
-| Ad-free rewards 🎟️ | `ad_free_rewards` | One-time product | Every rewarded-ad reward without watching the ad: the same rewards and the same daily limits, only the video is skipped. Kept for good. |
+| Ad-free rewards 🎟️ | `ad_free_rewards` | One-time product | Every rewarded-ad reward without watching the ad: the same rewards and the same daily limits, only the video is skipped. Also turns off the full-screen ads. Kept for good. |
 | Premium pass 👑 | `premium_pass` | One-time product, **consumable** | The season pass's premium track for the season running (28 days): a second reward at every tier, ⭐ 14 Stars, the Gold Rush livery and a limited hypercar (`PREMIUM_TIERS` in `src/game/config/pass.ts`). Bought again every season. |
 
 The first two are bought once. The premium pass is consumed once the game has
@@ -86,7 +86,7 @@ These steps need your accounts and payment details, so only you can do them.
      country.
    - **Activate** the product.
    - Do the same for `ad_free_rewards` ("Ad-free rewards: every ad reward
-     without the ad").
+     without the ad, and no full-screen ads").
    - And for `premium_pass` ("Premium pass: the premium track of the season
      pass, for one season"). Google Play has no consumable switch on the
      product: the game consumes it itself.

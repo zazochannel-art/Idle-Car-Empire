@@ -2811,7 +2811,7 @@ export const es: Record<MessageKey, string> = {
   "iap.item.starter": "Pack de inicio",
   "iap.item.adFree": "Recompensas sin anuncios",
   "iap.desc.starter": "Una vez por cuenta: ⭐ {stars} Estrellas, 8 horas de ingresos y 8 horas de investigación.",
-  "iap.desc.adFree": "Cada recompensa por anuncio sin el anuncio: las mismas recompensas y límites diarios, sin vídeo. Para siempre.",
+  "iap.desc.adFree": "Cada recompensa por anuncio sin el anuncio: las mismas recompensas y límites diarios, sin vídeo. Tampoco hay anuncios a pantalla completa. Para siempre.",
   "iap.owned": "Comprado",
   "iap.restore": "Restaurar compras",
   "iap.thanks": "¡Gracias! Has recibido: {name}",

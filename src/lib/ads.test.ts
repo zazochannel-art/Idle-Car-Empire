@@ -54,7 +54,7 @@ describe("watching an ad", () => {
 
 describe("full-screen ads (no reward)", () => {
   const status: AdStatus = { ready: true, showing: false, privacyOptions: false, adFree: false, interstitialReady: true, appOpenReady: true };
-  const ctx: InterstitialContext = { now: 10_000_000, playTime: INTERSTITIAL.minPlayTime, today: 0, lastAdAt: 0, openedAt: 0 };
+  const ctx: InterstitialContext = { now: 10_000_000, playTime: INTERSTITIAL.minPlayTime, firstCar: true, today: 0, lastAdAt: 0, openedAt: 0 };
 
   it("may show when everything allows", () => {
     expect(interstitialBlock(status, ctx)).toBeNull();
@@ -68,6 +68,8 @@ describe("full-screen ads (no reward)", () => {
 
   it("not in a young game or a just-opened app", () => {
     expect(interstitialBlock(status, { ...ctx, playTime: INTERSTITIAL.minPlayTime - 1 })).toBe("young");
+    // an hour of play but no car built yet: still young
+    expect(interstitialBlock(status, { ...ctx, firstCar: false })).toBe("young");
     expect(interstitialBlock(status, { ...ctx, openedAt: ctx.now - INTERSTITIAL.minOpenMs + 1 })).toBe("young");
   });
 
@@ -80,7 +82,7 @@ describe("full-screen ads (no reward)", () => {
 
 describe("App Open ads", () => {
   const status: AdStatus = { ready: true, showing: false, privacyOptions: false, adFree: false, interstitialReady: false, appOpenReady: true };
-  const ctx: AppOpenContext = { now: 10_000_000, playTime: INTERSTITIAL.minPlayTime, today: 0, appOpenToday: 0, lastAdAt: 0, openedAt: 0, awayMs: APP_OPEN.minAwayMs };
+  const ctx: AppOpenContext = { now: 10_000_000, playTime: INTERSTITIAL.minPlayTime, firstCar: true, today: 0, appOpenToday: 0, lastAdAt: 0, openedAt: 0, awayMs: APP_OPEN.minAwayMs };
 
   it("may show when the player is back after a while", () => {
     expect(appOpenBlock(status, ctx)).toBeNull();
@@ -97,6 +99,7 @@ describe("App Open ads", () => {
   it("not in a young company (so not on the first opens), nor after a short absence", () => {
     expect(appOpenBlock(status, { ...ctx, playTime: INTERSTITIAL.minPlayTime - 1 })).toBe("young");
     expect(appOpenBlock(status, { ...ctx, playTime: 0, awayMs: null })).toBe("young");
+    expect(appOpenBlock(status, { ...ctx, firstCar: false })).toBe("young");
     expect(appOpenBlock(status, { ...ctx, awayMs: APP_OPEN.minAwayMs - 1 })).toBe("short");
   });
 

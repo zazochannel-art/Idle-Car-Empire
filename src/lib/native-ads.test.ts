@@ -166,12 +166,12 @@ describe("full-screen ads in the app", () => {
     interstitialShows.mockClear();
     interstitialPrepares.mockClear();
     setAdStatus({ interstitialReady: true });
-    const shown = maybeShowInterstitial(INTERSTITIAL.minPlayTime, 0);
+    const shown = maybeShowInterstitial(INTERSTITIAL.minPlayTime, true, 0);
     await vi.advanceTimersByTimeAsync(0);
     expect(interstitialShows).toHaveBeenCalledTimes(1);
     expect(getAdStatus().showing).toBe(true);
     // nothing else starts over it (and the next one waits for the pause)
-    expect(await maybeShowInterstitial(INTERSTITIAL.minPlayTime, 0)).toBe(false);
+    expect(await maybeShowInterstitial(INTERSTITIAL.minPlayTime, true, 0)).toBe(false);
     expect(await watchAd(vi.fn())).toBe("failed");
     expect(interstitialShows).toHaveBeenCalledTimes(1);
     emit("interstitialDismissed");
@@ -190,11 +190,11 @@ describe("App Open ads in the app", () => {
     appOpenShows.mockClear();
     appOpenLoads.mockClear();
     setAdStatus({ appOpenReady: true, interstitialReady: true });
-    const shown = maybeShowAppOpen(INTERSTITIAL.minPlayTime, APP_OPEN.minAwayMs, () => false);
+    const shown = maybeShowAppOpen(INTERSTITIAL.minPlayTime, true, APP_OPEN.minAwayMs, () => false);
     await vi.advanceTimersByTimeAsync(0);
     expect(appOpenShows).toHaveBeenCalledTimes(1);
     expect(getAdStatus().showing).toBe(true);
-    expect(await maybeShowInterstitial(INTERSTITIAL.minPlayTime, 0)).toBe(false);
+    expect(await maybeShowInterstitial(INTERSTITIAL.minPlayTime, true, 0)).toBe(false);
     expect(await watchAd(vi.fn())).toBe("failed");
     emit("appOpenClosed");
     expect(await shown).toBe(true);
@@ -208,7 +208,7 @@ describe("App Open ads in the app", () => {
     await vi.advanceTimersByTimeAsync(24 * 3600_000);
     appOpenShows.mockClear();
     setAdStatus({ appOpenReady: true });
-    expect(await maybeShowAppOpen(INTERSTITIAL.minPlayTime, APP_OPEN.minAwayMs, () => true)).toBe(false);
+    expect(await maybeShowAppOpen(INTERSTITIAL.minPlayTime, true, APP_OPEN.minAwayMs, () => true)).toBe(false);
     expect(appOpenShows).not.toHaveBeenCalled();
   });
 });

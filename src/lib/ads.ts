@@ -97,8 +97,11 @@ export async function watchAd(onReward: () => void): Promise<AdResult> {
 // starts the pause), only a few a day, and never with the ad-free rewards purchase.
 
 export const INTERSTITIAL = {
-  /** Lifetime seconds of play before the first one. */
-  minPlayTime: 15 * 60,
+  /**
+   * Lifetime seconds of play before the first one, and never before the first car is built (a new
+   * company makes it at about 45 minutes): the first hour is for getting hooked, not for ads.
+   */
+  minPlayTime: 60 * 60,
   /** The app open for this long (ms) before the first one of a run. */
   minOpenMs: 3 * 60_000,
   /** The pause after any ad (ms). */
@@ -150,6 +153,8 @@ export interface InterstitialContext {
   now: number;
   /** The company's lifetime seconds of play. */
   playTime: number;
+  /** The company has built its first car. */
+  firstCar: boolean;
   /** Ads shown today. */
   today: number;
   lastAdAt: number;
@@ -160,7 +165,7 @@ export interface InterstitialContext {
 export function interstitialBlock(a: AdStatus, c: InterstitialContext): "adFree" | "notReady" | "young" | "pause" | "limit" | null {
   if (a.adFree) return "adFree";
   if (!a.interstitialReady || a.showing) return "notReady";
-  if (c.playTime < INTERSTITIAL.minPlayTime || c.now - c.openedAt < INTERSTITIAL.minOpenMs) return "young";
+  if (!c.firstCar || c.playTime < INTERSTITIAL.minPlayTime || c.now - c.openedAt < INTERSTITIAL.minOpenMs) return "young";
   if (c.now - c.lastAdAt < INTERSTITIAL.gapMs) return "pause";
   if (c.today >= INTERSTITIAL.perDay) return "limit";
   return null;
@@ -168,13 +173,14 @@ export function interstitialBlock(a: AdStatus, c: InterstitialContext): "adFree"
 
 /**
  * At a natural break: maybe shows a full-screen ad (by chance, within the limits above).
- * `playTime` is the company's seconds of play. True if one was shown.
+ * `playTime` is the company's seconds of play, `firstCar` whether it has built its first car.
+ * True if one was shown.
  */
-export async function maybeShowInterstitial(playTime: number, rand: number = Math.random()): Promise<boolean> {
+export async function maybeShowInterstitial(playTime: number, firstCar: boolean, rand: number = Math.random()): Promise<boolean> {
   const now = Date.now();
   const day = dateKey(now);
   const seen = readShown(day);
-  if (interstitialBlock(status, { now, playTime, today: seen.today, lastAdAt: lastAd(day), openedAt }) || rand >= INTERSTITIAL.chance || !driver) return false;
+  if (interstitialBlock(status, { now, playTime, firstCar, today: seen.today, lastAdAt: lastAd(day), openedAt }) || rand >= INTERSTITIAL.chance || !driver) return false;
   lastAdAt = now;
   countShown(day, now, false);
   const shown = await driver.showInterstitial().catch(() => false);
@@ -209,7 +215,7 @@ export interface AppOpenContext extends InterstitialContext {
 export function appOpenBlock(a: AdStatus, c: AppOpenContext): "adFree" | "notReady" | "young" | "short" | "pause" | "limit" | null {
   if (a.adFree) return "adFree";
   if (!a.appOpenReady || a.showing) return "notReady";
-  if (c.playTime < INTERSTITIAL.minPlayTime) return "young";
+  if (!c.firstCar || c.playTime < INTERSTITIAL.minPlayTime) return "young";
   if (c.awayMs !== null && c.awayMs < APP_OPEN.minAwayMs) return "short";
   if (c.now - c.lastAdAt < INTERSTITIAL.gapMs) return "pause";
   if (c.today >= INTERSTITIAL.perDay || c.appOpenToday >= APP_OPEN.perDay) return "limit";
@@ -222,13 +228,13 @@ const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
  * The player is back in the game (`awayMs`: how long it was away; null: it is opening).
  * `busy` says whether a tour or a race is on screen. True if an App Open ad was shown.
  */
-export async function maybeShowAppOpen(playTime: number, awayMs: number | null, busy: () => boolean): Promise<boolean> {
+export async function maybeShowAppOpen(playTime: number, firstCar: boolean, awayMs: number | null, busy: () => boolean): Promise<boolean> {
   // as the game opens, the ad may still be loading
   if (awayMs === null) for (let t = 0; t < APP_OPEN.openWaitMs && !status.appOpenReady; t += 250) await wait(250);
   const now = Date.now();
   const day = dateKey(now);
   const seen = readShown(day);
-  const ctx: AppOpenContext = { now, playTime, today: seen.today, appOpenToday: seen.appOpenToday, lastAdAt: lastAd(day), openedAt, awayMs };
+  const ctx: AppOpenContext = { now, playTime, firstCar, today: seen.today, appOpenToday: seen.appOpenToday, lastAdAt: lastAd(day), openedAt, awayMs };
   if (appOpenBlock(status, ctx) || busy() || !driver) return false;
   lastAdAt = now;
   countShown(day, now, true);

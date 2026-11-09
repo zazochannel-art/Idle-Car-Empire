@@ -2811,7 +2811,7 @@ export const ro: Record<MessageKey, string> = {
   "iap.item.starter": "Pachet de start",
   "iap.item.adFree": "Recompense fără reclame",
   "iap.desc.starter": "O dată pe cont: ⭐ {stars} Stele, 8 ore de venit și 8 ore de cercetare.",
-  "iap.desc.adFree": "Fiecare recompensă pentru reclamă, fără reclamă: aceleași recompense și limite zilnice, fără video. Pentru totdeauna.",
+  "iap.desc.adFree": "Fiecare recompensă pentru reclamă, fără reclamă: aceleași recompense și limite zilnice, fără video. Și fără reclame pe tot ecranul. Pentru totdeauna.",
   "iap.owned": "Deținut",
   "iap.restore": "Restaurează cumpărăturile",
   "iap.thanks": "Mulțumim! Ai primit: {name}",
