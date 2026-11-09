@@ -5,7 +5,7 @@
 // requires it (the EEA, the UK, Switzerland) and no ad is requested before it
 // allows. Then one ad is kept loaded, so the game offers an ad only when there
 // is one to watch.
-import { AdMob, AdmobConsentDebugGeography, AdmobConsentStatus, InterstitialAdPluginEvents, MaxAdContentRating, RewardAdPluginEvents } from "@capacitor-community/admob";
+import { AdMob, AdmobConsentDebugGeography, AdmobConsentStatus, AppOpenAdPluginEvents, InterstitialAdPluginEvents, MaxAdContentRating, RewardAdPluginEvents } from "@capacitor-community/admob";
 import { App } from "@capacitor/app";
 import { registerAdDriver, setAdStatus, type AdResult } from "./ads";
 import { platform } from "./platform";
@@ -25,6 +25,11 @@ let unit = UNIT;
 const TEST_INTERSTITIAL = platform() === "ios" ? "ca-app-pub-3940256099942544/4411468910" : "ca-app-pub-3940256099942544/1033173712";
 const INTERSTITIAL_UNIT = (platform() === "ios" ? process.env.NEXT_PUBLIC_ADMOB_INTERSTITIAL_ID_IOS : process.env.NEXT_PUBLIC_ADMOB_INTERSTITIAL_ID) || TEST_INTERSTITIAL;
 let interstitialUnit = INTERSTITIAL_UNIT;
+
+/** And the App Open ads (NEXT_PUBLIC_ADMOB_APP_OPEN_ID / _IOS). */
+const TEST_APP_OPEN = platform() === "ios" ? "ca-app-pub-3940256099942544/5575463023" : "ca-app-pub-3940256099942544/9257395921";
+const APP_OPEN_UNIT = (platform() === "ios" ? process.env.NEXT_PUBLIC_ADMOB_APP_OPEN_ID_IOS : process.env.NEXT_PUBLIC_ADMOB_APP_OPEN_ID) || TEST_APP_OPEN;
+let appOpenUnit = APP_OPEN_UNIT;
 
 let started = false;
 let loading = false;
@@ -81,11 +86,53 @@ function interstitialClosed(shown: boolean) {
 
 /** Shows the loaded full-screen ad (never over a rewarded one). It gives nothing; true once it was shown and closed. */
 function showInterstitial(): Promise<boolean> {
-  if (open || interstitialSettle) return Promise.resolve(false);
+  if (open || interstitialSettle || appOpenSettle) return Promise.resolve(false);
   setAdStatus({ showing: true });
   return new Promise<boolean>((settle) => {
     interstitialSettle = settle;
     AdMob.showInterstitial().catch(() => interstitialClosed(false));
+  });
+}
+
+let appOpenLoading = false;
+let appOpenFailures = 0;
+/** An App Open ad is on screen, and the show waiting for it to close. */
+let appOpenSettle: ((shown: boolean) => void) | null = null;
+
+/** Loads the next App Open ad; no fill or no network: again later, waiting longer each time (up to 10 minutes). */
+async function loadAppOpen() {
+  if (appOpenLoading) return;
+  appOpenLoading = true;
+  try {
+    await AdMob.loadAppOpen({ adId: appOpenUnit });
+    appOpenFailures = 0;
+    setAdStatus({ appOpenReady: true });
+  } catch {
+    setAdStatus({ appOpenReady: false });
+    appOpenFailures = Math.min(appOpenFailures + 1, 5);
+    setTimeout(() => void loadAppOpen(), Math.min(600, 30 * 2 ** appOpenFailures) * 1000);
+  } finally {
+    appOpenLoading = false;
+  }
+}
+
+/** The App Open ad closed (or couldn't show): the screen is the game's again, the next ad loads. */
+function appOpenClosed(shown: boolean) {
+  const settle = appOpenSettle;
+  if (!settle) return;
+  appOpenSettle = null;
+  setAdStatus({ showing: false, appOpenReady: false });
+  settle(shown);
+  void loadAppOpen();
+}
+
+/** Shows the loaded App Open ad (never over another ad). It gives nothing; true once it was shown and closed. */
+function showAppOpen(): Promise<boolean> {
+  if (open || interstitialSettle || appOpenSettle) return Promise.resolve(false);
+  setAdStatus({ showing: true });
+  return new Promise<boolean>((settle) => {
+    appOpenSettle = settle;
+    AdMob.showAppOpen().catch(() => appOpenClosed(false));
   });
 }
 
@@ -163,7 +210,7 @@ export function startAds(): Promise<void> {
 }
 
 async function begin() {
-  registerAdDriver({ show, privacyForm, showInterstitial });
+  registerAdDriver({ show, privacyForm, showInterstitial, showAppOpen });
   // a test build (its app id ends in ".debug", like the test APK the CI emulator plays) is never real
   // ad traffic: its consent check pretends to be outside the regulated regions. Google treats only
   // emulators and registered test devices that way, so a phone running a test build is unaffected.
@@ -207,9 +254,13 @@ async function begin() {
   if (testBuild) {
     unit = TEST_UNIT;
     interstitialUnit = TEST_INTERSTITIAL;
+    appOpenUnit = TEST_APP_OPEN;
   }
   await AdMob.addListener(InterstitialAdPluginEvents.Dismissed, () => interstitialClosed(true));
   await AdMob.addListener(InterstitialAdPluginEvents.FailedToShow, () => interstitialClosed(false));
+  await AdMob.addListener(AppOpenAdPluginEvents.Closed, () => appOpenClosed(true));
+  await AdMob.addListener(AppOpenAdPluginEvents.FailedToShow, () => appOpenClosed(false));
   void load();
   void loadInterstitial();
+  void loadAppOpen();
 }
