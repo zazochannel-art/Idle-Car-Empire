@@ -1,4 +1,4 @@
-Novedades en 1.1.2:
+Novedades en 1.1.7:
 • Día y noche en el mapa, con clima y nuevos efectos
 • Nueva vista Dyno: prueba la potencia y el tuning de tus coches
 • Tuning y clásicos actualizados
