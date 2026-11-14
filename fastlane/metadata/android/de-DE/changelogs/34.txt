@@ -1,4 +1,4 @@
-Neu in 1.1.7:
+Neu in 1.1.8:
 • Tag und Nacht auf der Karte, mit Wetter und neuen Effekten
 • Neue Dyno-Ansicht: teste Leistung und Tuning deiner Autos
 • Überarbeitetes Tuning und Klassiker
