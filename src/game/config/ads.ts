@@ -1,6 +1,8 @@
 /**
  * Rewarded ads (the Android app only): the player chooses to watch one and gets
- * a reward. Nothing in the game needs one.
+ * a reward. Nothing in the game needs one. There is no limit on how many a day:
+ * each reward has its own (a boost runs one at a time, an instant build waits,
+ * the offline report is collected once, the shop's packs and box have theirs).
  */
 export type AdReward = "offline" | "build" | "boost" | "login" | "qc";
 
@@ -16,6 +18,5 @@ export const ADS = {
   buildCooldown: 10 * 60_000,
   /** The daily login reward, multiplied (money days only: the Star days are not doubled). */
   loginMult: 2,
-  /** Most rewarded ads a day, all kinds together. */
-  perDay: 20,
+  // (no daily limit on rewarded ads: each reward has its own limit, below and in the shop)
 };

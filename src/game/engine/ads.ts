@@ -12,7 +12,7 @@ import { claimLogin, loginDoublable } from "./retention";
 import { dateKey } from "./calendar";
 
 export interface AdsState {
-  /** The day (dateKey) `count` is for: rewarded ads watched that day. */
+  /** The day (dateKey) `count` is for: rewarded ads watched that day (shown in the shop; nothing is limited by it). */
   day: string;
   count: number;
   /** Seconds of play left on the ×2 sales boost. */
@@ -27,13 +27,12 @@ export const createAds = (): AdsState => ({ day: "", count: 0, boostLeft: 0, bui
 export const adsToday = (s: GameState, now: number) => (s.ads.day === dateKey(now) ? s.ads.count : 0);
 
 /**
- * Why a reward can't be had now: today's limit, nothing to give (no report, no job, a Star day's
- * login, no break to skip), a boost already running, the pause after an instant build.
+ * Why a reward can't be had now: nothing to give (no report, no job, a Star day's login, no break
+ * to skip), a boost already running, the pause after an instant build.
  */
-export type AdBlock = "limit" | "nothing" | "active" | "wait" | null;
+export type AdBlock = "nothing" | "active" | "wait" | null;
 
 export function adBlock(s: GameState, reward: AdReward, now: number, plot?: string): AdBlock {
-  if (adsToday(s, now) >= ADS.perDay) return "limit";
   switch (reward) {
     case "offline":
       return (s.pendingOffline?.money ?? 0) > 0 ? null : "nothing";
@@ -88,7 +87,8 @@ export function adsTick(s: GameState, dt: number) {
 export function migrateAds(a: AdsState, now: number): AdsState {
   return {
     day: a.day,
-    count: Math.max(0, Math.min(ADS.perDay, Math.floor(a.count))),
+    // (a count only for the shop's "today": kept within what a save can hold)
+    count: Math.max(0, Math.min(1_000_000, Math.floor(a.count))),
     // an ad gives 30 minutes; the shop's long boost can add up to its cap
     boostLeft: Math.max(0, Math.min(SHOP.boostCap, a.boostLeft)),
     // a time from the future (a clock set back) would hold the pause for ever
