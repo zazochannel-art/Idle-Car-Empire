@@ -474,6 +474,8 @@ export const ro: Record<MessageKey, string> = {
   "classics.doneBody": "Acum e expusă în muzeu.",
   "classic.arrow55": "Silver Arrow",
   "classic.riviera63": "Riviera Coupé",
+  "classic.shelby1965": "Roadster Carmin",
+  "classic.gt40_1966": "Endurance GT",
   "classic.thunder69": "Thunder V8",
   "classic.rally72": "Rally Legend",
   "classic.hothatch85": "Hot Hatch GTi",

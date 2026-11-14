@@ -475,6 +475,8 @@ export const en = {
   "classics.doneBody": "It is on show in the museum now.",
   "classic.arrow55": "Silver Arrow",
   "classic.riviera63": "Riviera Coupé",
+  "classic.shelby1965": "Crimson Roadster",
+  "classic.gt40_1966": "Endurance GT",
   "classic.thunder69": "Thunder V8",
   "classic.rally72": "Rally Legend",
   "classic.hothatch85": "Hot Hatch GTi",

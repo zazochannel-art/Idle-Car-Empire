@@ -1,0 +1,6 @@
+Neu in 1.1.2:
+• Tag und Nacht auf der Karte, mit Wetter und neuen Effekten
+• Neue Dyno-Ansicht: teste Leistung und Tuning deiner Autos
+• Überarbeitetes Tuning und Klassiker
+• Werbung überarbeitet: deine Datenschutzentscheidungen werden respektiert, keine Tageslimits mehr
+• Korrekturen und Stabilität
