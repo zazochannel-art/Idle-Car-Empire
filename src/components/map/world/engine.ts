@@ -292,23 +292,23 @@ export class MapEngine {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !this.low, powerPreference: this.low ? "low-power" : "high-performance" });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = 1.20;
     this.renderer.shadowMap.enabled = !this.low;
-    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     // redrawn on demand (see render): every other frame, and whenever the view moves
     this.renderer.shadowMap.autoUpdate = false;
     this.ctx = labels.getContext("2d")!;
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     pmrem.dispose();
-    this.scene.environmentIntensity = 0.25;
-    this.scene.background = new THREE.Color("#bfe3f7");
-    this.scene.fog = new THREE.Fog("#bfe3f7", 400, 1600);
+    this.scene.environmentIntensity = 0.45;
+    this.scene.background = new THREE.Color("#95d5f5");
+    this.scene.fog = new THREE.Fog("#95d5f5", 350, 1500);
     this.sun.castShadow = true;
-    const sm = this.low ? 1024 : window.innerWidth < 700 ? 1536 : 2048;
+    const sm = this.low ? 1024 : window.innerWidth < 700 ? 2048 : 4096;
     this.sun.shadow.mapSize.set(sm, sm);
-    this.sun.shadow.bias = -0.0004;
-    this.sun.shadow.normalBias = 0.03;
+    this.sun.shadow.bias = -0.0003;
+    this.sun.shadow.normalBias = 0.02;
     this.scene.add(this.sun, this.sun.target, this.hemi, this.camera);
     this.traffic = new TrafficFacade(() => this.trafficLayer);
     this.ro = new ResizeObserver(() => this.resize());
@@ -412,6 +412,7 @@ export class MapEngine {
     this.fx = new Fx();
     this.fx.low = this.low;
     this.fx.setViewHeight(this.h * this.dpr);
+    if (this.trafficLayer) this.trafficLayer.fx = this.fx;
     this.weather = new WeatherFx(this.low);
     this.bonus = new BonusLayer(ground, this.trafficLayer, this.mats, this.fx);
     this.movers = new Movers(ground, this.mats, [WORLD_MAP.size[0] / 2, WORLD_MAP.size[1] / 2], { low: this.low, lines: this.scenery.lines });
@@ -794,17 +795,20 @@ export class MapEngine {
   }
 
   private steamAcc = 0;
-  /** Steam over the plants' roofs, only where the camera is looking close (a few puffs a second in all). */
+  /** Steam over the plants' roofs and welding sparks inside active factories. */
   private steam(dt: number) {
     if (!this.fx || !this.plots || this.cam.dist > CLOSE_VIEW * 1.3) return;
     this.steamAcc += dt;
-    if (this.steamAcc < (this.low ? 0.8 : 0.45)) return;
+    if (this.steamAcc < (this.low ? 0.6 : 0.3)) return;
     this.steamAcc = 0;
     const reach = this.cam.dist * 0.9;
     let n = 0;
     for (const v of this.plots.vents()) {
-      if (Math.hypot(v.x - this.cam.x, v.z - this.cam.z) > reach || n++ >= 10) continue;
-      this.fx.smoke(v.x, v.y + 0.03, v.z, 0.78);
+      if (Math.hypot(v.x - this.cam.x, v.z - this.cam.z) > reach || n++ >= 12) continue;
+      this.fx.chimneySteam(v.x, v.y + 0.03, v.z);
+      if (Math.random() < 0.6) {
+        this.fx.weldingSpark(v.x, v.y + 0.12, v.z, 2);
+      }
     }
   }
 
@@ -1311,6 +1315,11 @@ export class MapEngine {
     const p = lot.root.position;
     this.pops.push({ x: p.x, y: p.y + lot.top + 0.7, z: p.z, text, color, age: 0 });
     if (this.pops.length > 40) this.pops.shift();
+    if (text.includes("💰") || text.includes("$")) {
+      this.fx?.coins(p.x, p.y + lot.top, p.z);
+    } else {
+      this.fx?.sparkle(p.x, p.y + lot.top, p.z, 2, color);
+    }
   }
 
   /** Starts (or, with null, stops) following a vehicle with a close-up camera. */
@@ -1325,6 +1334,11 @@ export class MapEngine {
     this.traffic.rollOut({ id: plotId, entry: plot.entry, weight: 1 }, model, color);
     this.focusPlot(plotId, { x: 0, y: 0 }, 2.2, 0.9);
     this.followUntil = this.t + seconds;
+    const lot = this.plots?.lots.get(plotId);
+    if (lot) {
+      const p = lot.root.position;
+      this.fx?.fireworks(p.x, p.y + lot.top, p.z, 6, true, this.cam.dist / 30);
+    }
   }
 
   // ───────────────────────── camera helpers ─────────────────────────

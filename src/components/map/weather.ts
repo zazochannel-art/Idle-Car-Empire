@@ -65,3 +65,9 @@ export function weatherChangesAt(now: number, season: Season | null): number {
   while (next < block + 24 && kindOf(next, season) === kind) next++;
   return next * WEATHER_BLOCK_MS;
 }
+
+/** Returns the price multiplier for seasonal tires based on current weather (+30% during snow or heavy rain). */
+export function seasonalTireDemandMultiplier(w: Weather): number {
+  if (w.kind === "snow" || w.kind === "rain") return 1.3;
+  return 1.0;
+}

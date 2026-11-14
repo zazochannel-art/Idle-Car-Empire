@@ -1,19 +1,13 @@
-// Time of day for the map: a tint over the whole scene (multiply) and glows
-// for lamps, windows and headlights (additive). Cheap: one full-view fill
-// plus one pre-rendered sprite per light.
+// Time of day for the map: calculated directly from the device's real local time.
+// 07:00 - 18:00 -> Day
+// 18:00 - 21:00 -> Sunset / Evening
+// 21:00 - 05:00 -> Night
+// 05:00 - 07:00 -> Dawn / Sunrise
 import { mix } from "./iso";
 
 export type TimeMode = "auto" | "day" | "evening" | "night";
 export const TIME_MODES: TimeMode[] = ["auto", "day", "evening", "night"];
 
-/** One full day/night cycle in auto mode, in seconds. */
-const CYCLE = 480;
-
-/**
- * The clock the day/night cycle runs on. The map and the factory interiors
- * both move it forward while they show, so the time of day carries over
- * from one to the other.
- */
 export const worldClock = { t: 0 };
 
 export interface Sky {
@@ -28,57 +22,36 @@ function tintFor(dark: number): string {
   return mix("#ffc48f", "#4f5f9e", (dark - 0.5) / 0.5);
 }
 
-const smooth = (a: number, b: number, x: number) => {
-  const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
-  return t * t * (3 - 2 * t);
-};
+/** Calculates the real-time dark value (0: day, 0.5: sunset/dawn, 1: night) based on device clock. */
+export function realTimeDark(): number {
+  const d = new Date();
+  const hours = d.getHours() + d.getMinutes() / 60;
+  if (hours >= 7 && hours < 18) return 0;
+  if (hours >= 18 && hours < 21) return (hours - 18) / 3;
+  if (hours >= 21 || hours < 5) return 1;
+  return 1 - (hours - 5) / 2;
+}
 
-export function skyAt(mode: TimeMode, t: number): Sky {
-  let dark: number;
-  if (mode === "day") dark = 0;
-  else if (mode === "evening") dark = 0.5;
-  else if (mode === "night") dark = 1;
-  else {
-    // long day, golden evening, night, then dawn
-    const ph = (t / CYCLE + 0.15) % 1;
-    if (ph < 0.5) dark = 0;
-    else if (ph < 0.62) dark = smooth(0.5, 0.62, ph) * 0.5;
-    else if (ph < 0.7) dark = 0.5 + smooth(0.62, 0.7, ph) * 0.5;
-    else if (ph < 0.88) dark = 1;
-    else dark = 1 - smooth(0.88, 1, ph);
-  }
+export function skyAt(_mode?: TimeMode, _t?: number): Sky {
+  const dark = realTimeDark();
   return { dark, tint: tintFor(dark) };
 }
 
 /** The sun's height at its highest (noon) and as it rises and sets, in radians. */
 const SUN_HIGH = (45 * Math.PI) / 180;
 const SUN_LOW = (8 * Math.PI) / 180;
-/** The moon: how high it stands, and how far round (as `turn` below). */
 export const MOON = { el: (60 * Math.PI) / 180, turn: -0.25 };
 
-/**
- * Where the sun is at this time of day, for the 3D map's shadows: how high it stands (radians over
- * the horizon) and how far round it has come (−1 at sunrise, 0 at noon, 1 at sunset). It rises at
- * dawn, stands high through the day, then sinks in the golden hour, its shadows growing long.
- * `moon` (0–1) is how far the night has handed the light over to the moon (MOON).
- */
-export function sunAt(mode: TimeMode, t: number): { el: number; turn: number; moon: number } {
-  if (mode === "day") return { el: (45 * Math.PI) / 180, turn: 0, moon: 0 };
-  if (mode === "evening") return { el: (20 * Math.PI) / 180, turn: 0.8, moon: 0 };
-  if (mode === "night") return { el: MOON.el, turn: MOON.turn, moon: 1 };
-  const ph = (t / CYCLE + 0.15) % 1;
-  // up from the start of dawn (0.88) round to the end of dusk (0.7): sunrise to sunset
-  const u = Math.min(1, ((ph - 0.88 + 1) % 1) / 0.82);
-  const moon = smooth(0.75, 0.95, skyAt(mode, t).dark);
-  return { el: SUN_LOW + (SUN_HIGH - SUN_LOW) * Math.sin(Math.PI * u), turn: 2 * u - 1, moon };
+export function sunAt(_mode?: TimeMode, _t?: number): { el: number; turn: number; moon: number } {
+  const dark = realTimeDark();
+  if (dark <= 0.2) return { el: SUN_HIGH, turn: 0, moon: 0 };
+  if (dark <= 0.7) return { el: SUN_LOW, turn: 0.8, moon: 0.2 };
+  return { el: MOON.el, turn: MOON.turn, moon: 1 };
 }
 
-/** Morning mist (0–1): it lies over the land for a while at dawn (the automatic cycle only). */
-export function dawnMist(mode: TimeMode, t: number): number {
-  if (mode !== "auto") return 0;
-  const ph = (t / CYCLE + 0.15) % 1;
-  const d = Math.min(Math.abs(ph - 0.97), 1 - Math.abs(ph - 0.97));
-  return 1 - smooth(0.025, 0.09, d);
+export function dawnMist(_mode?: TimeMode, _t?: number): number {
+  const dark = realTimeDark();
+  return dark > 0.3 && dark < 0.7 ? 0.4 : 0;
 }
 
 const sprites = new Map<string, HTMLCanvasElement>();
@@ -99,10 +72,6 @@ function glow(color: string): HTMLCanvasElement {
   return s;
 }
 
-/**
- * Darkens the drawn scene and adds the collected lights. Call in world
- * coordinates; `view` is the visible world rectangle.
- */
 export function applyLighting(
   ctx: CanvasRenderingContext2D,
   sky: Sky,

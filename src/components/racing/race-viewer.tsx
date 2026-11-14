@@ -6,6 +6,7 @@
 // never stops a race: it keeps running on the map.
 import { Camera, Eye, Maximize2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { CAR_BY_ID } from "@/game/config/cars";
 import { RACE_COUNTDOWN, RACE_EVENT_BY_ID, RIVAL_BY_ID, SPECIAL_EVENTS, TRACK_BY_ID, type TrackId } from "@/game/config/racing";
 import { carRating, carStats, classOf, condition, entryFee, eventLock, raceCar, rivalsFor, setupFor } from "@/game/engine/racing";
@@ -353,6 +354,51 @@ function RaceWatch() {
       </div>
       {done && <Results rec={rec} />}
     </>
+  );
+}
+
+function PitStopOverlay({ onDone }: { onDone: (bonus: number) => void }) {
+  const [tires, setTires] = useState<{ fl: boolean; fr: boolean; rl: boolean; rr: boolean }>({ fl: false, fr: false, rl: false, rr: false });
+  const [timer, setTimer] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => setTimer((t) => t + 0.1), 100);
+    return () => clearInterval(interval);
+  }, []);
+
+  const changeTire = (key: keyof typeof tires) => {
+    const next = { ...tires, [key]: true };
+    setTires(next);
+    if (next.fl && next.fr && next.rl && next.rr) {
+      const bonus = timer <= 3.0 ? 2.5 : 1.0;
+      onDone(bonus);
+    }
+  };
+
+  return (
+    <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-fade-in">
+      <div className="w-full max-w-sm rounded-3xl bg-neutral-900/90 p-5 text-center ring-1 ring-amber-500/40 shadow-2xl">
+        <div className="text-3xl">🛞</div>
+        <div className="text-lg font-black text-white mt-1">PIT STOP MINIGAME (QTE)</div>
+        <div className="text-xs text-amber-300">Schimbă toate cele 4 anvelope sub 3.0s pentru bonus de timp -2.5s!</div>
+        <div className="mt-2 text-xl font-black text-white tabular-nums">{timer.toFixed(1)}s</div>
+
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <Button variant={tires.fl ? "gold" : "secondary"} onClick={() => changeTire("fl")}>
+            {tires.fl ? "✓ Față-Stânga" : "🛞 Față-Stânga"}
+          </Button>
+          <Button variant={tires.fr ? "gold" : "secondary"} onClick={() => changeTire("fr")}>
+            {tires.fr ? "✓ Față-Dreapta" : "🛞 Față-Dreapta"}
+          </Button>
+          <Button variant={tires.rl ? "gold" : "secondary"} onClick={() => changeTire("rl")}>
+            {tires.rl ? "✓ Spate-Stânga" : "🛞 Spate-Stânga"}
+          </Button>
+          <Button variant={tires.rr ? "gold" : "secondary"} onClick={() => changeTire("rr")}>
+            {tires.rr ? "✓ Spate-Dreapta" : "🛞 Spate-Dreapta"}
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 

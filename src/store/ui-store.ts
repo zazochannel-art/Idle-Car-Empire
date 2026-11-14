@@ -29,6 +29,7 @@ export type View =
   | "stats"
   | "economy"
   | "racing"
+  | "dyno"
   | "imperium"
   | "leaderboard"
   | "alliance"
