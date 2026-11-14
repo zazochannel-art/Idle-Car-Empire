@@ -94,6 +94,14 @@ no offer.
   needed (the EEA, the UK, Switzerland). If it is, Google's consent form shows
   before any ad is requested. Where the law asks for it, Settings shows
   **Ad privacy choices** to change it later.
+- **Withdrawn consent:** if the player turns the consent off in **Ad privacy choices**, every
+  loaded ad is dropped and none is requested or shown until it is given again (then they load again).
+- **Fresh ads only:** Google lets rewarded and full-screen ads expire after 1 hour and App Open
+  ads after 4, so an ad is loaded again after 55 minutes (App Open: 3 h 45 min) and one that
+  is already too old is never shown.
+- **No stuck screen:** if an ad doesn't appear within 20 seconds, or one is still "on screen"
+  after 15 minutes, the game stops waiting for its close event and the offers come back. An SDK
+  or consent start that fails is retried (with growing pauses), not given up for the session.
 - **Rating:** ads are limited to *Teen* content (the game is for 13 and over).
 - **Test ads until you set your ids:** without real ids, the build uses
   Google's public sample ids, which serve test ads that pay nothing:

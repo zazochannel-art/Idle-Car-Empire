@@ -82,6 +82,12 @@ export async function startNative() {
     if (pausedAt) void maybeShowAppOpen(useGame.getState().state.lifetime.playTime, useGame.getState().state.chain.firstCar, Date.now() - pausedAt, appOpenBusy).catch(() => {});
   });
   void cancelAway();
+  // ad-free rewards, for the company that bought them (also on a phone or a build that sells nothing).
+  // Before the opening ad below: when the game becomes ready the store tells its subscribers in the
+  // order they joined, and the opening ad must not be decided before this one knows the purchase.
+  const adFree = () => setAdFree(useGame.getState().ready && useGame.getState().state.iap.owned.includes("adFree"));
+  useGame.subscribe(adFree);
+  adFree();
   // rewarded ads, always the player's choice: the consent first, then an ad kept ready
   void import("./native-ads").then((m) => m.startAds()).catch((e) => reportError(e, "rejection"));
   // as the game opens: an App Open ad if one is ready within a few seconds (never in a young company)
@@ -95,10 +101,6 @@ export async function startNative() {
       if (opening()) stop();
     });
   }
-  // ad-free rewards, for the company that bought them (also on a phone or a build that sells nothing)
-  const adFree = () => setAdFree(useGame.getState().ready && useGame.getState().state.iap.owned.includes("adFree"));
-  useGame.subscribe(adFree);
-  adFree();
   // Google Play Games (achievements, a leaderboard): Android only, and only when the build has its project id
   if (platform() === "android") void import("./native-play-games").then((m) => m.startPlayGames()).catch((e) => reportError(e, "rejection"));
   // in-app purchases: Google Play only, and only once the build has its products (docs/android/iap.md)

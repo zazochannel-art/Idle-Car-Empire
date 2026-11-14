@@ -281,6 +281,8 @@ export const ro: Record<MessageKey, string> = {
   "ad.closedBody": "Recompensa vine după ce reclama rulează până la capăt.",
   "ad.failed": "Reclama nu a putut fi afișată",
   "ad.failedBody": "Încearcă din nou peste puțin timp.",
+  "ad.refused": "Nimic de colectat",
+  "ad.refusedBody": "Recompensa a fost deja luată sau nu mai e disponibilă.",
   "ad.limit": "Gata reclamele pe azi: mai sunt mâine.",
   "settings.adPrivacy": "Opțiuni de confidențialitate pentru reclame",
 

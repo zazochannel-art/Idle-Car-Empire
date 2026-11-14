@@ -146,6 +146,16 @@ function countShown(day: string, now: number, appOpen: boolean) {
   }
 }
 
+/** An ad that wasn't shown after all (another was on screen, it was out of date): taken back from today's count, and the pause before it too. */
+function refundShown(day: string, appOpen: boolean, last: number) {
+  const v = readShown(day);
+  try {
+    localStorage.setItem(STORE, JSON.stringify({ day, count: Math.max(0, v.today - 1), open: Math.max(0, v.appOpenToday - (appOpen ? 1 : 0)), last }));
+  } catch {
+    // no storage: nothing was kept to take back
+  }
+}
+
 /** The last ad of any kind began at this time (this run, or an earlier one). */
 const lastAd = (day: string) => Math.max(lastAdAt, readShown(day).last);
 
@@ -181,10 +191,16 @@ export async function maybeShowInterstitial(playTime: number, firstCar: boolean,
   const day = dateKey(now);
   const seen = readShown(day);
   if (interstitialBlock(status, { now, playTime, firstCar, today: seen.today, lastAdAt: lastAd(day), openedAt }) || rand >= INTERSTITIAL.chance || !driver) return false;
+  const before = lastAdAt;
   lastAdAt = now;
   countShown(day, now, false);
   const shown = await driver.showInterstitial().catch(() => false);
-  lastAdAt = Date.now();
+  // one that never showed doesn't use up a daily ad or start the pause
+  if (shown) lastAdAt = Date.now();
+  else {
+    lastAdAt = before;
+    refundShown(day, false, seen.last);
+  }
   return shown;
 }
 
@@ -236,10 +252,15 @@ export async function maybeShowAppOpen(playTime: number, firstCar: boolean, away
   const seen = readShown(day);
   const ctx: AppOpenContext = { now, playTime, firstCar, today: seen.today, appOpenToday: seen.appOpenToday, lastAdAt: lastAd(day), openedAt, awayMs };
   if (appOpenBlock(status, ctx) || busy() || !driver) return false;
+  const before = lastAdAt;
   lastAdAt = now;
   countShown(day, now, true);
   const shown = await driver.showAppOpen().catch(() => false);
-  lastAdAt = Date.now();
+  if (shown) lastAdAt = Date.now();
+  else {
+    lastAdAt = before;
+    refundShown(day, true, seen.last);
+  }
   return shown;
 }
 
