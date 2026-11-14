@@ -321,9 +321,17 @@ try {
   } else if (!loginShown) console.log(`      (no daily reward after 4 min: ${JSON.stringify(await evaluate(LOGIN))})`);
 
   // 2. a setting changed through the game's own screen (Settings → Română)
-  const opened = await evaluate(`(() => { const b = [...document.querySelectorAll("header button")].at(-1); b.click(); return true; })()`);
+  // (Settings has no button in the top bar any more: it is a tile of the Menu, the dock's last tab)
+  const SETTINGS_TILE = `[...document.querySelectorAll("button")].find((b) => b.textContent.trim().startsWith("⚙️"))`;
+  const DOCK_MENU = `[...document.querySelectorAll("nav button")].find((b) => /Menu|Meniu/.test(b.textContent))`;
+  const openSettings = async () => {
+    if (!(await evaluate(`!!(${SETTINGS_TILE})`))) await evaluate(`(${DOCK_MENU}).click()`);
+    await waitFor(`!!(${SETTINGS_TILE})`, 15_000, "the Settings tile in the Menu");
+    await evaluate(`(${SETTINGS_TILE}).click()`);
+  };
+  await openSettings();
   await waitFor(DIALOG_OPEN, 15_000, "the Settings dialog");
-  check(opened, "Settings opens");
+  check(true, "Settings opens");
   shot("2-settings");
   // 3. Back closes the dialog and the app stays open
   const didClose = await pressBack();
@@ -336,13 +344,16 @@ try {
   );
   if (!didClose) androidSince(lastBack);
 
-  await evaluate(`[...document.querySelectorAll("header button")].at(-1).click()`);
+  await openSettings();
   await waitFor(DIALOG_OPEN, 15_000, "the Settings dialog");
   await evaluate(`[...document.querySelectorAll('[role="dialog"] button')].find((b) => /Română/.test(b.textContent)).click()`);
   await waitFor(`(${SAVED})?.lang === "ro"`, 20_000, "the language in the save");
   // Back closes Settings (pressed again only if it is still open a while later)
   await pressBack();
   for (let i = 0; i < 2 && !(await until(noDialog, 20_000)); i++) await pressBack();
+  // the Menu the tile was in is still open: its dock tab closes it
+  if (await evaluate(`!!(${SETTINGS_TILE})`)) await evaluate(`(${DOCK_MENU}).click()`);
+  await until(() => evaluate(`!(${SETTINGS_TILE})`).catch(() => false), 10_000);
 
   // 4. Back with nothing open: the app goes to the background, and leaving saves the game.
   // Whatever the game opened by itself meanwhile (a story event, a card) is what Back closes
