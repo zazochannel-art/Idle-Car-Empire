@@ -144,15 +144,15 @@ describe("rewarded ads", () => {
     expect(s.ads.boostLeft).toBe(600);
   });
 
-  it("at most a day's worth of ads, counted again the next day", () => {
+  it("no limit on the ads a day: they are counted for the shop, and counted again the next day", () => {
     const s = createInitialState(T0);
-    for (let i = 0; i < ADS.perDay; i++) {
+    for (let i = 0; i < 60; i++) {
       s.ads.boostLeft = 0;
       expect(A.grantAd(s, "boost", T0)).toBe(true);
     }
+    expect(A.adsToday(s, T0)).toBe(60);
     s.ads.boostLeft = 0;
-    expect(A.adBlock(s, "boost", T0)).toBe("limit");
-    expect(A.grantAd(s, "boost", T0)).toBe(false);
+    expect(A.adBlock(s, "boost", T0)).toBeNull();
     const tomorrow = T0 + 24 * 3600_000;
     expect(A.adsToday(s, tomorrow)).toBe(0);
     expect(A.grantAd(s, "boost", tomorrow)).toBe(true);
@@ -165,7 +165,7 @@ describe("rewarded ads", () => {
     expect(decodeSave(encodeSave(s), T0).ads).toEqual(s.ads);
     // tampered or from a clock set back: clamped
     s.ads = { day: "2026-03-01", count: 1e6, boostLeft: 1e9, buildAt: T0 + 1e9 };
-    expect(decodeSave(encodeSave(s), T0).ads).toEqual({ day: "2026-03-01", count: ADS.perDay, boostLeft: SHOP.boostCap, buildAt: T0 });
+    expect(decodeSave(encodeSave(s), T0).ads).toEqual({ day: "2026-03-01", count: 1_000_000, boostLeft: SHOP.boostCap, buildAt: T0 });
     // an old save without it starts empty
     const raw = JSON.parse(JSON.stringify(createInitialState(T0)));
     delete raw.ads;

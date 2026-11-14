@@ -54,7 +54,7 @@ describe("watching an ad", () => {
 
 describe("full-screen ads (no reward)", () => {
   const status: AdStatus = { ready: true, showing: false, privacyOptions: false, adFree: false, interstitialReady: true, appOpenReady: true };
-  const ctx: InterstitialContext = { now: 10_000_000, playTime: INTERSTITIAL.minPlayTime, firstCar: true, today: 0, lastAdAt: 0, openedAt: 0 };
+  const ctx: InterstitialContext = { now: 10_000_000, playTime: INTERSTITIAL.minPlayTime, firstCar: true, lastAdAt: 0, openedAt: 0 };
 
   it("may show when everything allows", () => {
     expect(interstitialBlock(status, ctx)).toBeNull();
@@ -73,16 +73,15 @@ describe("full-screen ads (no reward)", () => {
     expect(interstitialBlock(status, { ...ctx, openedAt: ctx.now - INTERSTITIAL.minOpenMs + 1 })).toBe("young");
   });
 
-  it("a pause after any ad, and a few a day", () => {
+  it("a pause after any ad, and no limit a day", () => {
     expect(interstitialBlock(status, { ...ctx, lastAdAt: ctx.now - INTERSTITIAL.gapMs + 1 })).toBe("pause");
     expect(interstitialBlock(status, { ...ctx, lastAdAt: ctx.now - INTERSTITIAL.gapMs })).toBeNull();
-    expect(interstitialBlock(status, { ...ctx, today: INTERSTITIAL.perDay })).toBe("limit");
   });
 });
 
 describe("App Open ads", () => {
   const status: AdStatus = { ready: true, showing: false, privacyOptions: false, adFree: false, interstitialReady: false, appOpenReady: true };
-  const ctx: AppOpenContext = { now: 10_000_000, playTime: INTERSTITIAL.minPlayTime, firstCar: true, today: 0, appOpenToday: 0, lastAdAt: 0, openedAt: 0, awayMs: APP_OPEN.minAwayMs };
+  const ctx: AppOpenContext = { now: 10_000_000, playTime: INTERSTITIAL.minPlayTime, firstCar: true, lastAdAt: 0, openedAt: 0, awayMs: APP_OPEN.minAwayMs };
 
   it("may show when the player is back after a while", () => {
     expect(appOpenBlock(status, ctx)).toBeNull();
@@ -103,10 +102,8 @@ describe("App Open ads", () => {
     expect(appOpenBlock(status, { ...ctx, awayMs: APP_OPEN.minAwayMs - 1 })).toBe("short");
   });
 
-  it("the pause after any ad, the daily total and its own daily limit", () => {
+  it("the pause after any ad, and no limit a day", () => {
     expect(appOpenBlock(status, { ...ctx, lastAdAt: ctx.now - INTERSTITIAL.gapMs + 1 })).toBe("pause");
-    expect(appOpenBlock(status, { ...ctx, today: INTERSTITIAL.perDay })).toBe("limit");
-    expect(appOpenBlock(status, { ...ctx, today: 2, appOpenToday: APP_OPEN.perDay })).toBe("limit");
   });
 });
 
@@ -128,12 +125,12 @@ describe("an ad that wasn't shown after all", () => {
     vi.unstubAllGlobals();
   });
 
-  it("a full-screen one that didn't show uses up no daily ad and starts no pause", async () => {
+  it("a full-screen one that didn't show starts no pause", async () => {
     const showInterstitial = vi.fn(async () => false);
     registerAdDriver({ show: async () => "failed", privacyForm: async () => {}, showInterstitial, showAppOpen: async () => false });
-    for (let i = 0; i < INTERSTITIAL.perDay + 2; i++) expect(await maybeShowInterstitial(INTERSTITIAL.minPlayTime, true, 0)).toBe(false);
-    // every try reached the driver: none was held back by a pause or the limit
-    expect(showInterstitial).toHaveBeenCalledTimes(INTERSTITIAL.perDay + 2);
+    for (let i = 0; i < 4; i++) expect(await maybeShowInterstitial(INTERSTITIAL.minPlayTime, true, 0)).toBe(false);
+    // every try reached the driver: none was held back by a pause
+    expect(showInterstitial).toHaveBeenCalledTimes(4);
     // and the next one that does show is not refused
     registerAdDriver({ show: async () => "failed", privacyForm: async () => {}, showInterstitial: async () => true, showAppOpen: async () => false });
     expect(await maybeShowInterstitial(INTERSTITIAL.minPlayTime, true, 0)).toBe(true);
@@ -141,12 +138,31 @@ describe("an ad that wasn't shown after all", () => {
     expect(await maybeShowInterstitial(INTERSTITIAL.minPlayTime, true, 0)).toBe(false);
   });
 
-  it("an App Open one that didn't show is not counted either", async () => {
+  it("an App Open one that didn't show starts no pause either", async () => {
     const showAppOpen = vi.fn(async () => false);
     registerAdDriver({ show: async () => "failed", privacyForm: async () => {}, showInterstitial: async () => false, showAppOpen });
-    for (let i = 0; i < APP_OPEN.perDay + 2; i++) expect(await maybeShowAppOpen(INTERSTITIAL.minPlayTime, true, APP_OPEN.minAwayMs, () => false)).toBe(false);
-    expect(showAppOpen).toHaveBeenCalledTimes(APP_OPEN.perDay + 2);
+    for (let i = 0; i < 4; i++) expect(await maybeShowAppOpen(INTERSTITIAL.minPlayTime, true, APP_OPEN.minAwayMs, () => false)).toBe(false);
+    expect(showAppOpen).toHaveBeenCalledTimes(4);
     registerAdDriver({ show: async () => "failed", privacyForm: async () => {}, showInterstitial: async () => false, showAppOpen: async () => true });
     expect(await maybeShowAppOpen(INTERSTITIAL.minPlayTime, true, APP_OPEN.minAwayMs, () => false)).toBe(true);
+  });
+});
+
+describe("no limit a day", () => {
+  it("as many as the pauses allow: an ad every 8 minutes, all day", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => {} });
+    setAdFree(false);
+    setAdStatus({ ready: true, showing: false, interstitialReady: true, appOpenReady: true });
+    registerAdDriver({ show: async () => "failed", privacyForm: async () => {}, showInterstitial: async () => true, showAppOpen: async () => true });
+    vi.setSystemTime(Date.now() + 100 * 24 * 3600_000);
+    let shown = 0;
+    for (let i = 0; i < 30; i++) {
+      vi.advanceTimersByTime(INTERSTITIAL.gapMs + 1);
+      if (await maybeShowInterstitial(INTERSTITIAL.minPlayTime, true, 0)) shown++;
+    }
+    expect(shown).toBe(30);
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 });

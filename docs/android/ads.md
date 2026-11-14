@@ -38,8 +38,8 @@ and then, with no reward**. It never shows in the middle of something:
 - not in the first hour of a company, and not before its first car is built (a new
   company makes it at about 45 minutes), nor in the first 3 minutes after
   the app opens;
-- a break of 8 minutes after **any** ad (a rewarded one counts), at most 5 a
-  day, and only half of the eligible closes show one;
+- a break of 8 minutes after **any** ad (a rewarded one counts) and only half of
+  the eligible closes show one; there is **no limit a day**;
 - **never with the ad-free rewards purchase**.
 
 The limits live in `INTERSTITIAL` in `src/lib/ads.ts`; the plugin side is in
@@ -61,8 +61,7 @@ An **App Open** ad can show when the player comes back to the game:
   within 4 seconds;
 - never in a company with under an hour of play or before its first car (so never on the first
   opens or over the tour), never over a race;
-- the same 8-minute pause after any ad as above, inside the same daily total
-  of 5 full-screen ads, and at most 2 App Open ads a day;
+- the same 8-minute pause after any ad as above, and no limit a day;
 - **never with the ad-free rewards purchase**, and only after the consent.
 
 The code is `maybeShowAppOpen` in `src/lib/ads.ts` (the limits are in
@@ -71,7 +70,10 @@ The code is `maybeShowAppOpen` in `src/lib/ads.ts` (the limits are in
 (iOS: `ADMOB_APP_OPEN_ID_IOS`). Until it is set the build uses Google's sample
 unit (`ca-app-pub-3940256099942544/9257395921`), which pays nothing.
 
-At most **20 rewarded ads a day**, all kinds together. The numbers live in
+There is **no limit on the rewarded ads a day**; each reward has its own limit
+(the table above: a boost runs one at a time, an instant build waits 10 minutes,
+the offline report and the daily login are taken once, the shop's packs and box
+count by themselves). The numbers live in
 `src/game/config/ads.ts`; the rules in `src/game/engine/ads.ts` (tested in
 `src/game/ads.test.ts`).
 
