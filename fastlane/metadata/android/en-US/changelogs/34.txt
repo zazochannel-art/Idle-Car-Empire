@@ -1,4 +1,4 @@
-What's new in 1.1.7:
+What's new in 1.1.8:
 • Day and night on the map with weather and new effects
 • New Dyno view: test your cars' power and tuning
 • Updated tuning and classic cars
