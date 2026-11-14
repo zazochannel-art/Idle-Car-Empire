@@ -1,10 +1,10 @@
-// The tuning garage: a race car's paint, rims and spoiler. Rims and
-// spoilers change how it drives (engine/racing.ts statsOf); paint is for the
-// eye. Prices are shares of what the car is worth; changing back to a part
-// already paid for once is free (engine/tuning.ts).
+// The tuning garage: a race car's paint, rims, spoiler, ECU and Turbo.
+// Changing back to a part already paid for once is free.
 
 export type RimId = "standard" | "sport" | "forged" | "carbon";
 export type SpoilerId = "none" | "lip" | "wing" | "gt";
+export type EcuStage = "stock" | "stage1" | "stage2" | "raceEcu";
+export type TurboStage = "none" | "streetTurbo" | "twinTurbo" | "raceTurbo";
 
 export interface TuneEffect {
   handling?: number;
@@ -39,6 +39,20 @@ export const SPOILERS: Record<SpoilerId, TunePart> = {
   lip: { emoji: "📐", cost: 0.05, effect: { aero: 3, handling: 1 } },
   wing: { emoji: "🪽", cost: 0.12, effect: { aero: 7, handling: 2, speed: -1 } },
   gt: { emoji: "🛫", cost: 0.25, effect: { aero: 12, handling: 4, speed: -3 } },
+};
+
+export const ECU_STAGES: Record<EcuStage, { emoji: string; name: string; hpGain: number; torqueGain: number; costPct: number; certBonus: number }> = {
+  stock: { emoji: "💾", name: "Stock ECU", hpGain: 0, torqueGain: 0, costPct: 0, certBonus: 0 },
+  stage1: { emoji: "⚡", name: "Stage 1 Remap", hpGain: 45, torqueGain: 60, costPct: 0.08, certBonus: 0.07 },
+  stage2: { emoji: "🔥", name: "Stage 2 Tuning", hpGain: 90, torqueGain: 110, costPct: 0.18, certBonus: 0.14 },
+  raceEcu: { emoji: "🏁", name: "Race ECU System", hpGain: 160, torqueGain: 180, costPct: 0.32, certBonus: 0.25 },
+};
+
+export const TURBO_STAGES: Record<TurboStage, { emoji: string; name: string; hpGain: number; torqueGain: number; costPct: number }> = {
+  none: { emoji: "➖", name: "Naturally Aspirated", hpGain: 0, torqueGain: 0, costPct: 0 },
+  streetTurbo: { emoji: "🌀", name: "Street Turbo", hpGain: 50, torqueGain: 70, costPct: 0.1 },
+  twinTurbo: { emoji: "💨", name: "Twin Turbocharger", hpGain: 110, torqueGain: 140, costPct: 0.22 },
+  raceTurbo: { emoji: "🚀", name: "Big Single Race Turbo", hpGain: 210, torqueGain: 250, costPct: 0.4 },
 };
 
 /** Paint colours on offer (a respray costs the same whatever the colour). */

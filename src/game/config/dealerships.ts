@@ -35,3 +35,18 @@ export const DEALERS: DealerConfig[] = [
 export const DEALER_BY_ID: Record<DealerId, DealerConfig> = Object.fromEntries(DEALERS.map((d) => [d.id, d])) as Record<DealerId, DealerConfig>;
 
 export const DEALER_IDS = DEALERS.map((d) => d.id);
+
+/** Showroom Customization & Luxury Upgrades (+15% Dealer Markup Total) */
+export interface ShowroomDecor {
+  id: string;
+  name: string;
+  emoji: string;
+  cost: number;
+  markupBonus: number;
+}
+
+export const SHOWROOM_DECORS: ShowroomDecor[] = [
+  { id: "marbleFloor", name: "Podea de Marmură", emoji: "🏛️", cost: 50_000, markupBonus: 0.05 },
+  { id: "neonLighting", name: "Reflectoare Neon LED", emoji: "💡", cost: 120_000, markupBonus: 0.05 },
+  { id: "vipLounge", name: "Lounge VIP Espresso Bar", emoji: "☕", cost: 300_000, markupBonus: 0.05 },
+];

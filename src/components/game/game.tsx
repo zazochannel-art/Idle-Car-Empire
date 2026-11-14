@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { useGame } from "@/store/game-store";
 import { useUi, type View } from "@/store/ui-store";
 import { EmpireMap } from "../map/empire-map";
+import { DynoView } from "../views/dyno-view";
 import { BuildPanel, GaragesView, MechanicsSummary, MenuPanel, PlotPanel, UpgradePanel, ZonePanel, plotTitle } from "../panels/map-panels";
 import { Sheet } from "../panels/sheet";
 import { passWaiting } from "@/game/engine/pass";
@@ -419,6 +420,8 @@ function viewTitle(v: View, t: ReturnType<typeof useT>["t"]): string {
       return t("account.title");
     case "empire":
       return t("map.nav.factories");
+    case "dyno":
+      return "Dyno Tuning & Pista de Teste";
     default:
       return t(`nav.${v}`);
   }
@@ -462,6 +465,8 @@ const ViewSwitch = memo(function ViewSwitch({ view, onSettings }: { view: View; 
       return <EconomyView />;
     case "racing":
       return <RacingView />;
+    case "dyno":
+      return <DynoView />;
     case "story":
       return <StoryView />;
     case "profile":

@@ -288,6 +288,62 @@ export class Fx {
     this.soft.add(p);
   }
 
+  /** Robotic welding sparks flying inside factory windows. */
+  weldingSpark(x: number, y: number, z: number, n = 3) {
+    for (let i = 0; i < n; i++) {
+      const p = this.base(x + (Math.random() - 0.5) * 0.3, y + (Math.random() - 0.5) * 0.2, z + (Math.random() - 0.5) * 0.3);
+      const a = Math.random() * Math.PI * 2;
+      const spd = 1.2 + Math.random() * 2.5;
+      p.vx = Math.cos(a) * spd;
+      p.vz = Math.sin(a) * spd;
+      p.vy = 1.0 + Math.random() * 2.0;
+      p.grav = 8.0;
+      p.life = 0.2 + Math.random() * 0.3;
+      p.size = 0.18 + Math.random() * 0.12;
+      p.twinkle = true;
+      if (Math.random() < 0.5) { p.r = 0.4; p.g = 0.85; p.b = 1.0; }
+      else { p.r = 1.0; p.g = 0.8; p.b = 0.3; }
+      this.glow.add(p);
+    }
+  }
+
+  /** Puffs of white steam rising continuously from factory chimneys and cooling towers. */
+  chimneySteam(x: number, y: number, z: number) {
+    const p = this.base(x + (Math.random() - 0.5) * 0.2, y, z + (Math.random() - 0.5) * 0.2);
+    p.vy = 0.7 + Math.random() * 0.4;
+    p.vx = 0.12 + (Math.random() - 0.5) * 0.1;
+    p.vz = (Math.random() - 0.5) * 0.1;
+    p.drag = 0.3;
+    p.life = 2.2 + Math.random() * 0.8;
+    p.size = 0.4;
+    p.grow = 2.8;
+    p.r = p.g = p.b = 0.88;
+    this.soft.add(p);
+  }
+
+  /** Car exhaust smoke puffs when vehicles accelerate. */
+  exhaustFume(x: number, y: number, z: number) {
+    const p = this.base(x, y + 0.1, z);
+    p.vy = 0.2 + Math.random() * 0.2;
+    p.drag = 0.8;
+    p.life = 0.6 + Math.random() * 0.3;
+    p.size = 0.2;
+    p.grow = 1.8;
+    p.r = p.g = p.b = 0.45;
+    this.soft.add(p);
+  }
+
+  /** Electric cyan aura particle trail behind electric vehicles. */
+  evAura(x: number, y: number, z: number) {
+    const p = this.base(x + (Math.random() - 0.5) * 0.1, y + 0.12, z + (Math.random() - 0.5) * 0.1);
+    p.vy = 0.3 + Math.random() * 0.3;
+    p.life = 0.4 + Math.random() * 0.2;
+    p.size = 0.22;
+    p.twinkle = true;
+    p.r = 0.1; p.g = 0.9; p.b = 1.0;
+    this.glow.add(p);
+  }
+
   update(dt: number) {
     this.t += dt;
     for (const r of this.glow.step(dt, this.t)) this.explode(r);

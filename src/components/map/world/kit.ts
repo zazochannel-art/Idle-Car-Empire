@@ -603,9 +603,12 @@ if (uSnow > 0.001 || uWet > 0.001) {
   }
   if (uWet > 0.001) {
     float wet = smoothstep(0.3, 0.8, up) * uWet;
-    diffuseColor.rgb *= 1.0 - 0.22 * wet;
+    vec2 pw = floor(vLockUv * uLockSize * 18.0);
+    float pnz = fract(sin(dot(pw, vec2(12.9898, 78.233))) * 43758.5453);
+    float puddle = smoothstep(0.68, 0.85, pnz) * wet;
+    diffuseColor.rgb = mix(diffuseColor.rgb * (1.0 - 0.25 * wet), vec3(0.5, 0.7, 0.85), puddle * 0.35);
 #ifdef STANDARD
-    roughnessFactor = mix(roughnessFactor, roughnessFactor * 0.3, wet);
+    roughnessFactor = mix(roughnessFactor, 0.05, puddle);
 #endif
   }
 }`,

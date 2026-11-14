@@ -8,6 +8,7 @@ import { WORLD_MAP, along, plotOf, roadOpen, roadRoute, roadsBetween, type Entry
 import { buildCar, buildCarrier, buildTruck, loadHeroes, materialKit, type MaterialKit } from "../../three/car-models";
 import type { ShipView, Site, VehiclePick } from "../map-types";
 import { CAR_COLORS, type CarModel } from "../vehicles";
+import type { Fx } from "./fx";
 import type { Lamp } from "./street-lights";
 
 /** Simple unbranded commuter traffic only. Hero/special cars stay reserved for the player, showroom and events. */
@@ -335,6 +336,7 @@ export class Traffic3D {
   private yAxis = new THREE.Vector3(0, 1, 0);
   private col = new THREE.Color();
   hero: RoadCar | null = null;
+  fx: Pick<Fx, "evAura" | "exhaustFume"> | null = null;
   /** Seconds since start, and when each dealership last sent a buyer off. */
   private clock = 0;
   private lastBuyer = new Map<string, number>();
@@ -1158,6 +1160,15 @@ export class Traffic3D {
       if (Math.abs(fade - car.visualScale) > 0.001) {
         car.visualScale = fade;
         car.visual.scale.setScalar(fade);
+      }
+      if (visible && this.fx && car.v > 0.6) {
+        if (Math.random() < 0.15) {
+          if (car.model === "electric" || car.model === "robotaxi" || car.model === "supercar" || car.model === "hypercar") {
+            this.fx.evAura(car.x, car.y, car.z);
+          } else {
+            this.fx.exhaustFume(car.x, car.y, car.z);
+          }
+        }
       }
     }
 

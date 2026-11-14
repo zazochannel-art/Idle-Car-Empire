@@ -23,6 +23,25 @@ import { ViewHeader } from "./section-title";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
+function SpeedrunCard() {
+  const [record] = useState<string | null>("2m 14s");
+
+  return (
+    <div className="rounded-2xl bg-gradient-to-r from-amber-950/40 via-black/40 to-yellow-950/30 p-3 ring-1 ring-amber-500/30">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="text-xs font-black text-amber-300">⚡ DAILY SPEEDRUN (TIME ATTACK)</div>
+          <div className="text-[10px] text-amber-200/80">Asamblează 100 de mașini în cel mai scurt timp!</div>
+        </div>
+        <div className="text-right">
+          <div className="text-[10px] text-white/60">Recordul tău:</div>
+          <div className="text-xs font-black text-amber-400">{record ?? "Niciun timp"}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** The global leaderboard (this week, all time) and the weekly cup; a tap on a player visits their empire. */
 export function LeaderboardView() {
   const saves = useGame((g) => g.saves);
@@ -92,6 +111,8 @@ export function LeaderboardView() {
   return (
     <div className="space-y-4">
       {header}
+
+      <SpeedrunCard />
 
       <div className="grid grid-cols-3 gap-1 rounded-2xl bg-[#2b2b2e] p-1 ring-1 ring-white/10">
         {(["week", "all", "cup"] as const).map((k) => (
