@@ -1,4 +1,4 @@
-Novidades na 1.1.8:
+Novidades na 1.1.9:
 • Dia e noite no mapa, com clima e novos efeitos
 • Nova vista Dyno: teste a potência e o tuning dos seus carros
 • Tuning e clássicos atualizados
