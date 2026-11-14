@@ -1,4 +1,4 @@
-Noutăți în 1.1.2:
+Noutăți în 1.1.7:
 • Zi și noapte pe hartă, cu vreme și efecte noi
 • Vedere nouă Dyno: testează puterea și tuningul mașinilor
 • Tuning și mașini clasice actualizate
