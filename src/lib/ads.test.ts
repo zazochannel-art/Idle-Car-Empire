@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { APP_OPEN, appOpenBlock, canWatch, INTERSTITIAL, interstitialBlock, registerAdDriver, setAdFree, setAdStatus, watchAd, type AdStatus, type AppOpenContext, type InterstitialContext } from "./ads";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { APP_OPEN, appOpenBlock, canWatch, INTERSTITIAL, interstitialBlock, maybeShowAppOpen, maybeShowInterstitial, registerAdDriver, setAdFree, setAdStatus, watchAd, type AdStatus, type AppOpenContext, type InterstitialContext } from "./ads";
 
 describe("watching an ad", () => {
   it("gives one reward per ad, even when the ad network reports it twice", async () => {
@@ -107,5 +107,46 @@ describe("App Open ads", () => {
     expect(appOpenBlock(status, { ...ctx, lastAdAt: ctx.now - INTERSTITIAL.gapMs + 1 })).toBe("pause");
     expect(appOpenBlock(status, { ...ctx, today: INTERSTITIAL.perDay })).toBe("limit");
     expect(appOpenBlock(status, { ...ctx, today: 2, appOpenToday: APP_OPEN.perDay })).toBe("limit");
+  });
+});
+
+describe("an ad that wasn't shown after all", () => {
+  const store = new Map<string, string>();
+  // (the module keeps the time of the last ad: each test starts on a later day)
+  let day = 0;
+  beforeEach(() => {
+    vi.useFakeTimers();
+    store.clear();
+    vi.stubGlobal("localStorage", { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => store.set(k, v) });
+    setAdFree(false);
+    setAdStatus({ ready: true, showing: false, interstitialReady: true, appOpenReady: true });
+    // the app has been open a while
+    vi.setSystemTime(Date.now() + ++day * 24 * 3600_000);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("a full-screen one that didn't show uses up no daily ad and starts no pause", async () => {
+    const showInterstitial = vi.fn(async () => false);
+    registerAdDriver({ show: async () => "failed", privacyForm: async () => {}, showInterstitial, showAppOpen: async () => false });
+    for (let i = 0; i < INTERSTITIAL.perDay + 2; i++) expect(await maybeShowInterstitial(INTERSTITIAL.minPlayTime, true, 0)).toBe(false);
+    // every try reached the driver: none was held back by a pause or the limit
+    expect(showInterstitial).toHaveBeenCalledTimes(INTERSTITIAL.perDay + 2);
+    // and the next one that does show is not refused
+    registerAdDriver({ show: async () => "failed", privacyForm: async () => {}, showInterstitial: async () => true, showAppOpen: async () => false });
+    expect(await maybeShowInterstitial(INTERSTITIAL.minPlayTime, true, 0)).toBe(true);
+    // ...and it does start the pause
+    expect(await maybeShowInterstitial(INTERSTITIAL.minPlayTime, true, 0)).toBe(false);
+  });
+
+  it("an App Open one that didn't show is not counted either", async () => {
+    const showAppOpen = vi.fn(async () => false);
+    registerAdDriver({ show: async () => "failed", privacyForm: async () => {}, showInterstitial: async () => false, showAppOpen });
+    for (let i = 0; i < APP_OPEN.perDay + 2; i++) expect(await maybeShowAppOpen(INTERSTITIAL.minPlayTime, true, APP_OPEN.minAwayMs, () => false)).toBe(false);
+    expect(showAppOpen).toHaveBeenCalledTimes(APP_OPEN.perDay + 2);
+    registerAdDriver({ show: async () => "failed", privacyForm: async () => {}, showInterstitial: async () => false, showAppOpen: async () => true });
+    expect(await maybeShowAppOpen(INTERSTITIAL.minPlayTime, true, APP_OPEN.minAwayMs, () => false)).toBe(true);
   });
 });

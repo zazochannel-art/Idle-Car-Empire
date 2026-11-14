@@ -282,6 +282,8 @@ export const en = {
   "ad.closedBody": "The reward comes once the ad has played to the end.",
   "ad.failed": "The ad couldn't be shown",
   "ad.failedBody": "Try again in a moment.",
+  "ad.refused": "Nothing to collect",
+  "ad.refusedBody": "The reward was already taken or is no longer available.",
   "ad.limit": "That's all the ads for today: more tomorrow.",
   "settings.adPrivacy": "Ad privacy choices",
 

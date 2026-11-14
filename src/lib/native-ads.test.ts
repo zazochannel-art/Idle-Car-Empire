@@ -17,8 +17,8 @@ vi.mock("@capacitor-community/admob", () => ({
   AdmobConsentStatus: { REQUIRED: "REQUIRED" },
   AdmobConsentDebugGeography: { OTHER: 4 },
   MaxAdContentRating: { Teen: "Teen" },
-  AppOpenAdPluginEvents: { Closed: "appOpenClosed", FailedToShow: "appOpenFailedToShow" },
-  InterstitialAdPluginEvents: { Dismissed: "interstitialDismissed", FailedToShow: "interstitialFailedToShow" },
+  AppOpenAdPluginEvents: { Opened: "appOpenOpened", Closed: "appOpenClosed", FailedToShow: "appOpenFailedToShow" },
+  InterstitialAdPluginEvents: { Showed: "interstitialShowed", Dismissed: "interstitialDismissed", FailedToShow: "interstitialFailedToShow" },
   RewardAdPluginEvents: { Showed: "showed", Rewarded: "rewarded", Dismissed: "dismissed", FailedToShow: "failedToShow" },
   AdMob: {
     requestConsentInfo: async (options?: unknown) => {
@@ -187,9 +187,12 @@ describe("App Open ads in the app", () => {
     const { getAdStatus, maybeShowAppOpen, maybeShowInterstitial, INTERSTITIAL, APP_OPEN } = await import("./ads");
     // (each test's fake clock starts at the real time: far enough past the earlier tests' ads)
     await vi.advanceTimersByTimeAsync(24 * 3600_000);
+    // (the ad loaded before that day passed has expired: the first try loads a new one instead of showing it)
+    setAdStatus({ appOpenReady: true, interstitialReady: true });
+    expect(await maybeShowAppOpen(INTERSTITIAL.minPlayTime, true, APP_OPEN.minAwayMs, () => false)).toBe(false);
+    await vi.advanceTimersByTimeAsync(0);
     appOpenShows.mockClear();
     appOpenLoads.mockClear();
-    setAdStatus({ appOpenReady: true, interstitialReady: true });
     const shown = maybeShowAppOpen(INTERSTITIAL.minPlayTime, true, APP_OPEN.minAwayMs, () => false);
     await vi.advanceTimersByTimeAsync(0);
     expect(appOpenShows).toHaveBeenCalledTimes(1);

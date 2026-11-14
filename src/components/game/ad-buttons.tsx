@@ -18,10 +18,17 @@ import { useGame } from "@/store/game-store";
 
 type T = (key: MessageKey, vars?: Vars) => string;
 
-/** Plays an ad; `onReward` (the game giving the reward) runs only if the ad was watched to the end. */
-export async function playAd(onReward: () => void, t: T) {
-  const r = await watchAd(onReward);
-  if (r === "closed") uiEvents.emit({ type: "toast", tone: "info", icon: "📺", title: t("ad.closed"), body: t("ad.closedBody") });
+/**
+ * Plays an ad; `onReward` (the game giving the reward) runs only if the ad was watched to the end.
+ * If the game then has nothing to give (the report was collected, the limit reached), it says so.
+ */
+export async function playAd(onReward: () => boolean | void, t: T) {
+  let refused = false;
+  const r = await watchAd(() => {
+    refused = onReward() === false;
+  });
+  if (r === "rewarded" && refused) uiEvents.emit({ type: "toast", tone: "info", icon: "📺", title: t("ad.refused"), body: t("ad.refusedBody") });
+  else if (r === "closed") uiEvents.emit({ type: "toast", tone: "info", icon: "📺", title: t("ad.closed"), body: t("ad.closedBody") });
   else if (r === "failed") uiEvents.emit({ type: "toast", tone: "warn", icon: "📺", title: t("ad.failed"), body: t("ad.failedBody") });
 }
 
