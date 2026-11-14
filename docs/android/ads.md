@@ -71,7 +71,8 @@ The code is `maybeShowAppOpen` in `src/lib/ads.ts` (the limits are in
 (iOS: `ADMOB_APP_OPEN_ID_IOS`). Until it is set the build uses Google's sample
 unit (`ca-app-pub-3940256099942544/9257395921`), which pays nothing.
 
-At most **20 rewarded ads a day**, all kinds together. The numbers live in
+There is **no daily limit on rewarded ads** (the shop's ad packs and the mystery box keep their own
+per-day limits). The numbers live in
 `src/game/config/ads.ts`; the rules in `src/game/engine/ads.ts` (tested in
 `src/game/ads.test.ts`).
 

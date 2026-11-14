@@ -23,17 +23,16 @@ export interface AdsState {
 
 export const createAds = (): AdsState => ({ day: "", count: 0, boostLeft: 0, buildAt: 0 });
 
-/** Rewarded ads watched today. */
+/** Rewarded ads watched today (only counted: there is no daily limit). */
 export const adsToday = (s: GameState, now: number) => (s.ads.day === dateKey(now) ? s.ads.count : 0);
 
 /**
- * Why a reward can't be had now: today's limit, nothing to give (no report, no job, a Star day's
+ * Why a reward can't be had now: nothing to give (no report, no job, a Star day's
  * login, no break to skip), a boost already running, the pause after an instant build.
  */
-export type AdBlock = "limit" | "nothing" | "active" | "wait" | null;
+export type AdBlock = "nothing" | "active" | "wait" | null;
 
 export function adBlock(s: GameState, reward: AdReward, now: number, plot?: string): AdBlock {
-  if (adsToday(s, now) >= ADS.perDay) return "limit";
   switch (reward) {
     case "offline":
       return (s.pendingOffline?.money ?? 0) > 0 ? null : "nothing";
@@ -88,7 +87,7 @@ export function adsTick(s: GameState, dt: number) {
 export function migrateAds(a: AdsState, now: number): AdsState {
   return {
     day: a.day,
-    count: Math.max(0, Math.min(ADS.perDay, Math.floor(a.count))),
+    count: Math.max(0, Math.floor(a.count)),
     // an ad gives 30 minutes; the shop's long boost can add up to its cap
     boostLeft: Math.max(0, Math.min(SHOP.boostCap, a.boostLeft)),
     // a time from the future (a clock set back) would hold the pause for ever

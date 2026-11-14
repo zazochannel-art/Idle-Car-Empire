@@ -66,7 +66,7 @@ export function ShopView() {
         </div>
         <div className="flex flex-1 items-center gap-2 rounded-xl bg-white/[0.05] px-3 py-2 ring-1 ring-white/10">
           <span className="text-xl">{adFree ? "🎟️" : "📺"}</span>
-          <span className="text-xs font-bold leading-tight text-white/70">{t(adFree ? "shop.rewardsToday" : "shop.adsToday", { n: adsToday(state, state.lastActiveAt), max: ADS.perDay })}</span>
+          <span className="text-xs font-bold leading-tight text-white/70">{t(adFree ? "shop.rewardsToday" : "shop.adsToday", { n: adsToday(state, state.lastActiveAt) })}</span>
         </div>
       </div>
       <CrateHero />

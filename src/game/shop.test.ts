@@ -57,9 +57,10 @@ describe("the shop", () => {
     expect(S.packsToday(s, "cash", tomorrow)).toBe(0);
     expect(S.buyShop(s, "cash", tomorrow, snap)).toBe(true);
     expect(S.packsToday(s, "research", tomorrow)).toBe(0);
-    // the day's ad limit stops the packs too
-    s.ads.count = ADS.perDay;
-    expect(S.shopBlock(s, "research", tomorrow)).toBe("limit");
+    // no day's ad limit: only the packs' own count stops them
+    s.ads.day = dateKey(tomorrow);
+    s.ads.count = 1000;
+    expect(S.shopBlock(s, "research", tomorrow)).toBeNull();
   });
 
   it("the ad boost and the instant build are the rewarded ads' own", () => {
@@ -157,10 +158,10 @@ describe("the shop", () => {
     expect(S.buyShop(s, "box", T0 + HOUR, snap)).toBe(false);
     // tomorrow, a new box
     expect(S.shopBlock(s, "box", T0 + 24 * HOUR)).toBeNull();
-    // the day's ad limit stops it too
+    // no day's ad limit: a new day's box is there however many ads were watched
     s.ads.day = dateKey(T0 + 24 * HOUR);
-    s.ads.count = ADS.perDay;
-    expect(S.shopBlock(s, "box", T0 + 24 * HOUR)).toBe("limit");
+    s.ads.count = 1000;
+    expect(S.shopBlock(s, "box", T0 + 24 * HOUR)).toBeNull();
     // without the company and the day, the box is a surprise
     expect(S.shopReward("box", snap)).toEqual({});
   });

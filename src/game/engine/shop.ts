@@ -1,10 +1,9 @@
 // The shop: a free crate every few hours, a mystery box and packs for a rewarded
 // ad, and ⭐ Star items. An ad item is granted here only once the ad network says
 // the ad was watched to the end (the ad itself is shown by the app, lib/ads.ts).
-import { ADS } from "../config/ads";
 import { SHOP, SHOP_ITEM_BY_ID, type ShopItemId, type ShopPrice } from "../config/shop";
 import type { GameState, Reward } from "../types";
-import { adBlock, adsToday, countAd, grantAd } from "./ads";
+import { adBlock, countAd, grantAd } from "./ads";
 import { remainingOf } from "./construction";
 import type { EconomySnapshot } from "./economy";
 import { grantReward } from "./rewards";
@@ -95,8 +94,8 @@ export function shopReward(id: ShopItemId, snap: EconomySnapshot, s?: GameState,
 }
 
 /**
- * Why an item can't be had now: the crate not ready yet ("wait"), today's ad or
- * pack limit, nothing to build, a boost already running (or already as long as it
+ * Why an item can't be had now: the crate not ready yet ("wait"), today's pack
+ * or box limit, nothing to build, a boost already running (or already as long as it
  * can be: "full"), not enough Stars. Null: it can be had.
  */
 export type ShopBlock = "wait" | "limit" | "nothing" | "active" | "full" | "stars" | null;
@@ -122,9 +121,9 @@ export function shopBlock(s: GameState, id: ShopItemId, now: number): ShopBlock 
       return crateWait(s, now) > 0 ? "wait" : null;
     case "cash":
     case "research":
-      return adsToday(s, now) >= ADS.perDay || packsToday(s, id, now) >= SHOP.packsPerDay ? "limit" : null;
+      return packsToday(s, id, now) >= SHOP.packsPerDay ? "limit" : null;
     case "box":
-      return adsToday(s, now) >= ADS.perDay || s.shop.boxDay === dateKey(now) ? "limit" : null;
+      return s.shop.boxDay === dateKey(now) ? "limit" : null;
     case "boost":
       return adBlock(s, "boost", now);
     case "build":

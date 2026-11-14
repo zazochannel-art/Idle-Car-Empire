@@ -16,6 +16,4 @@ export const ADS = {
   buildCooldown: 10 * 60_000,
   /** The daily login reward, multiplied (money days only: the Star days are not doubled). */
   loginMult: 2,
-  /** Most rewarded ads a day, all kinds together. */
-  perDay: 20,
 };
