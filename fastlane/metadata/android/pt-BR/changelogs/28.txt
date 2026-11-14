@@ -1,0 +1,6 @@
+Novidades na 1.1.2:
+• Dia e noite no mapa, com clima e novos efeitos
+• Nova vista Dyno: teste a potência e o tuning dos seus carros
+• Tuning e clássicos atualizados
+• Anúncios renovados: suas escolhas de privacidade são respeitadas e não há mais limites diários
+• Correções e estabilidade
