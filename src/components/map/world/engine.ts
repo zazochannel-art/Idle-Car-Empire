@@ -5,6 +5,8 @@
 // and listens to its callbacks; it loads its world files on its own.
 import * as THREE from "three";
 import { isSaving, shouldDraw } from "@/lib/power";
+import { deviceFacts, textureBudget, type TextureBudget } from "@/lib/gpu-budget";
+import { loadTile } from "./tiles";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { DEPOT, MARKET, RACING_AREA, STARTER_PLOT, WORLD_MAP, type Plot } from "@/game/city/layout";
 import { SPEC_BY_ID, STRUCTURE_BY_ID, ZONES, type TerritoryId } from "@/game/config/city";
@@ -207,6 +209,8 @@ export class MapEngine {
   private dpr = 1;
   private maxDpr = 2;
   private low: boolean;
+  /** How big the textures may be on this device (lib/gpu-budget.ts). */
+  private budget: TextureBudget;
   /** When the last frame was drawn, frames drawn so far (battery saver: lib/power.ts), and whether the saver was on. */
   private lastDraw = 0;
   frames = 0;
@@ -291,6 +295,9 @@ export class MapEngine {
     // low graphics (battery saver, weak phones): no multisampling, and the GPU's power-saving mode
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !this.low, powerPreference: this.low ? "low-power" : "high-performance" });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    // the size of the ground pictures, the filtering and the shadow map follow what the device can hold
+    const caps = this.renderer.capabilities;
+    this.budget = textureBudget({ low: this.low, maxTextureSize: caps.maxTextureSize, maxAnisotropy: caps.getMaxAnisotropy(), ...deviceFacts() });
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.20;
     this.renderer.shadowMap.enabled = !this.low;
@@ -305,8 +312,7 @@ export class MapEngine {
     this.scene.background = new THREE.Color("#95d5f5");
     this.scene.fog = new THREE.Fog("#95d5f5", 350, 1500);
     this.sun.castShadow = true;
-    const sm = this.low ? 1024 : window.innerWidth < 700 ? 2048 : 4096;
-    this.sun.shadow.mapSize.set(sm, sm);
+    this.sun.shadow.mapSize.set(this.budget.shadowMap, this.budget.shadowMap);
     this.sun.shadow.bias = -0.0003;
     this.sun.shadow.normalBias = 0.02;
     this.scene.add(this.sun, this.sun.target, this.hemi, this.camera);
@@ -329,27 +335,8 @@ export class MapEngine {
       loadImage(`${base}/areas.png`),
     ]);
     if (this.destroyed) return;
-    const loader = new THREE.TextureLoader();
-    const aniso = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
-    const tiles = await Promise.all(
-      Array.from({ length: NTX * NTY }, (_, i) =>
-        loader.loadAsync(`${base}/t/${i % NTX}_${Math.floor(i / NTX)}.webp`).then((loaded) => {
-          let tex: THREE.Texture = loaded;
-          // phones in battery-saver mode get half-size ground textures
-          const img = loaded.image as HTMLImageElement;
-          if (this.low && img.width > 1024) {
-            const cv = document.createElement("canvas");
-            cv.width = cv.height = 1024;
-            cv.getContext("2d")!.drawImage(img, 0, 0, 1024, 1024);
-            loaded.dispose();
-            tex = new THREE.CanvasTexture(cv);
-          }
-          tex.colorSpace = THREE.SRGBColorSpace;
-          tex.anisotropy = aniso;
-          return tex;
-        }),
-      ),
-    );
+    const { tile, aniso } = this.budget;
+    const tiles = await Promise.all(Array.from({ length: NTX * NTY }, (_, i) => loadTile(`${base}/t/${i % NTX}_${Math.floor(i / NTX)}.webp`, tile, aniso)));
     if (this.destroyed) return;
     // the areas raster: which district or territory every spot belongs to
     const cv = document.createElement("canvas");
