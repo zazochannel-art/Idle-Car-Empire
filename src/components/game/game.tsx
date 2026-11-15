@@ -528,7 +528,7 @@ function LeftRail() {
     ...PILLARS.map((p) => ({ id: p.id, icon: p.icon, badge: p.id === "empire" ? badges.research : p.id === "business" ? badges.missions : 0 })),
   ];
   return (
-    <nav className="hidden absolute left-[calc(env(safe-area-inset-left)+0.5rem)] top-[calc(env(safe-area-inset-top)+6.75rem)] md:flex z-20 flex flex-col gap-1 rounded-xl hud-bar p-1 md:left-[calc(env(safe-area-inset-left)+0.75rem)] md:top-[calc(env(safe-area-inset-top)+11rem)]">
+    <nav className="hidden absolute left-[calc(env(safe-area-inset-left)+0.5rem)] top-[calc(env(safe-area-inset-top)+6.75rem)] md:flex z-20 flex flex-col gap-1 rounded-xl hud-bar p-1 md:left-[calc(env(safe-area-inset-left)+0.75rem)] md:top-[calc(env(safe-area-inset-top)+11rem)] land:top-[calc(env(safe-area-inset-top)+4.75rem)] land:gap-0.5 land:p-0.5">
       {items.map((r) => {
         const active = r.id === "map" ? nothing : current === r.id;
         const label = r.id === "map" ? t("map.nav.map") : t(`pillar.${r.id}`);
@@ -547,13 +547,13 @@ function LeftRail() {
               setView(active ? null : (last ?? pillar.views[0]));
             }}
             className={cn(
-              "race-type relative flex flex-col items-center gap-0.5 rounded-lg px-1.5 py-2 text-[11px] transition md:w-[4.5rem] md:text-[12px]",
+              "race-type relative flex flex-col items-center gap-0.5 rounded-lg px-1.5 py-2 text-[11px] transition md:w-[4.5rem] md:text-[12px] land:w-11 land:py-1.5",
               active ? "bg-electric text-white shadow-[0_3px_0_0_#1747b8]" : "text-white hover:bg-white/10",
             )}
             aria-label={label}
           >
             <r.icon className="size-5 stroke-[2.5]" />
-            <span className="hidden md:block">{label}</span>
+            <span className="hidden md:block land:hidden">{label}</span>
             <NavBadge n={r.badge} className="absolute right-0.5 top-0.5" />
           </button>
         );
@@ -588,7 +588,7 @@ function BottomDock() {
               key={d.id}
               onClick={() => setView(active ? null : d.id)}
               className={cn(
-                "race-type relative flex -skew-x-[9deg] flex-col items-center gap-0.5 rounded-md py-2 text-[13px] leading-none transition active:translate-y-[2px]",
+                "race-type relative flex -skew-x-[9deg] flex-col items-center gap-0.5 rounded-md py-2 text-[13px] leading-none transition active:translate-y-[2px] land:py-1",
                 active
                   ? "bg-electric text-white shadow-[0_3px_0_0_#1747b8]"
                   : d.id === "build"

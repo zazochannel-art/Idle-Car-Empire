@@ -155,6 +155,8 @@ dependencies {
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    // EdgeToEdge.enable (MainActivity): the same edge-to-edge window below Android 15 as on 15+
+    implementation "androidx.activity:activity:$androidxActivityVersion"
     implementation project(':capacitor-android')
     implementation "com.google.android.gms:play-services-games-v2:$playGamesVersion"
     testImplementation "junit:junit:$junitVersion"

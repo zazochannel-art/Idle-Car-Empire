@@ -13,7 +13,7 @@ other online features talk to the game's Supabase project.
 | SDK levels | minSdk 24 (Android 7.0), target/compile SDK 36 (Android 16) |
 | Version | `android/version.properties` (`versionCode`, `versionName`) |
 | Permissions | `INTERNET` (cloud save, ads), `VIBRATE` (haptics), `POST_NOTIFICATIONS` (asked only when the player turns notifications on); the notifications plugin adds `RECEIVE_BOOT_COMPLETED` and `WAKE_LOCK` (its `SCHEDULE_EXACT_ALARM` is removed: the game's reminders are never exact); the Google Mobile Ads SDK adds `AD_ID`, `ACCESS_NETWORK_STATE` and its own |
-| Orientation | portrait on phones; tablets and foldables rotate (Android 16 ignores the lock on large screens) |
+| Orientation | none locked: phones, tablets and foldables rotate and resize freely (split screen too); a phone held sideways gets a compact layout (the `land:` variant in `src/app/globals.css`) |
 
 Other documents: [signing.md](signing.md) (the upload key),
 [play-store.md](play-store.md) (listing, forms, publication, what is left to
@@ -44,7 +44,7 @@ do), [ads.md](ads.md) (rewarded ads: AdMob, consent, what you set up),
   the game loop: no battery use in the background, and nothing is lost if
   Android closes the app. On return, the time away is settled like any absence
   (the offline earnings report for long ones).
-- **Edge to edge** (Android 15+): the game's HUD and sheets use the safe-area
+- **Edge to edge** (every Android version: `EdgeToEdge.enable` in MainActivity, no deprecated window calls of our own): the game's HUD and sheets use the safe-area
   insets; a light shade under the status bar keeps its icons readable.
 - **Notifications** (off until the player turns them on in Settings, which
   asks Android 13+ for permission): when the app goes to the background it
