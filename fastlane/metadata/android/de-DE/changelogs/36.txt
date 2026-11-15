@@ -1,0 +1,7 @@
+Neu in 1.2.0:
+• Flüssigeres Spiel auf schwächeren Handys: die Karte passt ihre Grafik an dein Gerät an
+• Kleinere App und leichtere Kartentexturen
+• Eingebaute Geschwindigkeitsdiagnose (versteckt in den Einstellungen), damit wir Ruckler beheben können
+• Tag und Nacht auf der Karte, neue Dyno-Ansicht, überarbeitetes Tuning und Klassiker
+• Werbung überarbeitet: deine Datenschutzentscheidungen werden respektiert
+• Korrekturen und Stabilität

@@ -1,0 +1,7 @@
+Novedades en 1.2.0:
+• Juego más fluido en móviles más modestos: el mapa adapta sus gráficos a tu dispositivo
+• App más pequeña y texturas del mapa más ligeras
+• Diagnóstico de velocidad integrado (oculto en Ajustes) para ayudarnos a corregir ralentizaciones
+• Día y noche en el mapa, nueva vista Dyno, tuning y clásicos actualizados
+• Anuncios renovados: se respetan tus opciones de privacidad
+• Correcciones y estabilidad

@@ -1,0 +1,7 @@
+Noutăți în 1.2.0:
+• Joc mai fluid pe telefoane mai slabe: harta își adaptează grafica la dispozitiv
+• Aplicație mai mică și texturi de hartă mai ușoare
+• Diagnostic de viteză integrat (ascuns în Setări), ca să putem repara încetinirile
+• Zi și noapte pe hartă, vedere nouă Dyno, tuning și mașini clasice actualizate
+• Reclame refăcute: se respectă alegerile tale de confidențialitate
+• Reparații și stabilitate
