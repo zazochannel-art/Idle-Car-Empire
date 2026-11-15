@@ -1,19 +1,31 @@
 package com.zazochannel.idlecarempire;
 
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.ViewGroup;
 import android.webkit.WebView;
+import androidx.activity.EdgeToEdge;
+import androidx.activity.SystemBarStyle;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
 
     private static final String TAG = "idlecarempire";
 
-    /** The game's own plugin (Google Play Games), registered before the bridge starts. */
+    /**
+     * The game's own plugin (Google Play Games), registered before the bridge starts, and the
+     * window drawn edge to edge. Android 15+ does that for every app that targets it; EdgeToEdge
+     * (AndroidX's way, no deprecated window calls of our own) makes Android 7 to 14 do the same, so
+     * the game's safe-area padding (Capacitor's SystemBars plugin, capacitor.config.ts) is the one
+     * layout on every version. The bars are transparent with light icons over the game's dark
+     * screens; the status bar's readable shade is the page's own (.status-scrim).
+     */
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        SystemBarStyle bars = SystemBarStyle.dark(Color.TRANSPARENT);
+        EdgeToEdge.enable(this, bars, bars);
         registerPlugin(PlayGamesPlugin.class);
         super.onCreate(savedInstanceState);
     }

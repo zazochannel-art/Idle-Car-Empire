@@ -33,7 +33,7 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
   return (
     <header className="pointer-events-none absolute inset-x-0 top-0 z-30 pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       <div className="flex items-start gap-2 p-2 sm:p-3">
-        <div className="flex shrink-0 flex-col gap-1.5">
+        <div className="flex shrink-0 flex-col gap-1.5 land:flex-row">
           <ShopButton />
           <InboxButton />
           <CityButton />
@@ -60,7 +60,7 @@ export function Hud({ onSettings }: { onSettings: () => void }) {
         <div className="pointer-events-auto flex shrink-0 flex-col gap-1.5 md:flex-row">
           <ProfileButton />
           <WeatherChip />
-          <div className="hidden md:block"><LanguageSwitch /></div>
+          <div className="hidden md:block land:hidden"><LanguageSwitch /></div>
         </div>
       </div>
     </header>

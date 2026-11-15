@@ -14,16 +14,15 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
-        <!-- Portrait on phones: the game's phone layout is portrait (landscape squeezes the HUD).
-             Android 16 ignores this on tablets and foldables (600dp+), which rotate freely with
-             the game's wide layout. -->
+        <!-- No orientation lock and no resizing limits (Play's large-screen check): the game
+             rotates freely and fills whatever window it gets (tablets, foldables, split screen),
+             its layout following the window's size (src/app/globals.css, "land" variant). -->
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:name=".MainActivity"
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
-            android:screenOrientation="portrait"
             android:exported="true">
 
             <intent-filter>

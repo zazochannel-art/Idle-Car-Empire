@@ -41,17 +41,17 @@ export function Sheet({
           exit={{ opacity: 0, y: 40 }}
           transition={{ type: "spring", stiffness: 420, damping: 38 }}
           className={cn(
-            "glass-strong fixed inset-x-0 bottom-0 z-40 flex max-h-[72dvh] flex-col rounded-t-2xl pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] lg:inset-x-auto lg:bottom-[5.5rem] lg:right-3 lg:top-[5.25rem] lg:max-h-none lg:w-[460px] lg:rounded-2xl",
+            "glass-strong fixed inset-x-0 bottom-0 z-40 flex max-h-[72dvh] flex-col rounded-t-2xl pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] lg:inset-x-auto lg:bottom-[5.5rem] lg:right-3 lg:top-[5.25rem] lg:max-h-none lg:w-[460px] lg:rounded-2xl land:inset-x-auto land:inset-y-0 land:right-0 land:max-h-none land:w-[min(26rem,52vw)] land:rounded-l-2xl land:rounded-tr-none land:pl-0 land:pt-[env(safe-area-inset-top)]",
             className,
           )}
         >
-          <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-white/20 lg:hidden" />
-          <div className="flex shrink-0 items-center gap-2.5 px-4 pb-3 pt-2 lg:pt-4">
+          <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-white/20 lg:hidden land:hidden" />
+          <div className="flex shrink-0 items-center gap-2.5 px-4 pb-3 pt-2 lg:pt-4 land:pb-1.5 land:pt-2">
             {icon && <span className="text-2xl leading-none">{icon}</span>}
-            <h2 className="min-w-0 flex-1 truncate pr-1 text-[28px] leading-[1.1]">{title}</h2>
+            <h2 className="min-w-0 flex-1 truncate pr-1 text-[28px] leading-[1.1] land:text-[22px]">{title}</h2>
             <button
               onClick={onClose}
-              className="flex size-11 shrink-0 items-center justify-center rounded-full bg-stop text-white shadow-[0_3px_0_0_#a82424] transition hover:brightness-110 active:translate-y-[2px]"
+              className="flex size-11 shrink-0 items-center justify-center rounded-full land:size-9 bg-stop text-white shadow-[0_3px_0_0_#a82424] transition hover:brightness-110 active:translate-y-[2px]"
               aria-label={t("map.close")}
             >
               <X className="size-6 stroke-[3.5]" />

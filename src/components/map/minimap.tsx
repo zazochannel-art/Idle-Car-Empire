@@ -193,7 +193,7 @@ export function Minimap({ engine }: { engine: RefObject<MapEngine | null> }) {
   return (
     <div className="pointer-events-auto flex flex-col items-end gap-1.5">
       <div className="overflow-hidden rounded-xl bg-white p-1 shadow-[0_3px_0_0_rgba(0,0,0,0.3)]">
-        <canvas ref={ref} onPointerDown={onTap} style={{ aspectRatio: `${W} / ${H}` }} className="block w-[118px] cursor-pointer rounded-lg md:w-[172px]" aria-label={t("map.minimap")} />
+        <canvas ref={ref} onPointerDown={onTap} style={{ aspectRatio: `${W} / ${H}` }} className="block w-[118px] cursor-pointer rounded-lg md:w-[172px] land:w-[120px]" aria-label={t("map.minimap")} />
       </div>
       <div className="hidden gap-0.5 rounded-lg hud-bar p-0.5 md:flex" role="radiogroup" aria-label={t("map.tiers")}>
         {ZOOM_TIERS.map((k) => {
