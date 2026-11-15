@@ -1,0 +1,7 @@
+What's new in 1.2.0:
+• Smoother game on weaker phones: the map adapts its graphics to your device
+• Smaller app and lighter map textures
+• Built-in speed diagnostics (hidden in Settings) to help us fix slowdowns
+• Day and night on the map, new Dyno view, updated tuning and classic cars
+• Ads reworked: your consent choices are respected
+• Fixes and stability
