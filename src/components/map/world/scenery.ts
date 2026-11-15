@@ -172,6 +172,38 @@ function railBox(rail: [number, number][]) {
   return { x: (Math.min(...xs) + Math.max(...xs)) / 2, z: (Math.min(...zs) + Math.max(...zs)) / 2, w: (Math.max(...xs) - Math.min(...xs)) / 2 + 2, d: (Math.max(...zs) - Math.min(...zs)) / 2 + 2 };
 }
 
+/** Puts a set's instances (matrix and colour) in a fixed random order. */
+function shuffleInstances(m: THREE.InstancedMesh) {
+  const n = m.count;
+  const a = m.instanceMatrix.array as Float32Array;
+  const c = m.instanceColor?.array as Float32Array | undefined;
+  let s = 0x9e3779b9 ^ n;
+  const next = () => {
+    s ^= s << 13;
+    s ^= s >>> 17;
+    s ^= s << 5;
+    return (s >>> 0) / 4294967296;
+  };
+  const tmp = new Float32Array(16);
+  for (let i = n - 1; i > 0; i--) {
+    const j = Math.floor(next() * (i + 1));
+    tmp.set(a.subarray(i * 16, i * 16 + 16));
+    a.copyWithin(i * 16, j * 16, j * 16 + 16);
+    a.set(tmp, j * 16);
+    if (c) {
+      const r = c[i * 3], g = c[i * 3 + 1], b = c[i * 3 + 2];
+      c[i * 3] = c[j * 3];
+      c[i * 3 + 1] = c[j * 3 + 1];
+      c[i * 3 + 2] = c[j * 3 + 2];
+      c[j * 3] = r;
+      c[j * 3 + 1] = g;
+      c[j * 3 + 2] = b;
+    }
+  }
+  m.instanceMatrix.needsUpdate = true;
+  if (m.instanceColor) m.instanceColor.needsUpdate = true;
+}
+
 /** Side of the cells the big instanced sets are cut into for close-up views (world units). */
 const CELL = 25;
 /** Sets smaller than this stay whole: one draw is cheaper than several. */
@@ -237,6 +269,43 @@ export class Scenery {
       this.ad.key = key;
     }
     for (const b of this.boards) b.face.material = this.ad.mat;
+  }
+
+  /** The big sets' full counts (before thinning), for setFarShare. */
+  private fullCount = new Map<THREE.InstancedMesh, number>();
+
+  /**
+   * Wide views draw only this share of each big set (trees, bushes, props): from far out they are
+   * specks, and the island's triangles are mostly theirs. The instances are shuffled once so that
+   * the share is spread over the whole island (they were laid down region by region).
+   */
+  setFarShare(share: number) {
+    for (const o of this.whole.children) {
+      const m = o as THREE.InstancedMesh;
+      if (!m.isInstancedMesh) continue;
+      let full = this.fullCount.get(m);
+      if (full === undefined) {
+        if (share >= 1 || m.count < 300) continue;
+        full = m.count;
+        this.fullCount.set(m, full);
+        shuffleInstances(m);
+      }
+      m.count = Math.max(1, Math.round(full * share));
+    }
+  }
+
+  /** What each mesh did for the shadows as built (setShadows puts it back). */
+  private castBase = new WeakMap<THREE.Object3D, boolean>();
+
+  /** The scenery casts shadows (as built), or none at all: the shadow pass draws every cell that casts. */
+  setShadows(on: boolean) {
+    this.root.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      let base = this.castBase.get(m);
+      if (base === undefined) this.castBase.set(m, (base = m.castShadow));
+      m.castShadow = base && on;
+    });
   }
 
   /** Close-up views draw the cells, wide views the whole sets. */
