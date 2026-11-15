@@ -8,6 +8,10 @@ import type { LocalCopy, SavePayload } from "./types";
 export const LOCAL_SAVE_KEY = "idle-car-empire:save:v1";
 const OWNER_PREFIX = "idle-car-empire:save:u:";
 const BACKUP_PREFIX = "idle-car-empire:backup:";
+/** The last good copy of each save (see LocalStore.write): `<prefix><the save's own key>`. Not a save key, so it is never mirrored, listed as an account or restored. */
+const LASTGOOD_PREFIX = "idle-car-empire:lastgood:";
+/** The last good copy is replaced only when it is this old (ms): a damaged write is caught, and a bad stretch of play still has a way back. */
+export const LASTGOOD_EVERY_MS = 2 * 60_000;
 /** Backups kept (the oldest go first). */
 const BACKUPS = 3;
 
@@ -54,17 +58,37 @@ const keyFor = (owner: string | null) => (owner ? `${OWNER_PREFIX}${owner}` : LO
 export class LocalStore {
   constructor(private store: KeyValue | null = browserStorage()) {}
 
-  /** The copy of an account (null: the save from before accounts). */
-  read(owner: string | null): LocalCopy | null {
+  /** A stored copy as it can be played, or null when it is missing or damaged. */
+  private parse(raw: string | null | undefined, owner: string | null): LocalCopy | null {
+    if (!raw) return null;
     try {
-      const raw = this.store?.getItem(keyFor(owner));
-      if (!raw) return null;
       const parsed = JSON.parse(raw) as LocalCopy;
       if (!parsed || typeof parsed !== "object" || !parsed.state || typeof parsed.state !== "object") return null;
       // a copy found under an account's key belongs to that account
       return owner ? { ...parsed, owner } : parsed;
     } catch {
-      // damaged: treated as missing (the cloud copy, if any, takes over)
+      return null;
+    }
+  }
+
+  /**
+   * The copy of an account (null: the save from before accounts). A damaged copy (a write cut short by a
+   * crash, a full disk) falls back to the last good one, a few minutes older at most; with neither, it is
+   * treated as missing (the cloud copy, if any, takes over).
+   */
+  read(owner: string | null): LocalCopy | null {
+    try {
+      const key = keyFor(owner);
+      const raw = this.store?.getItem(key);
+      const own = this.parse(raw, owner);
+      if (own) return own;
+      // nothing there at all is a new player or a removed save, not damage
+      if (!raw) return null;
+      const good = this.parse(this.store?.getItem(LASTGOOD_PREFIX + key), owner);
+      // always unsaved: the write that was lost may have held progress the cloud never saw, so the start
+      // checks this copy against the cloud's revision (and asks when both moved on) instead of trusting it
+      return good ? { ...good, dirty: true } : null;
+    } catch {
       return null;
     }
   }
@@ -73,6 +97,7 @@ export class LocalStore {
     try {
       const key = keyFor(copy.owner ?? null);
       const json = JSON.stringify(copy);
+      this.keepLastGood(key, copy.savedAt);
       this.store?.setItem(key, json);
       mirror?.(key, json);
       return true;
@@ -82,10 +107,28 @@ export class LocalStore {
     }
   }
 
+  /** Before a save is replaced, its readable copy becomes the last good one, unless that is recent enough already. */
+  private keepLastGood(key: string, savedAt: number) {
+    const s = this.store;
+    if (!s) return;
+    try {
+      const current = s.getItem(key);
+      if (!current) return;
+      const old = this.parse(s.getItem(LASTGOOD_PREFIX + key), null);
+      const age = old ? savedAt - old.savedAt : Infinity;
+      if (age >= 0 && age < LASTGOOD_EVERY_MS) return;
+      // only a copy that reads becomes the last good one: a damaged one must never replace it
+      if (this.parse(current, null)) s.setItem(LASTGOOD_PREFIX + key, current);
+    } catch {
+      // full or blocked: the save itself is still written
+    }
+  }
+
   remove(owner: string | null) {
     mirror?.(keyFor(owner), null);
     try {
       this.store?.removeItem(keyFor(owner));
+      this.store?.removeItem(LASTGOOD_PREFIX + keyFor(owner));
     } catch {
       // blocked: nothing to remove
     }
