@@ -19,7 +19,11 @@ const addTo = (report: OfflineReport, id: CityId, money: number) => {
 
 /** Longest stretch of an absence played on one snapshot (the market and the stock move on). */
 const SPAN_MS = 60 * 60 * 1000;
-/** Steps the whole absence is played in (engine/chain.ts simulateChain), shared by its spans. */
+/**
+ * Steps the whole absence is played in (engine/chain.ts simulateChain), shared by its spans. The
+ * result depends on it: see "Settling an absence" in docs/performance.md before changing it
+ * (`computeOffline` / `settleOffline` take it as a parameter so scripts/bench-offline-steps.ts can sweep it).
+ */
 const STEPS = 20_000;
 
 /**
@@ -44,18 +48,18 @@ export function spanEnd(t: number, end: number): number {
  * The chain's state moves forward here; the money waits in the report until
  * the player collects it.
  */
-export function computeOffline(s: GameState, now: number): OfflineReport {
+export function computeOffline(s: GameState, now: number, steps = STEPS): OfflineReport {
   // an ad's sales boost counts play time only: it waits, unspent, while the game is closed
   const boostLeft = s.ads.boostLeft;
   s.ads.boostLeft = 0;
   try {
-    return absence(s, now);
+    return absence(s, now, steps);
   } finally {
     s.ads.boostLeft = boostLeft;
   }
 }
 
-function absence(s: GameState, now: number): OfflineReport {
+function absence(s: GameState, now: number, steps: number): OfflineReport {
   const seconds = Math.max(0, (now - s.lastActiveAt) / 1000);
   const snap = snapshot(s);
   const capped = Math.min(seconds, snap.gm.offlineCapHours * 3600);
@@ -83,7 +87,7 @@ function absence(s: GameState, now: number): OfflineReport {
       const span = (to - t) / 1000;
       s.lastActiveAt = t;
       const at = t === left ? snap : snapshot(s);
-      const got = simulateChain(s, span, at.chain, (amount) => credit(s, amount), Math.max(1, (STEPS * span) / capped));
+      const got = simulateChain(s, span, at.chain, (amount) => credit(s, amount), Math.max(1, (steps * span) / capped));
       for (const k of ["cars", "components", "deliveries", "carsSold", "materials"] as const) r[k] += got[k];
       // garages and map buildings keep working too, at the offline efficiency
       city += at.city.incomePerSec * span * at.gm.offline;
@@ -179,8 +183,8 @@ export function applyOffline(s: GameState, report: OfflineReport): number {
  * Called on load. Short absences are credited silently; longer ones are kept
  * as `pendingOffline` (persisted) until the player presses COLLECT.
  */
-export function settleOffline(s: GameState, now: number): OfflineReport | null {
-  const report = computeOffline(s, now);
+export function settleOffline(s: GameState, now: number, steps = STEPS): OfflineReport | null {
+  const report = computeOffline(s, now, steps);
   s.lastActiveAt = now;
   if (report.money <= 0 && report.cars <= 0 && !report.components && !report.serviced && !report.built?.length && !report.cities) return null;
   if (report.seconds < OFFLINE.minReportSeconds) {

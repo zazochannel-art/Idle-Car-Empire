@@ -150,5 +150,8 @@ if (process.env.DEBUG) {
   console.log(opts.filter((o) => /build|zone/.test(o.label)).map((o) => `${o.label} ${formatMoney(o.cost)}`).join("\n"));
   console.log("dealers", JSON.stringify(s.chain.dealers));
 }
-// DUMP=file.json: keep the bot's final state as a save (late-game maps for scripts/bench-map-draws.mjs, bench-tick.ts)
-if (process.env.DUMP) writeFileSync(process.env.DUMP, JSON.stringify({ state: s }));
+// DUMP=<file> keeps the bot's state as a save (the late-game save for scripts/bench-offline*.ts and bench-tick.ts)
+if (process.env.DUMP) {
+  writeFileSync(process.env.DUMP, JSON.stringify({ state: s }));
+  console.log(`saved ${process.env.DUMP}`);
+}
