@@ -18,8 +18,7 @@ What keeps the game light, and how to measure it.
 
 The Android bundle (AAB) was 16.7 MB; what is in it, and what was done:
 
-- **The game** (`out/`, 11.9 MB, 6.7 MB compressed): terrain tiles 2.2 MB (WebP, already lossy and
-  small for 2048 px), JS 4.5 MB (about 1.3 MB compressed; three.js 0.8 MB of that is the map's;
+- **The game** (`out/`, 11.9 MB, 6.7 MB compressed): terrain tiles 2.2 MB (1.7 MB after the texture pass below), JS 4.5 MB (about 1.3 MB compressed; three.js 0.8 MB of that is the map's;
   the map, the screens and the other languages' texts load on demand), fonts 1.3 MB, the cars' `.glb` 1.1 MB (meshopt),
   map data 1.2 MB, heights 0.9 MB. The rest is the apps' own code (Capacitor, ads, billing, Play Games),
   already shrunk by R8 and `shrinkResources` (`android/app/build.gradle`).
@@ -33,10 +32,46 @@ The Android bundle (AAB) was 16.7 MB; what is in it, and what was done:
 - **Launch screens and icons** (`scripts/app-assets.mjs`): Android's splash pictures (Android 7–11)
   and launcher icons are lossless WebP instead of PNG: the same pixels, 45% fewer bytes (`res/` 5.2 → 2.9 MB;
   one phone's density, about 1.5 → 0.8 MB). Android reads WebP from API 18; the minimum here is 24.
-- **Left alone**: the terrain tiles (a second lossy pass would show), `world.json`/`heights.bin`
+- **Left alone**: `world.json`/`heights.bin`
   (their format is the map's), framer-motion (the game's layout animations need its full feature set),
   Supabase's client (one package; realtime and storage can't be left out of `createClient`).
   iOS's launch screen is three identical 1.4 MB PNGs (Xcode wants the three files).
+
+## Texture memory on weak phones (15 November 2026)
+
+What was heavy was not the files but the graphics card's memory: the island's six ground tiles are
+2048 px pictures, 21 MB each on the card with their mipmaps, **128 MB** in all. A phone with 4 GB or
+less shares that with everything else, and the browser starts swapping textures. Three changes
+(`lib/gpu-budget.ts`, `map/world/tiles.ts`, `map/world/engine.ts`; the rules are tested in
+`gpu-budget.test.ts`):
+
+- **A texture budget by device.** Low graphics, a device reporting 4 GB of memory or less
+  (`navigator.deviceMemory`: 0.25 to 8, rounded down to a power of two, so a 6 GB phone reports 4),
+  or a card whose largest texture is under 4096 px takes the ground tiles at 1024 px: **32 MB
+  instead of 128 MB**. Browsers that don't tell their memory (Safari, Firefox) are treated as strong, as
+  before. The same budget caps the sun's shadow map at 2048 px (a landscape tablet used to get 4096 px,
+  64 MB on its own) and the filtering at 4× (it was 8×; the camera never tilts past 53°, which needs 2).
+  Strong devices keep what they had.
+- **Scaled off the main thread.** The half-size tile is decoded and scaled by the browser
+  (`createImageBitmap` with a size) instead of drawing a 2048 px picture onto a canvas on the main
+  thread six times while the map opens; where the browser can't (older Safari) the canvas does it, with
+  the same result. Low graphics did this before, but only for itself, and on the main thread.
+- **Recompressed tiles.** The 12 files (both islands) re-encoded as WebP quality 76, effort 6: **2.0 → 1.5 MB (−24%)**,
+  PSNR 39.6–44.8 dB against the old ones (worst single pixel 59 of 255, on edges). It is one extra lossy pass, so it was
+  checked side by side at the worst spot.
+
+Checked in headless Chromium (software GL) at 390×844 at 2×, the same views, day, clear weather, three
+runs: before (old files), after on a strong device, after with `deviceMemory` 4. Mean difference to
+the old picture over the lower 1,400 px of seven views: 0.5–1.3 out of 255 for the recompressed files,
+1.0–1.9 for the 1024 px tiles (part of it is traffic and clouds moving between two runs). `docs/graphics/terrain-textures-2026-11-15.jpg` has the three side by side.
+The painted ground is already stretched several times over at the zoom a phone plays at (about 20 px
+of tile for each map unit, 77 px of screen at the default zoom), and the close-up grain is the
+detail texture, which is untouched. Roads, markings and buildings are meshes, not tile pixels.
+
+What this container can't measure: the card's memory and the frame rate (software GL, no GPU). The
+gain is by construction (bytes uploaded) and needs a check on a real phone: Chrome's
+`chrome://gpu` or Android Studio's GPU profiler on a 3–4 GB phone, map open for a minute.
+Changing low graphics while the map is open doesn't swap the tiles until the map is opened again.
 
 ## While playing
 
