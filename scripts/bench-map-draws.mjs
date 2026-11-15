@@ -64,6 +64,8 @@ await ctx.route(`${SUPABASE}/**`, fake);
 const page = await ctx.newPage();
 page.setDefaultTimeout(120_000);
 page.on("pageerror", (e) => console.log("page error:", e.message));
+page.on("crash", () => console.log("the page crashed"));
+if (process.env.VERBOSE) page.on("console", (m) => console.log("console:", m.text().slice(0, 200)));
 await page.goto(BASE, { timeout: 240_000 });
 await page.getByText("Welcome to Idle Car Empire!").waitFor({ timeout: 240_000 });
 // the dev build hydrates late: fill until the values stick
@@ -91,7 +93,7 @@ if (process.env.DEBUG_SHOT) {
 await page.waitForFunction(() => !!window.__map && !!window.__map.renderer, null, { timeout: 240_000 });
 await page.waitForTimeout(8000);
 
-const rows = process.env.LIVE_ONLY ? [] : await page.evaluate(async () => {
+const rows = process.env.LIVE_ONLY || process.env.PARTS_ONLY ? [] : await page.evaluate(async (LEVELS) => {
   const m = window.__map;
   const info = m.renderer.info;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -103,7 +105,9 @@ const rows = process.env.LIVE_ONLY ? [] : await page.evaluate(async () => {
   const out = [];
   const views = [["play", z0], ["wide", z0 * 0.55], ["far", 0]];
   const steps = m.qualitySteps ?? 1;
+  const only = LEVELS;
   for (let level = 0; level < steps; level++) {
+    if (only && !only.includes(level)) continue;
     m.setQualityLevel?.(level);
     // ten seconds of game time at the play view, so the traffic and crowd settle to the tier's share
     m.cam.zoom = z0;
@@ -128,15 +132,15 @@ const rows = process.env.LIVE_ONLY ? [] : await page.evaluate(async () => {
   }
   m.setQualityLevel?.(0);
   return out;
-});
+}, process.env.LEVELS ? process.env.LEVELS.split(",").map(Number) : null);
 console.table(rows);
 
 // where the draws come from: visible, in-view meshes by the top-level group they hang from (per pass)
-const parts = process.env.LIVE_ONLY ? [] : await page.evaluate(async () => {
+const parts = process.env.LIVE_ONLY ? [] : await page.evaluate(async (FAR) => {
   const m = window.__map;
   m.setQualityLevel?.(0);
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-  m.cam.zoom = 0.86;
+  m.cam.zoom = FAR ? m.cam.minZoom : 0.86;
   m.cameraDirty = true;
   for (let i = 0; i < 4; i++) m.render(0.05);
   const scene = m.scene;
@@ -181,7 +185,7 @@ const parts = process.env.LIVE_ONLY ? [] : await page.evaluate(async () => {
     r.tris += Math.round((idx / 3) * (o.isInstancedMesh ? o.count : 1));
   });
   return Object.values(rows).sort((a, b) => b.draws - a.draws).slice(0, 14);
-});
+}, !!process.env.FAR);
 console.table(parts);
 console.log("(the part table is for step 0)");
 

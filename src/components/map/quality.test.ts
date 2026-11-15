@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GOVERNOR, Governor, TIERS, ladder } from "./quality";
+import { GOVERNOR, Governor, ResolutionWatch, TIERS, dprSteps, ladder } from "./quality";
 
 /** Feeds frames of `ms` each from `t0` for `seconds`; returns the levels it moved to, with the time. */
 function run(g: Governor, ms: number, seconds: number, t0: number): { moves: [number, number][]; end: number } {
@@ -27,6 +27,7 @@ describe("ladder", () => {
     for (let i = 1; i < TIERS.length; i++) {
       expect(TIERS[i].traffic).toBeLessThanOrEqual(TIERS[i - 1].traffic);
       expect(TIERS[i].crowd).toBeLessThanOrEqual(TIERS[i - 1].crowd);
+      expect(TIERS[i].farShare).toBeLessThanOrEqual(TIERS[i - 1].farShare);
       expect(TIERS[i].detailRange).toBeLessThanOrEqual(TIERS[i - 1].detailRange);
       expect(TIERS[i].minDpr).toBeLessThanOrEqual(TIERS[i - 1].minDpr);
       expect(TIERS[i].shadowEvery === 0 || TIERS[i - 1].shadowEvery !== 0).toBe(true);
@@ -111,5 +112,23 @@ describe("Governor", () => {
   it("clamps the starting level", () => {
     expect(new Governor(4, 9).level).toBe(3);
     expect(new Governor(4, -2).level).toBe(0);
+  });
+});
+
+describe("dprSteps and ResolutionWatch", () => {
+  it("goes from the device's resolution (at most 2x) down to the floor", () => {
+    expect(dprSteps(3)).toEqual([2, 1.75, 1.5, 1.25, 1, 0.75, 0.6]);
+    expect(dprSteps(1)).toEqual([1, 0.75, 0.6]);
+    expect(dprSteps(1.5, 2, 0.5)).toEqual([1.5, 1.25, 1, 0.75, 0.5]);
+  });
+  it("gives a lower resolution when frames stay slow, and none when they are fine", () => {
+    const w = new ResolutionWatch(2, 0);
+    let t = 0;
+    let changed: number | null = null;
+    for (let i = 0; i < 400 && changed === null; i++) changed = w.frame(16.7, (t += 16.7));
+    expect(changed).toBeNull();
+    for (let i = 0; i < 400 && changed === null; i++) changed = w.frame(40, (t += 40));
+    expect(changed).toBe(1.75);
+    expect(w.dpr).toBe(1.75);
   });
 });

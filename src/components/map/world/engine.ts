@@ -234,6 +234,9 @@ export class MapEngine {
   /** The tier in force (quality.ts) and the shadow map's redraw rhythm it asks for. */
   private tier = 0;
   private shadowEvery = 2;
+  /** What the camera sees (trucks outside it are left out of the batches). */
+  private frustum = new THREE.Frustum();
+  private pv = new THREE.Matrix4();
 
   private ground: Ground | null = null;
   private terrain: TerrainParts | null = null;
@@ -676,6 +679,7 @@ export class MapEngine {
       if (shadows) this.renderer.shadowMap.needsUpdate = true;
     }
     this.scenery?.setShadows(!low && T.sceneryShadows);
+    this.scenery?.setFarShare(low ? 1 : T.farShare);
     if (this.trafficLayer) this.trafficLayer.density = (low ? 0.5 : 1) * T.traffic;
     if (this.peds) this.peds.density = (low ? 0.5 : 1) * T.crowd;
     if (this.headlights) this.headlights.low = low || T.lean;
@@ -911,6 +915,9 @@ export class MapEngine {
     this.place(dt);
     // vehicles far from the middle of the view draw as the simple shape on the lower tiers
     this.trafficLayer?.setLod(cam.x, cam.z, TIERS[this.tier].detailRange * cam.dist);
+    this.pv.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
+    this.frustum.setFromProjectionMatrix(this.pv);
+    this.trafficLayer?.setFrustum(this.frustum);
 
     // time of day
     worldClock.t += dt;

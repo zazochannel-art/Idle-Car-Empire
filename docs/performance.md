@@ -128,23 +128,41 @@ and back up only after a long steady spell (`world/engine.ts` applies it; `Gover
 - Low graphics (Settings) and the battery saver stay as they were; the ladder is off in both.
 - Nothing here changes the game: traffic, crowd and shadows are only what is drawn. No `SAVE_VERSION`.
 
+Two more cuts apply at every step (no change to how the map looks):
+
+- **The trucks are drawn in batches** (`world/truck-batch.ts`). A truck model is 15 meshes, each its own
+  material (paint, glass, lamps, tyres, rims, trim), so 68 trucks were about a thousand draws, and as many
+  again in the shadow pass. Trucks of one kind (van, box truck, semi, road train, loaded or empty) share
+  their meshes' geometry and materials, so each part of a kind is one instanced mesh and each truck one
+  instance of it, all parts sharing one matrix buffer; the cab's own colour is the instance colour of the
+  cab part (its paint is white). Only trucks within 10 units of the camera's view are put in the batch
+  (their shadows can still fall into it). The car carriers keep their own meshes (their decks hold cars
+  of their own colours).
+- **Wide views thin the trees** (`Scenery.setFarShare`): each big set draws a share of its instances,
+  shuffled once so the share is spread over the island. 100 % at the fullest step, 80, 55, 35 and 20 % on
+  the tiers.
+
+The factory floors, the factory interiors and the race view are flat canvases or lighter scenes: they use
+the same frame watch (`ResolutionWatch`) to lower their resolution (down to 0.6×) while frames stay slow;
+the floor's old rule (under 42 FPS, 5 s) is gone.
+
 Measured with `scripts/bench-map-draws.mjs` (three.js's own counters, a late-game save of the greedy
-bot after 12 h: 13 plants, 68 trucks, 390×844): draw calls per frame, averaged over the shadow
-rhythm, and (in brackets) the frames that redraw the shadows.
+bot after 12 h: 13 plants, ~65 trucks, 390×844): draw calls per frame averaged over the shadow rhythm
+(frames that redraw the shadows peak higher: 938 at step 0, play view), and the triangles.
 
-| Step | play view (dist 35) | wide (dist 64) | far (whole island) |
-| --- | --- | --- | --- |
-| 0 (before: the only one) | 1015 (1440) | 1327 (1834) | 516 |
-| tier 1 | 666 (1305) | 1193 (1986) | 515 |
-| tier 2 | 686 (1224) | 1035 (1668) | 516 |
-| tier 3 | 488 | 893 | 516 |
-| tier 4 | 386 | 689 | 517 |
+| Step | play view (dist 35) | wide (dist 64) | far (whole island) | far triangles |
+| --- | --- | --- | --- | --- |
+| before this work (the only step) | 946-1015 | 1201-1355 | 516 | 2.67 M |
+| 0 | 669 | 869 | 518 | 2.67 M |
+| tier 1 | 523 | 706 | 517 | 2.38 M |
+| tier 2 | 533 | 776 | 520 | 2.02 M |
+| tier 3 | 388 | 516 | 521 | 1.70 M |
+| tier 4 | 237 | 487 | 519 | 1.48 M |
 
-Where the draws are at step 0 (play view): the trucks, 599 meshes (68 trucks × 15 parts, each part its
-own material, 434 k triangles), the scenery's 583 shadow-casting cells, the lots 56. That is why the
-vehicles' level of detail does most of the work. What is left: a truck model with fewer, merged
-parts (one material per kind of part) would take the biggest single bite out of step 0; the far
-view draws 2.7 M triangles (the whole scenery sets) and no tier thins them yet.
+The runs differ a little in how many trucks are in view (the traffic is random), so read it as ±10 %.
+The step 0 gain (about a third) is the trucks' batches alone; the tiers add the rest. What is left at step 0
+(play view): the scenery's 583 shadow-casting cells and the lots; the far view is 520 draws and 1.5-2.7 M
+triangles, the trees and buildings of the whole sets.
 
 `LIVE=100 node scripts/bench-map-draws.mjs <url> <save>` also lets the real loop run: in the container's
 software GL (about 0.5 FPS at step 0) the frame watcher walked from step 0 to the floor in about 30 s

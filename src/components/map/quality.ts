@@ -4,8 +4,9 @@
 //
 // The ladder, lightest step last:
 //   · the resolution, from the device's down to 1× in quarter steps (this was all there was);
-//   · tier 1: the shadows are redrawn every fourth frame, not every other, and the cars far from
-//     the middle of the view are drawn as the simple shape (one draw for all of them);
+//   · tier 1: the shadows are redrawn every fourth frame, not every other, the cars far from the
+//     middle of the view are drawn as the simple shape (one draw for all of them), and wide views
+//     draw four fifths of the trees;
 //   · tier 2: the scenery (trees, rocks, lots) casts no shadows, less traffic, a thinner crowd,
 //     fewer particles;
 //   · tier 3: no shadows at all, a resolution below 1× and the crowd thinned further;
@@ -22,6 +23,8 @@ export interface Tier {
   sceneryShadows: boolean;
   /** Cars and trucks farther than this many times the camera distance from the middle of the view draw as the simple shape (Infinity: all as models). */
   detailRange: number;
+  /** Share of the trees, bushes and props drawn in wide views (the island's triangles are mostly theirs). */
+  farShare: number;
   /** Share of the usual town traffic and crowd. */
   traffic: number;
   crowd: number;
@@ -32,12 +35,12 @@ export interface Tier {
 }
 
 export const TIERS: readonly Tier[] = [
-  { shadowEvery: 2, sceneryShadows: true, detailRange: Infinity, traffic: 1, crowd: 1, lean: false, minDpr: 1 },
-  { shadowEvery: 4, sceneryShadows: true, detailRange: 1, traffic: 1, crowd: 1, lean: false, minDpr: 1 },
-  { shadowEvery: 4, sceneryShadows: false, detailRange: 0.65, traffic: 0.7, crowd: 0.6, lean: true, minDpr: 1 },
-  { shadowEvery: 0, sceneryShadows: false, detailRange: 0.4, traffic: 0.5, crowd: 0.4, lean: true, minDpr: 0.75 },
+  { shadowEvery: 2, sceneryShadows: true, farShare: 1, detailRange: Infinity, traffic: 1, crowd: 1, lean: false, minDpr: 1 },
+  { shadowEvery: 4, sceneryShadows: true, farShare: 0.8, detailRange: 1, traffic: 1, crowd: 1, lean: false, minDpr: 1 },
+  { shadowEvery: 4, sceneryShadows: false, farShare: 0.55, detailRange: 0.65, traffic: 0.7, crowd: 0.6, lean: true, minDpr: 1 },
+  { shadowEvery: 0, sceneryShadows: false, farShare: 0.35, detailRange: 0.4, traffic: 0.5, crowd: 0.4, lean: true, minDpr: 0.75 },
   // the floor: the lightest the map can be drawn (a vehicle keeps its model only right at the middle of the view)
-  { shadowEvery: 0, sceneryShadows: false, detailRange: 0.2, traffic: 0.25, crowd: 0.2, lean: true, minDpr: 0.5 },
+  { shadowEvery: 0, sceneryShadows: false, farShare: 0.2, detailRange: 0.2, traffic: 0.25, crowd: 0.2, lean: true, minDpr: 0.5 },
 ];
 
 /** One rung of the ladder: the highest resolution allowed, and the tier. */
@@ -141,5 +144,34 @@ export class Governor {
     this.time = 0;
     this.skip = GOVERNOR.settle;
     return this.level;
+  }
+}
+
+/** The resolutions a flat canvas (a factory floor, the race view) may draw at, highest first: the device's (at most `cap`), in quarter steps down to `floor`. */
+export function dprSteps(device: number, cap = 2, floor = 0.6): number[] {
+  const top = Math.max(floor, Math.min(cap, device));
+  const out: number[] = [];
+  for (let d = top; d > floor + 1e-9; d -= 0.25) out.push(+d.toFixed(2));
+  out.push(floor);
+  return out;
+}
+
+/** The same frame watch as the map's, for views that only trade resolution: says the new resolution when it moves. */
+export class ResolutionWatch {
+  readonly steps: number[];
+  private gov: Governor;
+
+  constructor(device: number, now: number, cap = 2, floor = 0.6) {
+    this.steps = dprSteps(device, cap, floor);
+    this.gov = new Governor(this.steps.length, 0, now);
+  }
+
+  get dpr(): number {
+    return this.steps[this.gov.level];
+  }
+
+  /** One drawn frame that took `ms`; the new resolution if it changed, else null. */
+  frame(ms: number, now: number): number | null {
+    return this.gov.frame(ms, now) === null ? null : this.dpr;
   }
 }

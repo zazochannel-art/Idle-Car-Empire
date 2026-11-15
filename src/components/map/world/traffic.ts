@@ -35,6 +35,7 @@ import { freezeStatic, hazed, shadowFromLargest } from "./kit";
 import { ROAD_LIFT, carGeometry, roadSurface, type MapRoad } from "./scenery";
 import type { Arm, Signal, Signals } from "./signals";
 import { bake } from "./structures";
+import { TruckBatch, type TruckKind } from "./truck-batch";
 import type { Ground } from "./terrain";
 
 /** World units per metre for the vehicle models (a touch over life size, so they read from above). */
@@ -160,6 +161,9 @@ interface Truck {
   size?: THREE.Vector3;
   /** Drawn as the simple shape though the view is close (far from the middle of the view: setLod). */
   simple?: boolean;
+  /** Drawn from the shared batch of its kind (truck-batch.ts) instead of as meshes of its own, with this cab paint. */
+  batch?: { key: string; kind: TruckKind };
+  cab: THREE.Color;
 }
 
 /** The simple car shape's own size (length, height, width). */
@@ -329,6 +333,10 @@ export class Traffic3D {
   /** Far out, every road car is drawn from this one batch of simple car shapes. */
   private inst: THREE.InstancedMesh;
   private far = false;
+  /** The trucks of each kind, drawn as one batch per kind (the carriers keep their own meshes), and what the camera sees. */
+  private batch = new TruckBatch();
+  private frustum: THREE.Frustum | null = null;
+  private ball = new THREE.Sphere();
   private kit: MaterialKit = materialKit(THREE);
   private models = new Map<string, THREE.Group>();
   private carMats = new Map<string, THREE.Material>();
@@ -369,7 +377,7 @@ export class Traffic3D {
     this.inst.frustumCulled = false;
     this.inst.count = 0;
     this.inst.visible = false;
-    this.root.add(this.inst);
+    this.root.add(this.inst, this.batch.root);
     void loadHeroes(THREE).then(() => {
       for (const car of this.cars) this.refreshCarVisual(car);
     });
@@ -505,6 +513,11 @@ export class Traffic3D {
     this.lod.x = x;
     this.lod.z = z;
     this.lod.range = range;
+  }
+
+  /** What the camera sees: trucks well outside it are left out of the batches (their shadows may still fall into view, so the test is generous). */
+  setFrustum(f: THREE.Frustum | null) {
+    this.frustum = f;
   }
 
   /** Whether a vehicle at (x, z) is drawn as the simple shape: past the range, with a margin of a tenth each way so it does not flicker at the edge. */
@@ -829,7 +842,7 @@ export class Traffic3D {
   /** A truck model like those on the road (a red cab), for a truck that isn't a shipment. */
   truckObject(vehicle: ShipView["vehicle"], cargo = "#c08a4a"): THREE.Object3D {
     const site = { id: "", entry: WORLD_MAP.plots[0].entry, weight: 1 };
-    return this.truckModel({ id: 0, from: site, to: site, t: 0, dur: 1, back: false, vehicle, color: cargo });
+    return this.truckModel({ id: 0, from: site, to: site, t: 0, dur: 1, back: false, vehicle, color: cargo }, false).obj;
   }
 
   /**
@@ -1003,7 +1016,8 @@ export class Traffic3D {
     return aroundRings(line, this.rings.values(), (x, z) => this.ground.at(x, z) + ROAD_LIFT + 0.005);
   }
 
-  private truckModel(v: ShipView) {
+  /** A built truck for this shipment, and (but for the carriers) its kind in the batch: such a truck is not added to the scene, its kind draws it. */
+  private truckModel(v: ShipView, batched = true): { obj: THREE.Object3D; batch?: { key: string; kind: TruckKind }; cab: THREE.Color } {
     const empty = v.back;
     const cabColors = ["#e11d48", "#2563eb", "#f59e0b", "#f2f4f7", "#334155", "#16a34a"];
     const cabColor = cabColors[Math.abs(v.id) % cabColors.length];
@@ -1044,7 +1058,16 @@ export class Traffic3D {
     // the truck's parts (and the cars on a carrier) only move with the truck; its shadow comes from its big parts
     for (const part of m.children) freezeStatic(part);
     shadowFromLargest(m, 0.35);
-    return m;
+    const cab = new THREE.Color(cabColor);
+    // a carrier's decks hold cars of their own colours: it stays a model; the others draw from their kind's batch
+    if (v.vehicle === "carrier" || !batched) return { obj: m, cab };
+    const whiten = (mat: THREE.Material) => {
+      const w = mat.clone();
+      w.onBeforeCompile = mat.onBeforeCompile;
+      w.customProgramCacheKey = mat.customProgramCacheKey;
+      return w;
+    };
+    return { obj: m, batch: { key, kind: this.batch.kind(key, m, paint, whiten) }, cab };
   }
 
   private carMat(hex: string) {
@@ -1066,9 +1089,12 @@ export class Traffic3D {
         // turned round at the far end: unloaded, then the empty truck heads home (on the right, its own route back)
         if (!tr.back && tr.view.vehicle === "carrier") this.onArrive(tr.view.to.id);
         this.root.remove(tr.obj);
-        tr.obj = this.truckModel(v);
+        const made = this.truckModel(v);
+        tr.obj = made.obj;
+        tr.batch = made.batch;
+        tr.cab = made.cab;
         tr.size = undefined;
-        this.root.add(tr.obj);
+        if (!made.batch) this.root.add(tr.obj);
         tr.back = v.back;
         tr.path = v.back ? this.route(tr.b, tr.a) : this.route(tr.a, tr.b);
         tr.acc = cumulative(tr.path);
@@ -1080,8 +1106,9 @@ export class Traffic3D {
         if (!a || !b) continue;
         const path = v.back ? this.route(b, a) : this.route(a, b);
         if (path.length < 2) continue;
-        tr = { view: v, path, acc: cumulative(path), lt: v.t, et: v.t, a, b, back: v.back, obj: this.truckModel(v), x: 0, y: 0, z: 0, yaw: 0, gone: 0 };
-        this.root.add(tr.obj);
+        const made = this.truckModel(v);
+        tr = { view: v, path, acc: cumulative(path), lt: v.t, et: v.t, a, b, back: v.back, obj: made.obj, batch: made.batch, cab: made.cab, x: 0, y: 0, z: 0, yaw: 0, gone: 0 };
+        if (!made.batch) this.root.add(tr.obj);
         this.trucks.set(v.id, tr);
         this.placeTruck(tr, 1);
       }
@@ -1193,6 +1220,7 @@ export class Traffic3D {
       }
     }
 
+    this.batch.begin();
     for (const [id, tr] of this.trucks) {
       if (tr.gone > 0) {
         tr.gone += dt;
@@ -1217,8 +1245,14 @@ export class Traffic3D {
       this.placeTruck(tr, Math.min(1, dt * 6));
       tr.simple = !this.far && this.beyond(tr.x, tr.z, tr.simple);
       const shown = !this.far && !tr.simple;
-      if (tr.obj.visible !== shown) tr.obj.visible = shown;
+      if (!tr.batch) {
+        if (tr.obj.visible !== shown) tr.obj.visible = shown;
+      } else if (shown && (!this.frustum || this.frustum.intersectsSphere(this.ball.set(this.v.set(tr.x, tr.y + 1.5, tr.z), 10)))) {
+        tr.obj.updateMatrix();
+        this.batch.add(tr.batch.key, tr.batch.kind, tr.obj.matrix, tr.cab);
+      }
     }
+    this.batch.end();
     this.drawFar();
   }
 
@@ -1282,6 +1316,7 @@ export class Traffic3D {
 
   /** Releases GPU resources owned by this traffic layer when the map is unmounted. */
   dispose() {
+    this.batch.dispose();
     this.root.clear();
     const geometries = new Set<THREE.BufferGeometry>();
     const materials = new Set<THREE.Material>();

@@ -9,6 +9,7 @@ import { RACE_COUNTDOWN, RACE_TIME_SCALE, TRACK_BY_ID, type TrackId, type TrackT
 import { pointAt, trackOf, type CarOnTrack, type Track } from "@/game/racing/tracks";
 import type { RaceRecord } from "@/game/types";
 import { isSaving, shouldDraw } from "@/lib/power";
+import { ResolutionWatch } from "../../map/quality";
 import { carGeometry } from "../../map/world/scenery";
 import { buildCar, loadHeroes } from "../../three/car-models";
 import type { CameraMode } from "../race-canvas";
@@ -163,6 +164,9 @@ export class RaceScene3D {
   private lastDraw = 0;
   private t = 0;
   private dpr = 1;
+  /** Lowers the resolution while frames stay slow (map/quality.ts), and gives it back after a long steady spell. */
+  private watch = new ResolutionWatch(typeof window === "undefined" ? 1 : window.devicePixelRatio || 1, 0);
+  private maxDpr = 2;
   private size = { w: 0, h: 0 };
   private cam = { pos: new THREE.Vector3(), look: new THREE.Vector3(), init: false };
   private shadowTick = 0;
@@ -294,10 +298,15 @@ export class RaceScene3D {
       }
       if (!shouldDraw(now, this.lastDraw, this.opt.low)) return;
       this.lastDraw = now;
-      const dt = this.last ? Math.min(0.1, (now - this.last) / 1000) : 0;
+      const gap = this.last ? now - this.last : 0;
+      const dt = Math.min(0.1, gap / 1000);
       this.last = now;
       this.t += dt;
       this.frame(dt);
+      if (gap > 0 && !this.opt.low && !isSaving()) {
+        const next = this.watch.frame(Math.min(1000, gap), performance.now());
+        if (next !== null) this.maxDpr = next;
+      }
     };
     this.raf = requestAnimationFrame(loop);
   }
@@ -341,7 +350,7 @@ export class RaceScene3D {
     const r = this.canvas.getBoundingClientRect();
     const w = Math.max(1, Math.round(r.width));
     const h = Math.max(1, Math.round(r.height));
-    const dpr = Math.min(this.opt.low ? 1 : isSaving() ? 1.25 : 2, window.devicePixelRatio || 1);
+    const dpr = Math.min(this.opt.low ? 1 : isSaving() ? 1.25 : this.maxDpr, window.devicePixelRatio || 1);
     if (w === this.size.w && h === this.size.h && dpr === this.dpr) return;
     this.size = { w, h };
     this.dpr = dpr;
