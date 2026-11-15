@@ -13,6 +13,7 @@ import { CITIES } from "@/game/config/cities";
 import type { CityId } from "@/game/types";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
+import { diagTap } from "@/lib/diagnostics";
 import { batteryState, isSaving, powerVersion, watchPower, type SaverSetting } from "@/lib/power";
 import { legalUrl, PRIVACY_URL, TERMS_URL } from "@/lib/platform";
 import { uiEvents, type UiEvent, type UiToastAction } from "@/store/events";
@@ -429,7 +430,16 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
           )}
         </div>
         <div className="mt-3 border-t border-white/10 pt-3 text-[11px] leading-snug text-white/45">
-          <div className="mb-0.5 font-bold uppercase tracking-wider text-white/60">{t("settings.credits")}</div>
+          <div
+            className="mb-0.5 font-bold uppercase tracking-wider text-white/60"
+            // hidden: seven quick taps turn the FPS diagnostic panel on or off (lib/diagnostics.ts)
+            onClick={() => {
+              const on = diagTap();
+              if (on !== null) setMsg(on ? "Diagnostics on" : "Diagnostics off");
+            }}
+          >
+            {t("settings.credits")}
+          </div>
           <p>
             {t("settings.creditsModel")}{" "}
             <a className="underline" href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">

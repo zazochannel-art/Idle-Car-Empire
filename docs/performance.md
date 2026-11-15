@@ -37,6 +37,33 @@ The Android bundle (AAB) was 16.7 MB; what is in it, and what was done:
   Supabase's client (one package; realtime and storage can't be left out of `createClient`).
   iOS's launch screen is three identical 1.4 MB PNGs (Xcode wants the three files).
 
+## Checking the speed on a real phone (diagnostic mode)
+
+The phone's GPU can't be measured in a container (software GL), so the game carries a hidden panel
+that shows what a phone really does (`lib/diagnostics.ts`, `components/game/diag-overlay.tsx`).
+
+- **Turn it on:** Settings → tap the "Credits" heading seven times quickly ("Diagnostics on" appears);
+  or open the web build with `?diag=1`. The ✕ on the panel (or seven more taps) turns it off. It is off
+  by default, remembered in the browser's own storage (`ice-diag`), never in the save (no `SAVE_VERSION`).
+  While it is off nothing is measured: the views' `diagFrame` call returns at once, and the panel's code
+  is not even downloaded (it loads on the first turn-on).
+- **What it shows** (tap the top line to open it): FPS now / lowest one-second reading / average, the
+  1% low (the slowest frames), frame time (last, p95, worst), the share of frames under 45 FPS and the
+  count of hitches over 50 ms, a strip of the last 120 frame times (dashed lines: 60 and 45 FPS), the
+  quality level in use (low graphics, battery saver or standard, the render resolution, shadows, shadow
+  map size, canvas size), draw calls and triangles of the last frame, GPU memory (geometries, textures,
+  shaders), the JS heap and the phone's RAM where the browser tells, the screen's refresh rate and the
+  saver / battery state. The first line is green when the view reaches its target (60 FPS, the screen's
+  refresh when lower, or the 30 FPS cap that low graphics and the saver set on purpose).
+- **What it counts:** the frames the game draws (map, race viewer, factory floors), per view, not the
+  screen's refresh. Pauses (a hidden app, a screen swap, the battery saver's idle frames) are left out.
+- **The report:** "Copy report" puts a small JSON on the clipboard (Share, where the phone offers it): the
+  device (browser, cores, RAM, screen, GPU name), the settings, and for each view the figures above plus
+  one FPS reading per second. No account, save or personal data in it.
+- **For a new 3D view:** `registerDiagSource(name, { renderer, quality })` once when it starts, `diagFrame(name)`
+  after each frame it draws, and the returned function when it is destroyed. `quality()` is where a view
+  says which level it runs at.
+
 ## Texture memory on weak phones (15 November 2026)
 
 What was heavy was not the files but the graphics card's memory: the island's six ground tiles are

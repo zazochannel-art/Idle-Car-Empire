@@ -10,6 +10,7 @@
 // plant's real batch: a part walks the whole line in one production cycle,
 // and the line stands still whenever the plant does.
 import { liveryOf } from "../../three/livery";
+import { diagFrame, registerDiagSource } from "@/lib/diagnostics";
 import { isSaving, shouldDraw } from "@/lib/power";
 import { ResolutionWatch } from "../../map/quality";
 import { attachControls, Camera } from "../../map/camera";
@@ -117,6 +118,7 @@ export class InteriorEngine {
   private maxDpr = 2;
   private watch = new ResolutionWatch(typeof window === "undefined" ? 1 : window.devicePixelRatio || 1, 0);
   private raf = 0;
+  private diagOff: (() => void) | null = null;
   private running = false;
   private last = 0;
   private t = 0;
@@ -264,6 +266,7 @@ export class InteriorEngine {
     if (this.running) return;
     this.running = true;
     this.last = performance.now();
+    this.diagOff ??= registerDiagSource("factory interior", { quality: () => ({ label: this.low ? "low graphics" : isSaving() ? "battery saver" : "adaptive resolution", dpr: this.dpr, notes: { "max dpr": this.maxDpr } }) });
     const loop = (now: number) => {
       if (!this.running) return;
       this.raf = requestAnimationFrame(loop);
@@ -275,6 +278,7 @@ export class InteriorEngine {
       const dt = Math.min(saving ? 0.25 : 0.1, gap / 1000);
       this.last = now;
       this.render(dt);
+      diagFrame("factory interior");
       if (saving || this.low) return;
       const next = this.watch.frame(Math.min(1000, gap), performance.now());
       if (next !== null) {
@@ -287,6 +291,8 @@ export class InteriorEngine {
 
   destroy() {
     this.running = false;
+    this.diagOff?.();
+    this.diagOff = null;
     this.canvas.removeEventListener("pointerdown", this.interrupt);
     this.canvas.removeEventListener("wheel", this.interrupt);
     cancelAnimationFrame(this.raf);

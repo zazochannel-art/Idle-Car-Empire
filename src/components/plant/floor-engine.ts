@@ -4,6 +4,7 @@
 // assembly plant the car body travels through nine stations and gains its
 // engine, wheels and paint on the way.
 import { attachControls, Camera } from "../map/camera";
+import { diagFrame, registerDiagSource } from "@/lib/diagnostics";
 import { isSaving, shouldDraw } from "@/lib/power";
 import { ResolutionWatch } from "../map/quality";
 import { Painter, sx, sy } from "../map/iso";
@@ -54,6 +55,7 @@ export class FloorEngine {
   private dpr = 1;
   private maxDpr = 2;
   private raf = 0;
+  private diagOff: (() => void) | null = null;
   private running = false;
   private last = 0;
   /** When the last frame was drawn (battery saver: lib/power.ts). */
@@ -134,6 +136,7 @@ export class FloorEngine {
     if (this.running) return;
     this.running = true;
     this.last = performance.now();
+    this.diagOff ??= registerDiagSource("factory floor", { quality: () => ({ label: isSaving() ? "battery saver" : "adaptive resolution", dpr: this.dpr, notes: { "max dpr": this.maxDpr } }) });
     const loop = (now: number) => {
       if (!this.running) return;
       this.raf = requestAnimationFrame(loop);
@@ -149,6 +152,7 @@ export class FloorEngine {
       const dt = Math.min(saving ? 0.25 : 0.1, gap / 1000);
       this.last = now;
       this.render(dt);
+      diagFrame("factory floor");
       if (saving) return;
       const next = this.watch.frame(Math.min(1000, gap), performance.now());
       if (next !== null) {
@@ -161,6 +165,8 @@ export class FloorEngine {
 
   destroy() {
     this.running = false;
+    this.diagOff?.();
+    this.diagOff = null;
     cancelAnimationFrame(this.raf);
     this.detach();
     this.ro.disconnect();
