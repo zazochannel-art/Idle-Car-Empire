@@ -9,6 +9,7 @@
  * what a few restocks cost. (It used to spend it all and never buy material, so the
  * first plant stopped after ten minutes and nothing moved again.)
  */
+import { writeFileSync } from "node:fs";
 import { CARS } from "../src/game/config/cars";
 import { PLANTS } from "../src/game/config/chain";
 import { DEALERS } from "../src/game/config/dealerships";
@@ -148,4 +149,9 @@ if (process.env.DEBUG) {
   console.log("free plot:", freePlot(s), "zones:", s.city.zones.join(","), "cash", formatMoney(s.cash));
   console.log(opts.filter((o) => /build|zone/.test(o.label)).map((o) => `${o.label} ${formatMoney(o.cost)}`).join("\n"));
   console.log("dealers", JSON.stringify(s.chain.dealers));
+}
+// DUMP=<file> keeps the bot's state as a save (the late-game save for scripts/bench-offline*.ts and bench-tick.ts)
+if (process.env.DUMP) {
+  writeFileSync(process.env.DUMP, JSON.stringify({ state: s }));
+  console.log(`saved ${process.env.DUMP}`);
 }

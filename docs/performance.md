@@ -62,6 +62,8 @@ What keeps the game light, and how to measure it.
 
 - `npx tsx scripts/bench-tick.ts <save.json>`: the cost of one tick, part by part.
 - `npx tsx scripts/bench-offline.ts <save.json>`: the settlement of 1, 8 and 20 hours away.
+- `npx tsx scripts/bench-offline-steps.ts <save.json> [hours] [steps]`: the same, for other step counts, with what the result does against today's.
+- A late-game save: `DUMP=late.json npx tsx scripts/simulate.ts 12`.
 - Bundled like the browser (no module getters):
   `npx esbuild scripts/bench-tick.ts --bundle --platform=node --format=esm --outfile=/tmp/b.mjs && node /tmp/b.mjs <save.json>`.
 
@@ -129,6 +131,50 @@ A phone is three to five times slower than this container, so the 20 h case fell
 3-4 s to 2-3 s of the loading screen. What is left in it is the chain's own step (the trucks'
 walk, `destination`, the ledger): a further cut would have to change what the simulation does, or
 how many steps it takes (`STEPS` in `engine/offline.ts`), which would change the results.
+
+### Fewer steps for an absence: tried, not done (15 November 2026)
+
+`STEPS` (20,000 for the whole absence, never less than 1 s a step) is what the rest of the time
+goes on, so the obvious cut is fewer steps. It was measured with `scripts/bench-offline-steps.ts`
+on three bot saves (2 h, 5 h and 12 h of `scripts/simulate.ts`; `DUMP=<file>` keeps the save) and
+the result is that **no step count keeps the settlement within 1-2 % of today's**, because the
+result is not a smooth function of the step:
+
+- A truck leaves a plant at most once a step, the dealers' customers and the trucks' arrivals are
+  seen at step boundaries, so the step's length rounds a lot of small timings. On the late save
+  one hour gives 1,048 cars with a 1 s step and 775 with 1.5 s to 4 s (the plants stand "full",
+  waiting for the dealers), and again 1,047 with 5 s. The break moves with the save (3 to 4 s on
+  the 2 h save, 1 to 1.5 s on the 5 h one).
+- The money moves more than the cars: the part plants' surplus sold on the Parts Market and the
+  materials in the warehouses at the end both depend on when the last orders went out.
+- Today's settlement already does this: its step is `absence / 20,000` once the absence is over
+  about 5.5 h, so 8 h plays with a 1.44 s step, 12 h with 2.16 s and a raised 20 h cap with 3.6 s.
+  The late save makes ~1,050 cars an hour for the first hour and ~750 an hour in an 8 h absence,
+  and the same 20 h takes 7.4 B with 20,000 steps and 12.3 B with 16,000.
+
+The late save (13 plants), 20,000 steps against fewer, with what the result does (money earned,
+cars sold, parts made, material left in the warehouses):
+
+| away | steps | time | money | cars | parts | stock |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 h | 20,000 / 12,000 | 210 / 183 ms | same | same | same | same |
+| 8 h | 20,000 | 977 ms | 6.07 B | 6,020 | 347,393 | 3.05 M |
+| 8 h | 12,000 | 697 ms | -1.7 % | 0.0 % | -2.7 % | -0.1 % |
+| 8 h | 8,000 | 540 ms | **-49.4 %** | 0.0 % | **-80.9 %** | +6.5 % |
+| 20 h | 20,000 | 1,348 ms | 7.42 B | 14,559 | 160,308 | 3.21 M |
+| 20 h | 16,000 | 1,284 ms | **+65.2 %** | 0.0 % | **+282.7 %** | -3.3 % |
+| 20 h | 12,000 | 1,149 ms | -0.2 % | 0.0 % | +0.2 % | 0.0 % |
+| 72 h (cap 20 h) | 8,000 | 812 ms | -0.1 % | 0.0 % | +0.1 % | -0.4 % |
+
+With 12,000 steps, 30 cases (the three saves, 2 to 12 h away): 12 within 2 %, 18 outside it, up to
+-43 % and +128 % in money and ±25 % in cars on the same save and absence. A gain of 15-30 % of the time
+would be paid for with results that jump by whole tens of percent depending on the length of the
+absence, so the setting stays as it is.
+
+A way to cut the steps for good is to make the step stop mattering (several truck departures and
+dealer sales inside one step, the dealers' idle time counted exactly), but then a long absence in
+the late game would settle at what the same time played gives (about a third more cars than today)
+instead of today's value: a decision about the economy, not about speed.
 
 ### Looked at and left alone (15 November 2026)
 
