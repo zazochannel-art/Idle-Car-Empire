@@ -35,6 +35,7 @@ import { ConflictDialog, OpenElsewhere, ProfileView, StartGate } from "./account
 import { StartScreen } from "./start-screen";
 import { useCloud } from "@/store/cloud-store";
 import { Coach } from "./coach";
+import { DiagGate } from "./diag-gate";
 import { FeedbackBridge } from "./feedback-bridge";
 import { InterstitialBridge } from "./interstitial-bridge";
 import { MusicBridge } from "./music-bridge";
@@ -389,6 +390,7 @@ function Shell() {
       <PoachDialog />
 
       <Toasts />
+      <DiagGate />
       <FeedbackBridge />
       <MusicBridge />
       <InterstitialBridge />

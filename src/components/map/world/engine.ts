@@ -4,6 +4,7 @@
 // the HTML cards pinned over the districts. React feeds it the game state
 // and listens to its callbacks; it loads its world files on its own.
 import * as THREE from "three";
+import { diagFrame, registerDiagSource, type Quality } from "@/lib/diagnostics";
 import { isSaving, shouldDraw } from "@/lib/power";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { DEPOT, MARKET, RACING_AREA, STARTER_PLOT, WORLD_MAP, type Plot } from "@/game/city/layout";
@@ -213,6 +214,8 @@ export class MapEngine {
   private saving = false;
   private slow = { frames: 0, time: 0 };
   private lastAdaptiveAt = 0;
+  /** Removes this view from the diagnostic panel (lib/diagnostics.ts). */
+  private diagOff: (() => void) | null = null;
 
   private ground: Ground | null = null;
   private terrain: TerrainParts | null = null;
@@ -548,6 +551,7 @@ export class MapEngine {
     if (this.running || this.destroyed) return;
     this.running = true;
     this.last = performance.now();
+    this.diagOff ??= registerDiagSource("map", { renderer: this.renderer, quality: () => this.diagQuality() });
     const loop = (now: number) => {
       if (!this.running) return;
       this.raf = requestAnimationFrame(loop);
@@ -570,6 +574,7 @@ export class MapEngine {
       this.last = now;
       this.render(dt);
       this.frames++;
+      diagFrame("map");
       if (!saving) this.adaptQuality(dt);
     };
     this.raf = requestAnimationFrame(loop);
@@ -578,6 +583,17 @@ export class MapEngine {
   stop() {
     this.running = false;
     cancelAnimationFrame(this.raf);
+  }
+
+  /** The quality this view runs at, for the diagnostic panel (lib/diagnostics.ts). */
+  private diagQuality(): Quality {
+    const shadows = this.renderer.shadowMap.enabled;
+    return {
+      label: this.low ? "low graphics" : this.saving ? "battery saver" : "standard",
+      dpr: this.dpr,
+      shadows,
+      notes: { "max dpr": this.maxDpr, canvas: `${this.canvas.width}x${this.canvas.height}`, "shadow map": shadows ? this.sun.shadow.mapSize.x : 0 },
+    };
   }
 
   setLowGraphics(on: boolean) {
@@ -599,6 +615,8 @@ export class MapEngine {
   destroy() {
     this.destroyed = true;
     this.stop();
+    this.diagOff?.();
+    this.diagOff = null;
     this.detach();
     this.ro.disconnect();
     this.trafficLayer?.dispose();

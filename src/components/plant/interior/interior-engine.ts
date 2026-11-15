@@ -10,6 +10,7 @@
 // plant's real batch: a part walks the whole line in one production cycle,
 // and the line stands still whenever the plant does.
 import { liveryOf } from "../../three/livery";
+import { diagFrame, registerDiagSource } from "@/lib/diagnostics";
 import { isSaving, shouldDraw } from "@/lib/power";
 import { attachControls, Camera } from "../../map/camera";
 import { mix, Painter, raceFont, shade, sx, sy, toTile } from "../../map/iso";
@@ -113,6 +114,7 @@ export class InteriorEngine {
   private p: Painter;
   private dpr = 1;
   private raf = 0;
+  private diagOff: (() => void) | null = null;
   private running = false;
   private last = 0;
   private t = 0;
@@ -260,6 +262,7 @@ export class InteriorEngine {
     if (this.running) return;
     this.running = true;
     this.last = performance.now();
+    this.diagOff ??= registerDiagSource("factory interior", { quality: () => ({ label: this.low ? "low graphics" : isSaving() ? "battery saver" : "standard", dpr: this.dpr }) });
     const loop = (now: number) => {
       if (!this.running) return;
       this.raf = requestAnimationFrame(loop);
@@ -269,12 +272,15 @@ export class InteriorEngine {
       const dt = Math.min(isSaving() ? 0.25 : 0.1, (now - this.last) / 1000);
       this.last = now;
       this.render(dt);
+      diagFrame("factory interior");
     };
     this.raf = requestAnimationFrame(loop);
   }
 
   destroy() {
     this.running = false;
+    this.diagOff?.();
+    this.diagOff = null;
     this.canvas.removeEventListener("pointerdown", this.interrupt);
     this.canvas.removeEventListener("wheel", this.interrupt);
     cancelAnimationFrame(this.raf);

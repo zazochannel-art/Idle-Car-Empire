@@ -8,6 +8,7 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { RACE_COUNTDOWN, RACE_TIME_SCALE, TRACK_BY_ID, type TrackId, type TrackTheme } from "@/game/config/racing";
 import { pointAt, trackOf, type CarOnTrack, type Track } from "@/game/racing/tracks";
 import type { RaceRecord } from "@/game/types";
+import { diagFrame, registerDiagSource } from "@/lib/diagnostics";
 import { isSaving, shouldDraw } from "@/lib/power";
 import { carGeometry } from "../../map/world/scenery";
 import { buildCar, loadHeroes } from "../../three/car-models";
@@ -159,6 +160,7 @@ export class RaceScene3D {
   private sea: { mesh: THREE.Mesh; tex: THREE.CanvasTexture } | null = null;
   private podiumScene: { group: THREE.Group; confetti: THREE.InstancedMesh; spin: { m: THREE.Object3D; y: number }[] } | null = null;
   private raf = 0;
+  private diagOff: (() => void) | null = null;
   private last = 0;
   private lastDraw = 0;
   private t = 0;
@@ -286,6 +288,10 @@ export class RaceScene3D {
   // ───────────────────────── interface (as RaceCanvas) ─────────────────────────
 
   start() {
+    this.diagOff ??= registerDiagSource("race", {
+      renderer: this.renderer,
+      quality: () => ({ label: this.opt.low ? "low graphics" : isSaving() ? "battery saver" : "standard", dpr: this.dpr, shadows: this.renderer.shadowMap.enabled, notes: { canvas: `${this.canvas.width}x${this.canvas.height}` } }),
+    });
     const loop = (now: number) => {
       this.raf = requestAnimationFrame(loop);
       if (document.hidden) {
@@ -298,6 +304,7 @@ export class RaceScene3D {
       this.last = now;
       this.t += dt;
       this.frame(dt);
+      diagFrame("race");
     };
     this.raf = requestAnimationFrame(loop);
   }
@@ -305,6 +312,8 @@ export class RaceScene3D {
   /** Stops drawing and frees the GPU (the viewer makes a new scene per race). */
   stop() {
     cancelAnimationFrame(this.raf);
+    this.diagOff?.();
+    this.diagOff = null;
     if (this.disposed) return;
     this.disposed = true;
     this.scene.traverse((o) => {
