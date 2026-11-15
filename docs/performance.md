@@ -14,6 +14,30 @@ What keeps the game light, and how to measure it.
 - The ready-made cars (`public/models`) are compressed (meshopt geometry, WebP textures) and
   load after the map.
 
+## The app's size (15 November 2026)
+
+The Android bundle (AAB) was 16.7 MB; what is in it, and what was done:
+
+- **The game** (`out/`, 11.9 MB, 6.7 MB compressed): terrain tiles 2.2 MB (WebP, already lossy and
+  small for 2048 px), JS 4.5 MB (about 1.3 MB compressed; three.js 0.8 MB of that is the map's;
+  the map, the screens and the other languages' texts load on demand), fonts 1.3 MB, the cars' `.glb` 1.1 MB (meshopt),
+  map data 1.2 MB, heights 0.9 MB. The rest is the apps' own code (Capacitor, ads, billing, Play Games),
+  already shrunk by R8 and `shrinkResources` (`android/app/build.gradle`).
+- **Fonts** (`scripts/trim-fonts.mjs`, run by `build-app.mjs`): `next/font/google` writes every
+  subset of every weight (Fira Sans had 7 files per weight). Fira is only there for Russian, so the apps
+  keep its Cyrillic file and drop the Latin, Latin-extended, Greek, Cyrillic-extended and Vietnamese ones
+  (60 files, 814 KB): Barlow draws every Latin letter before Fira is tried, so no page asked for them.
+  The website build keeps them (browsers fetch only what the text needs). Barlow's own subsets stay
+  (Romanian's ă is in its Vietnamese file), and so do all weights (all are used) and Geist (it draws
+  the arrows and symbols Barlow lacks).
+- **Launch screens and icons** (`scripts/app-assets.mjs`): Android's splash pictures (Android 7–11)
+  and launcher icons are lossless WebP instead of PNG: the same pixels, 45% fewer bytes (`res/` 5.2 → 2.9 MB;
+  one phone's density, about 1.5 → 0.8 MB). Android reads WebP from API 18; the minimum here is 24.
+- **Left alone**: the terrain tiles (a second lossy pass would show), `world.json`/`heights.bin`
+  (their format is the map's), framer-motion (the game's layout animations need its full feature set),
+  Supabase's client (one package; realtime and storage can't be left out of `createClient`).
+  iOS's launch screen is three identical 1.4 MB PNGs (Xcode wants the three files).
+
 ## While playing
 
 - **Ticks** (10 a second): the state is copied with a plain-data copy (`cloneState`), plant lookups
