@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GOVERNOR, Governor, ResolutionWatch, TIERS, dprSteps, ladder } from "./quality";
+import { GOVERNOR, GRAPHICS_PROFILES, Governor, ResolutionWatch, TIERS, dprSteps, ladder, profileLadder } from "./quality";
 
 /** Feeds frames of `ms` each from `t0` for `seconds`; returns the levels it moved to, with the time. */
 function run(g: Governor, ms: number, seconds: number, t0: number): { moves: [number, number][]; end: number } {
@@ -130,5 +130,36 @@ describe("dprSteps and ResolutionWatch", () => {
     for (let i = 0; i < 400 && changed === null; i++) changed = w.frame(40, (t += 40));
     expect(changed).toBe(1.75);
     expect(w.dpr).toBe(1.75);
+  });
+});
+
+describe("profileLadder", () => {
+  it("high is what the game always did", () => {
+    expect(profileLadder("high", 3)).toEqual(ladder(3));
+    expect(profileLadder("high", 3, true)).toEqual(ladder(3, 1.5));
+  });
+  it("low is the 1x ladder, and the saver doesn't change it", () => {
+    expect(profileLadder("low", 3)).toEqual(ladder(3, 1));
+    expect(profileLadder("low", 3, true)).toEqual(ladder(3, 1));
+  });
+  it("medium never goes above 1.5x and starts at tier 1", () => {
+    const l = profileLadder("medium", 3);
+    expect(Math.max(...l.map((s) => s.dpr))).toBe(1.5);
+    expect(l[0]).toEqual({ dpr: 1.5, tier: 1 });
+    expect(l.every((s) => s.tier >= 1)).toBe(true);
+    // resolution first, then the tiers below, for a slow phone to walk down
+    expect(l.map((s) => [s.dpr, s.tier])).toEqual([[1.5, 1], [1.25, 1], [1, 1], [1, 2], [0.75, 3], [0.5, 4]]);
+  });
+  it("ultra reaches 3x where the screen has it, and no more than the screen has", () => {
+    expect(profileLadder("ultra", 3)[0]).toEqual({ dpr: 3, tier: 0 });
+    expect(profileLadder("ultra", 2)[0]).toEqual({ dpr: 2, tier: 0 });
+    expect(profileLadder("ultra", 1)[0]).toEqual({ dpr: 1, tier: 0 });
+  });
+  it("every profile on every screen has a first rung and ends at the floor", () => {
+    for (const p of GRAPHICS_PROFILES) for (const dpr of [1, 1.5, 2, 2.625, 3, 3.5]) for (const saving of [false, true]) {
+      const l = profileLadder(p, dpr, saving);
+      expect(l.length).toBeGreaterThan(0);
+      expect(l.at(-1)!.tier).toBe(4);
+    }
   });
 });

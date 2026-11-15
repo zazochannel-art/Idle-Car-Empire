@@ -20,6 +20,7 @@ import { formatMoney } from "@/game/format";
 import type { GameState, ZoneId } from "@/game/types";
 import { useContent } from "@/i18n/content";
 import { useT } from "@/i18n/use-t";
+import { currentProfile, useGraphics } from "@/lib/graphics-profile";
 import { cn } from "@/lib/utils";
 import { uiEvents } from "@/store/events";
 import { useGame } from "@/store/game-store";
@@ -170,7 +171,7 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
             }
             else ui.selectPlot(target.id);
           },
-          { low: useGame.getState().state.settings.lowGraphics },
+          { profile: currentProfile() },
         );
         made = e;
         setStatus("ready");
@@ -221,11 +222,13 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
               painted = now;
               paint(g.state.designs);
             }
-            if (g.state.settings.lowGraphics !== prev.state.settings.lowGraphics) e.setLowGraphics(g.state.settings.lowGraphics);
             // trucks follow the engine's shipments
             if (g.state.chain.shipments !== prev.state.chain.shipments && !visitRef.current) e.traffic.setShipments(shipViews(g.state));
           }),
         );
+        // the profile is this device's own (Settings); an older save's "low graphics" switch counts until one is chosen
+        offs.push(useGraphics.subscribe(() => e.setProfile(currentProfile())));
+        offs.push(useGame.subscribe((g, prev) => { if (g.state.settings.lowGraphics !== prev.state.settings.lowGraphics) e.setProfile(currentProfile()); }));
         setEngine((k) => k + 1);
         e.ready.then(
           () => alive && setStatus("ready"),

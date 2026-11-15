@@ -18,6 +18,8 @@ export interface DeviceInfo {
   maxAnisotropy: number;
   /** Width of the window (CSS px): phones in portrait are under 700. */
   width: number;
+  /** The "ultra" graphics profile: the biggest shadow map the device's budget allows, narrow screens included. */
+  ultra?: boolean;
 }
 
 export interface TextureBudget {
@@ -46,7 +48,7 @@ export function isLightDevice(d: Pick<DeviceInfo, "low" | "deviceMemory" | "maxT
 export function textureBudget(d: DeviceInfo): TextureBudget {
   const light = isLightDevice(d);
   const cap = Math.max(1, Math.min(8, d.maxAnisotropy));
-  const shadowMap = d.low ? 1024 : d.width < 700 || light ? 2048 : 4096;
+  const shadowMap = d.low ? 1024 : light || (d.width < 700 && !d.ultra) ? 2048 : 4096;
   if (!light) return { tile: Math.min(TILE_FILE, d.maxTextureSize), aniso: cap, shadowMap, light };
   return { tile: Math.min(TILE_FILE / 2, d.maxTextureSize), aniso: Math.min(4, cap), shadowMap, light };
 }

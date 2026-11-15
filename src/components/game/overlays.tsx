@@ -14,6 +14,7 @@ import type { CityId } from "@/game/types";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { diagTap } from "@/lib/diagnostics";
+import { GRAPHICS_PROFILES, useGraphics, useProfile } from "@/lib/graphics-profile";
 import { batteryState, isSaving, powerVersion, watchPower, type SaverSetting } from "@/lib/power";
 import { legalUrl, PRIVACY_URL, TERMS_URL } from "@/lib/platform";
 import { uiEvents, type UiEvent, type UiToastAction } from "@/store/events";
@@ -355,10 +356,11 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
           </div>
         </div>
 
+        <GraphicsPicker />
+
         <SaverPicker />
 
         <div className="mt-4 space-y-1.5">
-          <Toggle label={t("settings.lowGraphics")} hint={t("settings.lowGraphicsHint")} k="lowGraphics" />
           <Toggle label={t("settings.sound")} k="sound" />
           <Toggle label={t("settings.music")} hint={t("settings.musicHint")} k="music" />
           <Toggle label={t("settings.haptics")} k="haptics" />
@@ -465,6 +467,27 @@ export function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenCh
 const SAVER_OPTIONS: SaverSetting[] = ["auto", "on", "off"];
 
 /** The battery saver: auto (on when the battery is low), on or off, and what it does now. */
+/** The graphics profile of this phone (lib/graphics-profile.ts): kept on the device, never in the save or the cloud. */
+function GraphicsPicker() {
+  const { t } = useT();
+  const profile = useProfile();
+  const choose = useGraphics((g) => g.set);
+  return (
+    <div className="mt-4">
+      <div className="mb-1.5 text-xs font-semibold text-white/60">{t("graphics.title")}</div>
+      <div role="radiogroup" aria-label={t("graphics.title")} className="grid grid-cols-4 gap-1.5">
+        {GRAPHICS_PROFILES.map((id) => (
+          <Button key={id} role="radio" aria-checked={id === profile} size="sm" variant={id === profile ? "default" : "secondary"} onClick={() => choose(id)}>
+            {t(`graphics.${id}`)}
+          </Button>
+        ))}
+      </div>
+      <div className="mt-1.5 text-[11px] text-white/45">{t(`graphics.hint.${profile}`)}</div>
+      <div className="mt-1 text-[11px] text-white/45">{t("graphics.device")}</div>
+    </div>
+  );
+}
+
 function SaverPicker() {
   const { t } = useT();
   const saver = useGame((g) => g.state.settings.saver);
@@ -490,7 +513,7 @@ function SaverPicker() {
   );
 }
 
-function Toggle({ label, hint, k }: { label: string; hint?: string; k: "lowGraphics" | "sound" | "music" | "haptics" | "stats" }) {
+function Toggle({ label, hint, k }: { label: string; hint?: string; k: "sound" | "music" | "haptics" | "stats" }) {
   const on = useGame((g) => g.state.settings[k]);
   const setPref = useGame((g) => g.setPref);
   return (

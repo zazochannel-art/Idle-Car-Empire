@@ -58,6 +58,41 @@ export function ladder(deviceDpr: number, maxDpr = 2): Step[] {
   return steps;
 }
 
+/**
+ * The graphics profile a player picks for this device (Settings). It sets the ceiling the map's ladder
+ * starts from; the governor still steps down from it when frames are slow, and back up to it only.
+ *   · low:    the "low graphics" mode (30 FPS, 1×, no shadows, half the traffic; the engine's `low` flag);
+ *   · medium: at most 1.5× resolution, and the map starts at tier 1 (fewer shadow redraws, far cars simple);
+ *   · high:   what the game always did: up to 2× and every tier open;
+ *   · ultra:  up to 3× where the screen has it, and the largest shadow map the card can hold.
+ */
+export type GraphicsProfile = "low" | "medium" | "high" | "ultra";
+export const GRAPHICS_PROFILES: readonly GraphicsProfile[] = ["low", "medium", "high", "ultra"];
+
+const CEILING: Record<GraphicsProfile, { maxDpr: number; minTier: number }> = {
+  low: { maxDpr: 1, minTier: 0 },
+  medium: { maxDpr: 1.5, minTier: 1 },
+  high: { maxDpr: 2, minTier: 0 },
+  ultra: { maxDpr: 3, minTier: 0 },
+};
+
+/**
+ * The ladder for a profile on this screen: the profile's ceiling (and the battery saver's 1.5× when it is on),
+ * with the resolution rungs the profile can't have held at its lowest allowed tier, so a lighter profile still
+ * walks down in resolution before it gives up more.
+ */
+export function profileLadder(profile: GraphicsProfile, deviceDpr: number, saving = false): Step[] {
+  const c = CEILING[profile];
+  const cap = profile === "low" ? 1 : saving ? Math.min(1.5, c.maxDpr) : c.maxDpr;
+  const out: Step[] = [];
+  for (const s of ladder(deviceDpr, cap)) {
+    const step = s.tier < c.minTier ? { dpr: s.dpr, tier: c.minTier } : s;
+    const last = out.at(-1);
+    if (!last || last.dpr !== step.dpr || last.tier !== step.tier) out.push(step);
+  }
+  return out;
+}
+
 /** How the governor judges frames. Times in ms; `slow` and `fast` are frame times. */
 export const GOVERNOR = {
   /** A window of frames is judged once it spans this long. */

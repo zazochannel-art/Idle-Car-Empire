@@ -399,7 +399,7 @@ export function sourceNames(): string[] {
 export type Report = ReturnType<typeof buildReport>;
 
 /** The short report the panel copies: the device, the settings, and each view's numbers. No account or save data. */
-export function buildReport(ctx: { appVersion: string; lowGraphics: boolean; saver: string; displayHz: number }) {
+export function buildReport(ctx: { appVersion: string; lowGraphics: boolean; /** The device's graphics profile (lib/graphics-profile.ts). */ profile?: string; saver: string; displayHz: number }) {
   const nav = typeof navigator !== "undefined" ? navigator : null;
   const first = [...sources.values()].find((s) => s.renderer);
   let gl: { vendor: string | null; renderer: string | null } = { vendor: null, renderer: null };
@@ -425,7 +425,7 @@ export function buildReport(ctx: { appVersion: string; lowGraphics: boolean; sav
       displayHz: ctx.displayHz || null,
       gpu: gl,
     },
-    settings: { lowGraphics: ctx.lowGraphics, saver: ctx.saver, saverActive: isSaving() },
+    settings: { lowGraphics: ctx.lowGraphics, ...(ctx.profile ? { graphicsProfile: ctx.profile } : {}), saver: ctx.saver, saverActive: isSaving() },
     views: sourceNames()
       .map((n) => readSource(n, ctx.lowGraphics))
       .filter((r): r is SourceReading => !!r && r.fps.frames > 0)
