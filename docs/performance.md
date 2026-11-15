@@ -132,6 +132,9 @@ how many steps it takes (`STEPS` in `engine/offline.ts`), which would change the
 
 ### Looked at and left alone (15 November 2026)
 
+- A per-step table of what is on the road to each lot (to replace `incoming`'s walk in
+  `destination`) was slower: trucks are added almost every step, so the table was rebuilt as often
+  as the walk it replaced.
 - The first download is 501 KB gzip (1.78 MB parsed): React and Next's client are 470 KB of the
   1.6 MB, `framer-motion` 127 KB (the `layout` animations need its full build), the English texts
   131 KB. The screens, the other languages and three.js already load on demand.
