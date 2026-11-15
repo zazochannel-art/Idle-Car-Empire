@@ -63,7 +63,12 @@ export function orderCost(s: GameState, m: MaterialId, qty: number): number {
 // ───────────────────────────── warehouse ─────────────────────────────
 
 export const warehouseCap = (p: PlantData) => WAREHOUSE_CAP[Math.max(0, Math.min(WAREHOUSE_CAP.length - 1, p.warehouse - 1))];
-export const stockTotal = (st: MaterialStock) => Object.values(st).reduce<number>((a, v) => a + (v ?? 0), 0);
+export function stockTotal(st: MaterialStock): number {
+  // a plain loop, not Object.values().reduce(): the offline settlement calls this millions of times (same sum, same order)
+  let total = 0;
+  for (const m in st) total += st[m as MaterialId] ?? 0;
+  return total;
+}
 
 /** Material on its way to a plant (bought, on a depot truck). */
 export function incomingMaterials(s: GameState, plotId: string): MaterialStock {
@@ -148,15 +153,16 @@ export type BuyResult = { ok: true; cost: number; qty: number } | { ok: false; w
  * Buys `qty` units of a material for a plant: paid now, delivered by a depot
  * truck into the plant's warehouse. Only materials the plant uses, only
  * whole units, never more than the warehouse can take or the supplier sells
- * in one order, never more than the cash on hand.
+ * in one order, never more than the cash on hand. `room`: the free warehouse
+ * space, when the caller has already worked it out (it is `warehouseRoom`).
  */
-export function buyMaterial(s: GameState, plotId: string, m: MaterialId, qty: number): BuyResult {
+export function buyMaterial(s: GameState, plotId: string, m: MaterialId, qty: number, room?: number): BuyResult {
   const b = s.city.buildings[plotId];
   if (!b?.plant || !isPlantType(b.type)) return { ok: false, why: "plant" };
   if (!plantMaterials(b.type).includes(m)) return { ok: false, why: "material" };
   qty = Math.floor(qty);
   if (!(qty >= 1) || qty > supplierOf(s).maxOrder) return { ok: false, why: "qty" };
-  if (qty > warehouseRoom(s, plotId)) return { ok: false, why: "room" };
+  if (qty > (room ?? warehouseRoom(s, plotId))) return { ok: false, why: "room" };
   const cost = orderCost(s, m, qty);
   if (!Number.isFinite(cost) || cost > s.cash) return { ok: false, why: "cash" };
   s.cash -= cost;
@@ -258,28 +264,39 @@ export function buyPlan(s: GameState, plotId: string, r: RestockPlan): boolean {
  * a material that would last less than AUTO_BUY.belowMin minutes at the
  * plant's pace is topped up to AUTO_BUY.upToMin minutes (within its share of
  * the warehouse), if the cash allows. One delivery at a time per plant.
+ * `inbound` (optional): the plants with a material order on the road, if the caller
+ * has just worked that out for all of them (the chain's tick does, once a step).
  */
-export function autoRestock(s: GameState, plotId: string, unitsPerSec: number) {
+export function autoRestock(s: GameState, plotId: string, unitsPerSec: number, inbound?: ReadonlySet<string>) {
   const b = s.city.buildings[plotId];
   const p = b?.plant;
   if (!p?.autoBuy || !b || !isPlantType(b.type) || !supplierOf(s).autoBuy) return;
-  if (s.chain.shipments.some((sh) => !sh.back && sh.to === plotId && sh.materials)) return;
   const { need, list } = unitNeed(b.type, p.grade);
   const per = stockTotal(need);
   if (per <= 0) return;
   const cap = warehouseCap(p);
+  // Looked at only once a material is actually low (most steps none is, and the walk over the
+  // trucks on the road is the costly part of this): one delivery at a time per plant, so with
+  // one on the way nothing is ordered. Without one, no truck is bound for this plant, so its
+  // room is the warehouse minus its stock minus what this very call has ordered so far.
+  let room: number | null = null;
+  let ordered = 0;
   for (const [m, n] of list) {
     // each material's share of the warehouse follows the recipe
     const share = (cap * n) / per;
     const low = Math.min(share, n * Math.max(1, unitsPerSec * 60 * AUTO_BUY.belowMin));
-    const high = Math.min(share, n * Math.max(AUTO_BUY.minUnits, unitsPerSec * 60 * AUTO_BUY.upToMin));
     const have = p.stock[m] ?? 0;
     if (have >= low) continue;
-    let qty = Math.floor(Math.min(high - have, supplierOf(s).maxOrder, warehouseRoom(s, plotId)));
+    if (room === null) {
+      if (inbound ? inbound.has(plotId) : s.chain.shipments.some((sh) => !sh.back && sh.to === plotId && sh.materials)) return;
+      room = cap - stockTotal(p.stock);
+    }
+    const high = Math.min(share, n * Math.max(AUTO_BUY.minUnits, unitsPerSec * 60 * AUTO_BUY.upToMin));
+    let qty = Math.floor(Math.min(high - have, supplierOf(s).maxOrder, Math.max(0, room - ordered)));
     // the wage reserve stays in the cash, unless the plant has not even one unit's worth left
     const budget = have < n ? s.cash : spendable(s);
     while (qty >= 1 && orderCost(s, m, qty) > budget) qty = Math.floor(qty / 2);
-    if (qty >= 1) buyMaterial(s, plotId, m, qty);
+    if (qty >= 1 && buyMaterial(s, plotId, m, qty, Math.max(0, room - ordered)).ok) ordered += qty;
   }
 }
 

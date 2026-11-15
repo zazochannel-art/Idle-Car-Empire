@@ -651,8 +651,12 @@ function legTime(from: string, to: string, pace: number, dock = 1) {
   return DOCK_TIME * dock + distance(from, to) * pace * (1 + TRAFFIC_ALLOWANCE);
 }
 
-const incoming = (s: GameState, to: string, item: Shipment["item"]) =>
-  s.chain.shipments.reduce((n, sh) => (!sh.back && sh.to === to && sh.item === item ? n + sh.qty : n), 0);
+function incoming(s: GameState, to: string, item: Shipment["item"]): number {
+  // a plain loop: the offline settlement asks this for every plant on every step
+  let n = 0;
+  for (const sh of s.chain.shipments) if (!sh.back && sh.to === to && sh.item === item) n += sh.qty;
+  return n;
+}
 
 
 function ship(s: GameState, sh: Omit<Shipment, "id" | "t" | "back">) {
@@ -820,7 +824,12 @@ export function chainTick(
 
   // the trucks each plant has on the road (counted once, then kept up as trucks leave)
   const busy = new Map<string, number>();
-  for (const sh of s.chain.shipments) busy.set(sh.from, (busy.get(sh.from) ?? 0) + 1);
+  // …and the plants a material order is bound for (it is the same walk over the trucks; the restock below asks about its own plant only)
+  const inbound = new Set<string>();
+  for (const sh of s.chain.shipments) {
+    busy.set(sh.from, (busy.get(sh.from) ?? 0) + 1);
+    if (!sh.back && sh.materials) inbound.add(sh.to);
+  }
   const busyTrucks = (from: string) => busy.get(from) ?? 0;
   const plants = plantsOf(s);
   // each part maker's quality modes, in plant order (for the cars built in this step; looked up once)
@@ -844,7 +853,7 @@ export function chainTick(
     const p = b.plant;
 
     // 1. materials: restock automatically when the plant is set to (Wholesale supplier and up)
-    if (cfg.item && p.autoBuy) autoRestock(s, id, st.unitsPerSec);
+    if (cfg.item && p.autoBuy) autoRestock(s, id, st.unitsPerSec, inbound);
 
     // 1b. finished parts the company doesn't make yet come from an outside supplier:
     // ordered and paid up front, delivered by truck (see orderParts)
