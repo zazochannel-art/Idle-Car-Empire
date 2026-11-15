@@ -119,6 +119,8 @@ interface RoadCar {
   buyer?: boolean;
   /** Town traffic is painted in its own colour; buyers and the first car keep the model's factory look. */
   paint?: boolean;
+  /** Drawn as the simple shape though the view is close (it is far from the middle of the view: setLod). */
+  simple?: boolean;
   /** One of the company's own cars (the town drives them as sales grow). */
   own?: boolean;
   /** A bonus on the map (the golden car, the VIP's limousine): it drives until it is let go. */
@@ -156,6 +158,8 @@ interface Truck {
   b: Plot;
   /** Its model's length, height and width (for the simple shape far out). */
   size?: THREE.Vector3;
+  /** Drawn as the simple shape though the view is close (far from the middle of the view: setLod). */
+  simple?: boolean;
 }
 
 /** The simple car shape's own size (length, height, width). */
@@ -493,6 +497,22 @@ export class Traffic3D {
    */
   setFar(far: boolean) {
     this.far = far;
+  }
+
+  /** Where the middle of the view is (x, z) and how far from it vehicles keep their models; beyond, the simple shape (Infinity: all keep them). */
+  private lod = { x: 0, z: 0, range: Infinity };
+  setLod(x: number, z: number, range: number) {
+    this.lod.x = x;
+    this.lod.z = z;
+    this.lod.range = range;
+  }
+
+  /** Whether a vehicle at (x, z) is drawn as the simple shape: past the range, with a margin of a tenth each way so it does not flicker at the edge. */
+  private beyond(x: number, z: number, was: boolean | undefined): boolean {
+    const r = this.lod.range;
+    if (r === Infinity) return false;
+    const d = Math.hypot(x - this.lod.x, z - this.lod.z);
+    return d > r * (was ? 0.9 : 1.1);
   }
 
   /** Which roads carry traffic (those through open districts and territories). */
@@ -1154,7 +1174,8 @@ export class Traffic3D {
 
     // Real traffic models are individual cached GLB clones (close up).
     for (const car of this.cars) {
-      const visible = car.alpha > 0.01 && !this.far;
+      car.simple = !this.far && car !== this.hero && !car.hero && !car.special && !car.buyer && this.beyond(car.x, car.z, car.simple);
+      const visible = car.alpha > 0.01 && !this.far && !car.simple;
       if (car.visual.visible !== visible) car.visual.visible = visible;
       const fade = car.life > 0 ? Math.max(0.05, car.alpha) : 1;
       if (Math.abs(fade - car.visualScale) > 0.001) {
@@ -1194,7 +1215,9 @@ export class Traffic3D {
         tr.lt = Math.max(tr.et - TRUCK_LAG, Math.min(tr.et, tr.lt + dt * (room < 1 ? room : tr.lt < tr.et ? 1.35 : 1)));
       }
       this.placeTruck(tr, Math.min(1, dt * 6));
-      if (tr.obj.visible === this.far) tr.obj.visible = !this.far;
+      tr.simple = !this.far && this.beyond(tr.x, tr.z, tr.simple);
+      const shown = !this.far && !tr.simple;
+      if (tr.obj.visible !== shown) tr.obj.visible = shown;
     }
     this.drawFar();
   }
@@ -1228,14 +1251,10 @@ export class Traffic3D {
   /** Far out: every car and truck on the road as one instance of the simple shape, in its colour. */
   private drawFar() {
     const inst = this.inst;
-    if (!this.far) {
-      if (inst.visible) inst.visible = false;
-      return;
-    }
     const cap = inst.instanceMatrix.count;
     let n = 0;
     for (const car of this.cars) {
-      if (car.alpha <= 0.01 || n >= cap) continue;
+      if (car.alpha <= 0.01 || n >= cap || !(this.far || car.simple)) continue;
       const s = car.scale * (car.life > 0 ? Math.max(0.05, car.alpha) : 1);
       this.m4.compose(this.v.set(car.x, car.y, car.z), this.q.setFromAxisAngle(this.yAxis, car.yaw), this.sc.set(s, s, s));
       inst.setMatrixAt(n, this.m4);
@@ -1245,6 +1264,7 @@ export class Traffic3D {
     // trucks: the same shape stretched to the truck's size, in its cargo's colour
     for (const tr of this.trucks.values()) {
       if (n >= cap) break;
+      if (!(this.far || tr.simple)) continue;
       const size = (tr.size ??= modelSize(tr.obj));
       const f = tr.gone > 0 ? Math.max(0.01, 1 - tr.gone / 0.8) : 1;
       this.m4.compose(this.v.set(tr.x, tr.y, tr.z), this.q.setFromAxisAngle(this.yAxis, tr.yaw), this.sc.set((size.x / SHAPE.x) * f, (size.y / SHAPE.y) * f, (size.z / SHAPE.z) * f));
@@ -1253,8 +1273,10 @@ export class Traffic3D {
       n++;
     }
     inst.count = n;
-    inst.instanceMatrix.needsUpdate = true;
-    if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
+    if (n > 0 || inst.visible) {
+      inst.instanceMatrix.needsUpdate = true;
+      if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
+    }
     inst.visible = n > 0;
   }
 

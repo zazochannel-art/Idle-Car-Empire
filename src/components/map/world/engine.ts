@@ -5,6 +5,7 @@
 // and listens to its callbacks; it loads its world files on its own.
 import * as THREE from "three";
 import { isSaving, shouldDraw } from "@/lib/power";
+import { Governor, TIERS, ladder, type Step } from "../quality";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { DEPOT, MARKET, RACING_AREA, STARTER_PLOT, WORLD_MAP, type Plot } from "@/game/city/layout";
 import { SPEC_BY_ID, STRUCTURE_BY_ID, ZONES, type TerritoryId } from "@/game/config/city";
@@ -55,6 +56,21 @@ const LABEL_ZOOM = 0.55;
  * models; further out, the whole scenery sets and the simple car batch.
  */
 const CLOSE_VIEW = 70;
+
+/** The step of the quality ladder this device settled on last time (so a weak phone does not start at full detail every time). */
+const LEVEL_KEY = "ice.mapQuality";
+function readLevel(): number {
+  try {
+    const v = JSON.parse(localStorage.getItem(LEVEL_KEY) ?? "null") as { dpr?: number; level?: number } | null;
+    if (v && v.dpr === (window.devicePixelRatio || 1) && Number.isInteger(v.level) && (v.level as number) >= 0) return v.level as number;
+  } catch {}
+  return 0;
+}
+function writeLevel(level: number) {
+  try {
+    localStorage.setItem(LEVEL_KEY, JSON.stringify({ dpr: window.devicePixelRatio || 1, level }));
+  } catch {}
+}
 /**
  * Where the sun stands at noon, round the map (radians in the ground plane, from +x towards +z): in
  * front of the usual view (the camera looks along −z) and to its left, so the sides in view are lit
@@ -211,8 +227,13 @@ export class MapEngine {
   private lastDraw = 0;
   frames = 0;
   private saving = false;
-  private slow = { frames: 0, time: 0 };
-  private lastAdaptiveAt = 0;
+  /** The quality ladder (map/quality.ts): the step now, the rungs for this screen, and what decides when to move. */
+  private steps: Step[] = [];
+  private level = 0;
+  private gov!: Governor;
+  /** The tier in force (quality.ts) and the shadow map's redraw rhythm it asks for. */
+  private tier = 0;
+  private shadowEvery = 2;
 
   private ground: Ground | null = null;
   private terrain: TerrainParts | null = null;
@@ -313,6 +334,7 @@ export class MapEngine {
     this.traffic = new TrafficFacade(() => this.trafficLayer);
     this.ro = new ResizeObserver(() => this.resize());
     this.ro.observe(canvas);
+    this.setLadder(readLevel());
     this.resize();
     this.home(0);
     this.detach = this.attachControls();
@@ -418,6 +440,7 @@ export class MapEngine {
     this.movers = new Movers(ground, this.mats, [WORLD_MAP.size[0] / 2, WORLD_MAP.size[1] / 2], { low: this.low, lines: this.scenery.lines });
     this.scene.add(this.fx.root, this.weather.root, this.bonus.root, this.movers.root);
     this.traffic.flush();
+    this.applyTier();
     this.applyState();
     this.applyLife();
     this.plots.setSelected(this._selected);
@@ -563,14 +586,16 @@ export class MapEngine {
       const saving = isSaving();
       if (saving !== this.saving) {
         this.saving = saving;
-        this.maxDpr = this.low ? 1 : saving ? 1.5 : 2;
+        this.setLadder(0);
         this.resize();
       }
-      const dt = Math.min(saving ? 0.25 : 0.1, (now - this.last) / 1000);
+      const gap = now - this.last;
+      const dt = Math.min(saving ? 0.25 : 0.1, gap / 1000);
       this.last = now;
       this.render(dt);
       this.frames++;
-      if (!saving) this.adaptQuality(dt);
+      // the real time between frames (the simulation's step above is capped, the verdict on the frames is not)
+      if (!saving) this.adaptQuality(Math.min(1000, gap));
     };
     this.raf = requestAnimationFrame(loop);
   }
@@ -583,17 +608,78 @@ export class MapEngine {
   setLowGraphics(on: boolean) {
     if (this.low === on) return;
     this.low = on;
-    if (this.trafficLayer) this.trafficLayer.density = on ? 0.5 : 1;
-    if (this.peds) this.peds.density = on ? 0.5 : 1;
-    if (this.headlights) this.headlights.low = on;
-    this.maxDpr = on ? 1 : this.saving ? 1.5 : 2;
-    this.renderer.shadowMap.enabled = !on;
-    this.scene.traverse((o) => {
-      const m = (o as THREE.Mesh).material;
-      if (!m) return;
-      for (const x of Array.isArray(m) ? m : [m]) x.needsUpdate = true;
-    });
+    this.setLadder(on ? 0 : readLevel());
+    this.applyTier();
     this.resize();
+  }
+
+  /** The rungs of the quality ladder for this screen and mode (low graphics: resolution 1x, no climbing), and the one to stand on. */
+  private setLadder(level: number) {
+    const device = window.devicePixelRatio || 1;
+    const cap = this.low ? 1 : this.saving ? 1.5 : 2;
+    this.steps = ladder(device, cap);
+    this.gov = new Governor(this.steps.length, this.low ? 0 : level, performance.now());
+    this.level = this.gov.level;
+    this.maxDpr = this.steps[this.level].dpr;
+    this.tier = this.steps[this.level].tier;
+  }
+
+  /** The step the quality ladder stands on now (0 is the fullest). */
+  get qualityLevel() {
+    return this.level;
+  }
+
+  /** The tier in force (map/quality.ts): 0 the fullest, 4 the lightest. */
+  get qualityTier() {
+    return this.tier;
+  }
+
+  /** How many steps the ladder has on this screen. */
+  get qualitySteps() {
+    return this.steps.length;
+  }
+
+  /** Stands on this step of the ladder (the frame watcher does it itself; this is for tests and benchmarks). */
+  setQualityLevel(level: number) {
+    this.gov = new Governor(this.steps.length, level, performance.now());
+    this.moveTo(this.gov.level);
+  }
+
+  private moveTo(level: number) {
+    const was = this.steps[this.level];
+    this.level = level;
+    const now = this.steps[level];
+    this.maxDpr = now.dpr;
+    this.tier = now.tier;
+    if (now.tier !== was.tier) this.applyTier();
+    if (now.dpr !== was.dpr) this.resize();
+    if (!this.low) writeLevel(level);
+  }
+
+  /** Whether the shadow map is in use (switching it recompiles the materials once). */
+  private shadowsOn = true;
+
+  /** What the tier in force asks for: the shadows, the share of traffic and crowd, the particles (quality.ts). */
+  private applyTier() {
+    const T = TIERS[this.tier];
+    const low = this.low;
+    this.shadowEvery = low ? 0 : T.shadowEvery;
+    const shadows = this.shadowEvery > 0;
+    if (shadows !== this.shadowsOn) {
+      this.shadowsOn = shadows;
+      this.renderer.shadowMap.enabled = shadows;
+      this.scene.traverse((o) => {
+        const m = (o as THREE.Mesh).material;
+        if (!m) return;
+        for (const x of Array.isArray(m) ? m : [m]) x.needsUpdate = true;
+      });
+      if (shadows) this.renderer.shadowMap.needsUpdate = true;
+    }
+    this.scenery?.setShadows(!low && T.sceneryShadows);
+    if (this.trafficLayer) this.trafficLayer.density = (low ? 0.5 : 1) * T.traffic;
+    if (this.peds) this.peds.density = (low ? 0.5 : 1) * T.crowd;
+    if (this.headlights) this.headlights.low = low || T.lean;
+    if (this.fx) this.fx.low = low || T.lean;
   }
 
   destroy() {
@@ -653,28 +739,11 @@ export class MapEngine {
     if (!this.running) this.render(0);
   }
 
-  /** Drops render resolution step by step while frames stay slow (< ~45 FPS). */
-  private adaptQuality(dt: number) {
-    if (this.low || this.dpr <= 1 || document.hidden) return;
-    const s = this.slow;
-    s.frames++;
-    s.time += dt;
-    if (s.frames < 120) return;
-    const avg = s.time / s.frames;
-    s.frames = 0;
-    s.time = 0;
-    const elapsed = performance.now() - this.lastAdaptiveAt;
-    const deviceDpr = window.devicePixelRatio || 1;
-    if (avg > 1 / 45 && this.dpr > 1 && elapsed > 5000) {
-      this.lastAdaptiveAt = performance.now();
-      this.maxDpr = Math.max(1, this.dpr - 0.25);
-      this.resize();
-    } else if (avg < 1 / 58 && this.dpr < deviceDpr && elapsed > 12000) {
-      // Recover one step only after sustained headroom; this prevents quality oscillation.
-      this.lastAdaptiveAt = performance.now();
-      this.maxDpr = Math.min(deviceDpr, this.dpr + 0.25);
-      this.resize();
-    }
+  /** Gives up detail step by step while frames stay slow, and wins it back after a long steady stretch (quality.ts). */
+  private adaptQuality(ms: number) {
+    if (this.low || document.hidden) return;
+    const to = this.gov.frame(ms, performance.now());
+    if (to !== null) this.moveTo(to);
   }
 
   /**
@@ -840,6 +909,8 @@ export class MapEngine {
       }
     }
     this.place(dt);
+    // vehicles far from the middle of the view draw as the simple shape on the lower tiers
+    this.trafficLayer?.setLod(cam.x, cam.z, TIERS[this.tier].detailRange * cam.dist);
 
     // time of day
     worldClock.t += dt;
@@ -890,7 +961,10 @@ export class MapEngine {
     }
     // the shadows of moving cars and trucks follow at 30 FPS: the shadow pass
     // (about half the draw calls up close) runs every other frame
-    if (this.shadowLive && (this.shadowTick ^= 1)) this.renderer.shadowMap.needsUpdate = true;
+    if (this.shadowLive && this.shadowEvery > 0 && ++this.shadowTick >= this.shadowEvery) {
+      this.shadowTick = 0;
+      this.renderer.shadowMap.needsUpdate = true;
+    }
     // lots and traffic add meshes as the game goes: give them their own materials too (kit.ts)
     if (++this.splitTick >= 60) {
       this.splitTick = 0;

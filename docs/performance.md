@@ -103,6 +103,61 @@ Production build, headless Chromium on a phone profile (390×844, CPU slowed 4×
 | Settling 20 h away (Node, bundled) | ~0.98 s | ~0.64 s |
 | React renders per second on the map | ~300 | ~60 |
 
+### Adaptive quality for weak phones (15 November 2026)
+
+The target is 60 FPS. The map used to give up only resolution (down to 1×) and only when frames
+averaged under 45 FPS. Now `map/quality.ts` holds a ladder the map walks down while frames stay slow
+and back up only after a long steady spell (`world/engine.ts` applies it; `Governor` decides):
+
+| Step | What changes |
+| --- | --- |
+| resolution | the device's pixel ratio (up to 2×) in quarter steps down to 1× |
+| tier 1 | shadows redrawn every 4th frame (was every 2nd); vehicles farther than 1× the camera distance from the middle of the view draw as the simple shape (one instanced draw) |
+| tier 2 | the scenery casts no shadows; vehicles beyond 0.65×; 70 % of the traffic, 60 % of the crowd; fewer particles, no lamp pools |
+| tier 3 | no shadows at all; resolution 0.75×; vehicles beyond 0.4×; half the traffic |
+| tier 4 (the floor) | resolution 0.5×; vehicles beyond 0.2×; a quarter of the traffic |
+
+- **Thresholds**: a window is 2 s. Two slow windows in a row (average over 18 ms, under about 55 FPS)
+  step down; seven fast ones in a row (under 17 ms, over about 59 FPS) after at least 15 s since the
+  last change step up. Between the two nothing happens (the hysteresis). The first 20 frames after
+  any change are ignored (shaders and targets are built then).
+- **Backoff**: a climb that is undone within 30 s doubles the wait before the next climb (up to 8
+  min), so a device that cannot hold a step stops trying it.
+- **Memory of the device**: the step it settled on is kept in `localStorage` (`ice.mapQuality`, per
+  pixel ratio), so a weak phone does not start at full detail each time. Not part of the save.
+- Low graphics (Settings) and the battery saver stay as they were; the ladder is off in both.
+- Nothing here changes the game: traffic, crowd and shadows are only what is drawn. No `SAVE_VERSION`.
+
+Measured with `scripts/bench-map-draws.mjs` (three.js's own counters, a late-game save of the greedy
+bot after 12 h: 13 plants, 68 trucks, 390×844): draw calls per frame, averaged over the shadow
+rhythm, and (in brackets) the frames that redraw the shadows.
+
+| Step | play view (dist 35) | wide (dist 64) | far (whole island) |
+| --- | --- | --- | --- |
+| 0 (before: the only one) | 1015 (1440) | 1327 (1834) | 516 |
+| tier 1 | 666 (1305) | 1193 (1986) | 515 |
+| tier 2 | 686 (1224) | 1035 (1668) | 516 |
+| tier 3 | 488 | 893 | 516 |
+| tier 4 | 386 | 689 | 517 |
+
+Where the draws are at step 0 (play view): the trucks, 599 meshes (68 trucks × 15 parts, each part its
+own material, 434 k triangles), the scenery's 583 shadow-casting cells, the lots 56. That is why the
+vehicles' level of detail does most of the work. What is left: a truck model with fewer, merged
+parts (one material per kind of part) would take the biggest single bite out of step 0; the far
+view draws 2.7 M triangles (the whole scenery sets) and no tier thins them yet.
+
+`LIVE=100 node scripts/bench-map-draws.mjs <url> <save>` also lets the real loop run: in the container's
+software GL (about 0.5 FPS at step 0) the frame watcher walked from step 0 to the floor in about 30 s
+and the frame rate rose about 2.6× there, which shows the loop works end to end, not what a phone does.
+
+**Not measured, cannot be promised from here**: frame times. The container has no GPU (software GL),
+so these counts say how much is asked of the GPU, not how fast a given phone answers. A floor of 386
+draw calls at half resolution should hold 60 FPS on most phones from the last five years; on a very
+old or throttled one nothing in software can promise it. A 60 Hz screen caps the average at 60, so
+"over 59" is as good as it gets. To see what a real phone does, run the game on it with
+`chrome://inspect` (USB debugging) → the map → Performance → record 10 s, or watch the step the map
+settled on (`window.__map.qualityLevel` in a debug build).
+
 ### Settling an absence (15 November 2026)
 
 What a player waits for when the game opens after being away (`settleOffline`, run before the

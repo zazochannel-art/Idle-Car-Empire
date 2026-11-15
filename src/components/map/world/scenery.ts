@@ -239,6 +239,20 @@ export class Scenery {
     for (const b of this.boards) b.face.material = this.ad.mat;
   }
 
+  /** What each mesh did for the shadows as built (setShadows puts it back). */
+  private castBase = new WeakMap<THREE.Object3D, boolean>();
+
+  /** The scenery casts shadows (as built), or none at all: the shadow pass draws every cell that casts. */
+  setShadows(on: boolean) {
+    this.root.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      let base = this.castBase.get(m);
+      if (base === undefined) this.castBase.set(m, (base = m.castShadow));
+      m.castShadow = base && on;
+    });
+  }
+
   /** Close-up views draw the cells, wide views the whole sets. */
   setClose(close: boolean) {
     if (close === this.close) return;
