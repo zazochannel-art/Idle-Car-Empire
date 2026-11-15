@@ -12,6 +12,7 @@
 import { liveryOf } from "../../three/livery";
 import { diagFrame, registerDiagSource } from "@/lib/diagnostics";
 import { isSaving, shouldDraw } from "@/lib/power";
+import { ResolutionWatch } from "../../map/quality";
 import { attachControls, Camera } from "../../map/camera";
 import { mix, Painter, raceFont, shade, sx, sy, toTile } from "../../map/iso";
 import { skyAt, worldClock, type TimeMode } from "../../map/lighting";
@@ -113,6 +114,9 @@ export class InteriorEngine {
   private ctx: CanvasRenderingContext2D;
   private p: Painter;
   private dpr = 1;
+  /** The highest resolution now allowed: lowered while frames stay slow (map/quality.ts). */
+  private maxDpr = 2;
+  private watch = new ResolutionWatch(typeof window === "undefined" ? 1 : window.devicePixelRatio || 1, 0);
   private raf = 0;
   private diagOff: (() => void) | null = null;
   private running = false;
@@ -185,7 +189,7 @@ export class InteriorEngine {
 
   resize() {
     const r = this.canvas.getBoundingClientRect();
-    this.dpr = Math.min(2, window.devicePixelRatio || 1);
+    this.dpr = Math.min(this.maxDpr, window.devicePixelRatio || 1);
     this.cam.w = Math.max(1, r.width);
     this.cam.h = Math.max(1, r.height);
     this.canvas.width = Math.round(this.cam.w * this.dpr);
@@ -262,17 +266,25 @@ export class InteriorEngine {
     if (this.running) return;
     this.running = true;
     this.last = performance.now();
-    this.diagOff ??= registerDiagSource("factory interior", { quality: () => ({ label: this.low ? "low graphics" : isSaving() ? "battery saver" : "standard", dpr: this.dpr }) });
+    this.diagOff ??= registerDiagSource("factory interior", { quality: () => ({ label: this.low ? "low graphics" : isSaving() ? "battery saver" : "adaptive resolution", dpr: this.dpr, notes: { "max dpr": this.maxDpr } }) });
     const loop = (now: number) => {
       if (!this.running) return;
       this.raf = requestAnimationFrame(loop);
       // low graphics: ~30 FPS; battery saver: 30 FPS while playing, a few frames a second when idle
       if (document.hidden || !shouldDraw(now, this.lastDraw, this.low)) return;
       this.lastDraw = now;
-      const dt = Math.min(isSaving() ? 0.25 : 0.1, (now - this.last) / 1000);
+      const gap = now - this.last;
+      const saving = isSaving();
+      const dt = Math.min(saving ? 0.25 : 0.1, gap / 1000);
       this.last = now;
       this.render(dt);
       diagFrame("factory interior");
+      if (saving || this.low) return;
+      const next = this.watch.frame(Math.min(1000, gap), performance.now());
+      if (next !== null) {
+        this.maxDpr = next;
+        this.resize();
+      }
     };
     this.raf = requestAnimationFrame(loop);
   }

@@ -18,8 +18,7 @@ What keeps the game light, and how to measure it.
 
 The Android bundle (AAB) was 16.7 MB; what is in it, and what was done:
 
-- **The game** (`out/`, 11.9 MB, 6.7 MB compressed): terrain tiles 2.2 MB (WebP, already lossy and
-  small for 2048 px), JS 4.5 MB (about 1.3 MB compressed; three.js 0.8 MB of that is the map's;
+- **The game** (`out/`, 11.9 MB, 6.7 MB compressed): terrain tiles 2.2 MB (1.7 MB after the texture pass below), JS 4.5 MB (about 1.3 MB compressed; three.js 0.8 MB of that is the map's;
   the map, the screens and the other languages' texts load on demand), fonts 1.3 MB, the cars' `.glb` 1.1 MB (meshopt),
   map data 1.2 MB, heights 0.9 MB. The rest is the apps' own code (Capacitor, ads, billing, Play Games),
   already shrunk by R8 and `shrinkResources` (`android/app/build.gradle`).
@@ -33,7 +32,7 @@ The Android bundle (AAB) was 16.7 MB; what is in it, and what was done:
 - **Launch screens and icons** (`scripts/app-assets.mjs`): Android's splash pictures (Android 7–11)
   and launcher icons are lossless WebP instead of PNG: the same pixels, 45% fewer bytes (`res/` 5.2 → 2.9 MB;
   one phone's density, about 1.5 → 0.8 MB). Android reads WebP from API 18; the minimum here is 24.
-- **Left alone**: the terrain tiles (a second lossy pass would show), `world.json`/`heights.bin`
+- **Left alone**: `world.json`/`heights.bin`
   (their format is the map's), framer-motion (the game's layout animations need its full feature set),
   Supabase's client (one package; realtime and storage can't be left out of `createClient`).
   iOS's launch screen is three identical 1.4 MB PNGs (Xcode wants the three files).
@@ -64,6 +63,42 @@ that shows what a phone really does (`lib/diagnostics.ts`, `components/game/diag
 - **For a new 3D view:** `registerDiagSource(name, { renderer, quality })` once when it starts, `diagFrame(name)`
   after each frame it draws, and the returned function when it is destroyed. `quality()` is where a view
   says which level it runs at.
+
+## Texture memory on weak phones (15 November 2026)
+
+What was heavy was not the files but the graphics card's memory: the island's six ground tiles are
+2048 px pictures, 21 MB each on the card with their mipmaps, **128 MB** in all. A phone with 4 GB or
+less shares that with everything else, and the browser starts swapping textures. Three changes
+(`lib/gpu-budget.ts`, `map/world/tiles.ts`, `map/world/engine.ts`; the rules are tested in
+`gpu-budget.test.ts`):
+
+- **A texture budget by device.** Low graphics, a device reporting 4 GB of memory or less
+  (`navigator.deviceMemory`: 0.25 to 8, rounded down to a power of two, so a 6 GB phone reports 4),
+  or a card whose largest texture is under 4096 px takes the ground tiles at 1024 px: **32 MB
+  instead of 128 MB**. Browsers that don't tell their memory (Safari, Firefox) are treated as strong, as
+  before. The same budget caps the sun's shadow map at 2048 px (a landscape tablet used to get 4096 px,
+  64 MB on its own) and the filtering at 4× (it was 8×; the camera never tilts past 53°, which needs 2).
+  Strong devices keep what they had.
+- **Scaled off the main thread.** The half-size tile is decoded and scaled by the browser
+  (`createImageBitmap` with a size) instead of drawing a 2048 px picture onto a canvas on the main
+  thread six times while the map opens; where the browser can't (older Safari) the canvas does it, with
+  the same result. Low graphics did this before, but only for itself, and on the main thread.
+- **Recompressed tiles.** The 12 files (both islands) re-encoded as WebP quality 76, effort 6: **2.0 → 1.5 MB (−24%)**,
+  PSNR 39.6–44.8 dB against the old ones (worst single pixel 59 of 255, on edges). It is one extra lossy pass, so it was
+  checked side by side at the worst spot.
+
+Checked in headless Chromium (software GL) at 390×844 at 2×, the same views, day, clear weather, three
+runs: before (old files), after on a strong device, after with `deviceMemory` 4. Mean difference to
+the old picture over the lower 1,400 px of seven views: 0.5–1.3 out of 255 for the recompressed files,
+1.0–1.9 for the 1024 px tiles (part of it is traffic and clouds moving between two runs). `docs/graphics/terrain-textures-2026-11-15.jpg` has the three side by side.
+The painted ground is already stretched several times over at the zoom a phone plays at (about 20 px
+of tile for each map unit, 77 px of screen at the default zoom), and the close-up grain is the
+detail texture, which is untouched. Roads, markings and buildings are meshes, not tile pixels.
+
+What this container can't measure: the card's memory and the frame rate (software GL, no GPU). The
+gain is by construction (bytes uploaded) and needs a check on a real phone: Chrome's
+`chrome://gpu` or Android Studio's GPU profiler on a 3–4 GB phone, map open for a minute.
+Changing low graphics while the map is open doesn't swap the tiles until the map is opened again.
 
 ## While playing
 
@@ -155,6 +190,79 @@ Production build, headless Chromium on a phone profile (390×844, CPU slowed 4×
 | One tick (engine, Node, bundled) | 1.22 ms | 0.57 ms |
 | Settling 20 h away (Node, bundled) | ~0.98 s | ~0.64 s |
 | React renders per second on the map | ~300 | ~60 |
+
+### Adaptive quality for weak phones (15 November 2026)
+
+The target is 60 FPS. The map used to give up only resolution (down to 1×) and only when frames
+averaged under 45 FPS. Now `map/quality.ts` holds a ladder the map walks down while frames stay slow
+and back up only after a long steady spell (`world/engine.ts` applies it; `Governor` decides):
+
+| Step | What changes |
+| --- | --- |
+| resolution | the device's pixel ratio (up to 2×) in quarter steps down to 1× |
+| tier 1 | shadows redrawn every 4th frame (was every 2nd); vehicles farther than 1× the camera distance from the middle of the view draw as the simple shape (one instanced draw) |
+| tier 2 | the scenery casts no shadows; vehicles beyond 0.65×; 70 % of the traffic, 60 % of the crowd; fewer particles, no lamp pools |
+| tier 3 | no shadows at all; resolution 0.75×; vehicles beyond 0.4×; half the traffic |
+| tier 4 (the floor) | resolution 0.5×; vehicles beyond 0.2×; a quarter of the traffic |
+
+- **Thresholds**: a window is 2 s. Two slow windows in a row (average over 18 ms, under about 55 FPS)
+  step down; seven fast ones in a row (under 17 ms, over about 59 FPS) after at least 15 s since the
+  last change step up. Between the two nothing happens (the hysteresis). The first 20 frames after
+  any change are ignored (shaders and targets are built then).
+- **Backoff**: a climb that is undone within 30 s doubles the wait before the next climb (up to 8
+  min), so a device that cannot hold a step stops trying it.
+- **Memory of the device**: the step it settled on is kept in `localStorage` (`ice.mapQuality`, per
+  pixel ratio), so a weak phone does not start at full detail each time. Not part of the save.
+- Low graphics (Settings) and the battery saver stay as they were; the ladder is off in both.
+- Nothing here changes the game: traffic, crowd and shadows are only what is drawn. No `SAVE_VERSION`.
+
+Two more cuts apply at every step (no change to how the map looks):
+
+- **The trucks are drawn in batches** (`world/truck-batch.ts`). A truck model is 15 meshes, each its own
+  material (paint, glass, lamps, tyres, rims, trim), so 68 trucks were about a thousand draws, and as many
+  again in the shadow pass. Trucks of one kind (van, box truck, semi, road train, loaded or empty) share
+  their meshes' geometry and materials, so each part of a kind is one instanced mesh and each truck one
+  instance of it, all parts sharing one matrix buffer; the cab's own colour is the instance colour of the
+  cab part (its paint is white). Only trucks within 10 units of the camera's view are put in the batch
+  (their shadows can still fall into it). The car carriers keep their own meshes (their decks hold cars
+  of their own colours).
+- **Wide views thin the trees** (`Scenery.setFarShare`): each big set draws a share of its instances,
+  shuffled once so the share is spread over the island. 100 % at the fullest step, 80, 55, 35 and 20 % on
+  the tiers.
+
+The factory floors, the factory interiors and the race view are flat canvases or lighter scenes: they use
+the same frame watch (`ResolutionWatch`) to lower their resolution (down to 0.6×) while frames stay slow;
+the floor's old rule (under 42 FPS, 5 s) is gone.
+
+Measured with `scripts/bench-map-draws.mjs` (three.js's own counters, a late-game save of the greedy
+bot after 12 h: 13 plants, ~65 trucks, 390×844): draw calls per frame averaged over the shadow rhythm
+(frames that redraw the shadows peak higher: 938 at step 0, play view), and the triangles.
+
+| Step | play view (dist 35) | wide (dist 64) | far (whole island) | far triangles |
+| --- | --- | --- | --- | --- |
+| before this work (the only step) | 946-1015 | 1201-1355 | 516 | 2.67 M |
+| 0 | 669 | 869 | 518 | 2.67 M |
+| tier 1 | 523 | 706 | 517 | 2.38 M |
+| tier 2 | 533 | 776 | 520 | 2.02 M |
+| tier 3 | 388 | 516 | 521 | 1.70 M |
+| tier 4 | 237 | 487 | 519 | 1.48 M |
+
+The runs differ a little in how many trucks are in view (the traffic is random), so read it as ±10 %.
+The step 0 gain (about a third) is the trucks' batches alone; the tiers add the rest. What is left at step 0
+(play view): the scenery's 583 shadow-casting cells and the lots; the far view is 520 draws and 1.5-2.7 M
+triangles, the trees and buildings of the whole sets.
+
+`LIVE=100 node scripts/bench-map-draws.mjs <url> <save>` also lets the real loop run: in the container's
+software GL (about 0.5 FPS at step 0) the frame watcher walked from step 0 to the floor in about 30 s
+and the frame rate rose about 2.6× there, which shows the loop works end to end, not what a phone does.
+
+**Not measured, cannot be promised from here**: frame times. The container has no GPU (software GL),
+so these counts say how much is asked of the GPU, not how fast a given phone answers. A floor of 386
+draw calls at half resolution should hold 60 FPS on most phones from the last five years; on a very
+old or throttled one nothing in software can promise it. A 60 Hz screen caps the average at 60, so
+"over 59" is as good as it gets. To see what a real phone does, run the game on it with
+`chrome://inspect` (USB debugging) → the map → Performance → record 10 s, or watch the step the map
+settled on (`window.__map.qualityLevel` in a debug build).
 
 ### Settling an absence (15 November 2026)
 

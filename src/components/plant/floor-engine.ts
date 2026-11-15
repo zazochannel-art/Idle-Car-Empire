@@ -6,6 +6,7 @@
 import { attachControls, Camera } from "../map/camera";
 import { diagFrame, registerDiagSource } from "@/lib/diagnostics";
 import { isSaving, shouldDraw } from "@/lib/power";
+import { ResolutionWatch } from "../map/quality";
 import { Painter, sx, sy } from "../map/iso";
 import { forklift, robotArm, tireStack } from "../map/props";
 import { drawModel, drawTruck, type CarModel } from "../map/vehicles";
@@ -66,9 +67,8 @@ export class FloorEngine {
   private size: [number, number] = [12, 8];
   private detach: () => void;
   private ro: ResizeObserver;
-  private perfFrames = 0;
-  private perfTime = 0;
-  private lastAdaptiveDpr = 0;
+  /** Gives up resolution while frames stay slow (map/quality.ts), wins it back after a long steady spell. */
+  private watch = new ResolutionWatch(typeof window === "undefined" ? 1 : window.devicePixelRatio || 1, 0);
   private onMachineTap?: (index: number) => void;
 
   constructor(private canvas: HTMLCanvasElement, onMachineTap?: (index: number) => void) {
@@ -136,7 +136,7 @@ export class FloorEngine {
     if (this.running) return;
     this.running = true;
     this.last = performance.now();
-    this.diagOff ??= registerDiagSource("factory floor", { quality: () => ({ label: isSaving() ? "battery saver" : "standard", dpr: this.dpr }) });
+    this.diagOff ??= registerDiagSource("factory floor", { quality: () => ({ label: isSaving() ? "battery saver" : "adaptive resolution", dpr: this.dpr, notes: { "max dpr": this.maxDpr } }) });
     const loop = (now: number) => {
       if (!this.running) return;
       this.raf = requestAnimationFrame(loop);
@@ -148,30 +148,16 @@ export class FloorEngine {
       if (!shouldDraw(now, this.lastDraw, false)) return;
       this.lastDraw = now;
       const saving = isSaving();
-      const dt = Math.min(saving ? 0.25 : 0.1, (now - this.last) / 1000);
+      const gap = now - this.last;
+      const dt = Math.min(saving ? 0.25 : 0.1, gap / 1000);
       this.last = now;
       this.render(dt);
       diagFrame("factory floor");
       if (saving) return;
-      this.perfFrames++;
-      this.perfTime += dt;
-      if (this.perfFrames >= 90) {
-        const avg = this.perfTime / this.perfFrames;
-        this.perfFrames = 0;
-        this.perfTime = 0;
-        const nowDpr = this.dpr;
-        const elapsed = performance.now() - this.lastAdaptiveDpr;
-        if (avg > 1 / 42 && nowDpr > 1 && elapsed > 5000) {
-          this.lastAdaptiveDpr = performance.now();
-          this.maxDpr = Math.max(1, nowDpr - 0.25);
-          this.resize();
-        } else if (avg < 1 / 58 && nowDpr < (window.devicePixelRatio || 1) && elapsed > 12000) {
-          // Restore detail only after sustained headroom, so quality can recover
-          // when the factory becomes lighter without oscillating frame-to-frame.
-          this.lastAdaptiveDpr = performance.now();
-          this.maxDpr = Math.min(window.devicePixelRatio || 1, nowDpr + 0.25);
-          this.resize();
-        }
+      const next = this.watch.frame(Math.min(1000, gap), performance.now());
+      if (next !== null) {
+        this.maxDpr = next;
+        this.resize();
       }
     };
     this.raf = requestAnimationFrame(loop);
