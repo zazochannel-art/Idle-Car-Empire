@@ -33,11 +33,19 @@ const svg = (body) => Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width
 
 const DENSITIES = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
 
-async function png(input, size, file, opts = {}) {
+/** Writes a picture as PNG, or as lossless WebP (the same pixels, about 40% fewer bytes) when `file` ends in .webp. */
+async function save(img, file) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
+  // an old copy in the other format would be a second resource of the same name
+  const other = file.endsWith(".webp") ? file.replace(/\.webp$/, ".png") : file.replace(/\.png$/, ".webp");
+  fs.rmSync(other, { force: true });
+  await (file.endsWith(".webp") ? img.webp({ lossless: true, effort: 6 }) : img.png({ compressionLevel: 9 })).toFile(file);
+}
+
+async function png(input, size, file, opts = {}) {
   let img = sharp(input, { density: 72 * (size / 512) * 4 }).resize(size, size);
   if (opts.mask) img = img.composite([{ input: opts.mask(size), blend: "dest-in" }]);
-  await img.png({ compressionLevel: 9 }).toFile(file);
+  await save(img, file);
 }
 
 /** The cut-out logo at `scale` of a transparent square, in its middle. */
@@ -59,11 +67,11 @@ const rounded = (size) => Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" w
 // its middle, so at 0.64 of the layer it stays inside that circle.
 for (const [d, k] of Object.entries(DENSITIES)) {
   const dir = path.join(RES, `mipmap-${d}`);
-  await png(await centred(108 * k, 0.64), 108 * k, path.join(dir, "ic_launcher_foreground.png"));
-  await png(svg(BACKDROP), 108 * k, path.join(dir, "ic_launcher_background.png"));
+  await png(await centred(108 * k, 0.64), 108 * k, path.join(dir, "ic_launcher_foreground.webp"));
+  await png(svg(BACKDROP), 108 * k, path.join(dir, "ic_launcher_background.webp"));
   // the legacy square and round icons: the whole logo
-  await png(LOGO, 48 * k, path.join(dir, "ic_launcher.png"), { mask: rounded });
-  await png(LOGO, 48 * k, path.join(dir, "ic_launcher_round.png"), { mask: circle });
+  await png(LOGO, 48 * k, path.join(dir, "ic_launcher.webp"), { mask: rounded });
+  await png(LOGO, 48 * k, path.join(dir, "ic_launcher_round.webp"), { mask: circle });
   // no themed (one-colour) icon: the logo is a picture, so launchers show it in colour
   fs.rmSync(path.join(dir, "ic_launcher_monochrome.png"), { force: true });
 }
@@ -86,18 +94,18 @@ fs.rmSync(path.join(RES, "drawable-v24/ic_launcher_foreground.xml"), { force: tr
 async function splash(w, h, file, scale = 0.62) {
   const side = Math.round(Math.min(w, h) * scale);
   const logo = await sharp(CUTOUT).resize(side, side).png().toBuffer();
-  await sharp({ create: { width: w, height: h, channels: 3, background: BG } })
-    .composite([{ input: logo, left: Math.round((w - side) / 2), top: Math.round((h - side) / 2) }])
-    .png({ compressionLevel: 9 })
-    .toFile(file);
+  await save(
+    sharp({ create: { width: w, height: h, channels: 3, background: BG } }).composite([{ input: logo, left: Math.round((w - side) / 2), top: Math.round((h - side) / 2) }]),
+    file,
+  );
 }
 // Android 7–11
 const SPLASH = { mdpi: [320, 480], hdpi: [480, 800], xhdpi: [720, 1280], xxhdpi: [960, 1600], xxxhdpi: [1280, 1920] };
 for (const [d, [w, h]] of Object.entries(SPLASH)) {
-  await splash(w, h, path.join(RES, `drawable-port-${d}/splash.png`));
-  await splash(h, w, path.join(RES, `drawable-land-${d}/splash.png`));
+  await splash(w, h, path.join(RES, `drawable-port-${d}/splash.webp`));
+  await splash(h, w, path.join(RES, `drawable-land-${d}/splash.webp`));
 }
-await splash(480, 320, path.join(RES, "drawable/splash.png"));
+await splash(480, 320, path.join(RES, "drawable/splash.webp"));
 
 // Notification icon (Android): white on transparent, so a simple shape rather than the
 // logo's picture: the crown over a car, filling the 24 dp square. Drawn white with the

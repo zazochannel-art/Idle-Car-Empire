@@ -19,6 +19,8 @@ if (!process.env.NEXT_PUBLIC_SUPABASE_URL) console.warn("NEXT_PUBLIC_SUPABASE_UR
 execSync("node scripts/sync-version.mjs", { stdio: "inherit" });
 execSync("node scripts/app-assets.mjs", { stdio: "inherit" });
 execSync("npx next build", { stdio: "inherit" });
+// the apps carry the font files the game asks for, not every subset next/font wrote
+execSync("node scripts/trim-fonts.mjs", { stdio: "inherit" });
 // SOURCE_MAPS=1 (CI): the maps go to source-maps/ with the scripts they describe, not into the app
 if (process.env.SOURCE_MAPS === "1") {
   const chunks = "out/_next/static/chunks";
