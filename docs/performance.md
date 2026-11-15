@@ -103,6 +103,47 @@ Production build, headless Chromium on a phone profile (390×844, CPU slowed 4×
 | Settling 20 h away (Node, bundled) | ~0.98 s | ~0.64 s |
 | React renders per second on the map | ~300 | ~60 |
 
+### Settling an absence (15 November 2026)
+
+What a player waits for when the game opens after being away (`settleOffline`, run before the
+game shows). The steps cost most in the walks over the trucks on the road: every plant, on every
+step, looked through all of them to see whether a material order was on its way, twice more to
+count the free room, and summed its stock through `Object.values().reduce`. Now the chain's tick
+lists the plants with an order on the road once per step (`inbound`, passed to `autoRestock`), a
+plant looks only when a material is actually low, the room is kept as a number while the plant
+orders, and the sums are plain loops. The result is the same to the last digit (the state and
+report of 1, 8 and 20 hours away hash identically before and after, as does a live run of 6,000
+ticks).
+
+Bundled like the browser, a late-game save (the greedy bot of `scripts/simulate.ts` after 12 h:
+13 plants, ~60 trucks on the road), median of repeated runs, best of 5 each:
+
+| | before | after |
+| --- | --- | --- |
+| 1 h away | ~105 ms | ~75 ms |
+| 8 h away | ~600 ms | ~440 ms |
+| 20 h away | ~930 ms | ~600 ms |
+| One live tick | ~0.30 ms | ~0.28 ms |
+
+A phone is three to five times slower than this container, so the 20 h case fell from roughly
+3-4 s to 2-3 s of the loading screen. What is left in it is the chain's own step (the trucks'
+walk, `destination`, the ledger): a further cut would have to change what the simulation does, or
+how many steps it takes (`STEPS` in `engine/offline.ts`), which would change the results.
+
+### Looked at and left alone (15 November 2026)
+
+- A per-step table of what is on the road to each lot (to replace `incoming`'s walk in
+  `destination`) was slower: trucks are added almost every step, so the table was rebuilt as often
+  as the walk it replaced.
+- The first download is 501 KB gzip (1.78 MB parsed): React and Next's client are 470 KB of the
+  1.6 MB, `framer-motion` 127 KB (the `layout` animations need its full build), the English texts
+  131 KB. The screens, the other languages and three.js already load on demand.
+- With the CPU slowed four times, the map idles at about 5-10 % of the main thread; the engine's
+  tick is 0.3 ms. What is left on a phone is the GPU's work (draw calls, the shadow pass), which
+  only a real device shows: see "The 3D map's draws" above.
+- The container's software GL stalls the main thread on the first compile and texture upload, so
+  long-task numbers for the map's start-up are not comparable with a phone's.
+
 ## Night and UI round (round 3)
 - Street-lamp light pools: one additive `InstancedMesh` (one draw call), hidden by day.
 - Window glow on model glass (plants, dealers, garages) is a shader term on the shared glass material, no extra lights or draw calls.

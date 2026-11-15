@@ -1264,6 +1264,38 @@ describe("economy audit fixes", () => {
     expect(coming).toBeLessThan(M.warehouseCap(p) * 0.1);
   });
 
+  it("auto-restock orders once per plant, and the chain tick's inbound set says the same as looking at the trucks", () => {
+    const make = () => {
+      const s = createInitialState(T0);
+      s.market.bought = 1e6;
+      const p = s.city.buildings[STARTER_PLOT].plant!;
+      p.warehouse = 3;
+      p.stock = {};
+      p.autoBuy = true;
+      s.cash = 1e9;
+      return s;
+    };
+    const rate = (s: ReturnType<typeof make>) => snapshot(s).chain.plants[STARTER_PLOT].unitsPerSec;
+    // nothing on the road: it orders, and never more than the free room of its warehouse
+    const a = make();
+    M.autoRestock(a, STARTER_PLOT, rate(a));
+    const ordered = M.stockTotal(M.incomingMaterials(a, STARTER_PLOT));
+    expect(ordered).toBeGreaterThan(0);
+    expect(ordered).toBeLessThanOrEqual(M.warehouseCap(a.city.buildings[STARTER_PLOT].plant!));
+    // a delivery already on the way: nothing more is ordered, with or without the inbound set
+    const shipments = a.chain.shipments.length;
+    M.autoRestock(a, STARTER_PLOT, rate(a));
+    expect(a.chain.shipments.length).toBe(shipments);
+    // the same plant, same state: the set and the walk over the trucks agree
+    const b = make();
+    const c = make();
+    M.autoRestock(b, STARTER_PLOT, rate(b));
+    M.autoRestock(c, STARTER_PLOT, rate(c), new Set());
+    expect(c.chain.shipments).toEqual(b.chain.shipments);
+    M.autoRestock(c, STARTER_PLOT, rate(c), new Set([STARTER_PLOT]));
+    expect(c.chain.shipments.length).toBe(b.chain.shipments.length);
+  });
+
   it("the first goal of a new company is buying materials, not an upgrade", async () => {
     const { nextGoals } = await import("./engine/insights");
     const s = createInitialState(T0);
