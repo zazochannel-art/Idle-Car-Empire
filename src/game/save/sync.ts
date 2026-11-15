@@ -11,6 +11,9 @@
 //   the player chooses which progress to keep.
 // - A failed request (network, server) is retried with growing pauses; the
 //   game never waits for any of it.
+// - A request that failed with no answer may still have landed (the reply was lost). If the retry
+//   is then refused, the cloud is read: when it holds exactly the state that was sent, that save
+//   did land, and it counts as saved; any other state there is a real conflict.
 import type { GameState } from "../types";
 import type { LocalStore } from "./local";
 import type { CloudBackend, CloudCopy } from "./types";
@@ -43,6 +46,36 @@ export interface SyncOptions {
 
 const DEFAULTS = { interval: 30_000, debounce: 2_000, retries: [5_000, 15_000, 30_000, 60_000], timeout: 20_000 };
 
+/** A save that got no answer: it may or may not have reached the cloud. */
+interface Unsure {
+  seq: number;
+  at: number;
+  state: GameState;
+}
+
+/** Most unanswered saves remembered: only the first of them on a revision can have landed, and a long outage retries many times. */
+const MAX_UNSURE = 3;
+
+/** Same JSON value (the server's copy is JSON that went through the database: key order is not kept). */
+function jsonEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  const ka = Object.keys(a as object);
+  if (ka.length !== Object.keys(b as object).length) return false;
+  return ka.every((k) => Object.hasOwn(b as object, k) && jsonEqual((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]));
+}
+
+/** Whether the cloud's copy is this state (the app version the backend adds when it saves doesn't count). */
+export function sameSave(sent: GameState, cloud: unknown): boolean {
+  if (!cloud || typeof cloud !== "object") return false;
+  const { appVersion: _stamp, ...rest } = cloud as Record<string, unknown>;
+  void _stamp;
+  const { appVersion: _own, ...mine } = JSON.parse(JSON.stringify(sent)) as Record<string, unknown>;
+  void _own;
+  return jsonEqual(mine, rest);
+}
+
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const t = setTimeout(() => reject(new Error("timeout")), ms);
@@ -71,6 +104,8 @@ export class CloudSync {
   private due = Infinity;
   private lastSent = 0;
   private failures = 0;
+  /** Saves sent on the current revision that got no answer (see the top of the file). */
+  private unsure: Unsure[] = [];
   private stopped = false;
   private readonly o: Required<Omit<SyncOptions, "version" | "device">> & Pick<SyncOptions, "version" | "device">;
 
@@ -170,21 +205,39 @@ export class CloudSync {
     this.lastSent = this.o.now();
     this.inFlight = (async () => {
       try {
-        const res = await withTimeout(this.backend.save(state, this.o.version, base, this.o.device), this.o.timeout);
+        let res: { ok: boolean; revision: number; updatedAt: number };
+        let sent: Unsure = { seq, at, state };
+        try {
+          res = await withTimeout(this.backend.save(state, this.o.version, base, this.o.device), this.o.timeout);
+        } catch (e) {
+          // no answer: it may have landed all the same
+          this.unsure = [...this.unsure, { seq, at, state }].slice(-MAX_UNSURE);
+          throw e;
+        }
+        if (!res.ok && this.unsure.length) {
+          // refused after an earlier request with no answer: that one may be what the cloud holds now
+          const landed = await this.alreadyLanded();
+          if (landed) {
+            res = { ok: true, revision: landed.revision, updatedAt: landed.updatedAt };
+            sent = landed.save;
+          }
+        }
         if (!res.ok) {
           // another session saved in between (or the cloud holds a newer game version)
+          this.unsure = [];
           this.set({ status: "conflict", revision: res.revision || base });
           this.clear();
           return;
         }
         this.failures = 0;
-        this.sentSeq = seq;
+        this.unsure = [];
+        this.sentSeq = sent.seq;
         this.set({ status: "saved", revision: res.revision, lastSaved: res.updatedAt });
         // this device's copy now matches the cloud (unless the game moved on meanwhile); it keeps the
         // time the state was saved, and a copy that stopped meanwhile (another tab took over, a
         // logout) leaves the device's copy alone: the newer copy may be writing it by now
         if (this.stopped) return;
-        if (this.seq === seq) this.writeLocal(state, false, at);
+        if (this.seq === sent.seq) this.writeLocal(sent.state, false, sent.at);
         else this.writeLocal(this.latest!, true, this.latestAt);
       } catch {
         const offline = typeof navigator !== "undefined" && navigator.onLine === false;
@@ -202,6 +255,17 @@ export class CloudSync {
     });
   }
 
+  /**
+   * After a refusal that follows a request with no answer: whether the cloud holds one of those
+   * saves (so it did land). Reading the cloud can fail too: that is an error to retry, not a conflict.
+   */
+  private async alreadyLanded(): Promise<{ save: Unsure; revision: number; updatedAt: number } | null> {
+    const cloud = await withTimeout(this.backend.load(), this.o.timeout);
+    if (cloud.revision <= 0) return null;
+    const save = this.unsure.find((u) => sameSave(u.state, cloud.state));
+    return save ? { save, revision: cloud.revision, updatedAt: cloud.updatedAt } : null;
+  }
+
   /** Back online: try again now instead of waiting out the pause. */
   retryNow() {
     if (this.info.status === "error" || this.info.status === "offline") {
@@ -216,6 +280,7 @@ export class CloudSync {
    * is returned to be played (this device's is kept as a backup).
    */
   async resolve(keep: "local" | "cloud"): Promise<{ cloud: CloudCopy; outdated?: boolean } | null> {
+    this.unsure = [];
     const cloud = await this.backend.load();
     // the cloud holds a save from a newer version of the game (the server refused this one for
     // it): neither copy is played here, and this game saves nothing more until it is updated

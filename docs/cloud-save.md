@@ -51,6 +51,18 @@ settings, or while it can't be reached, it saves on the device only.
   `save_game()` only writes when the cloud is still at that revision; if
   another device or tab saved in between, it refuses and the game shows a
   conflict instead of overwriting anything.
+- **A reply that never arrives**: a save that timed out may still have reached the cloud. If the
+  retry is then refused, the game reads the cloud once: when it holds exactly the state that was
+  sent (key order and the app version the backend adds don't count), that save did land and counts
+  as saved (`CloudSync.alreadyLanded`, `sameSave`); a newer state waits and goes on top of it.
+  Any other state in the cloud is a real conflict, as before. If the cloud can't be read at that
+  moment it is an ordinary failure, retried, never a conflict.
+- **A damaged copy on the device** (a write cut short by a crash or a full disk) falls back to the
+  last good copy (`idle-car-empire:lastgood:<save key>`): the save as it was before the write that
+  replaced it, renewed at most every 2 minutes, only ever from a copy that reads, and removed with
+  the save on logout. The start treats it as unsaved, so it is checked against the cloud's revision
+  (and the player asked when both moved on) instead of being trusted. Not a save key: never listed
+  as an account, never mirrored, never a backup.
 - **Failures** (network, server, 20 s timeout) are retried after 5, 15, 30,
   60 s, and at once when the browser comes back online. The game never
   waits for any of it.
