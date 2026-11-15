@@ -19,6 +19,7 @@ import { debtVars, stockTotal } from "@/game/engine/materials";
 import { seasonAt } from "@/game/engine/season";
 import { brokenSlot, moraleOf } from "@/game/engine/floor";
 import { cue } from "@/lib/feedback";
+import { isLowGraphics } from "@/lib/graphics-profile";
 import { FactoryAmbience } from "@/lib/ambience";
 import { BoostButton, BreakdownBanner, MoraleChip } from "../floor-controls";
 import { useGame } from "@/store/game-store";
@@ -69,7 +70,7 @@ export function FactoryInterior({ plotId }: { plotId: string }) {
       // a machine tapped: its card replaces the plant's panel
       if (s) setManage(false);
     };
-    engine.low = useGame.getState().state.settings.lowGraphics;
+    engine.low = isLowGraphics();
     engine.onTourEnd = () => setTouring(false);
     if (process.env.NODE_ENV !== "production") Object.assign(window, { __interior: engine });
     engine.start();

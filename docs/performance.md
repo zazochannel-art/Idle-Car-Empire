@@ -354,3 +354,33 @@ instead of today's value: a decision about the economy, not about speed.
 - Window glow on model glass (plants, dealers, garages) is a shader term on the shared glass material, no extra lights or draw calls.
 - Sea sun glitter is a shader term on the sea material only.
 - The UI gloss (buttons, cards, dialogs) is CSS only (gradients and inset shadows).
+
+## Graphics profiles (15 November 2026)
+
+Settings → **Graphics**: Low, Medium, High, Ultra (`lib/graphics-profile.ts`, the rungs in `map/quality.ts`
+`profileLadder`). The profile belongs to the phone: it is kept in the device's own storage (`ice.graphics`), never
+in the save or the cloud (so no `SAVE_VERSION`, and a profile chosen on a weak phone doesn't follow the account to a
+strong tablet). With none chosen yet, an older save's "low graphics" switch decides once (Low, otherwise High, which is
+what the game did until now), so updating changes nobody's picture.
+
+| Profile | Resolution ceiling | Map tiers | Other |
+|---|---|---|---|
+| Low | 1× | the old "low graphics" mode | 30 FPS, no shadows, no multisampling, half the traffic |
+| Medium | 1.5× | starts at tier 1 | fewer shadow redraws, far vehicles drawn simple, 80% of the trees in wide views |
+| High | 2× | all open | exactly what the game did before |
+| Ultra | 3× where the screen has it | all open | the largest shadow map the device's texture budget allows, narrow screens included |
+
+The governor (`Governor`) still steps down from the profile's ceiling when frames are slow and climbs back only to it.
+The saver's 1.5× cap applies on top. The step the map settled on is remembered per profile and screen density.
+The profile's size for the ground tiles and the shadow map is set when the map opens.
+The diagnostic report names the profile (`settings.graphicsProfile`).
+
+Not measured: the container has no GPU, so what each profile gains in frames has to be read on a phone with the
+diagnostic panel (Settings → tap "Credits" seven times).
+
+### What saving the UI on the phone does and does not buy
+
+Measured on a late-game save (35 KB of JSON): writing it costs about 0.11 ms, every 5 s (a frame at 60 FPS is 16.7 ms);
+the cloud upload is asynchronous, one request at a time, at most every 30 s. Neither is on the drawing path, so moving
+settings out of the save would not change the frame rate. The frames are decided by the 3D map's draw calls, shadows and
+resolution, which is what the profiles control. What does move with the profile is battery and heat.

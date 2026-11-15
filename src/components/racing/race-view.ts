@@ -3,7 +3,7 @@
 import type { TrackId } from "@/game/config/racing";
 import type { CarOnTrack } from "@/game/racing/tracks";
 import type { RaceRecord } from "@/game/types";
-import { useGame } from "@/store/game-store";
+import { isLowGraphics } from "@/lib/graphics-profile";
 import { RaceCanvas, type CameraMode } from "./race-canvas";
 import type { RaceCarView } from "./race-replay";
 import { RaceScene3D } from "./race3d/scene";
@@ -24,7 +24,7 @@ let noWebgl = false;
 export function createRaceView(canvas: HTMLCanvasElement, track: TrackId, rec: RaceRecord | null): RaceView {
   if (!noWebgl)
     try {
-      return new RaceScene3D(canvas, track, rec, { low: useGame.getState().state.settings.lowGraphics });
+      return new RaceScene3D(canvas, track, rec, { low: isLowGraphics() });
     } catch {
       noWebgl = true;
     }

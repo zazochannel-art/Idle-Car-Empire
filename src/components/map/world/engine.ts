@@ -6,7 +6,7 @@
 import * as THREE from "three";
 import { diagFrame, registerDiagSource, type Quality } from "@/lib/diagnostics";
 import { isSaving, shouldDraw } from "@/lib/power";
-import { Governor, TIERS, ladder, type Step } from "../quality";
+import { Governor, TIERS, profileLadder, type GraphicsProfile, type Step } from "../quality";
 import { deviceFacts, textureBudget, type TextureBudget } from "@/lib/gpu-budget";
 import { loadTile } from "./tiles";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
@@ -62,16 +62,17 @@ const CLOSE_VIEW = 70;
 
 /** The step of the quality ladder this device settled on last time (so a weak phone does not start at full detail every time). */
 const LEVEL_KEY = "ice.mapQuality";
-function readLevel(): number {
+function readLevel(profile: GraphicsProfile): number {
   try {
-    const v = JSON.parse(localStorage.getItem(LEVEL_KEY) ?? "null") as { dpr?: number; level?: number } | null;
-    if (v && v.dpr === (window.devicePixelRatio || 1) && Number.isInteger(v.level) && (v.level as number) >= 0) return v.level as number;
+    const v = JSON.parse(localStorage.getItem(LEVEL_KEY) ?? "null") as { dpr?: number; level?: number; profile?: string } | null;
+    // the rungs depend on the profile (a record from before profiles was made on "high")
+    if (v && v.dpr === (window.devicePixelRatio || 1) && (v.profile ?? "high") === profile && Number.isInteger(v.level) && (v.level as number) >= 0) return v.level as number;
   } catch {}
   return 0;
 }
-function writeLevel(level: number) {
+function writeLevel(level: number, profile: GraphicsProfile) {
   try {
-    localStorage.setItem(LEVEL_KEY, JSON.stringify({ dpr: window.devicePixelRatio || 1, level }));
+    localStorage.setItem(LEVEL_KEY, JSON.stringify({ dpr: window.devicePixelRatio || 1, level, profile }));
   } catch {}
 }
 /**
@@ -194,7 +195,8 @@ interface Live {
 }
 
 export interface EngineOptions {
-  low: boolean;
+  /** This device's graphics profile (lib/graphics-profile.ts). */
+  profile: GraphicsProfile;
 }
 
 export class MapEngine {
@@ -225,6 +227,7 @@ export class MapEngine {
   private h = 1;
   private dpr = 1;
   private maxDpr = 2;
+  private profile: GraphicsProfile;
   private low: boolean;
   /** How big the textures may be on this device (lib/gpu-budget.ts). */
   private budget: TextureBudget;
@@ -317,14 +320,15 @@ export class MapEngine {
     private onTap: (t: MapTarget) => void,
     private opt: EngineOptions,
   ) {
-    this.low = opt.low;
+    this.profile = opt.profile;
+    this.low = opt.profile === "low";
     this.cam = new CameraRig([WORLD_MAP.size[0] / 2, WORLD_MAP.size[1] / 2]);
     // low graphics (battery saver, weak phones): no multisampling, and the GPU's power-saving mode
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !this.low, powerPreference: this.low ? "low-power" : "high-performance" });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     // the size of the ground pictures, the filtering and the shadow map follow what the device can hold
     const caps = this.renderer.capabilities;
-    this.budget = textureBudget({ low: this.low, maxTextureSize: caps.maxTextureSize, maxAnisotropy: caps.getMaxAnisotropy(), ...deviceFacts() });
+    this.budget = textureBudget({ low: this.low, ultra: this.profile === "ultra", maxTextureSize: caps.maxTextureSize, maxAnisotropy: caps.getMaxAnisotropy(), ...deviceFacts() });
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.20;
     this.renderer.shadowMap.enabled = !this.low;
@@ -346,7 +350,7 @@ export class MapEngine {
     this.traffic = new TrafficFacade(() => this.trafficLayer);
     this.ro = new ResizeObserver(() => this.resize());
     this.ro.observe(canvas);
-    this.setLadder(readLevel());
+    this.setLadder(this.low ? 0 : readLevel(this.profile));
     this.resize();
     this.home(0);
     this.detach = this.attachControls();
@@ -617,10 +621,12 @@ export class MapEngine {
     };
   }
 
-  setLowGraphics(on: boolean) {
-    if (this.low === on) return;
-    this.low = on;
-    this.setLadder(on ? 0 : readLevel());
+  /** The player chose another graphics profile for this device (the ground tiles and the shadow map's size are set when the map opens). */
+  setProfile(p: GraphicsProfile) {
+    if (this.profile === p) return;
+    this.profile = p;
+    this.low = p === "low";
+    this.setLadder(this.low ? 0 : readLevel(p));
     this.applyTier();
     this.resize();
   }
@@ -628,8 +634,7 @@ export class MapEngine {
   /** The rungs of the quality ladder for this screen and mode (low graphics: resolution 1x, no climbing), and the one to stand on. */
   private setLadder(level: number) {
     const device = window.devicePixelRatio || 1;
-    const cap = this.low ? 1 : this.saving ? 1.5 : 2;
-    this.steps = ladder(device, cap);
+    this.steps = profileLadder(this.profile, device, this.saving);
     this.gov = new Governor(this.steps.length, this.low ? 0 : level, performance.now());
     this.level = this.gov.level;
     this.maxDpr = this.steps[this.level].dpr;
@@ -665,7 +670,7 @@ export class MapEngine {
     this.tier = now.tier;
     if (now.tier !== was.tier) this.applyTier();
     if (now.dpr !== was.dpr) this.resize();
-    if (!this.low) writeLevel(level);
+    if (!this.low) writeLevel(level, this.profile);
   }
 
   /** Whether the shadow map is in use (switching it recompiles the materials once). */

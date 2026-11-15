@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useGame } from "@/store/game-store";
+import { useProfile } from "@/lib/graphics-profile";
 import { batteryState, isIdle, isSaving } from "@/lib/power";
 import { activeSource, buildReport, readMemory, readSource, resetDiag, setDiagEnabled, snapHz, SLOW_MS, sourceNames, verdict, type SourceReading, type Verdict } from "@/lib/diagnostics";
 import { cn } from "@/lib/utils";
@@ -67,7 +68,8 @@ function Spark({ ms }: { ms: number[] }) {
 }
 
 export default function DiagOverlay() {
-  const lowGraphics = useGame((g) => g.state.settings.lowGraphics);
+  const profile = useProfile();
+  const lowGraphics = profile === "low";
   const saver = useGame((g) => g.state.settings.saver);
   const [open, setOpen] = useState(false);
   const [top, setTop] = useState(false);
@@ -88,7 +90,7 @@ export default function DiagOverlay() {
   const idleSaving = isSaving() && isIdle();
   const battery = batteryState();
 
-  const makeReport = () => JSON.stringify(buildReport({ appVersion: APP_VERSION, lowGraphics, saver, displayHz: hz }), null, 1);
+  const makeReport = () => JSON.stringify(buildReport({ appVersion: APP_VERSION, lowGraphics, profile, saver, displayHz: hz }), null, 1);
   const copy = async () => {
     const text = makeReport();
     try {
