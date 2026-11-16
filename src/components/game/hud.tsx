@@ -1,9 +1,8 @@
 "use client";
 
 import { ProfileButton } from "./account";
-import { Bell, Car, Factory, Moon, Settings, Star, Store, Sun, Sunset, SunMoon, TrendingUp } from "lucide-react";
+import { Bell, Car, Factory, Star, Store, TrendingUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { TIME_MODES } from "@/components/map/lighting";
 import { formatMoney, formatNumber } from "@/game/format";
 import { LANGS } from "@/i18n";
 import { useT } from "@/i18n/use-t";
@@ -22,7 +21,7 @@ import { AnimatedNumber } from "./animated-number";
 const money = (n: number) => formatMoney(n);
 
 /** Top bar floating over the map: the shop, cash, profit/s, production rate, factories, ⭐ Stars. */
-export function Hud({ onSettings }: { onSettings: () => void }) {
+export function Hud() {
   // each number has its own small component, so a tick re-renders only the figures that changed
   // (the bar, its buttons and icons stay as they are)
   const setView = useUi((u) => u.setView);
@@ -250,21 +249,3 @@ function CashFlash({ cash }: { cash: number }) {
   return <span key={pulse} className="cash-flash pointer-events-none absolute inset-0 rounded-xl" aria-hidden />;
 }
 
-const TIME_ICONS = { auto: SunMoon, day: Sun, evening: Sunset, night: Moon } as const;
-
-function TimeButton() {
-  const mode = useUi((u) => u.timeMode);
-  const setTimeMode = useUi((u) => u.setTimeMode);
-  const { t } = useT();
-  const Icon = TIME_ICONS[mode];
-  return (
-    <button
-      onClick={() => setTimeMode(TIME_MODES[(TIME_MODES.indexOf(mode) + 1) % TIME_MODES.length])}
-      className="flex size-10 items-center justify-center rounded-full bg-[#5b5b60]/85 text-gold shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_3px_0_0_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:brightness-110"
-      aria-label={t(`time.${mode}`)}
-      title={t(`time.${mode}`)}
-    >
-      <Icon className="size-5" />
-    </button>
-  );
-}

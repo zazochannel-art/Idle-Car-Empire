@@ -118,12 +118,14 @@ while (t < end) {
   if (supplierOf(s).autoBuy)
     for (const [id, b] of Ch.plantsOf(s)) if (!b.plant.autoBuy && plantMaterials(b.type as PlantType).length) Ch.setAutoBuy(s, id, true);
   restockLow(s, snap);
-  // then the cheapest thing (weighted), a few per second, keeping the cash for a few restocks:
+  // then the next plant, else the cheapest thing (weighted), a few per second, keeping the cash for a few restocks:
   // while saving up for it, only what costs a tenth of it meanwhile (else the next plant never came)
   const reserve = workingCapital(s, snap);
   for (let i = 0; i < 5; i++) {
     const opts = options(s).sort((a, b) => a.cost * (a.weight ?? 1) - b.cost * (b.weight ?? 1));
-    const target = opts[0];
+    // a new plant of the chain (the next car model needs it) is what the bot saves up for, like a
+    // player following the goals; the greedy cheapest-first alone left it hours behind on refines
+    const target = opts.find((o) => o.label.startsWith("build ")) ?? opts[0];
     if (!target) break;
     const pick = target.cost + reserve <= s.cash ? target : opts.find((o) => o.cost + reserve <= s.cash && o.cost * 10 <= target.cost);
     if (!pick) break;

@@ -13,6 +13,12 @@ const eslintConfig = defineConfig([
     ignores: ["src/game/engine/{chain,city,construction,live,racing,modifiers,economy}.ts"],
     rules: { "import/no-cycle": ["error", { ignoreExternal: true }] },
   },
+  // Parameters kept for a signature (`_mode`, `_t`) are prefixed with an underscore.
+  {
+    rules: {
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" }],
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

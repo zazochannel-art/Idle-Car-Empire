@@ -181,7 +181,8 @@ for (let t = 0; t < hours * 3600; t++) {
       case "upgrade": case "shortage": if ("what" in g && g.what) acted = g.what === "speed" ? Ch.upgradePlantSpeed(s, g.plot, gm) : Ch.upgradePlantLevel(s, g.plot, gm); break;
       case "materials": { const st = snap.chain.plants[g.plot]; acted = restockLow(s, snap) > 0 || (!!st && buyPlan(s, g.plot, suggestedRestock(s, g.plot, st.need, RESTOCK_UNITS))); break; }
       case "dealer": acted = buyDealer(s, g.dealer); break;
-      case "dealerFull": acted = g.open ? buyDealer(s, g.dealer) : upgradeDealer(s, g.dealer); break;
+      case "dealerFull": case "dealerSlow": acted = g.open ? buyDealer(s, g.dealer) : upgradeDealer(s, g.dealer); break;
+      case "research": acted = doResearch(s, g.research); break;
       case "car": if (g.plot && g.cost !== undefined) acted = Ch.upgradeGrade(s, g.plot, gm); break;
       case "autoBuy": for (const p of g.plots) Ch.setAutoBuy(s, p, true); acted = true; break;
       case "warehouse": acted = Ch.upgradeWarehouse(s, g.plot, gm); break;

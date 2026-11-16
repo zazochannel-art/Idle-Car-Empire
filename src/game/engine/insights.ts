@@ -12,10 +12,11 @@ import { CARS } from "../config/cars";
 import { MAKER, PLANTS, PLANT_BY_ID } from "../config/chain";
 import { DEALERS } from "../config/dealerships";
 import { MANAGERS } from "../config/managers";
+import { RESEARCH } from "../config/research";
 import { ZONE_BY_ID } from "../config/city";
 import { WORLD_MAP, dealerPlot } from "../city/layout";
 import type { CarId, ComponentId, DealerId, GameState, ManagerId, MaterialStock, PlantType, StructureType, ZoneId } from "../types";
-import { canOpenDealers, isManagerUnlocked } from "./actions";
+import { canOpenDealers, canResearch, isManagerUnlocked } from "./actions";
 import { bestGrade, carLock, carTrip, gradeCost, levelCost, plantLock, speedCost } from "./chain";
 import { hasPlant, plantsOf } from "./plants";
 import { isPlotUnlocked, nextZone, zoneBlocker } from "./city";
@@ -45,6 +46,10 @@ export type Goal =
   | { kind: "dealer"; icon: string; cost: number; dealer: DealerId }
   /** Every dealer is full and cars wait at the plants: the cheapest way to sell more (perMin: cars waiting). */
   | { kind: "dealerFull"; icon: string; cost: number; dealer: DealerId; open: boolean; perMin: number }
+  /** The showrooms hold most of what they can and sell slower than the line builds: open or upgrade a dealer (waiting: cars in the showrooms). */
+  | { kind: "dealerSlow"; icon: string; cost: number; dealer: DealerId; open: boolean; waiting: number }
+  /** Enough research points for a node that is open: research it (the cheapest). */
+  | { kind: "research"; icon: string; research: string; points: number }
   /** A plant is out of (or low on) material and nothing is on the way: buy for up to 10 units (`units`: what fits and is affordable). */
   | { kind: "materials"; icon: string; plot: string; material: MaterialId; cost: number; units: number }
   | { kind: "autoBuy"; icon: string; plots: string[] }
@@ -187,15 +192,23 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
   // Dealers can't keep up: finished cars are waiting at the plants.
   const waiting = plantsOf(s).reduce((a, [, b]) => (b.type === "assemblyPlant" && b.plant.status === "full" ? a + Math.floor(b.plant.out) : a), 0);
   if (waiting >= 1) {
-    let best: Extract<Goal, { kind: "dealerFull" }> | null = null;
-    for (const d of DEALERS) {
-      const st = s.dealers[d.id];
-      const open = !st.owned;
-      if (open && dealerRequirement(s, d.id) !== null) continue;
-      const cost = open ? d.cost : dealerUpgradeCost(s, d.id);
-      if (!best || cost < best.cost) best = { kind: "dealerFull", icon: d.emoji, cost, dealer: d.id, open, perMin: waiting };
+    const best = cheapestDealerStep(s);
+    if (best) goals.push({ kind: "dealerFull", icon: best.icon, cost: best.cost, dealer: best.dealer, open: best.open, perMin: waiting });
+  } else {
+    // ...or before that: the showrooms are nearly full, so they (not the plants) set the pace of sales.
+    // Without this a player who follows the goals keeps one dealer for hours and sales stop growing.
+    const slow = showroomBacklog(s, snap);
+    if (slow) {
+      const best = cheapestDealerStep(s);
+      if (best) goals.push({ kind: "dealerSlow", icon: best.icon, cost: best.cost, dealer: best.dealer, open: best.open, waiting: slow });
     }
-    if (best) goals.push(best);
+  }
+
+  // Research points piling up unused: the cheapest open node they already pay for. It costs no
+  // cash and only makes the empire better, so it comes before the goals that spend money.
+  if (s.chain.firstCar) {
+    const node = RESEARCH.filter((r) => r.cost <= s.rp && canResearch(s, r.id)).sort((a, b) => a.cost - b.cost)[0];
+    if (node) goals.push({ kind: "research", icon: "🔬", research: node.id, points: node.cost });
   }
 
   // A production milestone that unlocks the next plant (25 bodies → Engine Factory).
@@ -329,7 +342,7 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
   // over the account's limit: say so first, and suggest nothing that spends money it doesn't have
   if (s.chain.suspended) {
     const limit = debtLimit(s);
-    const spending: Goal["kind"][] = ["plant", "upgrade", "warehouse", "dealer", "dealerFull", "zone", "territory", "manager", "car", "racing", "imperium"];
+    const spending: Goal["kind"][] = ["plant", "upgrade", "warehouse", "dealer", "dealerFull", "dealerSlow", "zone", "territory", "manager", "car", "racing", "imperium"];
     const keep = goals.filter((g) => !spending.includes(g.kind) && !(g.kind === "shortage" && g.what));
     return [{ kind: "debt" as const, icon: "⛔", owed: s.chain.owed, limit, resume: limit * DEBT.halt * DEBT.resume }, ...keep].slice(0, max);
   }
@@ -344,6 +357,37 @@ export function workingCapital(s: GameState, snap: EconomySnapshot): number {
     if (st && Object.keys(st.need).length) c += restockPlan(s, id, st.need, RESERVE_UNITS, true).cost;
   }
   return c;
+}
+
+/** Share of the showrooms' room that has to be taken before the dealers count as the bottleneck. */
+export const SHOWROOM_BACKLOG = 0.6;
+
+/** Cars in the showrooms when they hold at least SHOWROOM_BACKLOG of their room (else 0). */
+export function showroomBacklog(s: GameState, snap: EconomySnapshot): number {
+  let cars = 0;
+  let cap = 0;
+  for (const d of DEALERS) {
+    if (!s.dealers[d.id].owned) continue;
+    const info = snap.chain.dealers[d.id];
+    if (!info) continue;
+    cars += s.chain.dealers[d.id]?.cars ?? 0;
+    cap += info.stockCap;
+  }
+  return cap > 0 && cars >= 2 && cars >= cap * SHOWROOM_BACKLOG ? Math.floor(cars) : 0;
+}
+
+/** The cheapest way to sell more cars: open a dealer the player can open, or upgrade one. */
+function cheapestDealerStep(s: GameState): { icon: string; cost: number; dealer: DealerId; open: boolean } | null {
+  let best: { icon: string; cost: number; dealer: DealerId; open: boolean } | null = null;
+  for (const d of DEALERS) {
+    const st = s.dealers[d.id];
+    const open = !st.owned;
+    if (open && dealerRequirement(s, d.id) !== null) continue;
+    const cost = open ? d.cost : dealerUpgradeCost(s, d.id);
+    if (!Number.isFinite(cost)) continue;
+    if (!best || cost < best.cost) best = { icon: d.emoji, cost, dealer: d.id, open };
+  }
+  return best;
 }
 
 /** The cheaper of a plant's speed and level upgrades. */

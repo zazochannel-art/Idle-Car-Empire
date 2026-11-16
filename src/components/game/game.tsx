@@ -350,7 +350,7 @@ function Shell() {
         <EmpireMap active={!garage && !floor && !racing} panelOffset={panelOffset} />
       </ScreenBoundary>
       <ScreenBoundary onClose={() => {}}>
-        <Hud onSettings={() => setSettings(true)} />
+        <Hud />
       </ScreenBoundary>
       <LeftRail />
       {/* on phones the showroom card sits where the goal tracker is */}

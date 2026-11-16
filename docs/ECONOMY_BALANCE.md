@@ -150,3 +150,30 @@ Stars a month for an engaged player (logs in daily, ~2 h of play), before → af
 (premium orders only), partner deals 50–160 → ≤ 28, earnings 3–6 → 5–10; the fixed sources
 (login 16, racing season ~12, Auto Show ~8, free pass 8, chest and box ~7) are unchanged. The
 premium pass's 14 ⭐ go from ~10% of a month's Stars to about 15–20%.
+
+## 8. The mid-game plateau: what the goals didn't say (Nov 16, 2026)
+
+No number in `config/` changed. A player who only follows the **What's next** goals (`goal-bot.ts 6 q`)
+stayed on one Economy Dealer for hours and never spent a research point: the goals suggested a dealer
+only once finished cars piled up at the plant, and never suggested research. Sales were capped by
+the one showroom (25–29 of its 30 cars waiting) and income stopped growing at about $200–550/s.
+
+| Goal (`engine/insights.ts`) | When | Why |
+|---|---|---|
+| **dealerSlow** (new) | the open showrooms hold ≥ 60% of their room (`SHOWROOM_BACKLOG`) | the dealers, not the plants, set the pace of sales: open the cheapest dealer that can be opened, or upgrade one |
+| **research** (new) | after the first car, the cheapest open node the research points already pay for | points piled up unused (13K after 6 h); it costs no cash, so it comes before the goals that spend money |
+
+| Bot | Before | After |
+|---|---|---|
+| Goal-follower, 6 h (`6 q`): earned · steady income | $18.5M · $503/s | **$113M · $4,538/s** |
+| Goal-follower, 6 h: research nodes · dealers | 0 · 1 | 24 · 2 |
+| Full player, 8 h (`8 full`): earned | $271M | $327M (+21%) |
+| 24 h of play-1-h / away-7-h (`24 sessions`) | — | $200M, max owed $13.6K, no rescues |
+
+The full player already researched and opened dealers by itself, so it barely changes: the new goals
+close the gap between a player who follows the hints and one who knows every system.
+
+`scripts/simulate.ts` (the greedy bot) now saves up for the next plant of the chain instead of buying
+the cheapest upgrade forever: the Suspension Factory came at 3 h 56 min (Sedan at 3 h 57 min); now at
+1 h 0 min (Sedan 1 h 2 min). Its first car (18–22 min) is earlier than the goal-follower's (43 min 44 s)
+because it doesn't wait for the goals: the two bots measure different players.
