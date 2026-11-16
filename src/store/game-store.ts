@@ -1528,6 +1528,9 @@ export const useGame = create<GameStore>((set, get) => {
       // the same player starting over is not a new player: the funnel steps already sent stay sent
       state.funnel = [...old.funnel];
       state.settings.stats = old.settings.stats;
+      // the purchases belong to the player's account, not to the company: kept, so the store handing the
+      // starter pack back at the next return to the app finds it given already (it was paid out again each time)
+      state.iap = { owned: [...old.iap.owned], tokens: [...old.iap.tokens] };
       refreshDaily(state, Date.now());
       setWorld(state.activeCity);
       const snap = snapshot(state);

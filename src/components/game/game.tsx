@@ -528,7 +528,7 @@ function LeftRail() {
     ...PILLARS.map((p) => ({ id: p.id, icon: p.icon, badge: p.id === "empire" ? badges.research : p.id === "business" ? badges.missions : 0 })),
   ];
   return (
-    <nav className="hidden absolute left-[calc(env(safe-area-inset-left)+0.5rem)] top-[calc(env(safe-area-inset-top)+6.75rem)] md:flex z-20 flex flex-col gap-1 rounded-xl hud-bar p-1 md:left-[calc(env(safe-area-inset-left)+0.75rem)] md:top-[calc(env(safe-area-inset-top)+11rem)] land:top-[calc(env(safe-area-inset-top)+4.75rem)] land:gap-0.5 land:p-0.5">
+    <nav className="hidden absolute left-[calc(env(safe-area-inset-left)+0.5rem)] top-[calc(env(safe-area-inset-top)+6.75rem)] md:flex land:flex z-20 flex flex-col gap-1 rounded-xl hud-bar p-1 md:left-[calc(env(safe-area-inset-left)+0.75rem)] md:top-[calc(env(safe-area-inset-top)+11rem)] land:top-[calc(env(safe-area-inset-top)+4.75rem)] land:gap-0.5 land:p-0.5">
       {items.map((r) => {
         const active = r.id === "map" ? nothing : current === r.id;
         const label = r.id === "map" ? t("map.nav.map") : t(`pillar.${r.id}`);
@@ -620,7 +620,7 @@ function GoalTracker() {
   if (!view) return null;
   const { icon, title, detail, bar, pct, label, ready } = view;
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] z-20 flex justify-center px-3">
+    <div className="pointer-events-none absolute inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] z-20 flex justify-center px-3 land:bottom-[calc(env(safe-area-inset-bottom)+3.75rem)] land:justify-start land:pl-[calc(env(safe-area-inset-left)+3.75rem)]">
       <button
         onClick={() => {
           const g = useGame.getState();
@@ -628,7 +628,7 @@ function GoalTracker() {
           if (goal) runGoal(goal);
         }}
         className={cn(
-          "pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-xl p-2.5 text-left shadow-[0_4px_0_0_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:brightness-110",
+          "pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-xl p-2.5 land:max-w-[15rem] land:gap-2 land:p-1.5 text-left shadow-[0_4px_0_0_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:brightness-110",
           ready ? "bg-[#2b2b2e]/95 ring-2 ring-gold" : "bg-[#2b2b2e]/90",
         )}
       >

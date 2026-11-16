@@ -166,3 +166,42 @@ describe("no limit a day", () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe("the pause after a rewarded ad", () => {
+  const store = new Map<string, string>();
+  beforeEach(() => {
+    store.clear();
+    vi.stubGlobal("localStorage", { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => store.set(k, v) });
+    setAdFree(false);
+    setAdStatus({ ready: true, showing: false });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  const driver = (result: "rewarded" | "failed") => ({
+    show: async (onReward: () => void) => {
+      if (result === "rewarded") onReward();
+      return result;
+    },
+    privacyForm: async () => {},
+    showInterstitial: async () => false,
+    showAppOpen: async () => false,
+  });
+
+  it("is kept on the phone, so a restart doesn't end it", async () => {
+    registerAdDriver(driver("rewarded"));
+    expect(await watchAd(() => {})).toBe("rewarded");
+    expect(JSON.parse(store.get("ice.interstitial") ?? "null").last).toBeGreaterThan(0);
+  });
+
+  it("is not started by an ad that couldn't be shown", async () => {
+    registerAdDriver(driver("failed"));
+    store.set("ice.interstitial", JSON.stringify({ last: 1234 }));
+    expect(await watchAd(() => {})).toBe("failed");
+    expect(JSON.parse(store.get("ice.interstitial")!).last).toBe(1234);
+  });
+
+  it("an ad network that throws counts as a failed ad", async () => {
+    registerAdDriver({ ...driver("failed"), show: async () => Promise.reject(new Error("boom")) });
+    expect(await watchAd(() => {})).toBe("failed");
+  });
+});
