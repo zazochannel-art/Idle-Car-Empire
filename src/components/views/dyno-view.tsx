@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CARS, type CarConfig } from "@/game/config/cars";
 import { ECU_STAGES, TURBO_STAGES, type EcuStage, type TurboStage } from "@/game/config/tuning";
@@ -26,6 +26,12 @@ export function DynoView() {
   const topSpeed = Math.round(180 + totalHp * 0.22);
   const certBonus = Math.min(25, Math.round((ecuInfo.certBonus + (turbo === "raceTurbo" ? 0.08 : turbo === "twinTurbo" ? 0.04 : 0)) * 100));
 
+  // the test's timer: stopped when the screen closes (it must not set state on a screen that is gone)
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => () => {
+    if (timer.current) clearInterval(timer.current);
+  }, []);
+
   const runTestTrack = () => {
     if (testing) return;
     setTesting(true);
@@ -33,17 +39,16 @@ export function DynoView() {
     setCertified(false);
     setTestTime(null);
 
-    const interval = setInterval(() => {
-      setTestProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setTesting(false);
-          setCertified(true);
-          setTestTime(Number((zeroHundred * 1.4).toFixed(2)));
-          return 100;
-        }
-        return prev + 10;
-      });
+    let progress = 0;
+    timer.current = setInterval(() => {
+      progress = Math.min(100, progress + 10);
+      setTestProgress(progress);
+      if (progress < 100) return;
+      if (timer.current) clearInterval(timer.current);
+      timer.current = null;
+      setTesting(false);
+      setCertified(true);
+      setTestTime(Number((zeroHundred * 1.4).toFixed(2)));
     }, 150);
   };
 

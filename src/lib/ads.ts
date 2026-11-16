@@ -79,14 +79,26 @@ export async function watchAd(onReward: () => void): Promise<AdResult> {
     return "rewarded";
   }
   if (!driver || !status.ready || status.showing) return "failed";
-  lastAdAt = Date.now();
+  // the pause after any ad starts now, kept on the phone too; an ad that couldn't be shown doesn't start it
+  const before = lastAdAt;
+  const storedBefore = readLast();
+  const now = Date.now();
+  lastAdAt = now;
+  writeLast(now);
   // one ad, one reward, whatever the ad network reports (a shop pack would be given twice)
   let rewarded = false;
-  return driver.show(() => {
-    if (rewarded) return;
-    rewarded = true;
-    onReward();
-  });
+  const result = await driver
+    .show(() => {
+      if (rewarded) return;
+      rewarded = true;
+      onReward();
+    })
+    .catch((): AdResult => "failed");
+  if (result === "failed" && !rewarded) {
+    lastAdAt = before;
+    writeLast(storedBefore);
+  }
+  return result;
 }
 
 // ───────────────────────────── full-screen ads (no reward) ─────────────────────────────
