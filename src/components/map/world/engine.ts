@@ -11,24 +11,17 @@ import { deviceFacts, textureBudget, type TextureBudget } from "@/lib/gpu-budget
 import { loadTile } from "./tiles";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { DEPOT, MARKET, RACING_AREA, STARTER_PLOT, WORLD_MAP, type Plot } from "@/game/city/layout";
-import { SPEC_BY_ID, STRUCTURE_BY_ID, ZONES, type TerritoryId } from "@/game/config/city";
-import { COMPONENT_BY_ID } from "@/game/config/chain";
-import { DEALER_BY_ID } from "@/game/config/dealerships";
-import { MAP_BONUS_BY_KIND } from "@/game/config/map-bonus";
-import { slowsDeliveries } from "@/game/engine/map-bonus";
-import { levelCost } from "@/game/engine/chain";
-import { flowLinks, type FlowState } from "@/game/engine/flow";
+import { type TerritoryId } from "@/game/config/city";
 import { seasonAt } from "@/game/engine/season";
-import { plotStatus, type PlotStatus } from "@/game/engine/construction";
+import { type PlotStatus } from "@/game/engine/construction";
 import type { EconomySnapshot } from "@/game/engine/economy";
 import { unlockedAreas } from "@/game/engine/territory";
-import type { ComponentId, GameState, StructureType, ZoneId } from "@/game/types";
-import { MOON, dawnMist, skyAt, sunAt, worldClock, type TimeMode } from "../lighting";
+import type { GameState, StructureType, ZoneId } from "@/game/types";
+import { skyAt, worldClock, type TimeMode } from "../lighting";
 import { weatherAt, type Weather } from "../weather";
 import type { MapArea, MapNames, MapTarget, ShipView, Site, ZoomTier } from "../map-types";
 import type { CarModel } from "../vehicles";
 import { LOCK, freezeStatic, mapMaterials, splitSharedMaterials, type MapMaterials } from "./kit";
-import { banner, pop, tag } from "./labels";
 import { PlotLayer, plotViews, type PlotView } from "./plots";
 import { RaceCars } from "./race";
 import { buildRoads } from "./roads";
@@ -44,58 +37,12 @@ import { BonusLayer } from "./bonus";
 import { Fx } from "./fx";
 import { Movers } from "./movers";
 import { WeatherFx } from "./weather-fx";
+import { aimSun, applySky, sunNow } from "./engine-sun";
+import { attachControls, onPlane } from "./engine-controls";
+import { drawLabels, placeCards } from "./engine-overlays";
+import { AREA_IDS, CLOSE_VIEW, DIST1, FOV, TIER_ZOOM, ease, readLevel, smoothstep, writeLevel } from "./engine-shared";
 
 export { ZOOM_TIERS, type ZoomTier } from "../map-types";
-
-/** Camera distance (world units) at zoom 1: about ten lots across. */
-const DIST1 = 30;
-/** Zoom of each tier ("region" is the minimum zoom, "buildings" the default zoom). */
-const TIER_ZOOM = { region: 0, districts: 0.42, buildings: 1, detail: 2.6 };
-/** Below this zoom the district names are shown over the map. */
-const LABEL_ZOOM = 0.55;
-/**
- * Camera distance under which a view is "close up": the scenery draws its
- * small cells (most are out of view and culled) and traffic its real car
- * models; further out, the whole scenery sets and the simple car batch.
- */
-const CLOSE_VIEW = 70;
-
-/** The step of the quality ladder this device settled on last time (so a weak phone does not start at full detail every time). */
-const LEVEL_KEY = "ice.mapQuality";
-function readLevel(profile: GraphicsProfile): number {
-  try {
-    const v = JSON.parse(localStorage.getItem(LEVEL_KEY) ?? "null") as { dpr?: number; level?: number; profile?: string } | null;
-    // the rungs depend on the profile (a record from before profiles was made on "high")
-    if (v && v.dpr === (window.devicePixelRatio || 1) && (v.profile ?? "high") === profile && Number.isInteger(v.level) && (v.level as number) >= 0) return v.level as number;
-  } catch {}
-  return 0;
-}
-function writeLevel(level: number, profile: GraphicsProfile) {
-  try {
-    localStorage.setItem(LEVEL_KEY, JSON.stringify({ dpr: window.devicePixelRatio || 1, level, profile }));
-  } catch {}
-}
-/**
- * Where the sun stands at noon, round the map (radians in the ground plane, from +x towards +z): in
- * front of the usual view (the camera looks along −z) and to its left, so the sides in view are lit
- * and the shadows fall behind and to the right, where they show. Morning comes from the right, the
- * evening sun from the left: never from straight behind the scene, its shadows hidden under it.
- */
-const NOON = (150 * Math.PI) / 180;
-/** How far round from noon it rises and sets (radians). */
-const SUN_SWING = 1.45;
-/** The tallest things on the map: the shadow box reaches this high over the ground in view. */
-const SHADOW_TOP = 7;
-const FOV = 40;
-/** Game area ids in the order of the areas raster (id = index + 1; 0 = sea). */
-const AREA_IDS = ["town", "industrial", "downtown", "automotive", "luxury", "supercar", "mega", "global", "mountain", "port", "raw", "suburbs", "boulevard", "airport", "campus", "racing"];
-const ZONE_IDS = new Set<string>(ZONES.map((z) => z.id));
-
-const smoothstep = (a: number, b: number, x: number) => {
-  const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
-  return t * t * (3 - 2 * t);
-};
-const ease = (k: number) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
 
 /**
  * The camera: a point on the ground it looks at, a zoom (camera distance
@@ -189,7 +136,7 @@ interface Pop {
   age: number;
 }
 
-interface Live {
+export interface Live {
   state: GameState;
   snap: EconomySnapshot;
 }
@@ -213,19 +160,19 @@ export class MapEngine {
   names: MapNames | null = null;
 
   private renderer: THREE.WebGLRenderer;
-  private scene = new THREE.Scene();
-  private camera = new THREE.PerspectiveCamera(FOV, 1, 0.5, 2000);
-  private sun = new THREE.DirectionalLight("#fff3df", 3.3);
-  private hemi = new THREE.HemisphereLight("#d6ecff", "#6f7d5c", 0.6);
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(FOV, 1, 0.5, 2000);
+  sun = new THREE.DirectionalLight("#fff3df", 3.3);
+  hemi = new THREE.HemisphereLight("#d6ecff", "#6f7d5c", 0.6);
   /** Towards the sun (or the moon) now, and the shadow camera's frame worked out from it. */
-  private sunDir = new THREE.Vector3(-0.45, 1, -0.3).normalize();
+  sunDir = new THREE.Vector3(-0.45, 1, -0.3).normalize();
   private sunNext = new THREE.Vector3();
-  private sunFrame = new THREE.OrthographicCamera();
-  private sunPts = Array.from({ length: 8 }, () => new THREE.Vector3());
-  private ctx: CanvasRenderingContext2D;
-  private w = 1;
-  private h = 1;
-  private dpr = 1;
+  sunFrame = new THREE.OrthographicCamera();
+  sunPts = Array.from({ length: 8 }, () => new THREE.Vector3());
+  ctx: CanvasRenderingContext2D;
+  w = 1;
+  h = 1;
+  dpr = 1;
   private maxDpr = 2;
   private profile: GraphicsProfile;
   private low: boolean;
@@ -248,7 +195,7 @@ export class MapEngine {
   /** Removes this view from the diagnostic panel (lib/diagnostics.ts). */
   private diagOff: (() => void) | null = null;
 
-  private ground: Ground | null = null;
+  ground: Ground | null = null;
   private terrain: TerrainParts | null = null;
   private scenery: Scenery | null = null;
   /** Shadows are drawn (close enough), and the frame parity for redrawing them. */
@@ -257,12 +204,12 @@ export class MapEngine {
   /** Frames since shared materials were last split (splitSharedMaterials). */
   private splitTick = 0;
   /** Bumped whenever the camera moves; the HTML cards are placed again only then (or now and then). */
-  private viewVersion = 0;
-  private cardsAt = { version: -1, frame: 0 };
-  private cardStyle = new WeakMap<HTMLElement, { vis: string; tf: string }>();
-  private plots: PlotLayer | null = null;
+  viewVersion = 0;
+  cardsAt = { version: -1, frame: 0 };
+  cardStyle = new WeakMap<HTMLElement, { vis: string; tf: string }>();
+  plots: PlotLayer | null = null;
   readonly traffic: TrafficFacade;
-  private trafficLayer: Traffic3D | null = null;
+  trafficLayer: Traffic3D | null = null;
   private signals: Signals | null = null;
   private signalLamps: SignalLamps | null = null;
   private peds: Pedestrians | null = null;
@@ -270,8 +217,8 @@ export class MapEngine {
   private race: RaceCars | null = null;
   private mats: MapMaterials | null = null;
   private fx: Fx | null = null;
-  private weather: WeatherFx | null = null;
-  private bonus: BonusLayer | null = null;
+  weather: WeatherFx | null = null;
+  bonus: BonusLayer | null = null;
   private movers: Movers | null = null;
   /** The weather to show instead of the forecast (tests and screenshots). */
   weatherOverride: Weather | null = null;
@@ -280,44 +227,44 @@ export class MapEngine {
   /** Another player's empire is on the map (engine/visit.ts): no hints meant for the player. */
   visiting = false;
   /** Dealerships with no car to sell, and since when (s): "out of stock" after a while. */
-  private emptySince = new Map<string, number>();
+  emptySince = new Map<string, number>();
   /** Where the arrow to an off-screen bonus is drawn (CSS px), to tap it. */
-  private bonusArrow: [number, number] | null = null;
-  private glows: THREE.Points | null = null;
-  private pools: THREE.InstancedMesh | null = null;
+  bonusArrow: [number, number] | null = null;
+  glows: THREE.Points | null = null;
+  pools: THREE.InstancedMesh | null = null;
   private roadMarks: THREE.Group | null = null;
   private areaIds: Uint8Array | null = null;
   private areaSize: [number, number] = [1, 1];
   private lockTex: THREE.DataTexture | null = null;
   private lockKey = "";
 
-  private unlocked: Set<string> = new Set(["town"]);
+  unlocked: Set<string> = new Set(["town"]);
   private views: Map<string, PlotView> | null = null;
-  private _selected: string | null = null;
+  _selected: string | null = null;
   private _buildInfo: Map<string, PlotStatus> | null = null;
   private _preview: { plot: string; type: StructureType } | null = null;
 
-  private pops: Pop[] = [];
-  private banners: { plot: Plot; text: string; age: number }[] = [];
+  pops: Pop[] = [];
+  banners: { plot: Plot; text: string; age: number }[] = [];
   private earners: { plot: Plot; perSec: number; acc: number; every: number }[] = [];
-  private followUntil = 0;
-  private tracked: { ref: object } | null = null;
+  followUntil = 0;
+  tracked: { ref: object } | null = null;
   private raf = 0;
   private last = 0;
-  private t = 0;
+  t = 0;
   private lastLabelsAt = 0;
   private running = false;
   private ro: ResizeObserver;
-  private ty = 0;
+  ty = 0;
   private cameraDirty = true;
   private lastCamera = { x: NaN, z: NaN, zoom: NaN, az: NaN, ty: NaN };
   private detach: () => void;
   private destroyed = false;
 
   constructor(
-    private canvas: HTMLCanvasElement,
+    readonly canvas: HTMLCanvasElement,
     private labels: HTMLCanvasElement,
-    private onTap: (t: MapTarget) => void,
+    readonly onTap: (t: MapTarget) => void,
     private opt: EngineOptions,
   ) {
     this.profile = opt.profile;
@@ -353,7 +300,7 @@ export class MapEngine {
     this.setLadder(this.low ? 0 : readLevel(this.profile));
     this.resize();
     this.home(0);
-    this.detach = this.attachControls();
+    this.detach = attachControls(this);
     this.ready = this.load();
     this.ready.catch((e) => console.error("map: could not load the world", e));  }
 
@@ -771,7 +718,7 @@ export class MapEngine {
    * it sees). The level it looks at follows the ground over `dt` seconds
    * (0 snaps it there; a negative dt keeps it, so a drag stays steady).
    */
-  private place(dt: number) {
+  place(dt: number) {
     const c = this.cam;
     const g = this.ground;
     const want = g ? g.at(c.x, c.z) : 0;
@@ -808,7 +755,7 @@ export class MapEngine {
     // the shadow box moved with the view: redraw the shadows this frame
     if (near) this.renderer.shadowMap.needsUpdate = true;
     this.sun.shadow.intensity = smoothstep(110, 80, d);
-    this.aimSun();
+    aimSun(this);
     this.lastCamera.x = c.x;
     this.lastCamera.z = c.z;
     this.lastCamera.zoom = c.zoom;
@@ -816,71 +763,6 @@ export class MapEngine {
     this.lastCamera.ty = this.ty;
     this.cameraDirty = false;
     this.viewVersion++;
-  }
-
-  /**
-   * Points the sun (from where it stands this time of day) at the middle of the view, and fits its
-   * shadow box round what the camera sees: the view's corners on the ground and up to the tallest
-   * buildings, in the sun's own frame. Everything on screen casts its shadow, as sharp as the
-   * shadow map allows (the box was a square round the middle before: the edges of the view had none).
-   */
-  private aimSun() {
-    const c = this.cam;
-    const cam = this.camera;
-    const target = this.sun.target.position.set(c.x, this.ty, c.z);
-    this.sun.position.copy(target).addScaledVector(this.sunDir, 400);
-    const frame = this.sunFrame;
-    frame.position.copy(this.sun.position);
-    frame.lookAt(target);
-    frame.updateMatrixWorld();
-    // the ground the camera sees: its four corners (a ray that misses the ground stops three views out)
-    const reach = c.dist * 3 + 20;
-    const pts = this.sunPts;
-    for (let i = 0; i < 4; i++) {
-      const v = pts[i].set(i & 1 ? 1 : -1, i & 2 ? 1 : -1, 0.5).unproject(cam).sub(cam.position).normalize();
-      let t = v.y < -1e-3 ? (this.ty - cam.position.y) / v.y : reach;
-      const flat = Math.hypot(v.x, v.z) * t;
-      if (flat > reach) t *= reach / flat;
-      v.multiplyScalar(t).add(cam.position);
-      v.y = this.ty;
-      pts[i + 4].copy(v).setY(this.ty + SHADOW_TOP);
-    }
-    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, z0 = Infinity, z1 = -Infinity;
-    for (const q of pts) {
-      q.applyMatrix4(frame.matrixWorldInverse);
-      x0 = Math.min(x0, q.x);
-      x1 = Math.max(x1, q.x);
-      y0 = Math.min(y0, q.y);
-      y1 = Math.max(y1, q.y);
-      z0 = Math.min(z0, q.z);
-      z1 = Math.max(z1, q.z);
-    }
-    // a margin for what stands just out of view, no more than the old box at its widest, and
-    // snapped to whole units so the box keeps still while the view creeps
-    const cap = 110;
-    const mid = [(x0 + x1) / 2, (y0 + y1) / 2];
-    const hx = Math.min(cap, (x1 - x0) / 2 + 2);
-    const hy = Math.min(cap, (y1 - y0) / 2 + 2);
-    const sh = this.sun.shadow.camera;
-    sh.left = Math.floor(mid[0] - hx);
-    sh.right = Math.ceil(mid[0] + hx);
-    sh.bottom = Math.floor(mid[1] - hy);
-    sh.top = Math.ceil(mid[1] + hy);
-    sh.near = Math.max(1, -z1 - 40);
-    sh.far = -z0 + 40;
-    sh.updateProjectionMatrix();
-  }
-
-  /** Towards the light now: the sun along its path through the day, handed over to the moon by night. */
-  private sunNow(out: THREE.Vector3) {
-    const sun = sunAt(this.timeMode, worldClock.t);
-    const toward = (el: number, turn: number, v: THREE.Vector3) => {
-      const a = NOON + turn * SUN_SWING;
-      return v.set(Math.cos(el) * Math.cos(a), Math.sin(el), Math.cos(el) * Math.sin(a));
-    };
-    toward(sun.el, sun.turn, out);
-    if (sun.moon > 0) out.lerp(toward(MOON.el, MOON.turn, this.v3), sun.moon).normalize();
-    return out;
   }
 
   private steamAcc = 0;
@@ -939,11 +821,11 @@ export class MapEngine {
     worldClock.t += dt;
     LOCK.uniforms.uWind.value = this.t;
     const sky = skyAt(this.timeMode, worldClock.t);
-    this.applySky(sky.dark);
+    applySky(this, sky.dark);
     // the sun moves on (its shadows with it) once it has turned a little
-    if (this.sunNow(this.sunNext).dot(this.sunDir) < 0.99999) {
+    if (sunNow(this, this.sunNext).dot(this.sunDir) < 0.99999) {
       this.sunDir.copy(this.sunNext);
-      this.aimSun();
+      aimSun(this);
       if (this.shadowLive) this.renderer.shadowMap.needsUpdate = true;
     }
 
@@ -998,318 +880,34 @@ export class MapEngine {
     const labelDt = this.t - this.lastLabelsAt;
     if (labelDt >= 1 / 30) {
       this.lastLabelsAt = this.t;
-      this.drawLabels(labelDt, live);
+      drawLabels(this, labelDt, live);
     }
-    this.placeCards();
+    placeCards(this);
   }
 
-  private skyCol = new THREE.Color();
-  private readonly skyDay = new THREE.Color("#bfe3f7");
-  private readonly skyDusk = new THREE.Color("#f3c39b");
-  private readonly skyNight = new THREE.Color("#0d1a33");
-  private readonly skyGrey = new THREE.Color("#b7c0c9");
-  private readonly fogGrey = new THREE.Color("#dfe4e8");
-  private readonly sunWarm = new THREE.Color("#fff3df");
-  private readonly sunNight = new THREE.Color("#ffb070");
-  private readonly hemiDay = new THREE.Color("#d6ecff");
-  private readonly hemiNight = new THREE.Color("#5d6fae");
-  private applySky(dark: number) {
-    const day = this.skyDay;
-    const dusk = this.skyDusk;
-    const night = this.skyNight;
-    const c = this.skyCol;
-    if (dark <= 0.5) c.copy(day).lerp(dusk, dark / 0.5);
-    else c.copy(dusk).lerp(night, (dark - 0.5) / 0.5);
-    // rain or snow clouds grey the sky; fog and the morning mist close in round the view
-    const over = this.weather?.overcast ?? 0;
-    const mist = Math.max(this.weather?.fog ?? 0, dawnMist(this.timeMode, worldClock.t) * 0.55);
-    c.lerp(this.skyGrey, Math.min(0.7, over * 0.45 + mist * 0.4) * (1 - dark * 0.7));
-    (this.scene.background as THREE.Color).copy(c);
-    const fog = this.scene.fog as THREE.Fog;
-    fog.color.copy(c);
-    const d = this.cam.dist;
-    fog.near = d * 2.2 + 60 + (d * 0.15 - (d * 2.2 + 60)) * mist;
-    fog.far = d * 6 + 400 + (d * 1.5 - (d * 6 + 400)) * mist;
-    // the fog itself is a pale grey (by night it takes the sky's colour)
-    fog.color.lerp(this.fogGrey, mist * 0.8 * (1 - dark));
-    // the sun carries the light and the fill (sky and room light) stays low, so the shadows read
-    // clearly; by night the fill dims less than the sun, or the map would go black
-    this.sun.intensity = 3.3 * (1 - dark * 0.9) * (1 - 0.45 * over - 0.2 * mist);
-    this.sun.color.copy(this.sunWarm).lerp(this.sunNight, Math.min(1, dark * 1.4) * 0.6);
-    this.hemi.intensity = 0.6 - dark * 0.3;
-    this.hemi.color.copy(this.hemiDay).lerp(this.hemiNight, dark);
-    // wet ground and rain-washed colours catch more of the sky's light: the streets shine
-    this.scene.environmentIntensity = 0.25 * (1 - dark * 0.5) + 0.3 * LOCK.uniforms.uWet.value * (1 - dark * 0.4);
-    // clouds drift over the land by day, less under a grey sky
-    LOCK.uniforms.uCloud.value = (1 - smoothstep(0.3, 0.8, dark)) * (1 - 0.6 * over);
-    // the windows light up as the evening comes on
-    LOCK.uniforms.uNight.value = smoothstep(0.35, 0.8, dark);
-    if (this.glows) {
-      const k = smoothstep(0.55, 0.9, dark);
-      (this.glows.material as THREE.PointsMaterial).opacity = k;
-      this.glows.visible = k > 0.01;
-      if (this.pools) {
-        (this.pools.material as THREE.MeshBasicMaterial).opacity = k * 0.5;
-        this.pools.visible = k > 0.01;
-      }
-    }
-  }
+  skyCol = new THREE.Color();
+  readonly skyDay = new THREE.Color("#bfe3f7");
+  readonly skyDusk = new THREE.Color("#f3c39b");
+  readonly skyNight = new THREE.Color("#0d1a33");
+  readonly skyGrey = new THREE.Color("#b7c0c9");
+  readonly fogGrey = new THREE.Color("#dfe4e8");
+  readonly sunWarm = new THREE.Color("#fff3df");
+  readonly sunNight = new THREE.Color("#ffb070");
+  readonly hemiDay = new THREE.Color("#d6ecff");
+  readonly hemiNight = new THREE.Color("#5d6fae");
 
   // ───────────────────────── labels ─────────────────────────
 
-  private v3 = new THREE.Vector3();
+  v3 = new THREE.Vector3();
   /** World point → CSS px on screen; null behind the camera. */
-  private project(x: number, y: number, z: number): [number, number] | null {
+  project(x: number, y: number, z: number): [number, number] | null {
     const v = this.v3.set(x, y, z).project(this.camera);
     if (v.z > 1 || v.z < -1) return null;
     return [(v.x * 0.5 + 0.5) * this.w, (-v.y * 0.5 + 0.5) * this.h];
   }
 
-  private onScreen(p: [number, number] | null, m = 60): p is [number, number] {
+  onScreen(p: [number, number] | null, m = 60): p is [number, number] {
     return !!p && p[0] > -m && p[1] > -m && p[0] < this.w + m && p[1] < this.h + m;
-  }
-
-  private drawLabels(dt: number, live: Live | null) {
-    const c = this.ctx;
-    c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    c.clearRect(0, 0, this.w, this.h);
-    const plots = this.plots;
-    const names = this.names;
-    if (!plots || !live || !names) return;
-    const s = live.state;
-    const zoom = this.cam.zoom;
-    const anyCar = s.chain.firstCar || s.lifetime.carsProduced > 0;
-    if (this.flow) this.drawFlow(c, live);
-    for (const lot of plots.lots.values()) {
-      const plot = lot.plot;
-      const isOpen = this.unlocked.has(plot.zone);
-      if (!isOpen && plot.kind !== "racing") continue;
-      const pos = lot.root.position;
-      const top = this.project(pos.x, pos.y + lot.top + 0.12, pos.z);
-      if (!this.onScreen(top)) continue;
-      const [x, y] = top;
-      const v = lot.view;
-      if (!v) continue;
-      const sel = this._selected === plot.id;
-      switch (v.look.kind) {
-        case "market":
-        case "depot": {
-          if (zoom < 0.5) break;
-          const m = v.look.kind === "market";
-          tag(c, m ? names.market : names.depot, x, y, { icon: m ? "💰" : "🏗️", bg: m ? "rgba(21,128,61,0.9)" : "rgba(146,64,14,0.9)" });
-          break;
-        }
-        case "paddock":
-          if (zoom >= 0.5 && v.look.open) tag(c, names.racing, x, y, { icon: "🏁", bg: "rgba(185,28,28,0.9)" });
-          break;
-        case "dealer": {
-          if (zoom < 0.75) break;
-          const id = plot.dealer!;
-          const dl = s.dealers[id];
-          if (dl?.owned) {
-            tag(c, `${names.dealer(id)} · ${names.level(dl.level)}`, x, y, { icon: DEALER_BY_ID[id].emoji });
-            // no car to sell for a while: build more (or send them here)
-            const empty = (s.chain.dealers[id]?.cars ?? 0) < 1;
-            if (!empty) this.emptySince.delete(id);
-            else if (!this.emptySince.has(id)) this.emptySince.set(id, this.t);
-            if (empty && anyCar && !this.visiting && this.t - this.emptySince.get(id)! > 20) tag(c, "📭", x + 26, y - 22, { bg: "rgba(245,158,11,0.95)", size: 11 });
-          }
-          else if (anyCar) tag(c, names.money(DEALER_BY_ID[id].cost), x, y, { icon: "🏪", bg: "rgba(120,53,15,0.85)", fg: "#fde68a" });
-          else if (zoom >= 0.9) tag(c, "🔒", x, y, { bg: "rgba(15,23,42,0.75)", size: 10 });
-          break;
-        }
-        case "site": {
-          const st = s.city.sites[plot.id];
-          if (st && zoom >= 0.3) tag(c, `${Math.floor((st.t / st.dur) * 100)}%`, x, y, { icon: "🏗️", bg: "rgba(120,53,15,0.88)", fg: "#fde68a", size: 10 });
-          break;
-        }
-        case "empty": {
-          if (zoom < 0.38 || !plot.use || this.visiting) break;
-          const st = plotStatus(s, plot.id);
-          const bob = st === "available" ? Math.sin(this.t * 2.4 + lot.seed * 6) * 2 : 0;
-          const bg = sel ? "rgba(245,158,11,0.95)" : st === "owned" ? "rgba(37,99,235,0.9)" : st === "available" ? "rgba(21,128,61,0.88)" : "rgba(30,41,59,0.75)";
-          const mark = st === "owned" ? "🟦" : st === "locked" ? "🔒" : "+";
-          tag(c, zoom >= 0.85 ? `${mark} ${names.structure(plot.use)}` : mark, x, y - bob, { icon: STRUCTURE_BY_ID[plot.use].emoji, bg, size: 9 });
-          break;
-        }
-        case "plant": {
-          if (zoom < 0.32) break;
-          const b = s.city.buildings[plot.id];
-          if (!b) break;
-          tag(c, zoom < 0.9 ? names.level(b.level) : `${names.plant(plot.id)} · ${names.level(b.level)}`, x, y, { icon: STRUCTURE_BY_ID[b.type].emoji, bg: "rgba(15,23,42,0.85)" });
-          const pl = b.plant;
-          // a machine down: a red wrench (tap the plant to repair it)
-          if (pl?.broken) tag(c, "🔧", x - 22, y - 22 + Math.sin(this.t * 6) * 2, { bg: "rgba(220,38,38,0.95)", size: 11 });
-          // a boost: a lightning bolt
-          else if ((pl?.boost ?? 0) > 0) tag(c, "⚡", x - 22, y - 22, { bg: "rgba(8,145,178,0.95)", size: 11 });
-          if (pl && pl.status !== "ok") {
-            const icon = pl.status === "noParts" && pl.missing ? COMPONENT_BY_ID[pl.missing as ComponentId].emoji : pl.status === "noRaw" ? "🪨" : pl.status === "full" ? "📦" : "⚠️";
-            tag(c, zoom < 0.6 ? "!" : `⚠️ ${icon}`, x + 22, y - 22 + Math.sin(this.t * 4) * 2, { bg: "rgba(245,158,11,0.95)", fg: "#111", size: 11 });
-          }
-          // the next level is affordable: a green arrow over the plant
-          const up = zoom >= 0.45 && !this.visiting ? levelCost(b, live.snap.gm) : null;
-          if (up !== null && s.cash >= up) tag(c, "⬆️", x, y - 24 + Math.sin(this.t * 3 + lot.seed * 5) * 1.5, { bg: "rgba(22,163,74,0.95)", size: 11 });
-          break;
-        }
-        case "garage": {
-          if (zoom < 0.32) break;
-          const b = s.city.buildings[plot.id];
-          if (!b) break;
-          const active = (live.snap.city.garages[plot.id]?.incomePerSec ?? 0) > 0;
-          const no = b.garage?.no ?? 1;
-          tag(c, zoom < 0.9 ? `#${String(no).padStart(2, "0")} · ${names.level(b.level)}` : `${names.garage(no)} · ${names.level(b.level)}`, x, y, { icon: SPEC_BY_ID[b.garage?.spec ?? "repair"].emoji, bg: active ? "rgba(29,78,216,0.9)" : "rgba(8,12,20,0.8)" });
-          if (!active && zoom >= 0.5 && !this.visiting) tag(c, "!", x + 26, y - 22, { bg: "rgba(245,158,11,0.95)", fg: "#111", size: 11 });
-          break;
-        }
-        case "structure":
-          if (zoom >= 0.85) tag(c, names.level(v.look.level), x, y, { icon: STRUCTURE_BY_ID[v.look.type].emoji });
-          break;
-      }
-      // an upgrade under way: its progress over the crane
-      const w = v.works ? s.city.buildings[plot.id]?.works : undefined;
-      if (w && zoom >= 0.3) tag(c, `${Math.floor((w.t / w.dur) * 100)}%`, x, y - 24, { icon: "⬆️", bg: "rgba(120,53,15,0.88)", fg: "#fde68a", size: 10 });
-    }
-
-    this.drawBonus(c, names);
-
-    for (const p of this.pops) {
-      p.age += dt;
-      const k = p.age / 1.6;
-      if (k >= 1) continue;
-      const at = this.project(p.x, p.y, p.z);
-      if (this.onScreen(at)) pop(c, p.text, p.color, at[0], at[1], k);
-    }
-    this.pops = this.pops.filter((q) => q.age < 1.6);
-
-    for (const b of this.banners) {
-      b.age += dt;
-      const k = b.age / 2.6;
-      const lot = plots.lots.get(b.plot.id);
-      if (k >= 1 || !lot) continue;
-      const at = this.project(lot.root.position.x, lot.root.position.y + lot.top + 0.6, lot.root.position.z);
-      if (this.onScreen(at)) banner(c, b.text, at[0], at[1], k);
-    }
-    this.banners = this.banners.filter((b) => b.age < 2.6);
-  }
-
-  private static FLOW_COLOR: Record<FlowState, string> = { ok: "#22c55e", slow: "#f59e0b", stuck: "#ef4444" };
-
-  /** The flow view: an arc from each plant to where its loads go, dashes running along it. */
-  private drawFlow(c: CanvasRenderingContext2D, live: Live) {
-    const plots = this.plots!;
-    const top = (id: string): [number, number, number] | null => {
-      const lot = plots.lots.get(id);
-      if (!lot) return null;
-      const p = lot.root.position;
-      return [p.x, p.y + lot.top * 0.6, p.z];
-    };
-    c.save();
-    c.lineCap = "round";
-    c.lineJoin = "round";
-    for (const link of flowLinks(live.state, live.snap.chain)) {
-      const a = top(link.from);
-      const b = top(link.to);
-      if (!a || !b) continue;
-      const len = Math.hypot(b[0] - a[0], b[2] - a[2]);
-      const lift = 1.5 + len * 0.22;
-      const pts: [number, number][] = [];
-      for (let i = 0; i <= 24; i++) {
-        const k = i / 24;
-        const q = this.project(a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k + Math.sin(Math.PI * k) * lift, a[2] + (b[2] - a[2]) * k);
-        if (q) pts.push(q);
-      }
-      if (pts.length < 2) continue;
-      const col = MapEngine.FLOW_COLOR[link.state];
-      const path = () => {
-        c.beginPath();
-        c.moveTo(pts[0][0], pts[0][1]);
-        for (const q of pts.slice(1)) c.lineTo(q[0], q[1]);
-      };
-      c.setLineDash([]);
-      c.strokeStyle = "rgba(8,12,20,0.55)";
-      c.lineWidth = 6;
-      path();
-      c.stroke();
-      c.strokeStyle = col;
-      c.lineWidth = 3;
-      path();
-      c.stroke();
-      // goods running toward the destination (still when the link is stuck)
-      c.setLineDash([2, 12]);
-      c.lineDashOffset = link.state === "stuck" ? 0 : -this.t * (link.state === "ok" ? 36 : 12);
-      c.strokeStyle = "rgba(255,255,255,0.95)";
-      c.lineWidth = 3;
-      path();
-      c.stroke();
-      // an arrowhead at the destination
-      const [ex, ey] = pts[pts.length - 1];
-      const [fx, fy] = pts[Math.max(0, pts.length - 3)];
-      const ang = Math.atan2(ey - fy, ex - fx);
-      c.setLineDash([]);
-      c.fillStyle = col;
-      c.beginPath();
-      c.moveTo(ex, ey);
-      c.lineTo(ex - 11 * Math.cos(ang - 0.45), ey - 11 * Math.sin(ang - 0.45));
-      c.lineTo(ex - 11 * Math.cos(ang + 0.45), ey - 11 * Math.sin(ang + 0.45));
-      c.closePath();
-      c.fill();
-    }
-    c.restore();
-  }
-
-  /** The bonus's label over it; off screen, a bubble at the screen's edge pointing to it. */
-  private drawBonus(c: CanvasRenderingContext2D, names: MapNames) {
-    this.bonusArrow = null;
-    const b = this.bonus;
-    const p = b?.position();
-    const kind = b?.kind;
-    if (!p || !kind) return;
-    const emoji = MAP_BONUS_BY_KIND[kind].emoji;
-    const bob = Math.sin(this.t * 4) * 2;
-    const bg = kind === "golden" ? "rgba(202,138,4,0.97)" : kind === "vip" ? "rgba(109,40,217,0.95)" : kind === "drone" ? "rgba(21,128,61,0.95)" : kind === "storm" ? "rgba(2,132,199,0.95)" : kind === "police" ? "rgba(29,78,216,0.95)" : kind === "jam" ? "rgba(217,119,6,0.95)" : "rgba(220,38,38,0.95)";
-    const at = this.project(p.x, p.y + 0.5, p.z);
-    if (at && at[0] > 24 && at[1] > 24 && at[0] < this.w - 24 && at[1] < this.h - 24) {
-      tag(c, slowsDeliveries(kind) ? names.bonusSlowed : names.bonusTap, at[0], at[1] + bob, { icon: emoji, bg, fg: "#fff", size: 11 });
-      return;
-    }
-    // where it is, seen from the middle of the screen (behind the camera: the other way)
-    const v = this.v3.set(p.x, p.y, p.z).project(this.camera);
-    let dx = v.x;
-    let dy = -v.y;
-    if (v.z > 1) {
-      dx = -dx;
-      dy = -dy;
-    }
-    const n = Math.hypot(dx, dy) || 1;
-    dx /= n;
-    dy /= n;
-    // inside the edges, clear of the top bar, the side menu and the bottom bar
-    const l = this.w > 700 ? 110 : 34;
-    const r = this.w - 34;
-    const t = Math.min(130, this.h * 0.3);
-    const bt = Math.max(t + 40, this.h - 110);
-    const cx = (l + r) / 2;
-    const cy = (t + bt) / 2;
-    const k = Math.min(Math.abs(dx) > 1e-6 ? (dx > 0 ? r - cx : cx - l) / Math.abs(dx) : Infinity, Math.abs(dy) > 1e-6 ? (dy > 0 ? bt - cy : cy - t) / Math.abs(dy) : Infinity);
-    const ax = cx + dx * k;
-    const ay = cy + dy * k;
-    c.save();
-    c.fillStyle = bg;
-    c.beginPath();
-    c.arc(ax, ay, 19, 0, Math.PI * 2);
-    c.fill();
-    c.beginPath();
-    c.moveTo(ax + dx * 29, ay + dy * 29);
-    c.lineTo(ax + dx * 15 - dy * 9, ay + dy * 15 + dx * 9);
-    c.lineTo(ax + dx * 15 + dy * 9, ay + dy * 15 - dx * 9);
-    c.closePath();
-    c.fill();
-    c.font = "18px system-ui, sans-serif";
-    c.textAlign = "center";
-    c.textBaseline = "middle";
-    c.fillText(emoji, ax, ay + 1 + bob * 0.5);
-    c.restore();
-    this.bonusArrow = [ax, ay];
   }
 
   /** The bonus was taken (its money): coins over it, and it leaves. */
@@ -1340,62 +938,9 @@ export class MapEngine {
     this.fx.fireworks(x, g.at(x, z), z, target.big ? 7 : 4, !!target.big, this.cam.dist / 30);
   }
 
-  /**
-   * HTML over the areas follows the camera: names (data-far: only from far
-   * away, shrinking with the zoom), padlocks (data-fixed: always the same
-   * size) and the card a padlock opens (data-anchor="above": over its
-   * padlock, kept on the screen).
-   */
-  private placeCards() {
-    const cards = this.overlay?.children;
-    if (!cards) return;
-    // only when the view moved, a card came or went, or now and then (a card's size can change)
-    const at = this.cardsAt;
-    const n = cards.length;
-    if (at.version === this.viewVersion && at.frame < 10 && n === this.cardCount) {
-      at.frame++;
-      return;
-    }
-    at.version = this.viewVersion;
-    at.frame = 0;
-    this.cardCount = n;
-    const k = Math.max(0.5, Math.min(1, this.cam.zoom * 2.4));
-    // every size is read before any style is written: one layout, not one per card
-    const plan: { el: HTMLElement; vis: string; tf: string }[] = [];
-    for (const node of cards) {
-      const el = node as HTMLElement;
-      const id = el.dataset.zone as MapArea | undefined;
-      if (!id) continue;
-      const c = this.areaCenter(id);
-      const p = this.project(c.x, this.ground ? this.ground.at(c.x, c.y) + 0.5 : 0.5, c.y);
-      const far = el.dataset.far !== undefined;
-      const above = el.dataset.anchor === "above";
-      const off = !this.onScreen(p, above ? 0 : 200) || (far && this.cam.zoom > LABEL_ZOOM);
-      let tf = "";
-      if (p && !off) {
-        if (above) {
-          // the card sits over its padlock, or under it when there is no room above
-          const hw = el.offsetWidth / 2;
-          const x = Math.max(hw + 8, Math.min(this.w - hw - 8, p[0]));
-          const up = p[1] - el.offsetHeight - 26 > 8;
-          tf = `translate(${Math.round(x)}px, ${Math.round(p[1])}px) translate(-50%, ${up ? "calc(-100% - 22px)" : "22px"})`;
-        } else {
-          const s = el.dataset.fixed !== undefined ? 1 : k;
-          tf = `translate(${Math.round(p[0])}px, ${Math.round(p[1])}px) translate(-50%, -50%) scale(${s.toFixed(2)})`;
-        }
-      }
-      plan.push({ el, vis: off ? "hidden" : "visible", tf });
-    }
-    for (const { el, vis, tf } of plan) {
-      const was = this.cardStyle.get(el);
-      if (was?.vis !== vis) el.style.visibility = vis;
-      if (tf && was?.tf !== tf) el.style.transform = tf;
-      this.cardStyle.set(el, { vis, tf: tf || was?.tf || "" });
-    }
-  }
-  private cardCount = -1;
+  cardCount = -1;
 
-  private areaCenter(id: MapArea): { x: number; y: number } {
+  areaCenter(id: MapArea): { x: number; y: number } {
     if (id === "racing") {
       const p = RACING_AREA.paddock;
       return { x: p.x, y: p.y };
@@ -1534,236 +1079,16 @@ export class MapEngine {
       [this.w, this.h],
       [0, this.h],
     ].map(([px, py]) => {
-      const p = this.onPlane(px, py, this.ty) ?? this.onPlane(px, Math.max(py, this.h * 0.3), this.ty);
+      const p = onPlane(this, px, py, this.ty) ?? onPlane(this, px, Math.max(py, this.h * 0.3), this.ty);
       return p ? [p.x, p.z] : [this.cam.x, this.cam.z];
     });
   }
 
   // ───────────────────────── input ─────────────────────────
 
-  private ray = new THREE.Raycaster();
-  private ndc = new THREE.Vector2();
+  ray = new THREE.Raycaster();
+  ndc = new THREE.Vector2();
 
-  private rayAt(px: number, py: number) {
-    this.ndc.set((px / this.w) * 2 - 1, -(py / this.h) * 2 + 1);
-    this.ray.setFromCamera(this.ndc, this.camera);
-    return this.ray.ray;
-  }
-
-  /** Where the ray through a screen point meets the level y. */
-  private onPlane(px: number, py: number, y: number): THREE.Vector3 | null {
-    const r = this.rayAt(px, py);
-    if (Math.abs(r.direction.y) < 1e-4) return null;
-    const t = (y - r.origin.y) / r.direction.y;
-    if (t <= 0 || t > 1e5) return null;
-    return r.origin.clone().addScaledVector(r.direction, t);
-  }
-
-  /** Where the ray through a screen point meets the ground (marching over the heights). */
-  private onGround(px: number, py: number): THREE.Vector3 | null {
-    const g = this.ground;
-    if (!g) return this.onPlane(px, py, 0);
-    const r = this.rayAt(px, py);
-    const o = r.origin;
-    const d = r.direction;
-    let prev = 0;
-    for (let t = 0, i = 0; i < 800 && t < this.camera.far; i++) {
-      const x = o.x + d.x * t;
-      const y = o.y + d.y * t;
-      const z = o.z + d.z * t;
-      if (y <= g.at(x, z)) {
-        // refine between the last two steps
-        let a = prev;
-        let b = t;
-        for (let k = 0; k < 12; k++) {
-          const m = (a + b) / 2;
-          if (o.y + d.y * m <= g.at(o.x + d.x * m, o.z + d.z * m)) b = m;
-          else a = m;
-        }
-        return o.clone().addScaledVector(d, b);
-      }
-      prev = t;
-      t += Math.max(0.15, t * 0.01);
-    }
-    return null;
-  }
-
-  private pick(px: number, py: number): MapTarget {
-    if (!this.plots) return null;
-    // the bonus first: it is what the player is after
-    const bp = this.bonus?.position();
-    const bid = this.bonus?.id;
-    if (bp && bid) {
-      const at = this.project(bp.x, bp.y + 0.2, bp.z);
-      if (at && Math.hypot(at[0] - px, at[1] - py) < Math.max(36, 42 * this.cam.zoom)) return { kind: "bonus", id: bid };
-    }
-    // vehicles first: they drive in front of the buildings
-    const tl = this.trafficLayer;
-    if (tl) {
-      const radius = Math.max(16, Math.min(34, 22 * this.cam.zoom));
-      let best: MapTarget = null;
-      let bestD = radius;
-      for (const [x, y, z, v] of tl.pickables()) {
-        const p = this.project(x, y, z);
-        if (!p) continue;
-        const d = Math.hypot(p[0] - px, p[1] - py);
-        if (d < bestD) {
-          bestD = d;
-          best = { kind: "vehicle", v };
-        }
-      }
-      if (best) return best;
-    }
-    const id = this.plots.pick(this.rayAt(px, py));
-    if (id) {
-      const plot = WORLD_MAP.plotById[id];
-      if (plot && plot.kind !== "racing" && !this.unlocked.has(plot.zone)) return { kind: "zone", id: plot.zone };
-      return { kind: "plot", id };
-    }
-    const hit = this.onGround(px, py);
-    const area = hit ? this.areaAt(hit.x, hit.z) : null;
-    if (area && ZONE_IDS.has(area) && !this.unlocked.has(area)) return { kind: "zone", id: area as ZoneId };
-    return null;
-  }
-
-  private attachControls(): () => void {
-    const el = this.canvas;
-    const pts = new Map<number, { x: number; y: number }>();
-    let down: { x: number; y: number; t: number; moved: boolean; button: number } | null = null;
-    let lastMove = 0;
-    let hoverAt = 0;
-    const local = (e: PointerEvent | WheelEvent) => {
-      const r = el.getBoundingClientRect();
-      return { x: e.clientX - r.left, y: e.clientY - r.top };
-    };
-    const userMoved = () => {
-      this.cam.stop();
-      this.tracked = null;
-      this.followUntil = 0;
-    };
-    /** Shifts the camera so the ground under screen point a lands under b. */
-    const drag = (a: { x: number; y: number }, b: { x: number; y: number }) => {
-      const pa = this.onPlane(a.x, a.y, this.ty);
-      const pb = this.onPlane(b.x, b.y, this.ty);
-      if (!pa || !pb) return [0, 0];
-      const dx = pa.x - pb.x;
-      const dz = pa.z - pb.z;
-      // never fling the camera across the map when a ray grazes the horizon
-      const lim = this.cam.dist * 0.6;
-      const k = Math.min(1, lim / Math.max(1e-6, Math.hypot(dx, dz)));
-      this.cam.x += dx * k;
-      this.cam.z += dz * k;
-      this.cam.clamp();
-      this.place(-1);
-      return [dx * k, dz * k];
-    };
-    /** Zooms by f keeping the ground under screen point c in place. */
-    const zoomAt = (c: { x: number; y: number }, f: number) => {
-      const before = this.onPlane(c.x, c.y, this.ty);
-      this.cam.zoom *= f;
-      this.cam.clamp();
-      this.place(-1);
-      const after = this.onPlane(c.x, c.y, this.ty);
-      if (before && after) {
-        this.cam.x += before.x - after.x;
-        this.cam.z += before.z - after.z;
-        this.cam.clamp();
-        this.place(-1);
-      }
-    };
-    const pair = () => {
-      const [a, b] = [...pts.values()];
-      return { cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2, d: Math.hypot(a.x - b.x, a.y - b.y), ang: Math.atan2(b.y - a.y, b.x - a.x) };
-    };
-    let prevPair: ReturnType<typeof pair> | null = null;
-
-    const onDown = (e: PointerEvent) => {
-      el.setPointerCapture?.(e.pointerId);
-      const p = local(e);
-      pts.set(e.pointerId, p);
-      if (pts.size === 1) down = { ...p, t: performance.now(), moved: false, button: e.button };
-      else if (down) down.moved = true;
-      if (pts.size === 2) prevPair = pair();
-      this.cam.vx = this.cam.vz = 0;
-    };
-    const onMove = (e: PointerEvent) => {
-      const p = local(e);
-      const old = pts.get(e.pointerId);
-      if (!old) {
-        // hovering with a mouse: a pointer over things that can be tapped
-        if (e.pointerType === "mouse" && performance.now() - hoverAt > 90) {
-          hoverAt = performance.now();
-          el.style.cursor = this.pick(p.x, p.y) ? "pointer" : "grab";
-        }
-        return;
-      }
-      if (down && !down.moved && Math.hypot(p.x - down.x, p.y - down.y) > 7) {
-        down.moved = true;
-        userMoved();
-      }
-      if (!down?.moved) return;
-      if (pts.size === 1) {
-        if (down.button === 2 || e.ctrlKey || e.shiftKey) {
-          // turn the view
-          this.cam.az -= (p.x - old.x) * 0.006;
-        } else {
-          const now = performance.now();
-          const [dx, dz] = drag(old, p);
-          const dt = Math.max(0.008, (now - lastMove) / 1000);
-          lastMove = now;
-          this.cam.vx = this.cam.vx * 0.5 + (dx / dt) * 0.5;
-          this.cam.vz = this.cam.vz * 0.5 + (dz / dt) * 0.5;
-        }
-        pts.set(e.pointerId, p);
-      } else if (pts.size === 2) {
-        pts.set(e.pointerId, p);
-        const q = pair();
-        if (prevPair) {
-          drag({ x: prevPair.cx, y: prevPair.cy }, { x: q.cx, y: q.cy });
-          if (prevPair.d > 10) zoomAt({ x: q.cx, y: q.cy }, q.d / prevPair.d);
-          let da = q.ang - prevPair.ang;
-          da = Math.atan2(Math.sin(da), Math.cos(da));
-          this.cam.az += da;
-        }
-        prevPair = q;
-      }
-    };
-    const onUp = (e: PointerEvent) => {
-      const p = local(e);
-      const was = pts.size;
-      pts.delete(e.pointerId);
-      if (pts.size < 2) prevPair = null;
-      if (was === 1 && down && !down.moved && performance.now() - down.t < 600 && down.button !== 2) {
-        // the arrow to a bonus off screen: fly there
-        const arrow = this.bonusArrow;
-        const bp = this.bonus?.position();
-        if (arrow && bp && Math.hypot(arrow[0] - p.x, arrow[1] - p.y) < 30) this.cam.flyTo(bp.x, bp.z, Math.max(this.cam.zoom, 1.2), 0.8);
-        else this.onTap(this.pick(p.x, p.y));
-      }
-      if (performance.now() - lastMove > 80) this.cam.vx = this.cam.vz = 0;
-      if (pts.size === 0) down = null;
-    };
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      userMoved();
-      zoomAt(local(e), Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0016)));
-    };
-    const onMenu = (e: Event) => e.preventDefault();
-    el.addEventListener("pointerdown", onDown);
-    el.addEventListener("pointermove", onMove);
-    el.addEventListener("pointerup", onUp);
-    el.addEventListener("pointercancel", onUp);
-    el.addEventListener("wheel", onWheel, { passive: false });
-    el.addEventListener("contextmenu", onMenu);
-    return () => {
-      el.removeEventListener("pointerdown", onDown);
-      el.removeEventListener("pointermove", onMove);
-      el.removeEventListener("pointerup", onUp);
-      el.removeEventListener("pointercancel", onUp);
-      el.removeEventListener("wheel", onWheel);
-      el.removeEventListener("contextmenu", onMenu);
-    };
-  }
 }
 
 /**

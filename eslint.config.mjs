@@ -10,7 +10,7 @@ const eslintConfig = defineConfig([
   // they stay listed here until that core is split. A cycle through any other file fails the lint.
   {
     files: ["src/**/*.{ts,tsx}"],
-    ignores: ["src/game/engine/{chain,city,construction,live,racing,modifiers,economy}.ts"],
+    ignores: ["src/game/engine/{chain,city,construction,live,racing,modifiers,economy}.ts", "src/game/engine/chain/*.ts"],
     rules: { "import/no-cycle": ["error", { ignoreExternal: true }] },
   },
   // Parameters kept for a signature (`_mode`, `_t`) are prefixed with an underscore.

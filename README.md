@@ -144,6 +144,8 @@ src/game/
     chain.ts      the supply chain: production, raw material, stock, trucks
                   (shipments with routes and travel times), market, assembly,
                   dealers and customers, offline simulation, plant upgrades
+                  (re-exports chain/: state, unlocks, travel, cars, stats,
+                  road, tick, offline, actions, saves)
     economy.ts    costs and the income snapshot
     tick.ts       advances time in small steps
     actions.ts    player actions (buy, hire, research…)
@@ -158,8 +160,9 @@ src/game/
   save/       accounts and saves: device copy, cloud sync (revisions, conflicts,
               retries), start policy, Supabase backend, migration
   format.ts   $1,250 · $25.4K · $3.2M · $4.7B · $2.8T
-src/store/    Zustand stores: game loop + autosave (game-store), panels and
-              camera requests (ui-store), UI events
+src/store/    Zustand stores: game loop + autosave (game-store; its gameplay
+              actions in actions/), panels and camera requests (ui-store),
+              UI events
 src/components/
   map/        the Empire Map: empire-map.tsx (React side, cards over the
               districts), minimap, showcase; world/ is the 3D map (Three.js,
