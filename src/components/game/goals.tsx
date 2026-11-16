@@ -12,6 +12,7 @@ import { CAR_BY_ID } from "@/game/config/cars";
 import { MAKER } from "@/game/config/chain";
 import { DEALER_BY_ID } from "@/game/config/dealerships";
 import { MANAGER_BY_ID } from "@/game/config/managers";
+import { RESEARCH_BY_ID } from "@/game/config/research";
 import { type Goal } from "@/game/engine/insights";
 import { plantFlow, plantName } from "../panels/plant-panel";
 import type { Content } from "@/i18n/content";
@@ -60,6 +61,13 @@ export function goalText(g: Goal, t: (k: MessageKey, v?: Vars) => string, n: Con
         title: t("goal.dealerFull", { n: formatNumber(g.perMin) }),
         detail: t(g.open ? "goal.dealerFullOpen" : "goal.dealerFullUpgrade", { name: n.dealer(DEALER_BY_ID[g.dealer]) }),
       };
+    case "dealerSlow":
+      return {
+        title: t("goal.dealerSlow", { n: formatNumber(g.waiting) }),
+        detail: t(g.open ? "goal.dealerSlowOpen" : "goal.dealerSlowUpgrade", { name: n.dealer(DEALER_BY_ID[g.dealer]) }),
+      };
+    case "research":
+      return { title: t("goal.research", { name: n.research(RESEARCH_BY_ID[g.research]) }), detail: t("goal.researchDetail") };
     case "car":
       return { title: t("goal.car", { name: n.car(CAR_BY_ID[g.car]) }), detail: g.requirement ? t("goal.needs", { req: n.requirement(g.requirement) }) : "" };
     case "manager": {
@@ -123,11 +131,15 @@ export function runGoal(g: Goal) {
       break;
     case "dealer":
     case "dealerFull":
+    case "dealerSlow":
       ui.selectPlot(`d:${g.dealer}`);
       break;
     case "car":
       if (g.plot) ui.selectPlot(g.plot);
       else ui.setView("research");
+      break;
+    case "research":
+      ui.setView("research");
       break;
     case "imperium":
       ui.setView("imperium");
