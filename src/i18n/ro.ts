@@ -2417,6 +2417,8 @@ export const ro: Record<MessageKey, string> = {
   "chest.streakHint": "Deschide-l zilnic: +25% pentru fiecare zi la rând (până la +100%), o ⭐ în fiecare a 7-a zi.",
   "chest.open": "Deschide",
   "chest.toast": "Ai deschis cufărul zilei",
+  "newYear.toast": "La mulți ani {year}!",
+  "newYear.body": "Un cadou pentru că ai intrat în noul an cu imperiul tău: {stars} ⭐ și {money}.",
   "chest.star": "+1 ⭐ pentru {n} zile la rând!",
   "map.flow": "Fluxul livrărilor",
   "map.flow.ok": "Merge",

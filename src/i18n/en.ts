@@ -2419,6 +2419,8 @@ export const en = {
   "chest.streakHint": "Open it every day: +25% per day in a row (up to +100%), a ⭐ every 7th day.",
   "chest.open": "Open",
   "chest.toast": "Daily chest opened",
+  "newYear.toast": "Happy New Year {year}!",
+  "newYear.body": "A gift for seeing the year in with your empire: {stars} ⭐ and {money}.",
   "chest.star": "+1 ⭐ for {n} days in a row!",
   "map.flow": "Delivery flow",
   "map.flow.ok": "Running",

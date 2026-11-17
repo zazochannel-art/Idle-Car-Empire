@@ -2417,6 +2417,8 @@ export const de: Record<MessageKey, string> = {
   "chest.streakHint": "Öffne sie täglich: +25 % pro Tag in Folge (bis +100 %), ein ⭐ an jedem 7. Tag.",
   "chest.open": "Öffnen",
   "chest.toast": "Tagestruhe geöffnet",
+  "newYear.toast": "Frohes neues Jahr {year}!",
+  "newYear.body": "Ein Geschenk, weil du das Jahr mit deinem Imperium begrüßt: {stars} ⭐ und {money}.",
   "chest.star": "+1 ⭐ für {n} Tage in Folge!",
   "map.flow": "Lieferfluss",
   "map.flow.ok": "Läuft",
