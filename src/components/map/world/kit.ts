@@ -493,6 +493,10 @@ export function facade(kind: FacadeKind, w: number, h: number, d: number, c: THR
 
 // ───────────────────────────── locked land ─────────────────────────────
 
+/** Extra colour on the player's land, and how far locked land greys and hazes over (0–1), in the shader. */
+export const LOCK_LOOK = { vibrance: 0.12, grey: 0.35, haze: 0.28 };
+const LOCK_GLSL = `#define LOCK_VIBRANCE ${LOCK_LOOK.vibrance.toFixed(3)}\n#define LOCK_GREY ${LOCK_LOOK.grey.toFixed(3)}\n#define LOCK_HAZE ${LOCK_LOOK.haze.toFixed(3)}\n`;
+
 /**
  * Locked districts and territories fade into a blue-grey haze. A small
  * texture over the whole map says how locked each spot is (soft at the
@@ -504,7 +508,7 @@ export const LOCK = {
     uLockMap: { value: null as THREE.Texture | null },
     uLockOn: { value: 0 },
     uLockSize: { value: new THREE.Vector2(1, 1) },
-    uLockCol: { value: new THREE.Color("#a9b8c6") },
+    uLockCol: { value: new THREE.Color("#b4cbe0") },
     /** Snow lying on what faces up (0–1), and rain on it (0–1): the weather (weather-fx.ts). */
     uSnow: { value: 0 },
     uWet: { value: 0 },
@@ -586,7 +590,7 @@ lkW = modelMatrix * lkW;
 vLockUv = vec2(lkW.x / uLockSize.x + 0.5, lkW.z / uLockSize.y + 0.5);`,
       );
     sh.fragmentShader = sh.fragmentShader
-      .replace("#include <common>", "#include <common>\nvarying vec2 vLockUv;\nuniform sampler2D uLockMap;\nuniform float uLockOn;\nuniform vec3 uLockCol;\nuniform vec2 uLockSize;\nuniform float uSnow;\nuniform float uWet;\nuniform float uSnowK;")
+      .replace("#include <common>", "#include <common>\nvarying vec2 vLockUv;\nuniform sampler2D uLockMap;\nuniform float uLockOn;\nuniform vec3 uLockCol;\nuniform vec2 uLockSize;\n" + LOCK_GLSL + "uniform float uSnow;\nuniform float uWet;\nuniform float uSnowK;")
       .replace(
         "#include <normal_fragment_maps>",
         `#include <normal_fragment_maps>
@@ -618,12 +622,16 @@ if (uSnow > 0.001 || uWet > 0.001) {
         `#include <opaque_fragment>
 {
   float lk = texture2D(uLockMap, vLockUv).r * uLockOn;
+  vec3 c = gl_FragColor.rgb;
+  float l = dot(c, vec3(0.299, 0.587, 0.114));
+  // the player's own land a touch more colourful (the game's bright, mobile look); locked land
+  // keeps its colours under a light haze, so the island reads as one place to grow into
+  c = max(mix(vec3(l), c, 1.0 + LOCK_VIBRANCE * (1.0 - lk)), 0.0);
   if (lk > 0.003) {
-    vec3 c = gl_FragColor.rgb;
-    float l = dot(c, vec3(0.299, 0.587, 0.114));
-    c = mix(c, vec3(l), 0.7 * lk);
-    gl_FragColor.rgb = mix(c, uLockCol * (0.55 + 0.45 * l), 0.5 * lk);
+    c = mix(c, vec3(l), LOCK_GREY * lk);
+    c = mix(c, uLockCol * (0.7 + 0.3 * l), LOCK_HAZE * lk);
   }
+  gl_FragColor.rgb = c;
 }`,
       );
     if (lit) {
