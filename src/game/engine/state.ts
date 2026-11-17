@@ -120,6 +120,7 @@ export function createInitialState(now: number): GameState {
     staff: createStaff(),
     safety: createSafety(),
     takeover: createTakeover(),
+    eco: 0,
     qc: createQc(),
     logistics: createLogistics(),
     market: { t: 0, bought: 0 },

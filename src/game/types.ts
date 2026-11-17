@@ -618,6 +618,8 @@ export interface GameState {
   sponsors: SponsorsState;
   /** The used-car lot and the garage bay (engine/used-cars.ts). */
   usedCars: UsedCarsState;
+  /** The eco programme's level (engine/eco.ts). */
+  eco: number;
   /** The tenths of each rival's shares the company holds (engine/takeover.ts). */
   takeover: import("./engine/takeover").TakeoverState;
   /** Crash tests: each tested model's safety stars, and the test running now (engine/safety.ts). */
