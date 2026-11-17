@@ -54,6 +54,8 @@ import { Onboarding } from "./onboarding";
 import { UnlockCard } from "./unlock-card";
 import { RecallDialog } from "./recall-dialog";
 import { CompanyNameDialog } from "./company-name";
+import { MenuUnlockWatcher, useFreshTiles } from "./menu-unlocks";
+import { menuOpen } from "@/game/engine/menu";
 import { PoachDialog } from "../views/expansion-cards";
 import { HAS_INTERIOR } from "../plant/interior/layout";
 
@@ -190,7 +192,7 @@ function badgeCounts(state: ReturnType<typeof useGame.getState>["state"], snap: 
     managers: MANAGERS.filter((m) => !state.managers[m.id].hired && isManagerUnlocked(state, m.id) && state.cash >= m.cost).length + (idle > 0 ? 1 : 0),
     missions: claimableCount(state, snap),
     // the crown menu: an expansion ready, a decision on the desk or a chapter to close
-    imperium: (canImperium(state) ? 1 : 0) + (storyWaiting(state, snap) ? 1 : 0) + (winterWaiting(state, state.lastActiveAt) ? 1 : 0) + (festivalWaiting(state, state.lastActiveAt) ? 1 : 0) + (passWaiting(state) > 0 ? 1 : 0),
+    imperium: (canImperium(state) ? 1 : 0) + (storyWaiting(state, snap) ? 1 : 0) + (winterWaiting(state, state.lastActiveAt) ? 1 : 0) + (festivalWaiting(state, state.lastActiveAt) ? 1 : 0) + (menuOpen(state, "pass") && passWaiting(state) > 0 ? 1 : 0),
     upgrade: upgrades,
   };
 }
@@ -387,6 +389,7 @@ function Shell() {
       <UnlockCard />
       <RecallDialog />
       <CompanyNameDialog />
+      <MenuUnlockWatcher />
       <PoachDialog />
 
       <Toasts />
@@ -574,6 +577,8 @@ function BottomDock() {
   const view = useUi((u) => u.view);
   const setView = useUi((u) => u.setView);
   const badges = useBadges();
+  // the menu also counts the screens that just joined it (menu-unlocks.tsx)
+  const fresh = useFreshTiles().length;
   const { t } = useT();
   return (
     <nav className="absolute inset-x-0 bottom-0 z-30 flex justify-center pb-[env(safe-area-inset-bottom)] lg:px-3 lg:pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
@@ -581,7 +586,7 @@ function BottomDock() {
       <div className="grid w-full max-w-2xl grid-cols-5 gap-[3px] overflow-hidden bg-[#232326] px-1 pt-1 pb-1 shadow-[0_-8px_30px_-12px_rgba(0,0,0,.8)] lg:rounded-xl">
         {DOCK.map((d) => {
           const active = view === d.id;
-          const badge = d.badge ? badges[d.badge] : 0;
+          const badge = (d.badge ? badges[d.badge] : 0) + (d.id === "menu" ? fresh : 0);
           const label = t(d.label);
           return (
             <button

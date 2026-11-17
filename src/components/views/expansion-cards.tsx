@@ -18,6 +18,7 @@ import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
+import { useChoiceCard } from "../game/choice-card";
 
 const Box = ({ title, sub, children, className }: { title: string; sub?: string; children: React.ReactNode; className?: string }) => (
   <div className={cn("rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.07]", className)}>
@@ -363,8 +364,9 @@ function PoachCard() {
   const now = useGame((g) => g.state.lastActiveAt);
   const { counterOffer, letGoEngineer } = useGame.getState();
   const { t } = useT();
+  useChoiceCard();
   return (
-    <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+    <motion.div role="dialog" aria-modal="true" aria-label={t("eng.poachTitle")} className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       {poach && (
           <motion.div initial={{ scale: 0.85, y: 30 }} animate={{ scale: 1, y: 0 }} className="w-[min(92vw,22rem)] rounded-3xl border border-violet-400/40 bg-ink/95 p-5 text-center">
             <div className="text-5xl">{ENGINEER_BY_ID[poach.id].emoji}</div>

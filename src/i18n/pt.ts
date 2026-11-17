@@ -932,6 +932,15 @@ export const pt: Record<MessageKey, string> = {
   "upgrade.none": "Nada para melhorar ainda.",
 
   "menu.settings": "Configurações",
+  "menu.newTile": "Novo no menu: {name}",
+  "menu.newTileMore": "{names} e mais {n}",
+  "menu.newTileBody": "Abre agora que o seu império cresceu.",
+  "menu.newTileOpen": "Abrir",
+  "menu.comingUp": "Em breve",
+  "menu.lock.firstCar": "Depois do seu primeiro carro",
+  "menu.lock.territory": "Abra um território",
+  "menu.lock.earned": "Ao ganhar {money}",
+  "menu.lock.territories": "Todos os territórios abertos ({have}/{n})",
   "employees.mechanics": "Mecânicos das garagens",
   "employees.mechanicsHint": "Contrate mecânicos dentro de cada garagem (Trabalhadores).",
 

@@ -932,6 +932,15 @@ export const ro: Record<MessageKey, string> = {
   "upgrade.none": "Încă nimic de îmbunătățit.",
 
   "menu.settings": "Setări",
+  "menu.newTile": "Nou în meniu: {name}",
+  "menu.newTileMore": "{names} și încă {n}",
+  "menu.newTileBody": "Se deschide acum, pe măsură ce imperiul tău crește.",
+  "menu.newTileOpen": "Deschide",
+  "menu.comingUp": "În curând",
+  "menu.lock.firstCar": "După prima ta mașină",
+  "menu.lock.territory": "Deschide un teritoriu",
+  "menu.lock.earned": "La {money} câștigați",
+  "menu.lock.territories": "Toate teritoriile deschise ({have}/{n})",
   "employees.mechanics": "Mecanicii garajelor",
   "employees.mechanicsHint": "Angajează mecanici în fiecare garaj (Muncitori).",
 

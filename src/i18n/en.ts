@@ -933,6 +933,15 @@ export const en = {
   "upgrade.none": "Nothing to upgrade yet.",
 
   "menu.settings": "Settings",
+  "menu.newTile": "New in the menu: {name}",
+  "menu.newTileMore": "{names} +{n} more",
+  "menu.newTileBody": "It opens now that your empire has grown.",
+  "menu.newTileOpen": "Open",
+  "menu.comingUp": "Coming up",
+  "menu.lock.firstCar": "After your first car",
+  "menu.lock.territory": "Open a territory",
+  "menu.lock.earned": "At {money} earned",
+  "menu.lock.territories": "All territories open ({have}/{n})",
   "employees.mechanics": "Garage mechanics",
   "employees.mechanicsHint": "Hire mechanics inside each garage (Workers).",
 
