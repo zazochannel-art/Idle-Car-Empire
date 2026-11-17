@@ -191,10 +191,10 @@ describe("growing the chain", () => {
     expect(Ch.plantLock(s, "engineFactory")).toBeNull();
     expect(Ch.plantLock(s, "tireFactory")).toEqual({ kind: "plant", plant: "engineFactory" });
     expect(Ch.plantLock(s, "interiorFactory")).toEqual({ kind: "plant", plant: "assemblyPlant" });
-    expect(Ch.plantBuildCost(s, "engineFactory")).toBe(6_000);
+    expect(Ch.plantBuildCost(s, "engineFactory")).toBe(4_000);
     // land, then construction: together no more than the plant's price
     const total = Co.landCost(s, a) + Co.constructionCost(s, a);
-    expect(total).toBeLessThanOrEqual(6_000);
+    expect(total).toBeLessThanOrEqual(4_000);
     s.cash = total - 1;
     expect(C.buildStructure(s, a, "engineFactory")).toBe(false);
     s.cash = total;
@@ -208,7 +208,7 @@ describe("growing the chain", () => {
     expect(s.city.buildings[a].type).toBe("engineFactory");
     expect(Ch.plantLock(s, "tireFactory")).toBeNull();
     // a second engine factory costs more
-    expect(Ch.plantBuildCost(s, "engineFactory")).toBe(6_000 * 2.5);
+    expect(Ch.plantBuildCost(s, "engineFactory")).toBe(4_000 * 2.5);
     expect(Ch.plantLock(s, "batteryFactory")).not.toBeNull();
     expect(C.buildStructure(s, b, "assemblyPlant")).toBe(false);
   });
@@ -235,7 +235,7 @@ describe("tyre supplier and unlock moments", () => {
     build(s, a, "engineFactory");
     // the first assembly plant is cheap and needs only the engine factory
     expect(Ch.plantLock(s, "assemblyPlant")).toBeNull();
-    expect(Ch.plantBuildCost(s, "assemblyPlant")).toBe(6_000);
+    expect(Ch.plantBuildCost(s, "assemblyPlant")).toBe(3_000);
     build(s, b, "assemblyPlant");
     expect(Ch.plantBuildCost(s, "assemblyPlant")).toBe(30_000 * 2.5);
     expect(Ch.supplied(s, "tires")).toBe(true);
