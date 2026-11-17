@@ -41,7 +41,7 @@ jobs:
     # Playwright 1.56 installs Chromium's system libraries for Ubuntu 24.04, not for 26.04 (now
     # ubuntu-latest); move on once playwright-core is upgraded to a version that supports it
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -63,6 +63,9 @@ jobs:
       # the game open in two tabs: only the newest saves, "Play here" takes over (e2e/two-tabs.mjs)
       - name: Two tabs, one game
         run: npm run e2e:tabs
+      # the saves of a company after 1 h and 3 h: popups one at a time, every tab and menu screen opens (e2e/later-hours.mjs)
+      - name: Later in the game
+        run: npm run e2e:later
       - uses: actions/upload-artifact@v4
         if: always()
         with:
