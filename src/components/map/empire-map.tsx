@@ -26,6 +26,7 @@ import { uiEvents } from "@/store/events";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import type { MapEngine } from "./world/engine";
+import { recordEmpireClip, setClipRecorder } from "./clip";
 import { Showcase } from "./showcase";
 import { HAS_INTERIOR } from "../plant/interior/layout";
 import { setLiveryOverrides } from "../three/livery";
@@ -184,7 +185,13 @@ export function EmpireMap({ active, panelOffset }: { active: boolean; panelOffse
         e.overlay = overlayRef.current;
         e.traffic.setShipments(shipViews(useGame.getState().state));
         engineRef.current = e;
-        if (process.env.NODE_ENV !== "production") Object.assign(window, { __map: e, __game: useGame, __ui: useUi });
+        // the clip to share (account.tsx): the player's own empire only, never a visited one
+        void import("./world/engine-clip").then(({ recordClip }) => {
+          if (!alive) return;
+          setClipRecorder((text, onProgress) => (visitRef.current ? Promise.resolve(null) : recordClip(e, text, onProgress)));
+          offs.push(() => setClipRecorder(null));
+        });
+        if (process.env.NODE_ENV !== "production") Object.assign(window, { __map: e, __game: useGame, __ui: useUi, __clip: recordEmpireClip });
         const onVis = () => (document.visibilityState === "hidden" ? e.stop() : activeRef.current ? e.start() : undefined);
         document.addEventListener("visibilitychange", onVis);
         offs.push(() => document.removeEventListener("visibilitychange", onVis));
