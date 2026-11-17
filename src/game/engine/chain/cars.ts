@@ -1,4 +1,5 @@
 // Car models, recipes, values and what the assembly line orders.
+import { safetyMult } from "../safety";
 import { BASE_RECIPE, MAKER, OUTSOURCE, OUTSOURCED_PARTS, SUPPLIED_PARTS, VEHICLE_CAPACITY } from "../../config/chain";
 import { CARS, CAR_MODEL, type CarConfig } from "../../config/cars";
 import type { CityId, ComponentId, GameState, PlantData, PlantType } from "../../types";
@@ -151,7 +152,8 @@ export function carPartsValue(car: CarConfig): number {
 /** Sale value of one car before dealer markup (bonuses widen its margin). */
 export function carValue(s: GameState, car: CarConfig, gm: GlobalMods, extra = 1): number {
   // a landmark works' line sells for more to its territory's buyers, a winterised model to Nordheim's
-  return carListPrice(car, recipe(car), carMarginMult(s, car, gm) * modelStats(s, car).valueMult * protoValueMult(s, car.id) * extra) * localValueMult(s, car) * nordicMult(s, car.id);
+  // and a crash-tested model by its safety stars (engine/safety.ts)
+  return carListPrice(car, recipe(car), carMarginMult(s, car, gm) * modelStats(s, car).valueMult * protoValueMult(s, car.id) * extra) * localValueMult(s, car) * nordicMult(s, car.id) * safetyMult(s, car.id);
 }
 
 /** Sale value before the Design studio options (what R&D prices are based on). */

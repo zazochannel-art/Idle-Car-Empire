@@ -26,6 +26,7 @@ import { createSponsors } from "./sponsors";
 import { createUsedCars } from "./used-cars";
 import { createSources } from "./sources";
 import { createStaff } from "./staff";
+import { createSafety } from "./safety";
 import { createQc } from "./quality-check";
 import type { CarDesign, CarId, ComponentId, GameState, ManagerId, ManagerState, Stats } from "../types";
 import { createDealers, createShowroom } from "./defaults";
@@ -116,6 +117,7 @@ export function createInitialState(now: number): GameState {
     sources: createSources(),
     newYear: 0,
     staff: createStaff(),
+    safety: createSafety(),
     qc: createQc(),
     logistics: createLogistics(),
     market: { t: 0, bought: 0 },

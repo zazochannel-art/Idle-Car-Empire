@@ -112,6 +112,9 @@ export function showNews(news: readonly News[], s: GameState) {
         if (n.what === "candidate") uiEvents.emit({ type: "toast", kind: "clients", tone: "info", icon: "👩‍🔬", title: tr("eng.candidateToast", { name: ENGINEER_BY_ID[n.id as EngineerId].name }) });
         else uiEvents.emit({ type: "toast", kind: "clients", tone: "warn", icon: "🕵️", title: tr("eng.lostToast") });
         break;
+      case "crashTest":
+        uiEvents.emit({ type: "toast", kind: "progress", tone: n.stars >= 4 ? "gold" : n.stars <= 2 ? "warn" : "info", icon: "💥", title: tr("crash.done", { name: s.designs[n.car].name, stars: "★".repeat(n.stars) + "☆".repeat(5 - n.stars) }), body: tr("crash.doneBody", { pct: `${n.stars >= 3 ? "+" : "−"}${Math.abs(n.stars - 3) * 3}%` }), action: { label: tr("toast.open"), view: "cars" } });
+        break;
       case "passLeftover":
         uiEvents.emit({ type: "toast", kind: "events", tone: "gold", icon: "🎟️", title: tr("pass.leftoverToast", { n: n.n }) });
         break;

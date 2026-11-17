@@ -1,5 +1,6 @@
 "use client";
 
+import { CrashTestRow } from "./crash-test";
 import { EditionsCard } from "./editions-card";
 import { PrototypeLab } from "./expansion-cards";
 import { ClassicsPanel, ShowCard } from "./live-cards";
@@ -122,6 +123,7 @@ function ModelCard({ car, unlocked, open, onToggle }: { car: CarConfig; unlocked
         <StatBar label={t("design.design")} value={ms.design} />
       </div>
       <Review car={car} stars={ms.stars} />
+      {unlocked && <CrashTestRow car={car.id} />}
 
       <div className="relative mt-3 grid grid-cols-3 gap-1.5 text-center">
         <Spec label={t("cars.cost")} value={formatMoney(cost)} />

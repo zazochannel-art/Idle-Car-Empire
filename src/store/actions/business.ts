@@ -14,13 +14,15 @@ import * as Sp from "@/game/engine/sponsors";
 import * as Uc from "@/game/engine/used-cars";
 import { buySource } from "@/game/engine/sources";
 import { answerStaff } from "@/game/engine/staff";
+import { startCrashTest, testCost } from "@/game/engine/safety";
+import { carBaseValue, modelStats } from "@/game/engine/chain";
 import { chestStreakToday, claimDaily, claimDailyChest, claimMilestone, rewardCash } from "@/game/engine/progress";
 import { formatMoney } from "@/game/format";
 import { uiEvents } from "../events";
 import { unlockedCarIds } from "@/game/engine/economy";
 import type { GameStore, StoreCtx } from "../game-store";
 
-type Keys = "claimDaily" | "claimDailyChest" | "startPrototype" | "windTunnel" | "trackTest" | "launchProto" | "openMarket" | "setFleetProduct" | "acceptFleetOrder" | "declineFleetOrder" | "finishFleetOrder" | "hireEngineer" | "setEngineerPay" | "letGoEngineer" | "counterOffer" | "acceptVip" | "declineVip" | "claimVip" | "enterShow" | "claimShow" | "claimSeason" | "restoreClassic" | "acceptContract" | "signDeal" | "declineDeals" | "claimDeal" | "buyUsedCar" | "buySource" | "answerStaff" | "refurbishUsedCar" | "sellUsedCar" | "startQc" | "finishQc" | "declineContract" | "claimContract" | "claimLogin" | "dismissTip" | "claimMilestone";
+type Keys = "claimDaily" | "claimDailyChest" | "startPrototype" | "windTunnel" | "trackTest" | "launchProto" | "openMarket" | "setFleetProduct" | "acceptFleetOrder" | "declineFleetOrder" | "finishFleetOrder" | "hireEngineer" | "setEngineerPay" | "letGoEngineer" | "counterOffer" | "acceptVip" | "declineVip" | "claimVip" | "enterShow" | "claimShow" | "claimSeason" | "restoreClassic" | "acceptContract" | "signDeal" | "declineDeals" | "claimDeal" | "buyUsedCar" | "buySource" | "answerStaff" | "startCrashTest" | "refurbishUsedCar" | "sellUsedCar" | "startQc" | "finishQc" | "declineContract" | "claimContract" | "claimLogin" | "dismissTip" | "claimMilestone";
 
 export function businessActions({ get, act, persist, tr }: StoreCtx): Pick<GameStore, Keys> {
   return {
@@ -125,6 +127,11 @@ export function businessActions({ get, act, persist, tr }: StoreCtx): Pick<GameS
     if (!act((s) => (money = Sp.claimSponsor(s, get().snap, Date.now())) !== null)) return;
     uiEvents.emit({ type: "toast", tone: "gold", icon: "🤝", title: tr("sponsor.paid"), body: formatMoney(money ?? 0) });
     persist(true);
+  },
+  startCrashTest: (car) => {
+    const s0 = get().state;
+    const cfg = CAR_BY_ID[car];
+    if (act((s) => startCrashTest(s, car, modelStats(s0, cfg).quality, testCost(carBaseValue(s0, cfg, get().snap.gm)), Date.now()))) persist(true);
   },
   answerStaff: (yes) => {
     const out = act((s) => answerStaff(s, yes, Date.now()));
