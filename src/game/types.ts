@@ -615,6 +615,8 @@ export interface GameState {
   sponsors: SponsorsState;
   /** The used-car lot and the garage bay (engine/used-cars.ts). */
   usedCars: UsedCarsState;
+  /** Own sources of raw materials, a level per material (engine/sources.ts). Company-wide. */
+  sources: import("./engine/sources").SourcesState;
   /** Quality control inspections (engine/quality-check.ts). */
   qc: QcState;
   /** Daily login streak (1-7) and whether today's reward was taken. */

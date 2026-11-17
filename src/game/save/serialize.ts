@@ -19,6 +19,7 @@ import { migrateIap } from "../engine/iap";
 import { migrateSponsors } from "../engine/sponsors";
 import { migrateUsedCars } from "../engine/used-cars";
 import { migrateQc } from "../engine/quality-check";
+import { migrateSources } from "../engine/sources";
 import { CAR_BY_ID } from "../config/cars";
 import { migrateShop } from "../engine/shop";
 import { migrateCity, unlockOwnedZones } from "../engine/city";
@@ -236,6 +237,7 @@ export function migrate(input: unknown, now: number): GameState {
   state.sponsors = migrateSponsors(raw.sponsors);
   state.usedCars = migrateUsedCars(raw.usedCars, (id) => Object.hasOwn(CAR_BY_ID, id));
   state.qc = migrateQc(raw.qc);
+  state.sources = migrateSources(raw.sources);
   migrateLive(raw, state);
   state.classics = migrateClassics(raw.classics);
   migrateExpansion(raw, state);

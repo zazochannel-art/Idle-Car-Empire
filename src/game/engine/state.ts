@@ -24,6 +24,7 @@ import { createIap } from "./iap";
 import { createShop } from "./shop";
 import { createSponsors } from "./sponsors";
 import { createUsedCars } from "./used-cars";
+import { createSources } from "./sources";
 import { createQc } from "./quality-check";
 import type { CarDesign, CarId, ComponentId, GameState, ManagerId, ManagerState, Stats } from "../types";
 import { createDealers, createShowroom } from "./defaults";
@@ -111,6 +112,7 @@ export function createInitialState(now: number): GameState {
     contracts: { offer: null, active: null, nextAt: 0, done: 0 },
     sponsors: createSponsors(),
     usedCars: createUsedCars(),
+    sources: createSources(),
     qc: createQc(),
     logistics: createLogistics(),
     market: { t: 0, bought: 0 },
