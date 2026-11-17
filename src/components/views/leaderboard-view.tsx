@@ -19,6 +19,7 @@ import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { PlayerActions } from "../game/player-safety";
 import { CupPanel } from "./cup-panel";
+import { ChallengeCard } from "./challenge-card";
 import { ViewHeader } from "./section-title";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
@@ -111,6 +112,7 @@ export function LeaderboardView() {
   return (
     <div className="space-y-4">
       {header}
+      <ChallengeCard onFound={setVisiting} />
 
       <SpeedrunCard />
 

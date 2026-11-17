@@ -150,6 +150,9 @@ check((await redeem(b, inviteA?.code)) === "already", "a code is used once per a
 const inviteB = (await b.client.rpc("my_invite")).data;
 check(inviteB?.used === true && inviteB.canUse === false && inviteB.code !== inviteA?.code, "B is marked as invited", JSON.stringify(inviteB));
 check((await redeem(a, inviteB?.code)) === "self", "A can't use the code of a friend who used theirs");
+// race challenges (0033): a code leads to its player, for the duel on their card
+check((await b.client.rpc("player_by_code", { p_code: ` ${inviteA?.code?.toLowerCase()} ` })).data === idA, "B finds A by A's code (typed loosely)");
+check((await b.client.rpc("player_by_code", { p_code: "NOPE22" })).data === null, "an unknown code finds nobody");
 check((await a.client.rpc("my_invite")).data?.friends === 1 && (await a.client.rpc("claim_invite_rewards")).data === 0, "A sees one friend, no reward before B's first car");
 const sB2 = one(await b.client.rpc("save_game", { p_data: { cash: 7, lifetime: { carsProduced: 1 } }, p_save_version: 3, p_base_revision: Number(sB?.revision ?? 1), p_device: "e2e" }));
 check(sB2?.ok === true, "B builds their first car");
