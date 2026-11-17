@@ -10,6 +10,7 @@ import { formatMoney, formatPercent } from "@/game/format";
 import { useT } from "@/i18n/use-t";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
+import { useChoiceCard } from "./choice-card";
 
 /** ⚠️ A batch of cars has a defect: recall them (money, trust) or gamble on silence. */
 export function RecallDialog() {
@@ -26,10 +27,11 @@ function RecallCard() {
   const pay = useGame((g) => g.payRecall);
   const ignore = useGame((g) => g.ignoreRecall);
   const { t } = useT();
+  useChoiceCard();
   const car = recall ? CAR_BY_ID[recall.car] : null;
   const cost = recall && car ? recallCost(state, carValue(state, car, snap.gm)) : 0;
   return (
-    <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+    <motion.div role="dialog" aria-modal="true" aria-label={t("recall.title")} className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       {car && recall && (
           <motion.div
             initial={{ scale: 0.85, y: 30 }}
