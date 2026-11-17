@@ -1,0 +1,8 @@
+Neu in 1.3.0:
+• Nordheim wird zur Neujahrsstadt: Schnee, ein riesiger Baum, Lichter und Feuerwerk
+• Eine hellere, buntere Karte; jede Fabrik behält ihre Farben
+• Eigene Quellen: kaufe die Minen und Werke hinter deinen Materialien
+• Teile einen Clip deines Imperiums oder deine Karte direkt aus dem Spiel
+• Wer über deinen Link kommt, bekommt das Einladungsgeschenk automatisch
+• Das Menü wächst mit deiner Firma; dein erstes Auto kommt früher
+• Fehlerbehebungen und Stabilität

@@ -1,0 +1,8 @@
+Noutăți în 1.3.0:
+• Nordheim devine orașul de Anul Nou: zăpadă, brad uriaș, lumini și artificii
+• Hartă mai vie și mai colorată; fiecare fabrică își păstrează culorile
+• Surse proprii: cumpără minele și uzinele din spatele materialelor
+• Distribuie un clip cu imperiul tău sau cardul tău, direct din joc
+• Linkul tău îi dă prietenului cadoul de invitație automat
+• Meniul crește odată cu compania; prima mașină vine mai repede
+• Reparații și stabilitate
