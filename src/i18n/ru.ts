@@ -932,6 +932,15 @@ export const ru: Record<MessageKey, string> = {
   "upgrade.none": "Пока нечего улучшать.",
 
   "menu.settings": "Настройки",
+  "menu.newTile": "Новое в меню: {name}",
+  "menu.newTileMore": "{names} и ещё {n}",
+  "menu.newTileBody": "Открывается теперь, когда ваша империя выросла.",
+  "menu.newTileOpen": "Открыть",
+  "menu.comingUp": "Скоро",
+  "menu.lock.firstCar": "После первой машины",
+  "menu.lock.territory": "Откройте территорию",
+  "menu.lock.earned": "При заработке {money}",
+  "menu.lock.territories": "Все территории открыты ({have}/{n})",
   "employees.mechanics": "Механики гаражей",
   "employees.mechanicsHint": "Нанимай механиков внутри каждого гаража (Рабочие).",
 

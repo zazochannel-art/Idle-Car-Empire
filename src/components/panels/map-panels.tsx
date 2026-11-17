@@ -18,6 +18,8 @@ import type { MessageKey, Vars } from "@/i18n";
 import { useContent } from "@/i18n/content";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
+import { menuLock, type MenuTileId } from "@/game/engine/menu";
+import { MENU_TILES, markTileSeen, useFreshTiles } from "../game/menu-unlocks";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { CostButton } from "../game/cost-button";
@@ -455,38 +457,48 @@ export function MenuPanel({ onSettings }: { onSettings: () => void }) {
   const pass = useGame((g) => passWaiting(g.state) > 0);
   // a new city waiting to be opened
   const city = useGame((g) => cityUnlockStatus(g.state, "north").ready);
-  const tiles: { icon: string; label: string; go: () => void; gold?: boolean; badge?: boolean }[] = [
-    { icon: "👤", label: t("account.title"), go: () => setView("profile"), gold: true },
-    { icon: "📖", label: t("nav.story"), go: () => setView("story"), gold: true, badge: waiting },
-    { icon: "📊", label: t("nav.economy"), go: () => setView("economy"), gold: true },
-    { icon: "🏁", label: t("nav.racing"), go: () => setView("racing"), gold: true },
-    { icon: "👑", label: t("imperium.title"), go: () => setView("imperium"), gold: true },
-    { icon: "🏗️", label: t("nav.landmarks"), go: () => setView("landmarks"), gold: true },
-    { icon: "📈", label: t("nav.stock"), go: () => setView("stock"), gold: true },
-    { icon: "🌍", label: t("nav.world"), go: () => setView("world"), gold: true, badge: city },
-    ...(winter !== null ? [{ icon: "🎄", label: t("nav.winter"), go: () => setView("winter"), gold: true, badge: winter }] : []),
-    ...(festival ? [{ icon: SEASON_ICON[festival], label: t(`festival.${festival}`), go: () => setView("festival"), gold: true, badge: festivalBadge }] : []),
-    { icon: "🎟️", label: t("nav.pass"), go: () => setView("pass"), gold: true, badge: pass },
-    { icon: "🏆", label: t("nav.leaderboard"), go: () => setView("leaderboard"), gold: true },
-    { icon: "🤝", label: t("nav.alliance"), go: () => setView("alliance"), gold: true },
-    { icon: "🚗", label: t("nav.cars"), go: () => setView("cars") },
-    // research has no other way in (only a goal can open it)
-    { icon: "🔬", label: t("nav.research"), go: () => setView("research") },
-    { icon: "🎖️", label: t("nav.achievements"), go: () => setView("achievements") },
-    { icon: "📊", label: t("nav.stats"), go: () => setView("stats") },
-    { icon: "👔", label: t("nav.managers"), go: () => setView("managers") },
-    { icon: "🔔", label: t("nav.inbox"), go: () => setView("inbox") },
-    { icon: "🏪", label: t("nav.dealers"), go: () => setView("dealers") },
-    { icon: "🚚", label: t("nav.logistics"), go: () => setView("logistics") },
-    { icon: "⚙️", label: t("menu.settings"), go: onSettings },
+  const state = useGame((g) => g.view.state);
+  const fresh = useFreshTiles();
+  // what lights each tile up: something waiting there, or the screen just joined the menu
+  const waitingOn: Partial<Record<MenuTileId, boolean>> = { story: waiting, world: city, pass };
+  type Tile = { key: string; icon: string; label: string; go: () => void; gold?: boolean; badge?: boolean; lock?: string };
+  const lockText = (id: MenuTileId): string | undefined => {
+    const l = menuLock(state, id);
+    if (!l) return undefined;
+    if (l.kind === "firstCar") return t("menu.lock.firstCar");
+    if (l.kind === "territory") return t("menu.lock.territory");
+    if (l.kind === "earned") return t("menu.lock.earned", { money: formatMoney(l.money) });
+    return t("menu.lock.territories", { have: l.have, n: l.n });
+  };
+  const all: Tile[] = MENU_TILES.map((x) => ({
+    key: x.id,
+    icon: x.icon,
+    label: t(x.label),
+    gold: x.gold,
+    lock: lockText(x.id),
+    badge: !!waitingOn[x.id] || fresh.includes(x.id),
+    go: () => {
+      markTileSeen(x.id);
+      if (x.view) setView(x.view);
+      else onSettings();
+    },
+  }));
+  // the seasonal festivals sit after World while they run
+  const seasonal: Tile[] = [
+    ...(winter !== null ? [{ key: "winter", icon: "🎄", label: t("nav.winter"), go: () => setView("winter"), gold: true, badge: winter }] : []),
+    ...(festival ? [{ key: "festival", icon: SEASON_ICON[festival], label: t(`festival.${festival}`), go: () => setView("festival"), gold: true, badge: festivalBadge }] : []),
   ];
+  const at = all.findIndex((x) => x.key === "world") + 1;
+  const tiles = [...all.slice(0, at), ...seasonal, ...all.slice(at)];
+  const open = tiles.filter((x) => !x.lock);
+  const coming = tiles.filter((x) => x.lock);
   // four to a row, so the whole menu fits without scrolling on a phone; the gold group (you, your
   // company, other players) first, then the company's departments
-  const grid = (list: typeof tiles) => (
+  const grid = (list: Tile[]) => (
     <div className="grid grid-cols-4 gap-2">
       {list.map((x) => (
         <button
-          key={x.label}
+          key={x.key}
           onClick={x.go}
           className={cn(
             "relative flex min-h-[78px] flex-col items-center justify-center gap-1.5 rounded-2xl px-1 py-2.5 text-[12px] font-semibold ring-1 transition hover:bg-white/[0.07] active:scale-[0.97]",
@@ -503,8 +515,26 @@ export function MenuPanel({ onSettings }: { onSettings: () => void }) {
   return (
     // (a pixel of room on top: the first row's rings would be cut by the scrolling edge)
     <div className="space-y-3 pb-2 pt-px">
-      {grid(tiles.filter((x) => x.gold))}
-      {grid(tiles.filter((x) => !x.gold))}
+      {grid(open.filter((x) => x.gold))}
+      {grid(open.filter((x) => !x.gold))}
+      {coming.length > 0 && (
+        <div>
+          <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/40">
+            <Lock className="size-3" /> {t("menu.comingUp")}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {coming.map((x) => (
+              <div key={x.key} className="flex items-center gap-2 rounded-xl bg-white/[0.02] px-2.5 py-2 ring-1 ring-white/[0.05]">
+                <span className="text-lg leading-none opacity-40 grayscale">{x.icon}</span>
+                <div className="min-w-0">
+                  <div className="truncate text-[12px] font-semibold text-white/50">{x.label}</div>
+                  <div className="truncate text-[10px] text-white/35">{x.lock}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
