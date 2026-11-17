@@ -124,6 +124,8 @@ npm run ios:open        # Xcode (on a Mac)
    - Garages, car washes and other city buildings are a side business.
    - open **Nordheim**, the New Year city (after every territory of the first city): snow all
      year, a giant decorated tree on the main square, lights on the houses and fireworks at night;
+   - research **Fuel Cells** and **Hydrogen Cars** (after Solid-State Batteries): the Hydrogen
+     Works (on the Battery Factory's lots) makes fuel cells for the Hydrogen Cruiser;
    - from $250M earned, buy **own sources** (an iron mine, a rubber plantation, a
      lithium mine…): each of 5 levels takes 6% off that one material's price in every
      city (Economy screen).

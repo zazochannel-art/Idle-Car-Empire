@@ -49,6 +49,8 @@ export const COMPONENT_RECIPE: Record<ComponentId, Partial<Record<MaterialId, nu
   battery: { battery: 20, copper: 6, aluminum: 5 },
   // servers, sensors and test rigs the driving stack is trained and validated on
   software: { electronics: 14, copper: 2 },
+  // membranes, platinum-coated plates and the tank's valves
+  fuelcell: { electronics: 6, copper: 8, aluminum: 6, fluids: 12 },
   transmission: { steel: 14, aluminum: 8, fluids: 3 },
   wheels: { aluminum: 16, steel: 3 },
   brakes: { steel: 10, copper: 2, plastic: 2 },
@@ -75,6 +77,7 @@ export const COMPONENT_TIME: Record<ComponentId, number> = {
   electronics: 35,
   battery: 60,
   software: 55,
+  fuelcell: 55,
   transmission: 45,
   wheels: 30,
   brakes: 30,

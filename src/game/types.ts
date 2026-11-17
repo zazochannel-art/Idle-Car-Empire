@@ -16,6 +16,7 @@ export type CarId =
   | "hypercar"
   | "electric"
   | "autonomous"
+  | "hydrogen"
   // the lines of the map's landmark works (config/landmarks.ts): one in each territory
   | "pickup"
   | "minivan"
@@ -44,6 +45,7 @@ export type ComponentId =
   | "electronics"
   | "battery"
   | "software"
+  | "fuelcell"
   | "transmission"
   | "wheels"
   | "brakes"
@@ -72,6 +74,7 @@ export type PlantType =
   | "electronicsFactory"
   | "batteryFactory"
   | "softwareStudio"
+  | "hydrogenWorks"
   | "assemblyPlant"
   // the landmark works, one in each territory (config/landmarks.ts)
   | "frameWorks"

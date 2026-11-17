@@ -171,6 +171,7 @@ export const CAR_MODEL_FOR: Record<CarId, CarModel> = {
   hypercar: "hypercar",
   electric: "electric",
   autonomous: "robotaxi",
+  hydrogen: "electric",
   pickup: "pickup",
   minivan: "minivan",
   offroad: "offroad",
