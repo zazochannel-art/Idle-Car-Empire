@@ -236,6 +236,8 @@ export interface GameStore {
   claimDeal: () => void;
   /** The used-car lot (engine/used-cars.ts): buy a car, refurbish it, sell it. */
   buyUsedCar: (id: number) => void;
+  /** Answers the staff's card: yes (pay its cost) or no (engine/staff.ts). */
+  answerStaff: (yes: boolean) => void;
   /** Buys the next level of a material's own source (engine/sources.ts). */
   buySource: (m: import("@/game/config/economy").MaterialId) => void;
   refurbishUsedCar: () => void;

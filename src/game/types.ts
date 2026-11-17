@@ -615,6 +615,8 @@ export interface GameState {
   sponsors: SponsorsState;
   /** The used-car lot and the garage bay (engine/used-cars.ts). */
   usedCars: UsedCarsState;
+  /** The staff's morale and the card waiting for an answer (engine/staff.ts). Company-wide. */
+  staff: import("./engine/staff").StaffState;
   /** The last New Year whose gift was taken (engine/new-year.ts; 0: none yet). */
   newYear: number;
   /** Own sources of raw materials, a level per material (engine/sources.ts). Company-wide. */

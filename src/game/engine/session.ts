@@ -3,6 +3,7 @@
 // contracts, VIP and fleet orders, the season, the pass, festivals, the story…), in one place and
 // in one order. It changes the state and returns what happened as news; the store only turns the
 // news into toasts and screens (store/news.ts). Scripts (bench-tick) run the same step.
+import { staffTick } from "./staff";
 import { OPENABLE_CITIES } from "../config/cities";
 import type { CarId, CityId, GameEvent, GameState } from "../types";
 import * as Ap from "./autopilot";
@@ -46,6 +47,7 @@ export type News =
   | { kind: "classicRestored"; id: NonNullable<ReturnType<typeof Cl.classicsTick>> }
   | { kind: "engineer"; what: "candidate"; id: string }
   | { kind: "engineer"; what: "lost" }
+  | { kind: "staff"; card: import("./staff").StaffCardId }
   | { kind: "passLeftover"; n: number }
   | { kind: "passSeason"; n: number }
   | { kind: "winter" }
@@ -113,6 +115,8 @@ export function sessionTick(s: GameState, prev: GameState, dt: number, now: numb
   if (Lv.seasonTick(s, now) && s.season.last && !s.season.last.claimed) news.push({ kind: "seasonOver", rank: s.season.last.rank });
   const restored = Cl.classicsTick(s, now);
   if (restored) news.push({ kind: "classicRestored", id: restored });
+  const staffCard = staffTick(s, now, dt, snap.rewardIncomePerSec);
+  if (staffCard) news.push({ kind: "staff", card: staffCard });
   const eng = Ex.engineersTick(s, now, dt);
   if (eng === "candidate") news.push({ kind: "engineer", what: "candidate", id: s.engineers.candidate!.id });
   else if (eng === "lost") news.push({ kind: "engineer", what: "lost" });

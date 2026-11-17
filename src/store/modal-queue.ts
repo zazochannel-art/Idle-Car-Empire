@@ -7,10 +7,10 @@
 import { useEffect } from "react";
 import { create } from "zustand";
 
-export type ModalSlot = "offline" | "recall" | "poach" | "unlock" | "login" | "whatsNew" | "companyName";
+export type ModalSlot = "offline" | "recall" | "poach" | "staff" | "unlock" | "login" | "whatsNew" | "companyName";
 
 /** First is shown first. */
-export const MODAL_ORDER: ModalSlot[] = ["offline", "recall", "poach", "unlock", "login", "whatsNew", "companyName"];
+export const MODAL_ORDER: ModalSlot[] = ["offline", "recall", "poach", "staff", "unlock", "login", "whatsNew", "companyName"];
 
 export const useModalQueue = create<{ waiting: ModalSlot[] }>(() => ({ waiting: [] }));
 
