@@ -21,6 +21,7 @@ import { uiEvents, type UiEvent, type UiToastAction } from "@/store/events";
 import { useGame } from "@/store/game-store";
 import { useInbox } from "@/store/inbox";
 import { useUi } from "@/store/ui-store";
+import { useModalSlot } from "@/store/modal-queue";
 import { LedgerTable } from "../views/ledger-table";
 import { AdPrivacyButton, OfflineAdButton } from "./ad-buttons";
 import { AutoDecideSection } from "./auto-decide";
@@ -29,7 +30,9 @@ import { AutoDecideSection } from "./auto-decide";
 export function OfflineDialog() {
   // only whether a report waits: the report itself (and the plants it names) is read while it is open
   const waiting = useGame((g) => !!g.state.pendingOffline);
-  return waiting ? <OfflineReport /> : null;
+  // the first popup in line (store/modal-queue.ts)
+  const shown = useModalSlot("offline", waiting);
+  return shown ? <OfflineReport /> : null;
 }
 
 function OfflineReport() {

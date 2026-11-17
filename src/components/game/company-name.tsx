@@ -12,6 +12,7 @@ import { useT } from "@/i18n/use-t";
 import { uiEvents } from "@/store/events";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
+import { otherModalWaiting } from "@/store/modal-queue";
 
 const ASKED_KEY = "idle-car-empire:company-name-asked";
 /** Another dialog open: the question waits for it (checked again every few seconds). */
@@ -43,7 +44,7 @@ export function CompanyNameDialog() {
     if (!due || busy || open || asked()) return;
     // not over another dialog (Welcome back, a choice of saves, a recall…)
     const id = setInterval(() => {
-      if (document.querySelector('[role="dialog"], [data-modal]')) return;
+      if (document.querySelector('[role="dialog"], [data-modal]') || otherModalWaiting("companyName")) return;
       clearInterval(id);
       markAsked();
       setOpen(true);

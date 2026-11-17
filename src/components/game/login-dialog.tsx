@@ -10,6 +10,7 @@ import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
+import { useModalSlot } from "@/store/modal-queue";
 
 /** Once a day: the streak calendar and today's reward. */
 export function LoginDialog() {
@@ -20,7 +21,7 @@ export function LoginDialog() {
     const s = g.state;
     return !!s.login.day && !s.login.claimed && s.lifetime.playTime > 120 && !s.pendingOffline;
   });
-  const open = due && !tutorial;
+  const open = useModalSlot("login", due && !tutorial);
   const claimLogin = useGame((g) => g.claimLogin);
   return (
     <Dialog open={open} onOpenChange={(o) => !o && claimLogin()}>

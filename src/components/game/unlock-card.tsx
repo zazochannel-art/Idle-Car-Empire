@@ -15,6 +15,7 @@ import { useT } from "@/i18n/use-t";
 import { uiEvents } from "@/store/events";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
+import { useModalSlot } from "@/store/modal-queue";
 
 type Unlock = { kind: "car" | "plant"; id: string };
 
@@ -39,8 +40,9 @@ export function UnlockCard() {
     [],
   );
 
-  // the first-car celebration plays first
-  const cur = celebrating ? undefined : queue[0];
+  // the first-car celebration plays first, and a more important popup (store/modal-queue.ts)
+  const turn = useModalSlot("unlock", queue.length > 0 && !celebrating);
+  const cur = turn ? queue[0] : undefined;
   // the bonus moves with production every tick: read it only while a card is up
   const bonus = useGame((g) => (cur ? unlockBonus(g.state) : 0));
   const next = () => setQueue((q) => q.slice(1));

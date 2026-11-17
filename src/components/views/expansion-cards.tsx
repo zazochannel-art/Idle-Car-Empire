@@ -18,6 +18,7 @@ import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
+import { useModalSlot } from "@/store/modal-queue";
 import { useChoiceCard } from "../game/choice-card";
 
 const Box = ({ title, sub, children, className }: { title: string; sub?: string; children: React.ReactNode; className?: string }) => (
@@ -355,7 +356,8 @@ export function PoachDialog() {
   // only whether a rival is calling: the card itself follows the cash and the clock while it is open
   const open = useGame((g) => !!g.state.engineers.poach);
   const busy = useUi((u) => !!u.celebrate);
-  return <AnimatePresence>{open && !busy && <PoachCard />}</AnimatePresence>;
+  const shown = useModalSlot("poach", open && !busy);
+  return <AnimatePresence>{shown && <PoachCard />}</AnimatePresence>;
 }
 
 function PoachCard() {

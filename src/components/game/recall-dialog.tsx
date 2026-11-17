@@ -10,6 +10,7 @@ import { formatMoney, formatPercent } from "@/game/format";
 import { useT } from "@/i18n/use-t";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
+import { useModalSlot } from "@/store/modal-queue";
 import { useChoiceCard } from "./choice-card";
 
 /** ⚠️ A batch of cars has a defect: recall them (money, trust) or gamble on silence. */
@@ -17,7 +18,8 @@ export function RecallDialog() {
   // only whether there is a recall: the card itself follows the game while it is open
   const open = useGame((g) => !!g.state.quality.recall);
   const busy = useUi((u) => !!u.celebrate);
-  return <AnimatePresence>{open && !busy && <RecallCard />}</AnimatePresence>;
+  const shown = useModalSlot("recall", open && !busy);
+  return <AnimatePresence>{shown && <RecallCard />}</AnimatePresence>;
 }
 
 function RecallCard() {
