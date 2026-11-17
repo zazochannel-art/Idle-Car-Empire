@@ -684,7 +684,7 @@ function InviteCard() {
       const labels = { cars: t("card.cars"), earned: t("card.earned"), stars: t("card.stars"), achievements: t("card.achievements"), useCode: t("card.useCode"), get: t("card.get") };
       const blob = await cardBlob(shareCardData(gameState, info.code), labels);
       if (!blob) return;
-      const how = await sharePicture(blob, "idle-car-empire", `${share} ${shareUrl("card")}`);
+      const how = await sharePicture(blob, "idle-car-empire", `${share} ${shareUrl("card", info?.code)}`);
       uiEvents.emit({ type: "toast", tone: "success", icon: "🪪", title: t(how === "shared" ? "card.shared" : "card.saved") });
     } finally {
       setBusy(false);
@@ -706,7 +706,7 @@ function InviteCard() {
         return;
       }
       const ext = blob.type === "video/mp4" ? "mp4" : "webm";
-      const how = await shareFile(blob, `idle-car-empire.${ext}`, blob.type, `${share} ${shareUrl("clip")}`);
+      const how = await shareFile(blob, `idle-car-empire.${ext}`, blob.type, `${share} ${shareUrl("clip", info.code)}`);
       uiEvents.emit({ type: "toast", tone: "success", icon: "🎬", title: t(how === "shared" ? "clip.shared" : "clip.saved") });
     } finally {
       setClipPct(null);
@@ -748,7 +748,7 @@ function InviteCard() {
               {t("invite.copy")}
             </Button>
             {canShare && (
-              <Button size="sm" variant="gold" onClick={() => void navigator.share({ text: `${share} ${shareUrl("card")}` }).catch(() => {})}>
+              <Button size="sm" variant="gold" onClick={() => void navigator.share({ text: `${share} ${shareUrl("card", info?.code)}` }).catch(() => {})}>
                 {t("invite.share")}
               </Button>
             )}

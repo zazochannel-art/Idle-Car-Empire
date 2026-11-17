@@ -62,6 +62,7 @@ import { browserOptOut, sendStep } from "@/game/save/funnel";
 import { PASS, type WeeklyId } from "@/game/config/pass";
 import { batteryState, isIdle, isSaving, minTickMs, onSaverChange, setSaverSetting, startPower, type SaverSetting } from "@/lib/power";
 import { claimTab } from "@/lib/tabs";
+import { redeemFromInstall } from "@/lib/install-referrer";
 
 const TICK_MS = 100;
 /** How often the ticks refresh the screens' view of the state (ms). */
@@ -907,6 +908,8 @@ export const useGame = create<GameStore>((set, get) => {
           void get().publishGhost();
         };
         socialTimers.push(setTimeout(social, SOCIAL_FIRST_MS), setInterval(social, SOCIAL_EVERY_MS));
+        // a friend's code from the store link this install came from (once per phone)
+        socialTimers.push(setTimeout(() => void redeemFromInstall((code) => get().redeemInvite(code)), SOCIAL_FIRST_MS));
         syncPush();
       }
     },

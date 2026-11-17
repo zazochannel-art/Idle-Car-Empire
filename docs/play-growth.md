@@ -114,6 +114,18 @@ cadoul de bun venit. Un cod obișnuit primește cel mult 50 de jucători; migrar
 prieteni, ca să nu primească sute de Stele. Câți jucători a adus fiecare creator și câți au
 construit prima mașină: `select public.admin_creators();` (doar adminii).
 
+### Codul vine singur din link
+
+Cardul și clipul distribuite din joc duc la Play Store printr-un link care conține codul celui
+care le-a distribuit (`utm_content`). Pe Android, jocul nou instalat citește linkul o dată
+(Google Play Install Referrer, `src/lib/install-referrer.ts`) și folosește codul singur, deci
+prietenul primește cadoul fără să scrie nimic. Un creator poate da și el linkul lui:
+
+`https://play.google.com/store/apps/details?id=com.zazochannel.idlecarempire&referrer=utm_source%3Dinvite%26utm_medium%3Dcreator%26utm_content%3DABC234`
+
+(cu codul lui în loc de `ABC234`). În Play Console → *Statistics → Acquisition*, instalările
+din aceste linkuri apar la sursa `invite`.
+
 ## 7. Comunitate
 
 - Un server Discord cu canale: #anunțuri, #idei, #bug-uri, #imperiul-meu (capturi), pe limbi.

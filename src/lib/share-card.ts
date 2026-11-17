@@ -11,10 +11,14 @@ export const STORE_URL = "https://play.google.com/store/apps/details?id=com.zazo
 
 /**
  * The store link a player shares, tagged so Play Console's acquisition report counts the installs
- * that came from players' shares (utm_source=invite) and from which kind of share (card, clip).
+ * that came from players' shares (utm_source=invite) and from which kind of share (card, clip),
+ * with the player's invite code in it (utm_content): a friend who installs from it gets the code
+ * used for them (install-referrer.ts).
  */
-export function shareUrl(kind: "card" | "clip"): string {
-  return `${STORE_URL}&referrer=${encodeURIComponent(`utm_source=invite&utm_medium=${kind}&utm_campaign=player_share`)}`;
+export function shareUrl(kind: "card" | "clip", code = ""): string {
+  const c = code.replace(/[^A-Z0-9]/gi, "").toUpperCase().slice(0, 6);
+  const ref = `utm_source=invite&utm_medium=${kind}&utm_campaign=player_share${c ? `&utm_content=${c}` : ""}`;
+  return `${STORE_URL}&referrer=${encodeURIComponent(ref)}`;
 }
 
 export interface ShareCardData {

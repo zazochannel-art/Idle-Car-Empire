@@ -27,3 +27,6 @@
 
 # the game's own Capacitor plugin (Google Play Games): found by reflection, never shrunk
 -keep class com.zazochannel.idlecarempire.PlayGamesPlugin { *; }
+# and the share sheet and the install referrer (SharePlugin, InstallReferrerPlugin)
+-keep class com.zazochannel.idlecarempire.SharePlugin { *; }
+-keep class com.zazochannel.idlecarempire.InstallReferrerPlugin { *; }
