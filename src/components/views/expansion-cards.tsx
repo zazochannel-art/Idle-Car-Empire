@@ -18,6 +18,7 @@ import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
+import { useModalSlot } from "@/store/modal-queue";
 import { useChoiceCard } from "../game/choice-card";
 
 const Box = ({ title, sub, children, className }: { title: string; sub?: string; children: React.ReactNode; className?: string }) => (
@@ -299,6 +300,8 @@ export function EngineersCard() {
   const E = state.engineers;
   const now = state.lastActiveAt;
   const fee = signingFee(state);
+  // star engineers come after the first car (until then the card only said so)
+  if (!state.chain.firstCar && !E.hired.length) return null;
   return (
     <Box title={`👩‍🔬 ${t("eng.title", { n: E.hired.length, slots: ENGINEER.slots })}`} sub={t("eng.desc", { salary: formatMoney(salaries(state) * 60) })}>
       <div className="space-y-1.5">
@@ -355,7 +358,8 @@ export function PoachDialog() {
   // only whether a rival is calling: the card itself follows the cash and the clock while it is open
   const open = useGame((g) => !!g.state.engineers.poach);
   const busy = useUi((u) => !!u.celebrate);
-  return <AnimatePresence>{open && !busy && <PoachCard />}</AnimatePresence>;
+  const shown = useModalSlot("poach", open && !busy);
+  return <AnimatePresence>{shown && <PoachCard />}</AnimatePresence>;
 }
 
 function PoachCard() {

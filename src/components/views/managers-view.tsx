@@ -19,6 +19,9 @@ import { CostButton } from "../game/cost-button";
 import { plantName } from "../panels/plant-panel";
 import { ViewHeader } from "./section-title";
 
+/** Locked managers shown ahead (the rest are counted in a line under them). */
+const LOCKED_SHOWN = 2;
+
 export function ManagersView() {
   const state = useGame((g) => g.view.state);
   const { t, lang } = useT();
@@ -26,6 +29,11 @@ export function ManagersView() {
   const { hireManager, upgradeManager, assignManager } = useGame.getState();
   const owned = plantsOf(state).map(([id]) => id);
   const hired = MANAGERS.filter((m) => state.managers[m.id].hired).length;
+  // the hired and the open ones, and the next few still locked: twelve cards at once was a wall
+  const locked = MANAGERS.filter((m) => !state.managers[m.id].hired && !isManagerUnlocked(state, m.id)).sort((a, b) => a.unlockAt - b.unlockAt);
+  const soon = new Set(locked.slice(0, LOCKED_SHOWN).map((m) => m.id));
+  const shownManagers = MANAGERS.filter((m) => state.managers[m.id].hired || isManagerUnlocked(state, m.id) || soon.has(m.id));
+  const later = locked.length - soon.size;
 
   return (
     <div className="space-y-4">
@@ -36,7 +44,7 @@ export function ManagersView() {
       />
       <EngineersCard />
       <div className="grid gap-3 @xl:grid-cols-2">
-        {MANAGERS.map((m) => {
+        {shownManagers.map((m) => {
           const st = state.managers[m.id];
           const unlocked = isManagerUnlocked(state, m.id);
           if (!st.hired) {
@@ -116,6 +124,7 @@ export function ManagersView() {
           );
         })}
       </div>
+      {later > 0 && <p className="text-center text-xs text-white/45">{t("managers.moreLater", { n: later })}</p>}
     </div>
   );
 }

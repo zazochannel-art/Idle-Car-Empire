@@ -5,7 +5,7 @@ import { constructionCost, freePlotFor, landCost, ownsLand, progressOf, remainin
 import { atTrack, racingCost } from "./racing";
 import { nextTerritory, territoryLock } from "./territory";
 import type { TerritoryId } from "../config/city";
-import { DEBT, LOW_STOCK_UNITS, MATERIAL_BY_ID, RESERVE_UNITS, RESTOCK_UNITS, WAREHOUSE_MINUTES, type MaterialId } from "../config/economy";
+import { DEBT, LOW_STOCK_UNITS, MATERIAL_BY_ID, RESERVE_UNITS, RESERVE_UNITS_FIRST_CAR, RESTOCK_UNITS, WAREHOUSE_MINUTES, type MaterialId } from "../config/economy";
 import { buyPlan, plantMaterials, restockPlan, stockTotal, suggestedRestock, supplierOf, unitsInStock, warehouseCap, warehouseCost } from "./materials";
 import { debtLimit } from "./ledger";
 import { CARS } from "../config/cars";
@@ -229,7 +229,7 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
     const plot = freePlotFor(s, next.id);
     if (plot) {
       const land = ownsLand(s, plot) ? 0 : landCost(s, plot);
-      goals.push({ kind: "plant", icon: next.emoji, cost: land + constructionCost(s, plot), plant: next.id, plot, reserve: workingCapital(s, snap) });
+      goals.push({ kind: "plant", icon: next.emoji, cost: land + constructionCost(s, plot), plant: next.id, plot, reserve: workingCapital(s, snap, s.chain.firstCar ? RESERVE_UNITS : RESERVE_UNITS_FIRST_CAR) });
     } else {
       const z = nextZone(s);
       if (z && !zoneBlocker(s, z.id)) goals.push({ kind: "zone", icon: "🗺️", cost: ZONE_BY_ID[z.id].cost, zone: z.id });
@@ -350,11 +350,11 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
 }
 
 /** Cash that should stay free to buy materials for the next few units of every plant. */
-export function workingCapital(s: GameState, snap: EconomySnapshot): number {
+export function workingCapital(s: GameState, snap: EconomySnapshot, units = RESERVE_UNITS): number {
   let c = 0;
   for (const [id] of plantsOf(s)) {
     const st = snap.chain.plants[id];
-    if (st && Object.keys(st.need).length) c += restockPlan(s, id, st.need, RESERVE_UNITS, true).cost;
+    if (st && Object.keys(st.need).length) c += restockPlan(s, id, st.need, units, true).cost;
   }
   return c;
 }

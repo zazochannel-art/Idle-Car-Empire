@@ -7,6 +7,7 @@ import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
+import { useModalSlot } from "@/store/modal-queue";
 
 /**
  * What the update brought, once, with a button to each new thing. It waits for the other
@@ -22,8 +23,9 @@ export function WhatsNewDialog({ onSettings }: { onSettings: () => void }) {
   const seen = useGame((g) => g.seenWhatsNew);
   const { t } = useT();
   const close = () => seen(WHATS_NEW.id);
+  const open = useModalSlot("whatsNew", due && !tutorial);
   return (
-    <Dialog open={due && !tutorial} onOpenChange={(o) => !o && close()}>
+    <Dialog open={open} onOpenChange={(o) => !o && close()}>
       <DialogContent>
         <div className="mb-1 text-4xl">✨</div>
         <DialogTitle>{t("whatsNew.title")}</DialogTitle>

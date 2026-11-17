@@ -100,8 +100,8 @@ export const PLANTS: PlantConfig[] = [
   // the first car: body + engine + tyres, put together by the assembly plant
   // (tyres come from a supplier until the Tire Factory is built)
   { id: "bodyWorks", emoji: "🚙", item: "body", raw: "steel", rawPer: 10, time: 20, cost: 8_000, requires: null, color: "#e2e8f0", roof: "#64748b" },
-  { id: "engineFactory", emoji: "⚙️", item: "engine", raw: "metal", rawPer: 10, time: 30, cost: 6_000, requires: "bodyWorks", unlockMade: { item: "body", n: 12 }, color: "#e7e5e4", roof: "#b91c1c" },
-  { id: "assemblyPlant", emoji: "🏭", item: null, raw: "", rawPer: 0, time: 60, cost: 30_000, firstCost: 6_000, requires: "engineFactory", color: "#f1f5f9", roof: "#1d4ed8" },
+  { id: "engineFactory", emoji: "⚙️", item: "engine", raw: "metal", rawPer: 10, time: 30, cost: 4_000, requires: "bodyWorks", unlockMade: { item: "body", n: 12 }, color: "#e7e5e4", roof: "#b91c1c" },
+  { id: "assemblyPlant", emoji: "🏭", item: null, raw: "", rawPer: 0, time: 60, cost: 30_000, firstCost: 3_000, requires: "engineFactory", color: "#f1f5f9", roof: "#1d4ed8" },
   { id: "tireFactory", emoji: "🛞", item: "tires", raw: "rubber", rawPer: 10, time: 30, cost: 15_000, requires: "engineFactory", color: "#d4d4d8", roof: "#27272a" },
   // better cars need more parts
   { id: "interiorFactory", emoji: "💺", item: "interior", raw: "fabric", rawPer: 10, time: 40, cost: 150_000, requires: "assemblyPlant", color: "#fef3c7", roof: "#a16207" },

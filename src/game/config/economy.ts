@@ -129,6 +129,11 @@ export const LOW_STOCK_UNITS = 4;
 
 /** Goals only suggest spending on upgrades while this many units of materials per plant stay affordable. */
 export const RESERVE_UNITS = 5;
+/**
+ * Before the first car, the next plant of the chain asks for less kept back: parts sell at a thin
+ * margin until then, and five units for every plant on top of the price kept the first car ~40 min away.
+ */
+export const RESERVE_UNITS_FIRST_CAR = 2;
 
 /**
  * Suggested and automatic material orders leave this many seconds of what

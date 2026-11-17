@@ -18,8 +18,8 @@ A Level 1 Body Works makes 1.33 bodies a minute — about $300/min of profit sel
 
 The company starts with **$10,000** and a **Body Works already built**, with material for 3 bodies.
 That is enough for about six more bodies' worth of steel and plastic: the first decisions are what to
-buy, when to upgrade, and saving $6,000 for the Engine Factory (opens after 12 bodies). The first car
-needs the Engine Factory, the Assembly Plant ($6,000 for the first) and tyres (bought, until the
+buy, when to upgrade, and saving $4,000 for the Engine Factory (opens after 12 bodies). The first car
+needs the Engine Factory, the Assembly Plant ($3,000 for the first) and tyres (bought, until the
 $15,000 Tire Factory). The first sale opens the Local Dealer.
 
 ## 2. What changed — OLD → NEW → WHY
@@ -177,3 +177,24 @@ close the gap between a player who follows the hints and one who knows every sys
 the cheapest upgrade forever: the Suspension Factory came at 3 h 56 min (Sedan at 3 h 57 min); now at
 1 h 0 min (Sedan 1 h 2 min). Its first car (18–22 min) is earlier than the goal-follower's (43 min 44 s)
 because it doesn't wait for the goals: the two bots measure different players.
+
+## 9. The first car sooner (Nov 17, 2026)
+
+Before the first car the company only sells parts, at a thin margin (+10%): a player following the
+goals made about $5–8/s and needed the next plant's price **plus** five units of material for every
+plant kept back, twice (Engine Factory, then the Assembly Plant). The first car came at 43 min 44 s.
+
+| Value | OLD | NEW | WHY |
+|---|---|---|---|
+| Engine Factory (`PLANTS`, chain.ts) | $6,000 | **$4,000** | the first saving goal; a second one still costs 2.5× |
+| First Assembly Plant (`firstCost`) | $6,000 | **$3,000** | the next ones are unchanged ($30K × 2.5ⁿ) |
+| Cash kept back for the next plant before the first car (`RESERVE_UNITS_FIRST_CAR`) | 5 units per plant | **2** | after the first car it is 5 again |
+
+| Bot | Before | After |
+|---|---|---|
+| Goal-follower (`6 q`): first car | 43 min 44 s | **30 min 14 s** |
+| Goal-follower, 1 h · 6 h earned | $292K · $113M | $376K · $119M |
+| Full player, 8 h (`8 full`) | $327M | $329M, max owed $3.6K |
+| 24 h of play-1-h / away-7-h (`24 sessions`) | $200M | $193M, max owed $2.4K, no rescues |
+
+Only the start moves: from the first car on the economy is the same.

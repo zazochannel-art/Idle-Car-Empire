@@ -54,7 +54,7 @@ import { Onboarding } from "./onboarding";
 import { UnlockCard } from "./unlock-card";
 import { RecallDialog } from "./recall-dialog";
 import { CompanyNameDialog } from "./company-name";
-import { MenuUnlockWatcher, useFreshTiles } from "./menu-unlocks";
+import { MenuUnlockWatcher, useFreshTiles, viewLocked } from "./menu-unlocks";
 import { menuOpen } from "@/game/engine/menu";
 import { PoachDialog } from "../views/expansion-cards";
 import { HAS_INTERIOR } from "../plant/interior/layout";
@@ -526,9 +526,12 @@ function LeftRail() {
   const nothing = !view && !plot && !zone;
   const current = pillarOf(view);
   const seen = useUi((u) => u.seen);
+  // the screens the Empire menu shows (menu-unlocks.tsx): a group with none open yet is left out
+  const openKey = useGame((g) => PILLARS.map((p) => p.views.filter((v) => !viewLocked(g.state, v)).join(".")).join("|"));
+  const openViews = Object.fromEntries(PILLARS.map((p, i) => [p.id, (openKey.split("|")[i] ?? "").split(".").filter(Boolean) as View[]])) as Record<PillarId, View[]>;
   const items: { id: "map" | PillarId; icon: Icon; badge: number }[] = [
     { id: "map", icon: MapIcon, badge: 0 },
-    ...PILLARS.map((p) => ({ id: p.id, icon: p.icon, badge: p.id === "empire" ? badges.research : p.id === "business" ? badges.missions : 0 })),
+    ...PILLARS.filter((p) => openViews[p.id].length > 0).map((p) => ({ id: p.id, icon: p.icon, badge: p.id === "empire" ? badges.research : p.id === "business" ? badges.missions : 0 })),
   ];
   return (
     <nav className="hidden absolute left-[calc(env(safe-area-inset-left)+0.5rem)] top-[calc(env(safe-area-inset-top)+6.75rem)] md:flex land:flex z-20 flex flex-col gap-1 rounded-xl hud-bar p-1 md:left-[calc(env(safe-area-inset-left)+0.75rem)] md:top-[calc(env(safe-area-inset-top)+11rem)] land:top-[calc(env(safe-area-inset-top)+4.75rem)] land:gap-0.5 land:p-0.5">
@@ -544,10 +547,10 @@ function LeftRail() {
                 map({ kind: "home" });
                 return;
               }
-              const pillar = PILLARS.find((p) => p.id === r.id)!;
+              const views = openViews[r.id];
               // a pillar reopens on the screen last seen in it
-              const last = [...seen].reverse().find((v) => pillar.views.includes(v));
-              setView(active ? null : (last ?? pillar.views[0]));
+              const last = [...seen].reverse().find((v) => views.includes(v));
+              setView(active ? null : (last ?? views[0]));
             }}
             className={cn(
               "race-type relative flex flex-col items-center gap-0.5 rounded-lg px-1.5 py-2 text-[11px] transition md:w-[4.5rem] md:text-[12px] land:w-11 land:py-1.5",

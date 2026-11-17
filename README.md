@@ -60,11 +60,11 @@ npm run ios:open        # Xcode (on a Mac)
    - **Grades** (Standard → Lightweight → … → Carbon) raise the value of
      each part and unlock better cars.
 3. **Engines and the first choice.** After 12 bodies the Engine Factory
-   ($6K) unlocks. Until you have an assembly plant it can sell engines, or
+   ($4K) unlocks. Until you have an assembly plant it can sell engines, or
    fit each engine into a body and sell **motorized chassis**; the panel
    recommends one from your body and engine output.
 4. **Your first car needs three parts.** Build the **Car Assembly Plant**
-   ($6K for the first) on any plot in an unlocked district. Bodies and
+   ($3K for the first) on any plot in an unlocked district. Bodies and
    engines always come from your own plants. Tyres come from an outside
    supplier until you build the Tire Factory ($15K): +35% over what they cost
    to make, paid when ordered, brought by truck. Deliveries are automatic:

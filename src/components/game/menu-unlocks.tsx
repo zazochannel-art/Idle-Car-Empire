@@ -37,6 +37,12 @@ export const MENU_TILES: { id: MenuTileId; icon: string; label: MessageKey; view
   { id: "settings", icon: "⚙️", label: "menu.settings" },
 ];
 
+/** A screen the Empire menu doesn't show yet (screens not in the menu are always open). */
+export function viewLocked(state: Parameters<typeof menuOpen>[0], view: View): boolean {
+  const tile = MENU_TILES.find((x) => x.view === view);
+  return !!tile && !menuOpen(state, tile.id);
+}
+
 const KEY = "idle-car-empire:menu-tiles";
 /** The new screens a toast names before it says "+N more". */
 const MAX_NAMED = 3;
