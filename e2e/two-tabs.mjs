@@ -20,8 +20,11 @@ const RESULTS = join(ROOT, "e2e-results", "two-tabs");
 const SUPABASE = "https://e2e.supabase.test";
 /** The notice of a copy that stopped (en.ts "elsewhere.title"). */
 const NOTICE = "The game is open in another tab or window";
-/** How long a copy is watched for saves: the game saves every 5 s (the cloud at once the first time). */
-const WATCH_MS = 12_000;
+// The game saves every 5 s while it ticks; a copy that has just taken over is still building the 3D
+// map, and on a slow CI machine (software GL) that holds its ticks back for a few seconds, so its
+// saves come 7-8 s apart for a while. 20 s still asks for two saves and tells a copy that keeps
+// saving from one that stopped.
+const WATCH_MS = 20_000;
 mkdirSync(RESULTS, { recursive: true });
 
 // ---- the build, served as the browser would load it from the site

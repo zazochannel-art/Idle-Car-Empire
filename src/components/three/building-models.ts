@@ -211,8 +211,10 @@ export function buildPlant(T: Three, kit: MaterialKit, spec: PlantSpec, W: numbe
   const { hw, hd, hx, hy, h: hpx } = hallLayout(L, spec.big, W, D, spec.dockFront);
   const H = hpx * PX;
   const s = spec.big ? 2 : 1;
-  const wall = std(T, L >= 7 ? "#dbeafe" : spec.wall, 0.35, 0.5);
-  const rib = std(T, L >= 7 ? "#c7d7ea" : shadeHex(spec.wall, -0.1), 0.4, 0.5);
+  // every level keeps the plant's own colours (an engine works' red, a glass works' blue…), so
+  // each kind of plant stays recognisable on the map; the big ones get a sleeker, shinier cladding
+  const wall = std(T, spec.wall, L >= 7 ? 0.45 : 0.35, L >= 7 ? 0.38 : 0.5);
+  const rib = std(T, shadeHex(spec.wall, -0.1), 0.4, 0.5);
   const roof = std(T, spec.roof, 0.4, 0.55);
   const accent = std(T, spec.accent, 0.3, 0.4);
   const frame = std(T, "#2c3440", 0.6, 0.4);
@@ -244,13 +246,23 @@ export function buildPlant(T: Three, kit: MaterialKit, spec: PlantSpec, W: numbe
     g.add(box(T, frame, cx, 0.012, cz, 0.03, H + 0.01, 0.03));
   g.add(ribs(T, rib, hx, hx + hw, hy + hd + 0.004, 0.07, H - 0.08, "x"));
   g.add(ribs(T, rib, hy, hy + hd, hx + hw + 0.004, 0.07, H - 0.08, "z"));
-  // coloured fascia band under the eaves
-  g.add(box(T, accent, hx - 0.005, H - 0.035, hy + hd - 0.002, hw + 0.01, 0.03, 0.012));
-  g.add(box(T, accent, hx + hw - 0.002, H - 0.035, hy - 0.005, 0.012, 0.03, hd + 0.01));
+  // a band of the plant's colour under the eaves, deeper as the plant grows
+  const band = Math.min(0.09, 0.04 + L * 0.005);
+  g.add(box(T, accent, hx - 0.005, H - band - 0.005, hy + hd - 0.002, hw + 0.01, band, 0.012));
+  g.add(box(T, accent, hx + hw - 0.002, H - band - 0.005, hy - 0.005, 0.012, band, hd + 0.01));
 
   // roof: gable (small plants) or sawtooth with skylights (from Large)
   if (L >= 7) {
-    g.add(box(T, std(T, "#d5dbe3", 0.3, 0.6), hx - 0.02, H, hy - 0.02, hw + 0.04, 0.03, hd + 0.04));
+    // the roof deck in a light shade of the plant's colour (the map sees the plants from above),
+    // with a parapet in the colour itself
+    g.add(box(T, std(T, shadeHex(spec.roof, 0.55), 0.3, 0.6), hx - 0.02, H, hy - 0.02, hw + 0.04, 0.03, hd + 0.04));
+    for (const [px, pz, pw, pd] of [
+      [hx - 0.02, hy - 0.02, hw + 0.04, 0.03],
+      [hx - 0.02, hy + hd - 0.01, hw + 0.04, 0.03],
+      [hx - 0.02, hy - 0.02, 0.03, hd + 0.04],
+      [hx + hw - 0.01, hy - 0.02, 0.03, hd + 0.04],
+    ])
+      g.add(box(T, roof, px, H + 0.03, pz, pw, 0.04, pd));
     // solar panels in rows
     const panel = new T.MeshStandardMaterial({
       color: "#1d3a6b",

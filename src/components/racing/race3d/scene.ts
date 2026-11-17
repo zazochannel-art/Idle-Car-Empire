@@ -182,7 +182,8 @@ export class RaceScene3D {
   ) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !opt.low, powerPreference: "high-performance" });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    // the same tone mapping as the Empire Map (Khronos PBR Neutral: colours keep their saturation)
+    this.renderer.toneMapping = THREE.NeutralToneMapping;
     this.renderer.toneMappingExposure = 0.95;
     this.track = trackOf(trackId);
     this.theme = TRACK_BY_ID[trackId].theme;

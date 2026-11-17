@@ -202,8 +202,9 @@ export class MapEngine {
     // the size of the ground pictures, the filtering and the shadow map follow what the device can hold
     const caps = this.renderer.capabilities;
     this.budget = textureBudget({ low: this.low, ultra: this.profile === "ultra", maxTextureSize: caps.maxTextureSize, maxAnisotropy: caps.getMaxAnisotropy(), ...deviceFacts() });
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.20;
+    // Khronos PBR Neutral keeps the colours' saturation (ACES washed the map's greens and blues out)
+    this.renderer.toneMapping = THREE.NeutralToneMapping;
+    this.renderer.toneMappingExposure = 1.0;
     this.renderer.shadowMap.enabled = !this.low;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     // redrawn on demand (see render): every other frame, and whenever the view moves
@@ -213,8 +214,8 @@ export class MapEngine {
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     pmrem.dispose();
     this.scene.environmentIntensity = 0.45;
-    this.scene.background = new THREE.Color("#95d5f5");
-    this.scene.fog = new THREE.Fog("#95d5f5", 350, 1500);
+    this.scene.background = new THREE.Color("#8fd0f7");
+    this.scene.fog = new THREE.Fog("#8fd0f7", 350, 1500);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(this.budget.shadowMap, this.budget.shadowMap);
     this.sun.shadow.bias = -0.0003;
@@ -814,7 +815,7 @@ export class MapEngine {
   }
 
   skyCol = new THREE.Color();
-  readonly skyDay = new THREE.Color("#bfe3f7");
+  readonly skyDay = new THREE.Color("#8fd0f7");
   readonly skyDusk = new THREE.Color("#f3c39b");
   readonly skyNight = new THREE.Color("#0d1a33");
   readonly skyGrey = new THREE.Color("#b7c0c9");
