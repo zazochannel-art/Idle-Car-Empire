@@ -24,6 +24,11 @@ export interface CityConfig {
   snowstorms: boolean;
   /** Designs with the Nordic option sell for more here (engine/design.ts). */
   nordic: boolean;
+  /**
+   * The New Year city: snow all year, a giant decorated fir on the main square, lights on the
+   * houses and the firs round them, and fireworks at night (components/map/world/festive.ts).
+   */
+  festive: boolean;
 }
 
 export const CITY_IDS: readonly CityId[] = ["home", "north"];
@@ -36,8 +41,8 @@ export const HOME_CITY: CityId = CITY_IDS[0];
 
 /** Nordheim's island is made by scripts/island-gen (its map data and its 3D map's files). */
 export const CITIES: Record<CityId, CityConfig> = {
-  home: { id: "home", assets: "/world", lotPrefix: "", landmarks: true, emoji: "🏙️", snowstorms: false, nordic: false },
-  north: { id: "north", assets: "/world-north", lotPrefix: "n:", landmarks: true, emoji: "🏔️", opens: { after: "home", cash: NORTH_OPENS_CASH }, snowstorms: true, nordic: true },
+  home: { id: "home", assets: "/world", lotPrefix: "", landmarks: true, emoji: "🏙️", snowstorms: false, nordic: false, festive: false },
+  north: { id: "north", assets: "/world-north", lotPrefix: "n:", landmarks: true, emoji: "🎄", opens: { after: "home", cash: NORTH_OPENS_CASH }, snowstorms: true, nordic: true, festive: true },
 };
 
 /** The cities that can be opened, in order. */
