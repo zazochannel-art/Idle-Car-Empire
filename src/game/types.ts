@@ -618,6 +618,8 @@ export interface GameState {
   sponsors: SponsorsState;
   /** The used-car lot and the garage bay (engine/used-cars.ts). */
   usedCars: UsedCarsState;
+  /** Looks bought in the shop's Style section (engine/cosmetics.ts). */
+  cosmetics: import("./engine/cosmetics").CosmeticId[];
   /** The eco programme's level (engine/eco.ts). */
   eco: number;
   /** The tenths of each rival's shares the company holds (engine/takeover.ts). */

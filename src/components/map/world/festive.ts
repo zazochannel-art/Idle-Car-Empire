@@ -11,9 +11,10 @@ import type { CityId } from "@/game/types";
 
 /**
  * Whether a city's map is dressed for the holidays now: the New Year city always, every other city
- * through the winter festival (1 December – 6 January, engine/season.ts). Read when the map loads.
+ * through the winter festival (1 December – 6 January, engine/season.ts), or all year with the shop's
+ * holiday decor (engine/cosmetics.ts). Read when the map loads.
  */
-export const isFestive = (city: CityId, now: number) => CITIES[city].festive || seasonAt(now) === "winter";
+export const isFestive = (city: CityId, now: number, allYear = false) => allYear || CITIES[city].festive || seasonAt(now) === "winter";
 
 /** Building kinds that get lights along their eaves (homes, blocks of flats and hotels, not halls, towers or silos). */
 const LIT_KINDS = new Set(["casa", "vila", "cabana", "hotel", "bloc"]);

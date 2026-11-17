@@ -459,6 +459,10 @@ export const SKINS: Record<string, { emoji: string; color: string; accent: strin
   legend: { emoji: "🏆", color: "#111827", accent: "#facc15" },
   // the premium track of the season pass
   goldrush: { emoji: "👑", color: "#facc15", accent: "#78350f" },
+  // the shop's Style section (engine/cosmetics.ts)
+  midnight: { emoji: "🌙", color: "#0f172a", accent: "#818cf8" },
+  candy: { emoji: "🍬", color: "#f472b6", accent: "#fef08a" },
+  tiger: { emoji: "🐯", color: "#f97316", accent: "#111827" },
 };
 
 /** "Build the fastest car in the world": the goal at the end of the ladder. */
