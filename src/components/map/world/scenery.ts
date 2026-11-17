@@ -110,6 +110,8 @@ export interface SceneryOptions {
   low: boolean;
   /** Skip parked cars and scenery standing on these lots (world rectangles); `clear`: the buildings on it too (lots placed after the map was made). */
   lots?: { x: number; y: number; w: number; d: number; rot: number; clear?: boolean }[];
+  /** The New Year city: the giant fir stands where the fountain would (festive.ts). */
+  festive?: boolean;
 }
 
 /** A container ship (length along x, about 3.6 × 1 units), as merged parts. */
@@ -1382,7 +1384,7 @@ export class Scenery {
       this.boards.push({ face, base });
       m.rotation.y = rot;
     }
-    for (const [x, z] of list("fantani")) {
+    for (const [x, z] of this.opt.festive ? [] : list("fantani")) {
       const m = this.place(this.object([cylinder(0.46, 0.12, C("#e6dfd0"), 0, 0, 0, 24), cylinder(0.4, 0.13, C("#5fc3e4"), 0, 0.0, 0, 24), cylinder(0.05, 0.36, C("#e6dfd0"), 0, 0.1, 0, 10), cylinder(0.16, 0.05, C("#e6dfd0"), 0, 0.44, 0, 16), cylinder(0.13, 0.03, C("#7fd3ec"), 0, 0.47, 0, 16)]), x, z, 0.02);
       const jet = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.36, 12, 1, true), new THREE.MeshStandardMaterial({ color: "#e8f8ff", transparent: true, opacity: 0.55, roughness: 0.1 }));
       jet.position.set(0, 0.68, 0);

@@ -122,6 +122,8 @@ npm run ios:open        # Xcode (on a Mac)
    - collect ⭐ **Stars** for permanent upgrades as total earnings grow (the
      first at $20B, then 3 more for every tenfold); nothing is reset.
    - Garages, car washes and other city buildings are a side business.
+   - open **Nordheim**, the New Year city (after every territory of the first city): snow all
+     year, a giant decorated tree on the main square, lights on the houses and fireworks at night;
    - from $250M earned, buy **own sources** (an iron mine, a rubber plantation, a
      lithium mine…): each of 5 levels takes 6% off that one material's price in every
      city (Economy screen).

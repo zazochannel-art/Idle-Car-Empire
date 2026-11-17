@@ -19,6 +19,8 @@ import { unlockedAreas } from "@/game/engine/territory";
 import type { GameState, StructureType, ZoneId } from "@/game/types";
 import { skyAt, worldClock, type TimeMode } from "../lighting";
 import { weatherAt, type Weather } from "../weather";
+import { buildFestive, type FestiveDecor } from "./festive";
+import { CITIES } from "@/game/config/cities";
 import type { MapArea, MapNames, MapTarget, ZoomTier } from "../map-types";
 import type { CarModel } from "../vehicles";
 import { LOCK, freezeStatic, mapMaterials, splitSharedMaterials, type MapMaterials } from "./kit";
@@ -148,6 +150,9 @@ export class MapEngine {
   private movers: Movers | null = null;
   /** The weather to show instead of the forecast (tests and screenshots). */
   weatherOverride: Weather | null = null;
+  /** The New Year city's decorations (festive.ts), and when its next firework goes up (map clock, s). */
+  festive: FestiveDecor | null = null;
+  private nextFirework = 0;
   /** The flow view: lines from every plant to where its loads go, coloured by how they run. */
   flow = false;
   /** Another player's empire is on the map (engine/visit.ts): no hints meant for the player. */
@@ -266,8 +271,13 @@ export class MapEngine {
     // the junctions that are roundabouts: the scenery keeps off them, the roads draw them, the traffic drives round them
     const rings = roundabouts(WORLD_MAP, data.cladiri);
     const ringLots = [...rings.values()].map((r) => ({ x: r.x, y: r.z, w: 2 * r.outer + 0.3, d: 2 * r.outer + 0.3, rot: 0 }));
-    this.scenery = new Scenery(data, ground, this.mats, { low: this.low, lots: [...WORLD_MAP.plots.map((p) => ({ x: p.x, y: p.y, w: p.w, d: p.d, rot: p.rot, clear: !!p.territory })), ...ringLots] });
+    const festive = CITIES[WORLD_MAP.id].festive;
+    this.scenery = new Scenery(data, ground, this.mats, { low: this.low, festive, lots: [...WORLD_MAP.plots.map((p) => ({ x: p.x, y: p.y, w: p.w, d: p.d, rot: p.rot, clear: !!p.territory })), ...ringLots] });
     this.scene.add(this.scenery.root);
+    if (festive) {
+      this.festive = buildFestive(data, ground, { low: this.low });
+      this.scene.add(this.festive.root);
+    }
     this.scenery.setClose(this.cam.dist < CLOSE_VIEW);
     // traffic lights at the plain junctions and crossings with lights along the long streets
     const mapRoads = this.scenery.roads;
@@ -778,6 +788,16 @@ export class MapEngine {
       this.headlights!.update(this.trafficLayer!.lamps(), sky.dark, this.cam.dist >= CLOSE_VIEW);
       this.race!.update(live.state, this.t);
       this.scenery!.animate(dt, this.t);
+      if (this.festive) {
+        this.festive.update(this.t, sky.dark);
+        // the New Year city: now and then a firework over the main square once night has come
+        if (sky.dark > 0.55 && this.t >= this.nextFirework && this.festive.square && this.fx) {
+          const { x, z } = this.festive.square;
+          const ox = (Math.random() - 0.5) * 14, oz = (Math.random() - 0.5) * 10;
+          this.fx.fireworks(x + ox, this.ground.at(x + ox, z + oz), z + oz, 3, false, this.cam.dist / 30);
+          this.nextFirework = this.t + 12 + Math.random() * 25;
+        }
+      }
       this.bonus!.set(live.state.mapBonus.active);
       this.bonus!.update(dt, this.t);
       this.movers!.setTier(live.state.logistics.tier);
@@ -790,7 +810,7 @@ export class MapEngine {
     if (this.fx && this.weather) {
       this.fx.update(dt);
       const now = Date.now();
-      this.weather.update(this.weatherOverride ?? weatherAt(now, seasonAt(now)), dt, this.t, cam.x, this.ty, cam.z, cam.dist, this.h * this.dpr);
+      this.weather.update(this.weatherOverride ?? weatherAt(now, CITIES[WORLD_MAP.id].festive ? "winter" : seasonAt(now)), dt, this.t, cam.x, this.ty, cam.z, cam.dist, this.h * this.dpr);
     }
     // the shadows of moving cars and trucks follow at 30 FPS: the shadow pass
     // (about half the draw calls up close) runs every other frame
