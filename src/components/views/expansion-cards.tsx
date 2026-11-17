@@ -300,6 +300,8 @@ export function EngineersCard() {
   const E = state.engineers;
   const now = state.lastActiveAt;
   const fee = signingFee(state);
+  // star engineers come after the first car (until then the card only said so)
+  if (!state.chain.firstCar && !E.hired.length) return null;
   return (
     <Box title={`👩‍🔬 ${t("eng.title", { n: E.hired.length, slots: ENGINEER.slots })}`} sub={t("eng.desc", { salary: formatMoney(salaries(state) * 60) })}>
       <div className="space-y-1.5">

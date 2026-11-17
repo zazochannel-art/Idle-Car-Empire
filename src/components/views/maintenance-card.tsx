@@ -14,6 +14,8 @@ export function MaintenanceCard() {
   const level = useGame((g) => g.view.state.maintenance.level);
   const cost = useGame((g) => maintenanceCost(g.view.state, g.view.snap));
   const buy = useGame((g) => g.buyMaintenance);
+  // breakdowns matter once cars are on the line: before the first car the crew is not offered
+  const shown = useGame((g) => g.view.state.chain.firstCar || g.view.state.maintenance.level > 0);
   const { t } = useT();
   const effects = (l: number) =>
     t("crew.effects", {
@@ -22,6 +24,7 @@ export function MaintenanceCard() {
       managed: secs(BREAKDOWN.repairManaged * crewRepair(l)),
     });
 
+  if (!shown) return null;
   return (
     <div className="mb-4 space-y-2 rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.07]">
       <div className="flex items-center justify-between gap-2">

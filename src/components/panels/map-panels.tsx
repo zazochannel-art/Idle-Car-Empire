@@ -545,6 +545,8 @@ export function MechanicsSummary() {
   const enterGarage = useUi((u) => u.enterGarage);
   const { t } = useT();
   const ids = garagePlots(state);
+  // nothing to staff without a garage
+  if (!ids.length) return null;
   return (
     <div className="mb-4 rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.07]">
       <div className="mb-1 text-sm font-bold">👷 {t("employees.mechanics")}</div>

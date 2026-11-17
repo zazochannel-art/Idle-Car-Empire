@@ -49,21 +49,26 @@ export function MissionsView() {
       <MissionStrip />
       <EventGoalCard />
 
-      <section className="space-y-2">
-        <SectionTitle title={t("contract.title")} subtitle={t("contract.subtitle", { n: state.contracts.done })} />
-        <ContractCard />
-      </section>
+      {!state.chain.firstCar && <p className="rounded-xl bg-white/[0.03] p-3 text-center text-xs text-white/50 ring-1 ring-white/[0.06]">{t("missions.afterFirstCar")}</p>}
+      {state.chain.firstCar && (
+        <>
+          <section className="space-y-2">
+            <SectionTitle title={t("contract.title")} subtitle={t("contract.subtitle", { n: state.contracts.done })} />
+            <ContractCard />
+          </section>
 
-      <section className="space-y-2">
-        <SectionTitle title={t("vip.title")} subtitle={t("vip.subtitle", { n: state.vip.done })} />
-        <VipCard />
-      </section>
+          <section className="space-y-2">
+            <SectionTitle title={t("vip.title")} subtitle={t("vip.subtitle", { n: state.vip.done })} />
+            <VipCard />
+          </section>
 
-      <section className="space-y-2">
-        <SectionTitle title={t("side.title")} subtitle={t("side.subtitle")} />
-        <QualityCard />
-        <UsedCarsCard />
-      </section>
+          <section className="space-y-2">
+            <SectionTitle title={t("side.title")} subtitle={t("side.subtitle")} />
+            <QualityCard />
+            <UsedCarsCard />
+          </section>
+        </>
+      )}
 
       <section className="space-y-2">
         <SectionTitle title={t("mission.daily")} subtitle={t("missions.newIn", { time: formatDuration(untilMidnight()) })} />
