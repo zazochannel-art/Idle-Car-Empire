@@ -16,7 +16,9 @@ import { INVITE } from "@/game/engine/invites";
 import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
 import { passwordIssue } from "@/lib/password";
-import { cardBlob, sharePicture, shareCardData, STORE_URL } from "@/lib/share-card";
+import { cardBlob, sharePicture, shareCardData, shareUrl } from "@/lib/share-card";
+import { shareFile } from "@/lib/share-file";
+import { canRecordClip, recordEmpireClip } from "@/components/map/clip";
 import { installPlayUpdate, playApp } from "@/lib/play-update";
 import { cn } from "@/lib/utils";
 import { answerStartChoice, enterGame, useCloud } from "@/store/cloud-store";
@@ -648,6 +650,7 @@ function InviteCard() {
   const [reads, setReads] = useState(0);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
+  const [clipPct, setClipPct] = useState<number | null>(null);
   const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null);
   // rewards due are taken first, so the numbers shown come after them
   useEffect(() => {
@@ -681,9 +684,32 @@ function InviteCard() {
       const labels = { cars: t("card.cars"), earned: t("card.earned"), stars: t("card.stars"), achievements: t("card.achievements"), useCode: t("card.useCode"), get: t("card.get") };
       const blob = await cardBlob(shareCardData(gameState, info.code), labels);
       if (!blob) return;
-      const how = await sharePicture(blob, "idle-car-empire", `${share} ${STORE_URL}`);
+      const how = await sharePicture(blob, "idle-car-empire", `${share} ${shareUrl("card")}`);
       uiEvents.emit({ type: "toast", tone: "success", icon: "🪪", title: t(how === "shared" ? "card.shared" : "card.saved") });
     } finally {
+      setBusy(false);
+    }
+  };
+  const shareClip = async () => {
+    if (!info) return;
+    setBusy(true);
+    setClipPct(0);
+    try {
+      const st = useGame.getState().state;
+      const card = shareCardData(st, info.code);
+      const blob = await recordEmpireClip(
+        { company: card.company, logo: card.logo, color: card.color, useCode: t("card.useCode"), code: card.code, get: t("card.get") },
+        (k) => setClipPct(Math.round(k * 100)),
+      );
+      if (!blob) {
+        setMsg({ text: t("clip.failed"), bad: true });
+        return;
+      }
+      const ext = blob.type === "video/mp4" ? "mp4" : "webm";
+      const how = await shareFile(blob, `idle-car-empire.${ext}`, blob.type, `${share} ${shareUrl("clip")}`);
+      uiEvents.emit({ type: "toast", tone: "success", icon: "🎬", title: t(how === "shared" ? "clip.shared" : "clip.saved") });
+    } finally {
+      setClipPct(null);
       setBusy(false);
     }
   };
@@ -722,7 +748,7 @@ function InviteCard() {
               {t("invite.copy")}
             </Button>
             {canShare && (
-              <Button size="sm" variant="gold" onClick={() => void navigator.share({ text: `${share} ${STORE_URL}` }).catch(() => {})}>
+              <Button size="sm" variant="gold" onClick={() => void navigator.share({ text: `${share} ${shareUrl("card")}` }).catch(() => {})}>
                 {t("invite.share")}
               </Button>
             )}
@@ -730,6 +756,11 @@ function InviteCard() {
           <Button size="sm" variant="secondary" className="w-full" disabled={busy} onClick={() => void shareCard()}>
             🪪 {t("invite.card")}
           </Button>
+          {canRecordClip() && (
+            <Button size="sm" variant="secondary" className="w-full" disabled={busy} onClick={() => void shareClip()}>
+              🎬 {clipPct === null ? t("invite.clip") : t("clip.recording", { pct: clipPct })}
+            </Button>
+          )}
           <div className="flex justify-between text-[11px] text-white/60">
             <span>{t("invite.friends", { n: formatNumber(info.friends) })}</span>
             <span>{t("invite.rewardedCount", { n: formatNumber(info.rewarded), max: formatNumber(info.max) })}</span>

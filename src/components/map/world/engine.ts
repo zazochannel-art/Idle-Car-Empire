@@ -157,6 +157,12 @@ export class MapEngine {
   timeMode: TimeMode = "auto";
   /** The game state and economy now (labels, sites, race cars read it every frame). */
   live: () => Live | null = () => null;
+  /**
+   * While a clip of the map is recorded (engine-clip.ts): runs after the camera's own update each
+   * frame (the clip's camera path), and after the frame is drawn (to copy it); every frame is
+   * drawn then, battery saver or not, so the clip is smooth.
+   */
+  clip: { camera: (dt: number) => void; frame: () => void } | null = null;
   names: MapNames | null = null;
 
   private renderer: THREE.WebGLRenderer;
@@ -526,7 +532,7 @@ export class MapEngine {
         return;
       }
       // low graphics: ~30 FPS; battery saver: 30 FPS while playing, a few frames a second when nobody touches the screen
-      if (!shouldDraw(now, this.lastDraw, this.low)) return;
+      if (!this.clip && !shouldDraw(now, this.lastDraw, this.low)) return;
       this.lastDraw = now;
       const saving = isSaving();
       if (saving !== this.saving) {
@@ -788,6 +794,7 @@ export class MapEngine {
     const live = this.live();
     const cam = this.cam;
     cam.update(dt);
+    this.clip?.camera(dt);
 
     // the first car rolling out, and the vehicle in the showroom
     const hero = this.trafficLayer?.hero;
@@ -876,6 +883,7 @@ export class MapEngine {
       splitSharedMaterials(this.scene);
     }
     this.renderer.render(this.scene, this.camera);
+    this.clip?.frame();
     // HTML cards remain frame-accurate; the heavier canvas labels only need ~30 FPS.
     const labelDt = this.t - this.lastLabelsAt;
     if (labelDt >= 1 / 30) {

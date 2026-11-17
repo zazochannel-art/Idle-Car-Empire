@@ -20,6 +20,7 @@ import { MarketNewsCard, ReputationCard } from "../panels/market-controls";
 import { itemName, plantName } from "../panels/plant-panel";
 import { LEDGER_ICON, LedgerTable } from "./ledger-table";
 import { SectionTitle } from "./section-title";
+import { SourcesCard } from "./sources-card";
 
 export function EconomyView() {
   const state = useGame((g) => g.view.state);
@@ -127,6 +128,9 @@ export function EconomyView() {
             </p>
           ))}
       </div>
+
+      <SectionTitle title={t("source.title")} />
+      <SourcesCard />
 
       <SectionTitle title={t("eco.run")} />
       <LedgerTable values={state.chain.ledger.run} />

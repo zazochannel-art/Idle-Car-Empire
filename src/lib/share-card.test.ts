@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createInitialState } from "@/game/engine/state";
-import { shareCardData, STORE_URL } from "./share-card";
+import { shareCardData, shareUrl, STORE_URL } from "./share-card";
 
 describe("share card", () => {
   it("takes the company's numbers and cleans the invite code", () => {
@@ -22,5 +22,13 @@ describe("share card", () => {
 
   it("points to the game's Google Play page", () => {
     expect(STORE_URL).toContain("id=com.zazochannel.idlecarempire");
+  });
+});
+
+describe("share link", () => {
+  it("tags the store link for Play Console's acquisition report", () => {
+    const u = new URL(shareUrl("clip"));
+    expect(u.searchParams.get("id")).toBe("com.zazochannel.idlecarempire");
+    expect(u.searchParams.get("referrer")).toBe("utm_source=invite&utm_medium=clip&utm_campaign=player_share");
   });
 });

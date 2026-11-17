@@ -4,9 +4,18 @@
 import { brandName } from "@/game/engine/brand";
 import { formatMoney, formatNumber } from "@/game/format";
 import type { GameState } from "@/game/types";
+import { shareFile } from "./share-file";
 
 /** Where a friend installs the game from. */
 export const STORE_URL = "https://play.google.com/store/apps/details?id=com.zazochannel.idlecarempire";
+
+/**
+ * The store link a player shares, tagged so Play Console's acquisition report counts the installs
+ * that came from players' shares (utm_source=invite) and from which kind of share (card, clip).
+ */
+export function shareUrl(kind: "card" | "clip"): string {
+  return `${STORE_URL}&referrer=${encodeURIComponent(`utm_source=invite&utm_medium=${kind}&utm_campaign=player_share`)}`;
+}
 
 export interface ShareCardData {
   company: string;
@@ -141,23 +150,5 @@ export function cardBlob(d: ShareCardData, labels: ShareCardLabels): Promise<Blo
 
 /** Shares a picture where the device can (phones), or saves it as a file. */
 export async function sharePicture(blob: Blob, name: string, text?: string): Promise<"shared" | "saved"> {
-  const file = new File([blob], `${name}.png`, { type: "image/png" });
-  const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
-  if (nav.share && nav.canShare?.({ files: [file] })) {
-    try {
-      await nav.share({ files: [file], title: name, text });
-      return "shared";
-    } catch {
-      // cancelled: save it instead
-    }
-  }
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${name}.png`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 4000);
-  return "saved";
+  return shareFile(blob, `${name}.png`, "image/png", text);
 }

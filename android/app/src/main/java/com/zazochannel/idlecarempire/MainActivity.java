@@ -27,6 +27,7 @@ public class MainActivity extends BridgeActivity {
         SystemBarStyle bars = SystemBarStyle.dark(Color.TRANSPARENT);
         EdgeToEdge.enable(this, bars, bars);
         registerPlugin(PlayGamesPlugin.class);
+        registerPlugin(SharePlugin.class);
         super.onCreate(savedInstanceState);
     }
 

@@ -122,6 +122,9 @@ npm run ios:open        # Xcode (on a Mac)
    - collect ⭐ **Stars** for permanent upgrades as total earnings grow (the
      first at $20B, then 3 more for every tenfold); nothing is reset.
    - Garages, car washes and other city buildings are a side business.
+   - from $250M earned, buy **own sources** (an iron mine, a rubber plantation, a
+     lithium mine…): each of 5 levels takes 6% off that one material's price in every
+     city (Economy screen).
 
 Drag to pan, pinch or scroll to zoom, tap buildings; the minimap jumps the
 camera. Coming back after a while shows **Welcome Back!** with the time away,

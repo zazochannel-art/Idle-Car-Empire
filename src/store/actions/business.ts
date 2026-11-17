@@ -12,13 +12,14 @@ import * as Qc from "@/game/engine/quality-check";
 import * as R from "@/game/engine/retention";
 import * as Sp from "@/game/engine/sponsors";
 import * as Uc from "@/game/engine/used-cars";
+import { buySource } from "@/game/engine/sources";
 import { chestStreakToday, claimDaily, claimDailyChest, claimMilestone, rewardCash } from "@/game/engine/progress";
 import { formatMoney } from "@/game/format";
 import { uiEvents } from "../events";
 import { unlockedCarIds } from "@/game/engine/economy";
 import type { GameStore, StoreCtx } from "../game-store";
 
-type Keys = "claimDaily" | "claimDailyChest" | "startPrototype" | "windTunnel" | "trackTest" | "launchProto" | "openMarket" | "setFleetProduct" | "acceptFleetOrder" | "declineFleetOrder" | "finishFleetOrder" | "hireEngineer" | "setEngineerPay" | "letGoEngineer" | "counterOffer" | "acceptVip" | "declineVip" | "claimVip" | "enterShow" | "claimShow" | "claimSeason" | "restoreClassic" | "acceptContract" | "signDeal" | "declineDeals" | "claimDeal" | "buyUsedCar" | "refurbishUsedCar" | "sellUsedCar" | "startQc" | "finishQc" | "declineContract" | "claimContract" | "claimLogin" | "dismissTip" | "claimMilestone";
+type Keys = "claimDaily" | "claimDailyChest" | "startPrototype" | "windTunnel" | "trackTest" | "launchProto" | "openMarket" | "setFleetProduct" | "acceptFleetOrder" | "declineFleetOrder" | "finishFleetOrder" | "hireEngineer" | "setEngineerPay" | "letGoEngineer" | "counterOffer" | "acceptVip" | "declineVip" | "claimVip" | "enterShow" | "claimShow" | "claimSeason" | "restoreClassic" | "acceptContract" | "signDeal" | "declineDeals" | "claimDeal" | "buyUsedCar" | "buySource" | "refurbishUsedCar" | "sellUsedCar" | "startQc" | "finishQc" | "declineContract" | "claimContract" | "claimLogin" | "dismissTip" | "claimMilestone";
 
 export function businessActions({ get, act, persist, tr }: StoreCtx): Pick<GameStore, Keys> {
   return {
@@ -123,6 +124,12 @@ export function businessActions({ get, act, persist, tr }: StoreCtx): Pick<GameS
     if (!act((s) => (money = Sp.claimSponsor(s, get().snap, Date.now())) !== null)) return;
     uiEvents.emit({ type: "toast", tone: "gold", icon: "🤝", title: tr("sponsor.paid"), body: formatMoney(money ?? 0) });
     persist(true);
+  },
+  buySource: (m) => {
+    if (act((s) => buySource(s, m))) {
+      uiEvents.emit({ type: "toast", tone: "gold", icon: "⛏️", title: tr("source.bought", { name: tr(`mat.${m}` as MessageKey), level: get().state.sources[m] ?? 0 }) });
+      persist(true);
+    }
   },
   buyUsedCar: (id) => {
     if (act((s) => Uc.buyUsed(s, id))) persist(true);

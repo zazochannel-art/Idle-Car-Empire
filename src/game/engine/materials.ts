@@ -3,6 +3,7 @@
 // restocking, and the ledger that records where every dollar goes.
 // All numbers come from config/economy.ts.
 import { materialDiscount } from "./landmarks";
+import { sourceDiscount } from "./sources";
 import { materialTrendMult } from "./market";
 import {
   AUTO_BUY,
@@ -36,8 +37,8 @@ export function marketPrice(s: GameState, m: MaterialId): number {
   const span = PRICE_DRIFT.maxPeriod - PRICE_DRIFT.minPeriod;
   const period = PRICE_DRIFT.minPeriod + ((i * 7919) % 97) / 97 * span;
   const phase = i * 1.7;
-  // the island's own steel works (a landmark works) lowers every price
-  return MATERIAL_BY_ID[m].price * (1 + PRICE_DRIFT.amp * Math.sin((2 * Math.PI * s.market.t) / period + phase)) * materialTrendMult(s, m) * (1 - materialDiscount(s));
+  // the island's own steel works (a landmark works) lowers every price; the company's own source of this material lowers its own
+  return MATERIAL_BY_ID[m].price * (1 + PRICE_DRIFT.amp * Math.sin((2 * Math.PI * s.market.t) / period + phase)) * materialTrendMult(s, m) * (1 - materialDiscount(s)) * (1 - sourceDiscount(s, m));
 }
 
 /** The best supplier the company has unlocked (by material bought so far). */
