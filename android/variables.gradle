@@ -22,4 +22,5 @@ ext {
     firebaseMessagingVersion = '25.0.1'
     // Google Play Games Services (the game's own PlayGamesPlugin, lib/play-games.ts): exact, as above
     playGamesVersion = '21.0.0'
+    installReferrerVersion = '2.2'
 }

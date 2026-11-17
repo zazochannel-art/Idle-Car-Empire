@@ -28,6 +28,7 @@ public class MainActivity extends BridgeActivity {
         EdgeToEdge.enable(this, bars, bars);
         registerPlugin(PlayGamesPlugin.class);
         registerPlugin(SharePlugin.class);
+        registerPlugin(InstallReferrerPlugin.class);
         super.onCreate(savedInstanceState);
     }
 
