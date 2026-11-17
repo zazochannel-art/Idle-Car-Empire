@@ -27,3 +27,15 @@ describe("the New Year city", () => {
     }
   });
 });
+
+describe("holiday decorations", () => {
+  const at = (y: number, m: number, d: number) => new Date(y, m, d, 12).getTime();
+  it("dress the first city only through the winter festival, Nordheim all year", async () => {
+    const { isFestive } = await import("./world/festive");
+    expect(isFestive("home", at(2026, 11, 10))).toBe(true);
+    expect(isFestive("home", at(2027, 0, 5))).toBe(true);
+    expect(isFestive("home", at(2027, 0, 8))).toBe(false);
+    expect(isFestive("home", at(2026, 6, 1))).toBe(false);
+    expect(isFestive("north", at(2026, 6, 1))).toBe(true);
+  });
+});

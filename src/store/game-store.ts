@@ -63,6 +63,7 @@ import { PASS, type WeeklyId } from "@/game/config/pass";
 import { batteryState, isIdle, isSaving, minTickMs, onSaverChange, setSaverSetting, startPower, type SaverSetting } from "@/lib/power";
 import { claimTab } from "@/lib/tabs";
 import { redeemFromInstall } from "@/lib/install-referrer";
+import { claimNewYear } from "@/game/engine/new-year";
 
 const TICK_MS = 100;
 /** How often the ticks refresh the screens' view of the state (ms). */
@@ -458,6 +459,13 @@ export const useGame = create<GameStore>((set, get) => {
     const step = sessionTick(next, state, dt, now, snap, { mapOnScreen: !ui.garage && !ui.floor && !ui.race && !ui.visit, autoMoney });
     autoMoney = step.autoMoney;
     showNews(step.news, next);
+    // New Year's night: the gift for a player in the game round midnight, once a year
+    const ny = claimNewYear(next, now, snap);
+    if (ny) {
+      uiEvents.emit({ type: "toast", kind: "events", tone: "gold", icon: "🎆", title: tr("newYear.toast", { year: ny.year }), body: tr("newYear.body", { stars: ny.stars, money: formatMoney(ny.money) }) });
+      uiEvents.emit({ type: "fireworks", big: true });
+      lastSave = 0;
+    }
     commit(next, snap, true);
     if (now - lastSave > SAVE_MS) persist();
     if (now - lastFunnel > FUNNEL_MS) {

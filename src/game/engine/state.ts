@@ -113,6 +113,7 @@ export function createInitialState(now: number): GameState {
     sponsors: createSponsors(),
     usedCars: createUsedCars(),
     sources: createSources(),
+    newYear: 0,
     qc: createQc(),
     logistics: createLogistics(),
     market: { t: 0, bought: 0 },

@@ -19,7 +19,8 @@ import { unlockedAreas } from "@/game/engine/territory";
 import type { GameState, StructureType, ZoneId } from "@/game/types";
 import { skyAt, worldClock, type TimeMode } from "../lighting";
 import { weatherAt, type Weather } from "../weather";
-import { buildFestive, type FestiveDecor } from "./festive";
+import { buildFestive, isFestive, type FestiveDecor } from "./festive";
+import { newYearShow } from "@/game/engine/new-year";
 import { CITIES } from "@/game/config/cities";
 import type { MapArea, MapNames, MapTarget, ZoomTier } from "../map-types";
 import type { CarModel } from "../vehicles";
@@ -271,7 +272,7 @@ export class MapEngine {
     // the junctions that are roundabouts: the scenery keeps off them, the roads draw them, the traffic drives round them
     const rings = roundabouts(WORLD_MAP, data.cladiri);
     const ringLots = [...rings.values()].map((r) => ({ x: r.x, y: r.z, w: 2 * r.outer + 0.3, d: 2 * r.outer + 0.3, rot: 0 }));
-    const festive = CITIES[WORLD_MAP.id].festive;
+    const festive = isFestive(WORLD_MAP.id, Date.now());
     this.scenery = new Scenery(data, ground, this.mats, { low: this.low, festive, lots: [...WORLD_MAP.plots.map((p) => ({ x: p.x, y: p.y, w: p.w, d: p.d, rot: p.rot, clear: !!p.territory })), ...ringLots] });
     this.scene.add(this.scenery.root);
     if (festive) {
@@ -788,6 +789,14 @@ export class MapEngine {
       this.headlights!.update(this.trafficLayer!.lamps(), sky.dark, this.cam.dist >= CLOSE_VIEW);
       this.race!.update(live.state, this.t);
       this.scenery!.animate(dt, this.t);
+      // New Year's Eve: fireworks all over the view round midnight, the sky full of them just after
+      const show = newYearShow(Date.now());
+      if (show && this.fx && this.t >= this.nextFirework) {
+        const spread = cam.dist * 0.5;
+        const fx = cam.x + (Math.random() - 0.5) * spread, fz = cam.z + (Math.random() - 0.5) * spread;
+        this.fx.fireworks(fx, this.ground.at(fx, fz), fz, show === 2 ? 6 : 4, show === 2, cam.dist / 30);
+        this.nextFirework = this.t + (show === 2 ? 0.6 + Math.random() * 0.8 : 2 + Math.random() * 3);
+      }
       if (this.festive) {
         this.festive.update(this.t, sky.dark);
         // the New Year city: now and then a firework over the main square once night has come

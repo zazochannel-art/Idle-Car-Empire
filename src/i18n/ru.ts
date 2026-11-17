@@ -2417,6 +2417,8 @@ export const ru: Record<MessageKey, string> = {
   "chest.streakHint": "Открывайте каждый день: +25% за каждый день подряд (до +100%), ⭐ каждый 7-й день.",
   "chest.open": "Открыть",
   "chest.toast": "Ежедневный сундук открыт",
+  "newYear.toast": "С Новым {year} годом!",
+  "newYear.body": "Подарок за то, что встретили год вместе с империей: {stars} ⭐ и {money}.",
   "chest.star": "+1 ⭐ за {n} дней подряд!",
   "map.flow": "Поток доставок",
   "map.flow.ok": "Работает",
