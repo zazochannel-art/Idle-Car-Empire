@@ -236,6 +236,8 @@ export interface GameStore {
   claimDeal: () => void;
   /** The used-car lot (engine/used-cars.ts): buy a car, refurbish it, sell it. */
   buyUsedCar: (id: number) => void;
+  /** Buys the next tenth of a rival's shares (engine/takeover.ts). */
+  buyRivalShares: (id: import("@/game/engine/takeover").RivalId) => void;
   /** Sends a model to the crash lab (engine/safety.ts). */
   startCrashTest: (car: CarId) => void;
   /** Answers the staff's card: yes (pay its cost) or no (engine/staff.ts). */

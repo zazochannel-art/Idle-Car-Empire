@@ -14,6 +14,7 @@ import type { CarId, Effect, GameState, PlantType } from "../types";
 import { cityEffects } from "./city";
 import { editionBonus } from "./collection";
 import { staffSpeed } from "./staff";
+import { takeoverEffects } from "./takeover";
 
 /** The highest car tier (Nordheim's Northern Lights is 11): every tier has its value multiplier. */
 export const MAX_TIER = Math.max(...CARS.map((c) => c.tier));
@@ -210,6 +211,11 @@ export function computeGlobalMods(s: GameState): GlobalMods {
 
   // Star engineers on the payroll.
   for (const e of s.engineers?.hired ?? []) ENGINEER_BY_ID[e.id]?.effects.forEach((x) => applyEffect(m, x));
+
+  // Shares in the rivals, and the rivals taken over (their dealer networks sell our cars too).
+  const tk = takeoverEffects(s);
+  m.income *= tk.income;
+  m.dealerCap *= tk.dealerCap;
 
   // The staff's morale, a strike or a burst of work (the clock is the last tick).
   m.speed *= staffSpeed(s, s.lastActiveAt);

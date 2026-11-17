@@ -15,6 +15,8 @@ import * as Uc from "@/game/engine/used-cars";
 import { buySource } from "@/game/engine/sources";
 import { answerStaff } from "@/game/engine/staff";
 import { startCrashTest, testCost } from "@/game/engine/safety";
+import { buyTenth } from "@/game/engine/takeover";
+import { RIVALS } from "@/game/config/rivals";
 import { carBaseValue, modelStats } from "@/game/engine/chain";
 import { chestStreakToday, claimDaily, claimDailyChest, claimMilestone, rewardCash } from "@/game/engine/progress";
 import { formatMoney } from "@/game/format";
@@ -22,7 +24,7 @@ import { uiEvents } from "../events";
 import { unlockedCarIds } from "@/game/engine/economy";
 import type { GameStore, StoreCtx } from "../game-store";
 
-type Keys = "claimDaily" | "claimDailyChest" | "startPrototype" | "windTunnel" | "trackTest" | "launchProto" | "openMarket" | "setFleetProduct" | "acceptFleetOrder" | "declineFleetOrder" | "finishFleetOrder" | "hireEngineer" | "setEngineerPay" | "letGoEngineer" | "counterOffer" | "acceptVip" | "declineVip" | "claimVip" | "enterShow" | "claimShow" | "claimSeason" | "restoreClassic" | "acceptContract" | "signDeal" | "declineDeals" | "claimDeal" | "buyUsedCar" | "buySource" | "answerStaff" | "startCrashTest" | "refurbishUsedCar" | "sellUsedCar" | "startQc" | "finishQc" | "declineContract" | "claimContract" | "claimLogin" | "dismissTip" | "claimMilestone";
+type Keys = "claimDaily" | "claimDailyChest" | "startPrototype" | "windTunnel" | "trackTest" | "launchProto" | "openMarket" | "setFleetProduct" | "acceptFleetOrder" | "declineFleetOrder" | "finishFleetOrder" | "hireEngineer" | "setEngineerPay" | "letGoEngineer" | "counterOffer" | "acceptVip" | "declineVip" | "claimVip" | "enterShow" | "claimShow" | "claimSeason" | "restoreClassic" | "acceptContract" | "signDeal" | "declineDeals" | "claimDeal" | "buyUsedCar" | "buySource" | "answerStaff" | "startCrashTest" | "buyRivalShares" | "refurbishUsedCar" | "sellUsedCar" | "startQc" | "finishQc" | "declineContract" | "claimContract" | "claimLogin" | "dismissTip" | "claimMilestone";
 
 export function businessActions({ get, act, persist, tr }: StoreCtx): Pick<GameStore, Keys> {
   return {
@@ -126,6 +128,16 @@ export function businessActions({ get, act, persist, tr }: StoreCtx): Pick<GameS
     let money: number | null = null;
     if (!act((s) => (money = Sp.claimSponsor(s, get().snap, Date.now())) !== null)) return;
     uiEvents.emit({ type: "toast", tone: "gold", icon: "🤝", title: tr("sponsor.paid"), body: formatMoney(money ?? 0) });
+    persist(true);
+  },
+  buyRivalShares: (id) => {
+    const out = act((s) => buyTenth(s, id, Date.now()));
+    if (!out) return;
+    if (out === "taken") {
+      const r = RIVALS.find((x) => x.id === id)!;
+      uiEvents.emit({ type: "toast", kind: "progress", tone: "gold", icon: "🏢", title: tr("takeover.taken", { name: r.name }), body: tr("takeover.takenBody") });
+      uiEvents.emit({ type: "fireworks", big: true });
+    }
     persist(true);
   },
   startCrashTest: (car) => {
