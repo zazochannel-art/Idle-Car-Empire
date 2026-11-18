@@ -1,0 +1,3 @@
+What's new in 1.4.1:
+• Rain on the map looks like rain now, not static
+• Fixed a black bar with the game's name at the top of the screen on some phones
