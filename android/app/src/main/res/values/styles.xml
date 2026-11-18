@@ -19,10 +19,10 @@
     </style>
 
 
-    <!-- Launch screen: the icon on the game's background (Android 12+), the splash
-         picture before that. -->
+    <!-- Launch screen: the icon on the game's background (AndroidX SplashScreen, installed in
+         MainActivity). No android:background here: a theme's background is every view's, and it
+         drew the splash picture, squashed, behind whatever view had none of its own. -->
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
-        <item name="android:background">@drawable/splash</item>
         <item name="windowSplashScreenBackground">@color/game_background</item>
         <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
     </style>

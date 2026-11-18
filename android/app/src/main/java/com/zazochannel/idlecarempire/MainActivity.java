@@ -8,6 +8,7 @@ import android.view.ViewGroup;
 import android.webkit.WebView;
 import androidx.activity.EdgeToEdge;
 import androidx.activity.SystemBarStyle;
+import androidx.core.splashscreen.SplashScreen;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
@@ -24,6 +25,11 @@ public class MainActivity extends BridgeActivity {
      */
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // The launch theme (the splash) hands over to the game's own theme here, first: the window
+        // is built from whatever theme is current when EdgeToEdge below first touches it. Built from
+        // the launch theme, some phones added a title bar with the app's name, drawn over a squashed
+        // splash picture, above the game.
+        SplashScreen.installSplashScreen(this);
         SystemBarStyle bars = SystemBarStyle.dark(Color.TRANSPARENT);
         EdgeToEdge.enable(this, bars, bars);
         registerPlugin(PlayGamesPlugin.class);
