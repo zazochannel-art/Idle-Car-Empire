@@ -1,0 +1,7 @@
+Noutăți în 1.4.0:
+• Casa de licitații: schimbă mașini de ediție limitată cu alți jucători; fiecare mașină din colecție aduce venit
+• Turneul săptămânal al alianțelor: cele mai bune alianțe câștigă Stele în fiecare luni
+• Hidrogen: cercetarea Celule de combustie, Uzina de hidrogen și Hydrogen Cruiser
+• Teste de impact: stele de siguranță care urcă prețul modelelor
+• Cărți cu moralul angajaților, preluarea rivalilor și cardul Mediu
+• Provoacă un prieten la cursă cu codul tău

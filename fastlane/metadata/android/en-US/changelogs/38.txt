@@ -1,0 +1,7 @@
+What's new in 1.4.0:
+• Auction house: trade limited-edition cars with other players; each one in your collector garage adds income
+• Weekly alliance tournament: the best alliances win Stars every Monday
+• Hydrogen: Fuel Cells research, the Hydrogen Works and the Hydrogen Cruiser
+• Crash tests: safety stars that lift your models' price
+• Staff morale cards, rival takeovers and an Environment card
+• Challenge a friend to a race with your code
