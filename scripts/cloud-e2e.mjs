@@ -309,6 +309,24 @@ check(!!errorsRead.error, "the error reports' table is out of the API's reach", 
 // ── registration: playing needs an account, so an email and a password must work at once for any
 // address (Supabase's "Confirm email" off, or an SMTP sender for everyone). A third test player
 // registers the way the game does: a guest that gets an email, then a password ──
+// ── the auction house (0035): A puts a car up, B buys it at once (so real players never see it), A is paid once ──
+{
+  check((await a.client.rpc("auction_list", { p_car: "city", p_edition: "plaid", p_ask: 5 })).data === "invalid", "an unknown finish is refused at the auction");
+  const listed = await a.client.rpc("auction_list", { p_car: "city", p_edition: "gold", p_ask: 5 });
+  check(listed.data === "ok", "A puts a car up at the auction", listed.error?.message ?? listed.data);
+  const mine = ((await a.client.rpc("auction_mine")).data ?? []).find((l) => l.status === "open");
+  check(!!mine, "A sees the listing");
+  check(mine && (await a.client.rpc("auction_buy", { p_id: mine.id })).data?.result === "self", "A can't buy their own car");
+  const bought = mine ? (await b.client.rpc("auction_buy", { p_id: mine.id })).data : null;
+  check(bought?.result === "ok" && bought.car === "city" && bought.edition === "gold" && bought.ask === 5, "B buys it", JSON.stringify(bought));
+  check(mine && (await b.client.rpc("auction_buy", { p_id: mine.id })).data?.result === "gone", "a car sells once");
+  const paid = (await a.client.rpc("auction_collect")).data ?? [];
+  check(paid.length === 1 && paid[0].ask === 5, "A collects the sale", JSON.stringify(paid));
+  check(((await a.client.rpc("auction_collect")).data ?? []).length === 0, "a sale is paid once");
+  const table = await b.client.from("auction_listings").select("id");
+  check(!!table.error || (table.data ?? []).length === 0, "the listings are out of the API's reach", table.error?.code);
+}
+
 const c = browser();
 const signC = await c.client.auth.signInAnonymously();
 const idC = signC.data.user?.id;

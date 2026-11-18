@@ -18,7 +18,7 @@ export type { Account, AuthResult, CloudBackend, CloudBackup, CloudCopy, LocalCo
 export type { SaveSummary } from "./policy";
 export { nearlySame, summarize } from "./policy";
 export type { SyncInfo, SyncStatus } from "./sync";
-export type { AllianceMember, AllianceSummary, AllianceTournament, TournamentRow, BoardKind, BoardRow, ClaimTierResult, CreateAllianceResult, CupPlace, CupRow, CupSubmitResult, EmpireCard, GiftResult, JoinAllianceResult, MyAlliance, MyInvite, PurchaseVerdict, RedeemInviteResult, ReportReason, ReportResult } from "./social";
+export type { AuctionBuyResult, AuctionListing, AuctionListResult, MyListing, AllianceMember, AllianceSummary, AllianceTournament, TournamentRow, BoardKind, BoardRow, ClaimTierResult, CreateAllianceResult, CupPlace, CupRow, CupSubmitResult, EmpireCard, GiftResult, JoinAllianceResult, MyAlliance, MyInvite, PurchaseVerdict, RedeemInviteResult, ReportReason, ReportResult } from "./social";
 export { GIFTS_PER_DAY, REPORT_REASONS } from "./social";
 export { encodeSave, decodeSave, migrate } from "./serialize";
 

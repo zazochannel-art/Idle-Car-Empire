@@ -46,6 +46,7 @@ import * as Tm from "@/game/engine/team";
 import * as Cu from "@/game/engine/cup";
 import * as Gh from "@/game/engine/ghost";
 import { allianceReward, payTournament } from "@/game/engine/alliance";
+import * as Au from "@/game/engine/auction";
 import type { AdReward } from "@/game/config/ads";
 import * as Ap from "@/game/engine/autopilot";
 import { type ShopItemId } from "@/game/config/shop";
@@ -152,6 +153,10 @@ export interface GameStore {
   claimAllianceTier: (tier: number) => Promise<import("@/game/save").ClaimTierResult | "error">;
   /** Stores the alliance's tournament points and takes last week's prize when one waits: the Stars paid. */
   syncTournament: () => Promise<number>;
+  /** Buys a car at the auction house for the collector garage (engine/auction.ts). */
+  auctionBuy: (l: import("@/game/save").AuctionListing) => Promise<"ok" | "gone" | "self" | "limit" | "banned" | "owned" | "cash" | "locked" | "error">;
+  /** Collects the auction house's sales and pays them: how many. */
+  collectAuction: () => Promise<number>;
   init: () => Promise<void>;
   /** The app went to the background (Android): saves at once and stops ticking until it is back. */
   suspend: () => void;
@@ -842,6 +847,39 @@ export const useGame = create<GameStore>((set, get) => {
       return stars;
     },
 
+    auctionBuy: async (l) => {
+      const social = saves?.social;
+      if (!social || !get().ready || saves?.sync?.state.status === "conflict") return "error";
+      const block = Au.buyBlock(get().state, l.car, l.edition, l.ask, get().snap);
+      if (block) return block;
+      const r = await social.auctionBuy(l.id).catch(() => null);
+      if (!r) return "error";
+      if (r.result !== "ok") return r.result;
+      let price = 0;
+      act((s) => {
+        price = Au.payPurchase(s, r.car, r.edition, r.ask, get().snap, Date.now());
+        return true;
+      });
+      persist(true);
+      uiEvents.emit({ type: "toast", tone: "gold", icon: "🔨", title: tr("auction.boughtToast"), body: tr("auction.boughtBody", { money: formatMoney(price) }) });
+      return "ok";
+    },
+    collectAuction: async () => {
+      const social = saves?.social;
+      // not while two saves wait for the player's choice: the money paid might be dropped
+      if (!social || !get().ready || saves?.sync?.state.status === "conflict") return 0;
+      const sales = await social.auctionCollect().catch(() => []);
+      if (!sales.length) return 0;
+      let money = 0;
+      act((s) => {
+        for (const x of sales) money += Au.paySale(s, x.ask, get().snap);
+        return true;
+      });
+      persist(true);
+      uiEvents.emit({ type: "toast", tone: "gold", icon: "🔨", title: tr("auction.soldToast", { n: sales.length }), body: tr("auction.soldBody", { money: formatMoney(money) }) });
+      return sales.length;
+    },
+
     init: async () => {
       if (get().ready || loop || starting || replaced) return;
       starting = true;
@@ -942,6 +980,7 @@ export const useGame = create<GameStore>((set, get) => {
           void get().sendCup();
           void get().publishGhost();
           void get().syncTournament();
+          void get().collectAuction();
         };
         socialTimers.push(setTimeout(social, SOCIAL_FIRST_MS), setInterval(social, SOCIAL_EVERY_MS));
         // a friend's code from the store link this install came from (once per phone)
