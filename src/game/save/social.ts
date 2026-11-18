@@ -85,6 +85,30 @@ export interface MyAlliance {
   members: AllianceMember[];
 }
 
+/** One alliance on the tournament's board (0034). */
+export interface TournamentRow {
+  rank: number;
+  name: string;
+  tag: string;
+  emblem: string;
+  points: number;
+  mine: boolean;
+}
+
+/** The weekly tournament between alliances (0034). */
+export interface AllianceTournament {
+  /** The week (Monday, UTC). */
+  week: string;
+  /** This week's best 20. */
+  top: TournamentRow[];
+  /** The player's alliance's place this week (null: none yet). */
+  rank: number | null;
+  /** Its final place last week (null: none). */
+  lastRank: number | null;
+  /** Stars waiting for the player for last week (0: none, or taken). */
+  prize: number;
+}
+
 export type CreateAllianceResult = "ok" | "member" | "invalid" | "blocked" | "name" | "tag";
 export type JoinAllianceResult = "ok" | "member" | "full" | "unknown";
 export type ClaimTierResult = "ok" | "none" | "new" | "short" | "claimed" | "invalid";
@@ -266,6 +290,26 @@ export class Social {
   async claimAllianceTier(tier: number): Promise<ClaimTierResult> {
     const r = str(await this.call("claim_alliance_tier", { p_tier: tier }));
     return r === "ok" || r === "none" || r === "new" || r === "short" || r === "claimed" ? r : "invalid";
+  }
+
+  /** The weekly tournament; a member's call also stores their alliance's points for the week. */
+  async allianceTournament(): Promise<AllianceTournament> {
+    const r = obj(await this.call("alliance_tournament"));
+    const place = (v: unknown) => (typeof v === "number" && v >= 1 ? Math.floor(v) : null);
+    return {
+      week: str(r.week),
+      top: (Array.isArray(r.top) ? r.top : [])
+        .map(obj)
+        .map((t) => ({ rank: num(t.rank), name: str(t.name), tag: str(t.tag), emblem: str(t.emblem), points: num(t.points), mine: t.mine === true })),
+      rank: place(r.rank),
+      lastRank: place(r.lastRank),
+      prize: Math.max(0, Math.floor(num(r.prize))),
+    };
+  }
+
+  /** Takes last week's tournament prize: the Stars due (0: none, or taken already). */
+  async claimAllianceTournament(): Promise<number> {
+    return Math.max(0, Math.floor(num(await this.call("claim_alliance_tournament"))));
   }
 
   // ───────────────────────── reports (0008) ─────────────────────────

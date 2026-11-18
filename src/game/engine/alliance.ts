@@ -19,3 +19,28 @@ export function allianceReward(s: GameState, tier: number, snap: EconomySnapshot
   grantReward(s, reward, snap);
   return money;
 }
+
+/**
+ * The weekly tournament between alliances (supabase/migrations/0034): Stars for each member of the
+ * best alliances once the week is over, by final place. The same table as the server's
+ * ops.tournament_prize; the server says what is due, this pays at most the top prize.
+ */
+export const TOURNAMENT_PRIZES: { upTo: number; stars: number }[] = [
+  { upTo: 1, stars: 10 },
+  { upTo: 3, stars: 6 },
+  { upTo: 10, stars: 3 },
+  { upTo: 50, stars: 1 },
+];
+
+/** Stars for a final place (0: none). */
+export function tournamentPrize(rank: number | null): number {
+  if (!rank || rank < 1) return 0;
+  return TOURNAMENT_PRIZES.find((p) => rank <= p.upTo)?.stars ?? 0;
+}
+
+/** Pays the tournament prize the server granted: the Stars paid (whole, at most the top prize). */
+export function payTournament(s: GameState, stars: number): number {
+  const n = Math.max(0, Math.min(TOURNAMENT_PRIZES[0].stars, Math.floor(Number.isFinite(stars) ? stars : 0)));
+  s.stars += n;
+  return n;
+}

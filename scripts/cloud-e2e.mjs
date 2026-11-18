@@ -240,6 +240,10 @@ if (canLeave.data === "none") {
   const mineB = (await b.client.rpc("my_alliance")).data;
   check(mineB?.members?.length === 2 && mineB.leader === false && mineB.tiers?.length === 3, "B sees the alliance, its members and goal", JSON.stringify(mineB)?.slice(0, 160));
   check((await b.client.rpc("claim_alliance_tier", { p_tier: 1 })).data === "new", "a new member can't take rewards yet");
+  // the weekly tournament (0034): the board answers, a member who joined this week has no prize
+  const tour = await b.client.rpc("alliance_tournament");
+  check(!tour.error && Array.isArray(tour.data?.top) && tour.data.prize === 0, "B sees the alliance tournament, with no prize yet", tour.error?.message ?? JSON.stringify(tour.data)?.slice(0, 160));
+  check((await b.client.rpc("claim_alliance_tournament")).data === 0, "a new member takes no tournament prize");
   // (the report goes with the alliance when it closes below)
   check(found && (await b.client.rpc("report_alliance", { p_alliance: found.id })).data === "ok", "B reports the alliance's name (0008)");
   const membersTable = await b.client.from("alliance_members").select("user_id");

@@ -45,7 +45,7 @@ import * as Iv from "@/game/engine/invites";
 import * as Tm from "@/game/engine/team";
 import * as Cu from "@/game/engine/cup";
 import * as Gh from "@/game/engine/ghost";
-import { allianceReward } from "@/game/engine/alliance";
+import { allianceReward, payTournament } from "@/game/engine/alliance";
 import type { AdReward } from "@/game/config/ads";
 import * as Ap from "@/game/engine/autopilot";
 import { type ShopItemId } from "@/game/config/shop";
@@ -150,6 +150,8 @@ export interface GameStore {
   claimPassWeekly: (id: WeeklyId) => boolean;
   /** Takes a reward tier of the alliance's weekly goal (the server decides): its answer. */
   claimAllianceTier: (tier: number) => Promise<import("@/game/save").ClaimTierResult | "error">;
+  /** Stores the alliance's tournament points and takes last week's prize when one waits: the Stars paid. */
+  syncTournament: () => Promise<number>;
   init: () => Promise<void>;
   /** The app went to the background (Android): saves at once and stops ticking until it is back. */
   suspend: () => void;
@@ -825,6 +827,21 @@ export const useGame = create<GameStore>((set, get) => {
       return r;
     },
 
+    syncTournament: async () => {
+      const social = saves?.social;
+      // not while two saves wait for the player's choice: the Stars paid might be dropped
+      if (!social || !get().ready || saves?.sync?.state.status === "conflict") return 0;
+      const tour = await social.allianceTournament().catch(() => null);
+      if (!tour?.prize) return 0;
+      const due = await social.claimAllianceTournament().catch(() => 0);
+      let stars = 0;
+      if (due > 0) act((s) => (stars = payTournament(s, due)) > 0);
+      if (!stars) return 0;
+      persist(true);
+      uiEvents.emit({ type: "toast", tone: "gold", icon: "🏆", title: tr("tourney.prize", { rank: tour.lastRank ?? 0 }), body: tr("tourney.prizeBody", { stars }) });
+      return stars;
+    },
+
     init: async () => {
       if (get().ready || loop || starting || replaced) return;
       starting = true;
@@ -924,6 +941,7 @@ export const useGame = create<GameStore>((set, get) => {
           void get().claimTeamCommands();
           void get().sendCup();
           void get().publishGhost();
+          void get().syncTournament();
         };
         socialTimers.push(setTimeout(social, SOCIAL_FIRST_MS), setInterval(social, SOCIAL_EVERY_MS));
         // a friend's code from the store link this install came from (once per phone)
