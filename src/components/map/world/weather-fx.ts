@@ -32,20 +32,29 @@ vec3 dropAt(vec3 base) {
   return w;
 }`;
 
+// A streak is drawn in view space, so it reads as a falling line from any angle: from the map's
+// high camera a drop's true (vertical) path would shrink to a dot, and thousands of dots look
+// like static. Its head is the brightest part and its tail fades out.
 const RAIN_VERT = /* glsl */ `
 ${COMMON}
 attribute float aEnd;
 uniform float uLen;
+varying float vEnd;
 void main() {
   vec3 w = dropAt(position);
-  w += vec3(0.18, -1.0, 0.1) * uLen * aEnd;
-  gl_Position = projectionMatrix * viewMatrix * vec4(w, 1.0);
+  vec4 mv = viewMatrix * vec4(w, 1.0);
+  // a little longer or shorter per drop, slanted by the wind
+  float len = uLen * (0.75 + 0.5 * fract(position.x * 97.0 + position.z * 53.0));
+  mv.xy += vec2(-0.22, 1.0) * len * aEnd;
+  vEnd = aEnd;
+  gl_Position = projectionMatrix * mv;
 }`;
 const RAIN_FRAG = /* glsl */ `
 uniform float uAlpha;
 varying float vFade;
+varying float vEnd;
 void main() {
-  gl_FragColor = vec4(0.78, 0.84, 0.92, uAlpha * vFade);
+  gl_FragColor = vec4(0.74, 0.82, 0.93, uAlpha * vFade * (1.0 - vEnd) * (1.0 - vEnd));
 }`;
 
 const FLAKE_VERT = /* glsl */ `
@@ -140,7 +149,7 @@ export class WeatherFx {
 
   constructor(low: boolean) {
     this.root.name = "weather";
-    this.rain = new THREE.LineSegments(cloud(low ? 1200 : 3000, true), material(RAIN_VERT, RAIN_FRAG, this.ur));
+    this.rain = new THREE.LineSegments(cloud(low ? 500 : 1100, true), material(RAIN_VERT, RAIN_FRAG, this.ur));
     this.snow = new THREE.Points(cloud(low ? 900 : 2200, false), material(FLAKE_VERT, SNOW_FRAG, this.us));
     this.petals = new THREE.Points(cloud(low ? 500 : 1200, false), material(FLAKE_VERT, PETAL_FRAG, this.up));
     for (const o of [this.rain, this.snow, this.petals]) {
@@ -186,8 +195,9 @@ export class WeatherFx {
       u.uAlpha.value = alpha;
     };
     const far = Math.max(1, dist / 30);
-    set(this.ur, 26, 0, 0, 0.42 * k.rain);
-    this.ur.uLen.value = Math.max(0.7, Math.min(4, dist * 0.035));
+    set(this.ur, 34, 0, 0, 0.8 * k.rain);
+    // long streaks: about a sixteenth of the view's height wherever the camera is
+    this.ur.uLen.value = Math.max(1.2, Math.min(9, dist * 0.06));
     set(this.us, 2.2, 0.7, 0.2 * far, 0.9 * k.snow);
     // the petals drift in a smaller box round the view: fewer of them, so closer together
     set(this.up, 1.2, 1.2, 0.34 * far, k.petals, 0.6);

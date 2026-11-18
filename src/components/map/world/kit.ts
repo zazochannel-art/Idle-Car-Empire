@@ -606,13 +606,25 @@ if (uSnow > 0.001 || uWet > 0.001) {
 #endif
   }
   if (uWet > 0.001) {
+    // wet ground is a little darker and richer; on flat ground, a few soft puddles (smooth value
+    // noise, a few tiles across) catch a dull sheen of the sky. Never small bright specks: from the
+    // map's camera those read as static.
     float wet = smoothstep(0.3, 0.8, up) * uWet;
-    vec2 pw = floor(vLockUv * uLockSize * 18.0);
-    float pnz = fract(sin(dot(pw, vec2(12.9898, 78.233))) * 43758.5453);
-    float puddle = smoothstep(0.68, 0.85, pnz) * wet;
-    diffuseColor.rgb = mix(diffuseColor.rgb * (1.0 - 0.25 * wet), vec3(0.5, 0.7, 0.85), puddle * 0.35);
+    vec2 pp = vLockUv * uLockSize * 3.0;
+    vec2 pi = floor(pp);
+    vec2 pf = fract(pp);
+    pf = pf * pf * (3.0 - 2.0 * pf);
+    float h00 = fract(sin(dot(pi, vec2(12.9898, 78.233))) * 43758.5453);
+    float h10 = fract(sin(dot(pi + vec2(1.0, 0.0), vec2(12.9898, 78.233))) * 43758.5453);
+    float h01 = fract(sin(dot(pi + vec2(0.0, 1.0), vec2(12.9898, 78.233))) * 43758.5453);
+    float h11 = fract(sin(dot(pi + vec2(1.0, 1.0), vec2(12.9898, 78.233))) * 43758.5453);
+    float pn = mix(mix(h00, h10, pf.x), mix(h01, h11, pf.x), pf.y);
+    float puddle = smoothstep(0.66, 0.78, pn) * smoothstep(0.88, 0.98, up) * uWet;
+    diffuseColor.rgb *= 1.0 - 0.18 * wet;
+    diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.55 + vec3(0.08, 0.11, 0.15), puddle * 0.7);
 #ifdef STANDARD
-    roughnessFactor = mix(roughnessFactor, 0.05, puddle);
+    roughnessFactor = mix(roughnessFactor, roughnessFactor * 0.75, wet);
+    roughnessFactor = mix(roughnessFactor, 0.3, puddle);
 #endif
   }
 }`,
