@@ -16,6 +16,7 @@ import { editionBonus } from "./collection";
 import { staffSpeed } from "./staff";
 import { takeoverEffects } from "./takeover";
 import { ecoIncomeMult } from "./eco";
+import { auctionBonus } from "./auction";
 
 /** The highest car tier (Nordheim's Northern Lights is 11): every tier has its value multiplier. */
 export const MAX_TIER = Math.max(...CARS.map((c) => c.tier));
@@ -215,6 +216,9 @@ export function computeGlobalMods(s: GameState): GlobalMods {
 
   // The environment: a green label under the city's pollution limit, a fine over it.
   m.income *= ecoIncomeMult(s);
+
+  // The auction house's collector garage: each different car and finish bought, a little more.
+  m.income *= 1 + auctionBonus(s);
 
   // Shares in the rivals, and the rivals taken over (their dealer networks sell our cars too).
   const tk = takeoverEffects(s);

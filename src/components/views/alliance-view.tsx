@@ -3,11 +3,11 @@
 import { Crown, LogOut, RefreshCw, Search, UserMinus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ALLIANCE_EMBLEMS, ALLIANCE_REWARDS } from "@/game/engine/alliance";
+import { ALLIANCE_EMBLEMS, ALLIANCE_REWARDS, TOURNAMENT_PRIZES, tournamentPrize } from "@/game/engine/alliance";
 import { isCleanName } from "@/game/engine/names";
 import { rewardCash } from "@/game/engine/progress";
 import { formatDuration, formatMoney, formatNumber } from "@/game/format";
-import type { AllianceSummary, MyAlliance } from "@/game/save";
+import type { AllianceSummary, AllianceTournament, MyAlliance } from "@/game/save";
 import type { MessageKey } from "@/i18n";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/utils";
@@ -166,6 +166,8 @@ function AllianceHome({ a, onChange }: { a: MyAlliance; onChange: () => void }) 
         {msg && <p className={cn("text-center text-xs", msg.bad ? "text-rose-300" : "text-sky-300")}>{msg.text}</p>}
       </div>
 
+      <TournamentCard />
+
       {/* members */}
       <div className="space-y-1.5">
         <div className="px-1 text-[11px] font-bold uppercase tracking-wider text-white/55">{t("alliance.membersTitle")}</div>
@@ -211,6 +213,103 @@ function AllianceHome({ a, onChange }: { a: MyAlliance; onChange: () => void }) 
         <Button size="sm" variant="secondary" className="w-full" onClick={() => setLeaving(true)}>
           <LogOut /> {t("alliance.leave")}
         </Button>
+      )}
+    </div>
+  );
+}
+
+/** The week's tournament between alliances: the best 20, the alliance's place, last week's prize. */
+function TournamentCard() {
+  const saves = useGame((g) => g.saves);
+  const { t } = useT();
+  const social = saves?.social ?? null;
+  const [attempt, setAttempt] = useState(0);
+  const [answer, setAnswer] = useState<{ key: number; data: AllianceTournament | "error" } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [all, setAll] = useState(false);
+
+  useEffect(() => {
+    if (!social) return;
+    let live = true;
+    social.allianceTournament().then(
+      (data) => live && setAnswer({ key: attempt, data }),
+      () => live && setAnswer({ key: attempt, data: "error" }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [social, attempt]);
+  const data = answer?.key === attempt ? answer.data : undefined;
+
+  const claim = async () => {
+    setBusy(true);
+    await useGame.getState().syncTournament();
+    setBusy(false);
+    setAttempt((n) => n + 1);
+  };
+
+  const rows = data && data !== "error" ? data.top : [];
+  const shown = all ? rows : rows.slice(0, 5);
+  return (
+    <div className="space-y-2.5 rounded-2xl bg-[#2b2b2e] p-3 ring-1 ring-white/10">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-bold">🏆 {t("tourney.title")}</span>
+        {data && data !== "error" && data.rank && <span className="text-sm font-black tabular-nums text-gold">{t("tourney.place", { rank: data.rank })}</span>}
+      </div>
+      <p className="text-[11px] leading-snug text-white/50">{t("tourney.hint")}</p>
+      <div className="flex flex-wrap gap-1.5">
+        {TOURNAMENT_PRIZES.map((p, i) => (
+          <span key={p.upTo} className="rounded-lg bg-white/[0.05] px-2 py-1 text-[11px] font-semibold tabular-nums ring-1 ring-white/[0.07]">
+            {i === 0 ? "🥇 1" : `${(TOURNAMENT_PRIZES[i - 1]?.upTo ?? 0) + 1}–${p.upTo}`} · ⭐ {p.stars}
+          </span>
+        ))}
+      </div>
+      {data === undefined ? (
+        <div className="h-24 animate-pulse rounded-xl bg-white/[0.04]" />
+      ) : data === "error" ? (
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs text-rose-300">{t("board.error")}</p>
+          <Button variant="secondary" size="sm" onClick={() => setAttempt((n) => n + 1)}>
+            <RefreshCw /> {t("board.retry")}
+          </Button>
+        </div>
+      ) : (
+        <>
+          {data.prize > 0 && (
+            <div className="flex items-center gap-2 rounded-xl bg-gold/10 px-3 py-2 ring-1 ring-gold/30">
+              <span className="min-w-0 flex-1 text-xs font-semibold">
+                {t("tourney.last", { rank: data.lastRank ?? 0 })} <span className="text-gold">⭐ {data.prize}</span>
+              </span>
+              <Button size="sm" variant="gold" disabled={busy} onClick={() => void claim()}>
+                {t("alliance.claim")}
+              </Button>
+            </div>
+          )}
+          {data.prize === 0 && data.lastRank && tournamentPrize(data.lastRank) > 0 && (
+            <p className="text-[11px] text-white/45">{t("tourney.lastTaken", { rank: data.lastRank })}</p>
+          )}
+          {rows.length === 0 ? (
+            <p className="text-center text-xs text-white/50">{t("tourney.empty")}</p>
+          ) : (
+            <div className="space-y-1">
+              {shown.map((r) => (
+                <div key={`${r.rank}-${r.tag}`} className={cn("flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs ring-1", r.mine ? "bg-gold/[0.1] ring-gold/40" : "bg-white/[0.03] ring-white/[0.06]")}>
+                  <span className="w-6 shrink-0 text-center font-black tabular-nums text-white/60">{r.rank <= 3 ? ["🥇", "🥈", "🥉"][r.rank - 1] : r.rank}</span>
+                  <span className="shrink-0 text-base">{r.emblem}</span>
+                  <span className="min-w-0 flex-1 truncate font-bold">
+                    {r.name} <span className="text-gold">[{r.tag}]</span>
+                  </span>
+                  <span className="font-black tabular-nums">{formatNumber(r.points)}</span>
+                </div>
+              ))}
+              {rows.length > 5 && (
+                <button className="w-full rounded-lg py-1 text-[11px] font-semibold text-white/55 hover:bg-white/5" onClick={() => setAll((v) => !v)}>
+                  {t(all ? "tourney.less" : "tourney.more")}
+                </button>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

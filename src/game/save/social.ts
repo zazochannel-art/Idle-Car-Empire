@@ -85,6 +85,54 @@ export interface MyAlliance {
   members: AllianceMember[];
 }
 
+/** One alliance on the tournament's board (0034). */
+export interface TournamentRow {
+  rank: number;
+  name: string;
+  tag: string;
+  emblem: string;
+  points: number;
+  mine: boolean;
+}
+
+/** The weekly tournament between alliances (0034). */
+export interface AllianceTournament {
+  /** The week (Monday, UTC). */
+  week: string;
+  /** This week's best 20. */
+  top: TournamentRow[];
+  /** The player's alliance's place this week (null: none yet). */
+  rank: number | null;
+  /** Its final place last week (null: none). */
+  lastRank: number | null;
+  /** Stars waiting for the player for last week (0: none, or taken). */
+  prize: number;
+}
+
+/** A car up for sale at the auction house (0035). */
+export interface AuctionListing {
+  id: number;
+  car: string;
+  edition: string;
+  ask: number;
+  seller: string;
+  avatar: string;
+  expiresAt: number;
+}
+
+/** One of the player's own listings. */
+export interface MyListing {
+  id: number;
+  car: string;
+  edition: string;
+  ask: number;
+  expiresAt: number;
+  status: "open" | "sold" | "cancelled" | "expired";
+}
+
+export type AuctionListResult = "ok" | "invalid" | "open" | "limit" | "banned";
+export type AuctionBuyResult = { result: "ok"; car: string; edition: string; ask: number } | { result: "gone" | "self" | "limit" | "banned" };
+
 export type CreateAllianceResult = "ok" | "member" | "invalid" | "blocked" | "name" | "tag";
 export type JoinAllianceResult = "ok" | "member" | "full" | "unknown";
 export type ClaimTierResult = "ok" | "none" | "new" | "short" | "claimed" | "invalid";
@@ -266,6 +314,69 @@ export class Social {
   async claimAllianceTier(tier: number): Promise<ClaimTierResult> {
     const r = str(await this.call("claim_alliance_tier", { p_tier: tier }));
     return r === "ok" || r === "none" || r === "new" || r === "short" || r === "claimed" ? r : "invalid";
+  }
+
+  /** The weekly tournament; a member's call also stores their alliance's points for the week. */
+  async allianceTournament(): Promise<AllianceTournament> {
+    const r = obj(await this.call("alliance_tournament"));
+    const place = (v: unknown) => (typeof v === "number" && v >= 1 ? Math.floor(v) : null);
+    return {
+      week: str(r.week),
+      top: (Array.isArray(r.top) ? r.top : [])
+        .map(obj)
+        .map((t) => ({ rank: num(t.rank), name: str(t.name), tag: str(t.tag), emblem: str(t.emblem), points: num(t.points), mine: t.mine === true })),
+      rank: place(r.rank),
+      lastRank: place(r.lastRank),
+      prize: Math.max(0, Math.floor(num(r.prize))),
+    };
+  }
+
+  /** Takes last week's tournament prize: the Stars due (0: none, or taken already). */
+  async claimAllianceTournament(): Promise<number> {
+    return Math.max(0, Math.floor(num(await this.call("claim_alliance_tournament"))));
+  }
+
+  // ───────────────────────── auction house (0035) ─────────────────────────
+
+  /** The cheapest cars up for sale (others' only). */
+  async auctionBrowse(): Promise<AuctionListing[]> {
+    const rows = await this.call("auction_browse");
+    return (Array.isArray(rows) ? rows : []).map(obj).map((r) => ({
+      id: num(r.id),
+      car: str(r.car),
+      edition: str(r.edition),
+      ask: num(r.ask),
+      seller: str(r.seller),
+      avatar: str(r.avatar),
+      expiresAt: Date.parse(str(r.expiresAt)) || 0,
+    }));
+  }
+
+  async auctionMine(): Promise<MyListing[]> {
+    const rows = await this.call("auction_mine");
+    const status = (v: unknown): MyListing["status"] => (v === "sold" || v === "cancelled" || v === "expired" ? v : "open");
+    return (Array.isArray(rows) ? rows : []).map(obj).map((r) => ({ id: num(r.id), car: str(r.car), edition: str(r.edition), ask: num(r.ask), expiresAt: Date.parse(str(r.expiresAt)) || 0, status: status(r.status) }));
+  }
+
+  async auctionList(car: string, edition: string, ask: number): Promise<AuctionListResult> {
+    const r = str(await this.call("auction_list", { p_car: car, p_edition: edition, p_ask: ask }));
+    return r === "ok" || r === "open" || r === "limit" || r === "banned" ? r : "invalid";
+  }
+
+  async auctionCancel(id: number): Promise<boolean> {
+    return (await this.call("auction_cancel", { p_id: id })) === true;
+  }
+
+  async auctionBuy(id: number): Promise<AuctionBuyResult> {
+    const r = obj(await this.call("auction_buy", { p_id: id }));
+    if (r.result === "ok") return { result: "ok", car: str(r.car), edition: str(r.edition), ask: num(r.ask) };
+    return { result: r.result === "self" || r.result === "limit" || r.result === "banned" ? r.result : "gone" };
+  }
+
+  /** The player's sales not yet paid (each one handed over once). */
+  async auctionCollect(): Promise<{ id: number; car: string; edition: string; ask: number }[]> {
+    const rows = await this.call("auction_collect");
+    return (Array.isArray(rows) ? rows : []).map(obj).map((r) => ({ id: num(r.id), car: str(r.car), edition: str(r.edition), ask: num(r.ask) }));
   }
 
   // ───────────────────────── reports (0008) ─────────────────────────

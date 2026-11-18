@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ALLIANCE_REWARDS, allianceReward } from "./engine/alliance";
+import { ALLIANCE_REWARDS, allianceReward, payTournament, tournamentPrize } from "./engine/alliance";
 import { snapshot } from "./engine/economy";
 import { createInitialState } from "./engine/state";
 
@@ -30,5 +30,22 @@ describe("alliance rewards", () => {
     expect(allianceReward(s, 0, snapshot(s))).toBe(0);
     expect(allianceReward(s, 4, snapshot(s))).toBe(0);
     expect(s.cash).toBe(cash);
+  });
+});
+
+describe("alliance tournament", () => {
+  it("gives Stars by final place, as the server's table", () => {
+    expect([1, 2, 3, 4, 10, 11, 50, 51, 0, null].map((r) => tournamentPrize(r))).toEqual([10, 6, 6, 3, 3, 1, 1, 0, 0, 0]);
+  });
+
+  it("pays whole Stars, never more than the top prize", () => {
+    const s = createInitialState(T0);
+    const stars = s.stars;
+    expect(payTournament(s, 6)).toBe(6);
+    expect(payTournament(s, 999)).toBe(10);
+    expect(payTournament(s, -3)).toBe(0);
+    expect(payTournament(s, Number.NaN)).toBe(0);
+    expect(payTournament(s, 2.7)).toBe(2);
+    expect(s.stars - stars).toBe(18);
   });
 });
