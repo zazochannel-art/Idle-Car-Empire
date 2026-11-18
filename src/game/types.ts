@@ -16,6 +16,7 @@ export type CarId =
   | "hypercar"
   | "electric"
   | "autonomous"
+  | "hydrogen"
   // the lines of the map's landmark works (config/landmarks.ts): one in each territory
   | "pickup"
   | "minivan"
@@ -44,6 +45,7 @@ export type ComponentId =
   | "electronics"
   | "battery"
   | "software"
+  | "fuelcell"
   | "transmission"
   | "wheels"
   | "brakes"
@@ -72,6 +74,7 @@ export type PlantType =
   | "electronicsFactory"
   | "batteryFactory"
   | "softwareStudio"
+  | "hydrogenWorks"
   | "assemblyPlant"
   // the landmark works, one in each territory (config/landmarks.ts)
   | "frameWorks"
@@ -615,6 +618,16 @@ export interface GameState {
   sponsors: SponsorsState;
   /** The used-car lot and the garage bay (engine/used-cars.ts). */
   usedCars: UsedCarsState;
+  /** Looks bought in the shop's Style section (engine/cosmetics.ts). */
+  cosmetics: import("./engine/cosmetics").CosmeticId[];
+  /** The eco programme's level (engine/eco.ts). */
+  eco: number;
+  /** The tenths of each rival's shares the company holds (engine/takeover.ts). */
+  takeover: import("./engine/takeover").TakeoverState;
+  /** Crash tests: each tested model's safety stars, and the test running now (engine/safety.ts). */
+  safety: import("./engine/safety").SafetyState;
+  /** The staff's morale and the card waiting for an answer (engine/staff.ts). Company-wide. */
+  staff: import("./engine/staff").StaffState;
   /** The last New Year whose gift was taken (engine/new-year.ts; 0: none yet). */
   newYear: number;
   /** Own sources of raw materials, a level per material (engine/sources.ts). Company-wide. */

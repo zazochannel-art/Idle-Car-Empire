@@ -5,6 +5,8 @@
 // the end), and items for ⭐ Stars. Premium items for real money only in an app
 // build whose products are set up on Google Play (lib/iap.ts): otherwise nothing
 // in it costs real money.
+import { COSMETICS, ownsCosmetic } from "@/game/engine/cosmetics";
+import { SKINS as RACE_SKINS } from "@/game/config/racing";
 import { playAd } from "@/components/game/ad-buttons";
 import { Button } from "@/components/ui/button";
 import { ADS } from "@/game/config/ads";
@@ -76,6 +78,7 @@ export function ShopView() {
         {seasonAt(state.lastActiveAt) === "blackfriday" && <p className="rounded-xl bg-red-500/15 px-3 py-2 text-xs font-bold text-red-100 ring-1 ring-red-400/35">🏷️ {t("shop.blackFriday", { pct: blackFridayCut() })}</p>}
         <p className="px-1 text-[11px] text-white/45">{t("shop.starsHow")}</p>
       </Section>
+      <StyleSection />
       <p className="px-1 text-center text-[11px] text-white/40">{t(iapConfigured() ? "shop.footerIap" : "shop.footer")}</p>
     </div>
   );
@@ -304,6 +307,40 @@ function ShopCard({ item }: { item: ShopItem }) {
         {packs !== null && <div className="mt-0.5 text-[10px] font-bold text-white/40">{t("shop.left", { n: Math.max(0, packs) })}</div>}
       </div>
       {button}
+    </div>
+  );
+}
+
+/** ✨ Looks for Stars, kept for good, no effect on the game (engine/cosmetics.ts). */
+function StyleSection() {
+  const state = useGame((g) => g.view.state);
+  const buy = useGame((g) => g.buyCosmetic);
+  const { t } = useT();
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between px-1">
+        <span className="text-xs font-black uppercase tracking-wider text-white/70">✨ {t("style.title")}</span>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {COSMETICS.map((c) => {
+          const owned = ownsCosmetic(state, c.id);
+          const skin = c.skin ? RACE_SKINS[c.skin] : null;
+          return (
+            <div key={c.id} className="flex flex-col gap-1.5 rounded-2xl bg-white/[0.04] p-3 ring-1 ring-white/[0.08]">
+              <div className="flex items-center gap-2">
+                <span className="flex size-9 items-center justify-center rounded-xl text-xl" style={skin ? { background: `linear-gradient(135deg, ${skin.color} 55%, ${skin.accent} 55%)` } : undefined}>
+                  {c.icon}
+                </span>
+                <span className="min-w-0 text-[12px] font-bold leading-tight">{t(`style.${c.id}`)}</span>
+              </div>
+              <p className="text-[10.5px] leading-snug text-white/55">{t(c.skin ? "style.skinDesc" : "style.decorDesc")}</p>
+              <Button size="sm" variant={owned ? "secondary" : "gold"} disabled={owned || state.stars < c.stars} onClick={() => buy(c.id)}>
+                {owned ? t("style.owned") : `⭐ ${c.stars}`}
+              </Button>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

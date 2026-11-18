@@ -236,6 +236,16 @@ export interface GameStore {
   claimDeal: () => void;
   /** The used-car lot (engine/used-cars.ts): buy a car, refurbish it, sell it. */
   buyUsedCar: (id: number) => void;
+  /** Buys a look in the shop's Style section with Stars (engine/cosmetics.ts). */
+  buyCosmetic: (id: import("@/game/engine/cosmetics").CosmeticId) => void;
+  /** Buys the next level of the eco programme (engine/eco.ts). */
+  buyEco: () => void;
+  /** Buys the next tenth of a rival's shares (engine/takeover.ts). */
+  buyRivalShares: (id: import("@/game/engine/takeover").RivalId) => void;
+  /** Sends a model to the crash lab (engine/safety.ts). */
+  startCrashTest: (car: CarId) => void;
+  /** Answers the staff's card: yes (pay its cost) or no (engine/staff.ts). */
+  answerStaff: (yes: boolean) => void;
   /** Buys the next level of a material's own source (engine/sources.ts). */
   buySource: (m: import("@/game/config/economy").MaterialId) => void;
   refurbishUsedCar: () => void;

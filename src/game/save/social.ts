@@ -175,6 +175,12 @@ export class Social {
     }));
   }
 
+  /** The account behind an invite code, for a race challenge (null: no such code). */
+  async playerByCode(code: string): Promise<string | null> {
+    const id = str(await this.call("player_by_code", { p_code: code }));
+    return /^[0-9a-f-]{36}$/i.test(id) ? id : null;
+  }
+
   /** A listed player's public card (null: not listed, or no game saved yet). */
   async visit(userId: string): Promise<EmpireCard | null> {
     const rows = (await this.call("visit_empire", { p_user: userId })) as unknown[] | null;

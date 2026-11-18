@@ -241,6 +241,16 @@ export const RECIPES: Record<string, StationDef[]> = {
     qc("pack", "testBench"),
     store("goods", "goodsRack", "pack"),
   ]),
+  // hydrogen fuel cells: membranes coated like electrodes → cells → welded stacks → tank and valves
+  hydrogenWorks: line7([
+    store("rawStore", "rawRack", "drum", "drum", ["drumPallet", "drumPallet"]),
+    { id: "electrode", machine: "extruder", variant: "coater", unlock: 1, upgrade: "speed", icon: "🎞️", robotsFrom: 3, part: "electrode", staff: 1, tool: "gripper", robot: "floor", fx: "heat", props: ["drumPallet", "boxPallet"] },
+    { id: "cellAsm", machine: "bodyJig", unlock: 2, upgrade: "speed", icon: "🔋", robotsFrom: 2, part: "cell", staff: 1, tool: "suction", robot: "reach", props: ["binRack", "boxPallet"] },
+    { id: "moduleWeld", machine: "welder", unlock: 1, upgrade: "automation", icon: "⚡", robotsFrom: 1, part: "module", staff: 2, role: "welder", tool: "torch", robot: "reach", fx: "laser", props: ["partsCage", "partsCage"] },
+    { id: "packAsm", machine: "assemblyStand", variant: "pack", unlock: 3, upgrade: "automation", icon: "🧰", robotsFrom: 2, part: "pack", staff: 2, tool: "gripper", robot: "reach", props: ["partsCage", "toolCabinet"] },
+    qc("pack", "testBench"),
+    store("goods", "goodsRack", "pack"),
+  ]),
   // server and sensor kits → code at the desks → trained on fleet data → simulated miles → flashed modules
   softwareStudio: line7([
     store("rawStore", "rawRack", "reel", "chips", ["binRack", "boxPallet"]),

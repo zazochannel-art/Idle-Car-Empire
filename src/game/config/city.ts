@@ -189,9 +189,9 @@ export const PLOT_USES: Record<ZoneId, { cells: StructureType[]; big: StructureT
 /**
  * Plots that can also take a second kind of building, picked when it is
  * built. The Software Studio came after the map was zoned, so it shares the
- * Electronics Factory's plots: no plot of an existing save changes.
+ * Electronics Factory's plots, and the Hydrogen Works the Battery Factory's: no plot of an existing save changes.
  */
-export const ALT_USES: Partial<Record<StructureType, StructureType[]>> = { electronicsFactory: ["softwareStudio"] };
+export const ALT_USES: Partial<Record<StructureType, StructureType[]>> = { electronicsFactory: ["softwareStudio"], batteryFactory: ["hydrogenWorks"] };
 
 export type PlotSize = "small" | "medium" | "large" | "mega";
 

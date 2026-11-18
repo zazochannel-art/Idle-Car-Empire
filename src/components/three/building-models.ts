@@ -434,6 +434,19 @@ export function buildPlant(T: Three, kit: MaterialKit, spec: PlantSpec, W: numbe
       }
       break;
     }
+    case "hydrogenWorks":
+      // two hydrogen tanks lying in the yard: white, with a blue band
+      for (let i = 0; i < 2; i++) {
+        const t = new T.Mesh(new T.CylinderGeometry(0.09, 0.09, 0.55, 18), std(T, "#f1f5f9", 0.5, 0.35));
+        t.rotation.z = Math.PI / 2;
+        t.position.set(W - 0.45, 0.11, yardZ + 0.05 + i * 0.22);
+        g.add(t);
+        const band = new T.Mesh(new T.CylinderGeometry(0.093, 0.093, 0.06, 18), std(T, "#0284c7", 0.3, 0.5));
+        band.rotation.z = Math.PI / 2;
+        band.position.set(W - 0.45, 0.11, yardZ + 0.05 + i * 0.22);
+        g.add(band);
+      }
+      break;
     case "batteryFactory":
       for (let i = 0; i < 3; i++) {
         g.add(box(T, std(T, "#d9f99d", 0.3, 0.5), W - 0.75 + i * 0.22, 0.012, yardZ, 0.18, 0.14, 0.3));

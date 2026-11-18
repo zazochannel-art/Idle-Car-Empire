@@ -34,6 +34,7 @@ export const RACE_CLASS_OF: Record<CarId, RaceClass> = {
   hypercar: "S",
   electric: "S",
   autonomous: "S",
+  hydrogen: "S",
   pickup: "D",
   minivan: "D",
   offroad: "C",
@@ -63,6 +64,7 @@ export const BASE_WEIGHT: Record<CarId, number> = {
   hypercar: 1_320,
   electric: 1_900,
   autonomous: 2_050,
+  hydrogen: 1_980,
   pickup: 2_000,
   minivan: 1_900,
   offroad: 2_150,
@@ -90,6 +92,7 @@ export const BODY_DYNAMICS: Record<CarId, { handling: number; aero: number }> = 
   hypercar: { handling: 70, aero: 74 },
   electric: { handling: 62, aero: 66 },
   autonomous: { handling: 58, aero: 70 },
+  hydrogen: { handling: 60, aero: 72 },
   pickup: { handling: 32, aero: 20 },
   minivan: { handling: 36, aero: 30 },
   offroad: { handling: 40, aero: 24 },
@@ -456,6 +459,10 @@ export const SKINS: Record<string, { emoji: string; color: string; accent: strin
   legend: { emoji: "🏆", color: "#111827", accent: "#facc15" },
   // the premium track of the season pass
   goldrush: { emoji: "👑", color: "#facc15", accent: "#78350f" },
+  // the shop's Style section (engine/cosmetics.ts)
+  midnight: { emoji: "🌙", color: "#0f172a", accent: "#818cf8" },
+  candy: { emoji: "🍬", color: "#f472b6", accent: "#fef08a" },
+  tiger: { emoji: "🐯", color: "#f97316", accent: "#111827" },
 };
 
 /** "Build the fastest car in the world": the goal at the end of the ladder. */

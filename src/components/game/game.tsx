@@ -53,6 +53,7 @@ import { FirstCarOverlay } from "./first-car";
 import { Onboarding } from "./onboarding";
 import { UnlockCard } from "./unlock-card";
 import { RecallDialog } from "./recall-dialog";
+import { StaffDialog } from "./staff-dialog";
 import { CompanyNameDialog } from "./company-name";
 import { MenuUnlockWatcher, useFreshTiles, viewLocked } from "./menu-unlocks";
 import { menuOpen } from "@/game/engine/menu";
@@ -388,6 +389,7 @@ function Shell() {
       <Onboarding />
       <UnlockCard />
       <RecallDialog />
+      <StaffDialog />
       <CompanyNameDialog />
       <MenuUnlockWatcher />
       <PoachDialog />

@@ -51,6 +51,8 @@ export const RESEARCH: ResearchNode[] = [
   { id: "solid_state", category: "electric", name: "Solid-State Batteries", description: "+100% Electric Performance value", cost: 400_000, requires: ["electric_motors"], effects: [{ kind: "value", mult: 2, minTier: 9, maxTier: 9 }] },
   { id: "charging_network", category: "electric", name: "Charging Network", description: "Charging stations at your dealers: electric cars sell faster and drivers pay to charge", cost: 250_000, requires: ["electric_motors"], effects: [] },
   { id: "fast_charging", category: "electric", name: "Fast Charging", description: "Every charging station serves twice as many cars", cost: 1_500_000, requires: ["charging_network", "solid_state"], effects: [] },
+  { id: "fuel_cells", category: "electric", name: "Fuel Cells", description: "Unlocks the Hydrogen Works", cost: 900_000, requires: ["solid_state"], effects: [{ kind: "unlockPlant", plant: "hydrogenWorks" }] },
+  { id: "hydrogen_cars", category: "electric", name: "Hydrogen Cars", description: "Unlocks the Hydrogen Cruiser", cost: 2_200_000, requires: ["fuel_cells"], effects: [{ kind: "unlockCar", car: "hydrogen" }] },
 
   // 🤖 AI Manufacturing
   { id: "ai_factory", category: "ai", name: "AI Factory", description: "+50% offline income", cost: 1_200, requires: ["robotic_assembly"], effects: [{ kind: "offline", add: 0.5 }] },

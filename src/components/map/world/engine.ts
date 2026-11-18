@@ -272,7 +272,7 @@ export class MapEngine {
     // the junctions that are roundabouts: the scenery keeps off them, the roads draw them, the traffic drives round them
     const rings = roundabouts(WORLD_MAP, data.cladiri);
     const ringLots = [...rings.values()].map((r) => ({ x: r.x, y: r.z, w: 2 * r.outer + 0.3, d: 2 * r.outer + 0.3, rot: 0 }));
-    const festive = isFestive(WORLD_MAP.id, Date.now());
+    const festive = isFestive(WORLD_MAP.id, Date.now(), (this.live()?.state.cosmetics ?? []).includes("decorAllYear"));
     this.scenery = new Scenery(data, ground, this.mats, { low: this.low, festive, lots: [...WORLD_MAP.plots.map((p) => ({ x: p.x, y: p.y, w: p.w, d: p.d, rot: p.rot, clear: !!p.territory })), ...ringLots] });
     this.scene.add(this.scenery.root);
     if (festive) {
