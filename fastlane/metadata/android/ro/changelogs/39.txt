@@ -1,0 +1,3 @@
+Noutăți în 1.4.1:
+• Ploaia de pe hartă arată acum ca ploaia, nu ca un televizor fără semnal
+• Reparată o bandă neagră cu numele jocului sus pe ecran, pe unele telefoane

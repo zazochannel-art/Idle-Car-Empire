@@ -1,0 +1,3 @@
+Neu in 1.4.1:
+• Regen auf der Karte sieht jetzt wie Regen aus, nicht wie Rauschen
+• Schwarze Leiste mit dem Spielnamen oben auf manchen Handys behoben

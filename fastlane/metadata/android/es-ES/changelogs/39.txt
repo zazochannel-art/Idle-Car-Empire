@@ -1,0 +1,3 @@
+Novedades de 1.4.1:
+• La lluvia del mapa ahora parece lluvia, no interferencias
+• Corregida una barra negra con el nombre del juego arriba en algunos teléfonos
