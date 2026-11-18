@@ -1,0 +1,7 @@
+Novidades da 1.4.0:
+• Casa de leilões: troque carros de edição limitada com outros jogadores; cada um dá renda para sempre
+• Torneio semanal de alianças: as melhores ganham Estrelas toda segunda
+• Hidrogênio: células de combustível, a usina de hidrogênio e o Hydrogen Cruiser
+• Testes de colisão: estrelas de segurança que aumentam o preço dos modelos
+• Cartas de moral da equipe, compra de rivais e um cartão de Meio ambiente
+• Desafie um amigo para uma corrida com seu código

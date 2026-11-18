@@ -1,0 +1,7 @@
+Neu in 1.4.0:
+• Auktionshaus: tausche Sondereditionen mit anderen Spielern; jedes Auto in der Sammlergarage bringt Einnahmen
+• Wöchentliches Allianzturnier: die besten Allianzen gewinnen jeden Montag Sterne
+• Wasserstoff: Brennstoffzellen, das Wasserstoffwerk und der Hydrogen Cruiser
+• Crashtests: Sicherheitssterne heben den Preis deiner Modelle
+• Moral-Karten fürs Personal, Übernahmen von Rivalen und eine Umwelt-Karte
+• Fordere Freunde mit deinem Code zum Rennen heraus

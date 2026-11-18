@@ -1,0 +1,7 @@
+Novedades de 1.4.0:
+• Casa de subastas: intercambia coches de edición limitada con otros jugadores; cada uno da ingresos para siempre
+• Torneo semanal de alianzas: las mejores ganan Estrellas cada lunes
+• Hidrógeno: pilas de combustible, la planta de hidrógeno y el Hydrogen Cruiser
+• Pruebas de choque: estrellas de seguridad que suben el precio de tus modelos
+• Cartas de moral del personal, compra de rivales y una tarjeta de Medio ambiente
+• Reta a un amigo a una carrera con tu código
