@@ -9,9 +9,9 @@
 //     open puts the app in the background (what the app did with each Back, it logs:
 //     lib/native.ts; the emulator can take a minute to hand it a key, which isn't timed);
 //   - leaving the app saves the game (the save on the phone is fresh);
-//   - the game survives the app being killed, an app update (reinstall over it) and,
-//     with --reboot, the phone restarting: same company, same settings;
-//   - a rewarded ad (Google's test ads) loads, plays and, watched to the end, gives its reward.
+//   - the game survives the app being killed and an app update (reinstall over it);
+//   - a rewarded ad (Google's test ads) loads, plays and, watched to the end, gives its reward;
+//   - with --reboot, last, the phone restarting: same company, same settings.
 // Screenshots go to the output folder (default android-check/). Needs adb on the PATH
 // (Android SDK platform-tools) and Node 22+. Exits non-zero if a check fails.
 import { execFileSync } from "node:child_process";
@@ -34,6 +34,14 @@ fs.mkdirSync(outDir, { recursive: true });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const adb = (...a) => execFileSync("adb", a, { encoding: "utf8", maxBuffer: 64 << 20, stdio: ["ignore", "pipe", "pipe"] }).trim();
+/** adb that answers `fallback` instead of throwing (a device offline mid-restart), and never waits over 30 s. */
+const adbOr = (fallback, ...a) => {
+  try {
+    return execFileSync("adb", a, { encoding: "utf8", maxBuffer: 64 << 20, stdio: ["ignore", "pipe", "pipe"], timeout: 30_000 }).trim();
+  } catch {
+    return fallback;
+  }
+};
 const results = [];
 function check(ok, what, detail = "") {
   results.push({ ok, what, detail });
@@ -413,29 +421,10 @@ try {
   const updated = await evaluate(SAVED);
   check(updated?.createdAt === first.createdAt && updated?.lang === "ro", "after an app update: same company, same settings", JSON.stringify(updated));
 
-  // 8. the phone restarts
-  if (reboot) {
-    dumpLogcat("logcat-before-reboot", 80);
-    await sleep(6000);
-    adb("shell", "input", "keyevent", "KEYCODE_HOME");
-    await sleep(3000);
-    adb("reboot");
-    adb("wait-for-device");
-    const end = Date.now() + 300_000;
-    while (Date.now() < end && adb("shell", "getprop", "sys.boot_completed") !== "1") await sleep(3000);
-    await sleep(10_000);
-    await launch();
-    const rebooted = await evaluate(SAVED);
-    check(rebooted?.createdAt === first.createdAt && rebooted?.lang === "ro", "after the phone restarts: same company, same settings", JSON.stringify(rebooted));
-    const copiesNow = (await gamePages()).length;
-    check(copiesNow === 1, "after the phone restarts: one copy of the game", `${copiesNow} game page(s)`);
-    shot("4-after-reboot");
-  }
-
-  // 9. a rewarded ad (Google's test ads): the offer appears once one is loaded, the ad
+  // 8. a rewarded ad (Google's test ads): the offer appears once one is loaded, the ad
   // plays in its own screen, and once it has played to the end the reward is given
   const AD_OFFER = `!![...document.querySelectorAll("header button")].find((b) => b.textContent.includes("📺"))`;
-  // whatever the restart left open first (the offline report has an ad button of its own)
+  // whatever the update left open first (the offline report has an ad button of its own)
   for (let i = 0; i < 4 && (await evaluate(DIALOG_OPEN).catch(() => false)); i++) {
     await pressBack();
     await until(noDialog, 10_000);
@@ -466,6 +455,37 @@ try {
       shot("6-after-ad");
     }
   }
+  // 9. the phone restarts (last: an emulator that dies on the restart takes no other check with it)
+  if (reboot) {
+    dumpLogcat("logcat-before-reboot", 80);
+    await sleep(6000);
+    adb("shell", "input", "keyevent", "KEYCODE_HOME");
+    await sleep(3000);
+    adb("reboot");
+    // bounded: an emulator that dies on the restart (seen: "DisplaySurfaceGlContextHelper context
+    // was preempted") never comes back, and an unbounded wait-for-device held the job until its
+    // 45-minute limit, hiding every result
+    let back = true;
+    try {
+      execFileSync("adb", ["wait-for-device"], { stdio: "ignore", timeout: 300_000 });
+    } catch {
+      back = false;
+    }
+    const end = Date.now() + 300_000;
+    while (back && Date.now() < end && adbOr("", "shell", "getprop", "sys.boot_completed") !== "1") await sleep(3000);
+    back &&= adbOr("", "shell", "getprop", "sys.boot_completed") === "1";
+    check(back, "the phone restarts (the emulator comes back)", back ? "" : "the emulator didn't come back within 10 min: an emulator problem, not the game's");
+    if (back) {
+      await sleep(10_000);
+      await launch();
+      const rebooted = await evaluate(SAVED);
+      check(rebooted?.createdAt === first.createdAt && rebooted?.lang === "ro", "after the phone restarts: same company, same settings", JSON.stringify(rebooted));
+      const copiesNow = (await gamePages()).length;
+      check(copiesNow === 1, "after the phone restarts: one copy of the game", `${copiesNow} game page(s)`);
+      shot("4-after-reboot");
+    }
+  }
+
 } catch (e) {
   check(false, "the run finished", e.message);
   try {
