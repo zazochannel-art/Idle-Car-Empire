@@ -35,6 +35,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(PlayGamesPlugin.class);
         registerPlugin(SharePlugin.class);
         registerPlugin(InstallReferrerPlugin.class);
+        registerPlugin(AdLogPlugin.class);
         super.onCreate(savedInstanceState);
     }
 

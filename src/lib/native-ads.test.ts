@@ -17,9 +17,9 @@ vi.mock("@capacitor-community/admob", () => ({
   AdmobConsentStatus: { REQUIRED: "REQUIRED" },
   AdmobConsentDebugGeography: { OTHER: 4 },
   MaxAdContentRating: { Teen: "Teen" },
-  AppOpenAdPluginEvents: { Opened: "appOpenOpened", Closed: "appOpenClosed", FailedToShow: "appOpenFailedToShow" },
-  InterstitialAdPluginEvents: { Showed: "interstitialShowed", Dismissed: "interstitialDismissed", FailedToShow: "interstitialFailedToShow" },
-  RewardAdPluginEvents: { Showed: "showed", Rewarded: "rewarded", Dismissed: "dismissed", FailedToShow: "failedToShow" },
+  AppOpenAdPluginEvents: { Opened: "appOpenOpened", Closed: "appOpenClosed", FailedToShow: "appOpenFailedToShow", FailedToLoad: "appOpenFailedToLoad", AdImpression: "appOpenImpression" },
+  InterstitialAdPluginEvents: { Showed: "interstitialShowed", Dismissed: "interstitialDismissed", FailedToShow: "interstitialFailedToShow", FailedToLoad: "interstitialFailedToLoad", AdImpression: "interstitialImpression" },
+  RewardAdPluginEvents: { Showed: "showed", Rewarded: "rewarded", Dismissed: "dismissed", FailedToShow: "failedToShow", FailedToLoad: "failedToLoad", AdImpression: "impression" },
   AdMob: {
     requestConsentInfo: async (options?: unknown) => {
       consentRequests(options);
@@ -58,7 +58,9 @@ vi.mock("@capacitor-community/admob", () => ({
 }));
 
 const { startAds } = await import("./native-ads");
-const { watchAd, setAdStatus } = await import("./ads");
+const { watchAd, setAdStatus, setAdNeeds } = await import("./ads");
+// a company that may be shown every kind of ad (lib/ads.ts adNeeds)
+setAdNeeds({ rewarded: true, fullScreen: true });
 const emit = (event: string) => listeners.get(event)?.({ type: "coins", amount: 10 });
 
 beforeEach(async () => {

@@ -22,18 +22,18 @@ type T = (key: MessageKey, vars?: Vars) => string;
  * Plays an ad; `onReward` (the game giving the reward) runs only if the ad was watched to the end.
  * If the game then has nothing to give (the report was collected, the limit reached), it says so.
  */
-export async function playAd(onReward: () => boolean | void, t: T) {
+export async function playAd(onReward: () => boolean | void, t: T, place?: string) {
   let refused = false;
   const r = await watchAd(() => {
     refused = onReward() === false;
-  });
+  }, place);
   if (r === "rewarded" && refused) uiEvents.emit({ type: "toast", tone: "info", icon: "📺", title: t("ad.refused"), body: t("ad.refusedBody") });
   else if (r === "closed") uiEvents.emit({ type: "toast", tone: "info", icon: "📺", title: t("ad.closed"), body: t("ad.closedBody") });
   else if (r === "failed") uiEvents.emit({ type: "toast", tone: "warn", icon: "📺", title: t("ad.failed"), body: t("ad.failedBody") });
 }
 
 /** Plays an ad for `reward`. */
-const watch = (reward: AdReward, t: T, plot?: string) => playAd(() => useGame.getState().adReward(reward, plot), t);
+const watch = (reward: AdReward, t: T, plot?: string) => playAd(() => useGame.getState().adReward(reward, plot), t, reward);
 
 /** An ad is loaded and not on screen (or ad-free rewards), and what would stop the game giving this reward now. */
 function useAdOffer(reward: AdReward, plot?: string) {

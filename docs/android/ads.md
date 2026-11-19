@@ -83,6 +83,36 @@ event is ignored. The offers show only when an ad is loaded, so a phone that is
 offline, or a player who hasn't given consent where it is needed, simply sees
 no offer.
 
+## Which ads are requested, and the ad log
+
+An ad is requested only when the game could show it (`src/lib/ads.ts` `adNeeds`); a request that can't
+become an impression only lowers the show rate AdMob reports (impressions ÷ matched requests):
+
+- **Rewarded**: kept loaded for every company without ad-free rewards.
+- **Full-screen (interstitial, App Open)**: only once the company has built its first car and played
+  55 minutes (5 minutes before they may show at the hour).
+- **Ad-free rewards** bought: nothing is requested at all.
+- **In the background**: nothing is requested; coming back loads what is missing. After a failed request
+  (no fill, no network) the next try waits longer each time, and no other check goes round that wait.
+
+Every step of every ad is written to logcat under one tag, in every build (the native `AdLog` plugin):
+in Android Studio, Logcat, filter `tag:IDLE_CAR_ADMOB`. A line looks like
+
+```
+AD_FAILED_TO_LOAD format=interstitial unit=…8255 code=3 message="No fill." t=2026-11-19T08:00:00.000Z
+```
+
+Events: `AD_REQUEST_STARTED`, `AD_LOADED`, `AD_FAILED_TO_LOAD` (the SDK's code: 3 no fill, 2 network,
+0 internal, 1 invalid request), `AD_REQUEST_SKIPPED` (in the background), `AD_SHOW_REQUESTED`,
+`AD_SHOWED`, `AD_IMPRESSION_RECORDED` (the SDK's paid event, which comes with the impression),
+`AD_REWARDED`, `AD_FAILED_TO_SHOW`, `AD_DISMISSED`, `AD_EXPIRED` (a loaded ad dropped before Google's
+1-hour limit, to load a fresh one). `place` says where: the reward offered (`offline`, `login`, `build`,
+`boost`, `qc`, `shop:…`), `map-break` for a full-screen ad, `open` or `resume` for App Open. Only a
+unit's last 4 digits are written.
+
+Playing the store build on your own phone makes real requests: add the phone under AdMob → Settings →
+Test devices (its id is in logcat, tag `Ads`, "Use RequestConfiguration.Builder().setTestDeviceIds").
+
 ## How it is built
 
 - **Plugin:** [`@capacitor-community/admob`](https://github.com/capacitor-community/admob)

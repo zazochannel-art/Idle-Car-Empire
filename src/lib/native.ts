@@ -2,7 +2,7 @@
 // components/game/native-app.tsx): the system Back button (Android), and the
 // app going to the background and coming back.
 import { App } from "@capacitor/app";
-import { maybeShowAppOpen, setAdFree } from "./ads";
+import { adNeeds, maybeShowAppOpen, setAdFree, setAdNeeds } from "./ads";
 import { reportError } from "./errors";
 import { iapConfigured } from "./iap";
 import { cancelAway, scheduleAway } from "./notify";
@@ -88,6 +88,15 @@ export async function startNative() {
   const adFree = () => setAdFree(useGame.getState().ready && useGame.getState().state.iap.owned.includes("adFree"));
   useGame.subscribe(adFree);
   adFree();
+  // which ads may be requested at all (lib/ads.ts adNeeds): none until the game is loaded, none with
+  // ad-free rewards, the full-screen ones only once the company nears the age they may show at
+  const needs = () => {
+    const g = useGame.getState();
+    if (!g.ready) return;
+    setAdNeeds(adNeeds(g.state.iap.owned.includes("adFree"), g.state.lifetime.playTime, g.state.chain.firstCar));
+  };
+  useGame.subscribe(needs);
+  needs();
   // rewarded ads, always the player's choice: the consent first, then an ad kept ready
   void import("./native-ads").then((m) => m.startAds()).catch((e) => reportError(e, "rejection"));
   // as the game opens: an App Open ad if one is ready within a few seconds (never in a young company)

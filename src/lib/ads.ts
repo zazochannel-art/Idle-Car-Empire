@@ -23,14 +23,14 @@ export interface AdStatus {
 
 /** What the Android app's ad code does for the game. */
 export interface AdDriver {
-  /** Shows the loaded ad; `onReward` runs (at most once) when the ad network says it was watched. */
-  show(onReward: () => void): Promise<AdResult>;
+  /** Shows the loaded ad; `onReward` runs (at most once) when the ad network says it was watched. `place`: the offer (for the ad log). */
+  show(onReward: () => void, place?: string): Promise<AdResult>;
   /** Google's form to change the ad consent. */
   privacyForm(): Promise<void>;
   /** Shows the loaded full-screen ad (true: it was shown and closed). */
   showInterstitial(): Promise<boolean>;
-  /** Shows the loaded App Open ad (true: it was shown and closed). */
-  showAppOpen(): Promise<boolean>;
+  /** Shows the loaded App Open ad (true: it was shown and closed). `place`: "open" or "resume" (for the ad log). */
+  showAppOpen(place?: string): Promise<boolean>;
 }
 
 /** Rewarded (the reward was given), closed early (none), or the ad couldn't be shown. */
@@ -47,6 +47,45 @@ export function setAdStatus(patch: Partial<AdStatus>) {
 
 export function registerAdDriver(d: AdDriver) {
   driver = d;
+}
+
+// ───────────────────────────── which ads to load ─────────────────────────────
+//
+// An ad is requested only when the game could show it (lib/native-ads.ts asks here before each
+// request): every request that can't become an impression lowers the show rate AdMob reports.
+
+export interface AdNeeds {
+  /** Rewarded ads: offered to every company without ad-free rewards. */
+  rewarded: boolean;
+  /** Full-screen ads (interstitial, App Open): only once the company is near the age they may show at. */
+  fullScreen: boolean;
+}
+
+/** Full-screen ads start loading this many seconds of play before they may show (INTERSTITIAL.minPlayTime). */
+export const FULL_SCREEN_PRELOAD_SECONDS = 5 * 60;
+
+/** Which ads the company being played could be shown. */
+export function adNeeds(adFree: boolean, playTime: number, firstCar: boolean): AdNeeds {
+  if (adFree) return { rewarded: false, fullScreen: false };
+  return { rewarded: true, fullScreen: firstCar && playTime >= INTERSTITIAL.minPlayTime - FULL_SCREEN_PRELOAD_SECONDS };
+}
+
+/** Nothing until the game says what it plays (lib/native.ts). */
+let needs: AdNeeds = { rewarded: false, fullScreen: false };
+const needsListeners = new Set<() => void>();
+
+export const getAdNeeds = () => needs;
+
+export function setAdNeeds(n: AdNeeds) {
+  if (n.rewarded === needs.rewarded && n.fullScreen === needs.fullScreen) return;
+  needs = n;
+  for (const l of needsListeners) l();
+}
+
+/** Called when what may be loaded changes (returns the unsubscribe). */
+export function onAdNeeds(l: () => void): () => void {
+  needsListeners.add(l);
+  return () => needsListeners.delete(l);
 }
 
 /** Ad-free rewards on or off (the purchase owned by the company being played). */
@@ -73,7 +112,7 @@ export function useAdStatus(): AdStatus {
 }
 
 /** Shows an ad; `onReward` runs once if it was watched to the end (at once, with ad-free rewards). */
-export async function watchAd(onReward: () => void): Promise<AdResult> {
+export async function watchAd(onReward: () => void, place?: string): Promise<AdResult> {
   if (status.adFree) {
     onReward();
     return "rewarded";
@@ -92,7 +131,7 @@ export async function watchAd(onReward: () => void): Promise<AdResult> {
       if (rewarded) return;
       rewarded = true;
       onReward();
-    })
+    }, place)
     .catch((): AdResult => "failed");
   if (result === "failed" && !rewarded) {
     lastAdAt = before;
@@ -238,7 +277,7 @@ export async function maybeShowAppOpen(playTime: number, firstCar: boolean, away
   const storedBefore = readLast();
   lastAdAt = now;
   writeLast(now);
-  const shown = await driver.showAppOpen().catch(() => false);
+  const shown = await driver.showAppOpen(awayMs === null ? "open" : "resume").catch(() => false);
   if (shown) lastAdAt = Date.now();
   else {
     lastAdAt = before;
