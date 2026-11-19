@@ -33,7 +33,10 @@ const PORT = 9333;
 fs.mkdirSync(outDir, { recursive: true });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const adb = (...a) => execFileSync("adb", a, { encoding: "utf8", maxBuffer: 64 << 20, stdio: ["ignore", "pipe", "pipe"] }).trim();
+// every adb call is bounded (an install takes a minute at most): an emulator that dies mid-run makes
+// a call throw, and the run ends with what it found, instead of holding the job to its time limit
+const ADB_TIMEOUT = 180_000;
+const adb = (...a) => execFileSync("adb", a, { encoding: "utf8", maxBuffer: 64 << 20, stdio: ["ignore", "pipe", "pipe"], timeout: ADB_TIMEOUT }).trim();
 /** adb that answers `fallback` instead of throwing (a device offline mid-restart), and never waits over 30 s. */
 const adbOr = (fallback, ...a) => {
   try {
@@ -247,7 +250,7 @@ function adLoads() {
     return e.message;
   }
 }
-const shot = (name) => fs.writeFileSync(path.join(outDir, `${name}.png`), execFileSync("adb", ["exec-out", "screencap", "-p"], { maxBuffer: 64 << 20 }));
+const shot = (name) => fs.writeFileSync(path.join(outDir, `${name}.png`), execFileSync("adb", ["exec-out", "screencap", "-p"], { maxBuffer: 64 << 20, timeout: 60_000 }));
 
 /** Waits until the page answers quickly again (the map's first frames are heavy without a GPU). */
 async function settle() {
@@ -461,7 +464,8 @@ try {
     await sleep(6000);
     adb("shell", "input", "keyevent", "KEYCODE_HOME");
     await sleep(3000);
-    adb("reboot");
+    // the restart command itself can hang on an emulator that is going down
+    adbOr("", "reboot");
     // bounded: an emulator that dies on the restart (seen: "DisplaySurfaceGlContextHelper context
     // was preempted") never comes back, and an unbounded wait-for-device held the job until its
     // 45-minute limit, hiding every result
