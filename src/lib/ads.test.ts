@@ -205,3 +205,15 @@ describe("the pause after a rewarded ad", () => {
     expect(await watchAd(() => {})).toBe("failed");
   });
 });
+
+describe("which ads to load", () => {
+  it("rewarded for every company without ad-free; full-screen only near the age they may show at", async () => {
+    const { adNeeds, INTERSTITIAL, FULL_SCREEN_PRELOAD_SECONDS } = await import("./ads");
+    expect(adNeeds(false, 0, false)).toEqual({ rewarded: true, fullScreen: false });
+    // the hour of play but no first car: never shown, so never loaded
+    expect(adNeeds(false, 2 * 3600, false)).toEqual({ rewarded: true, fullScreen: false });
+    expect(adNeeds(false, INTERSTITIAL.minPlayTime - FULL_SCREEN_PRELOAD_SECONDS - 1, true).fullScreen).toBe(false);
+    expect(adNeeds(false, INTERSTITIAL.minPlayTime - FULL_SCREEN_PRELOAD_SECONDS, true).fullScreen).toBe(true);
+    expect(adNeeds(true, 10 * 3600, true)).toEqual({ rewarded: false, fullScreen: false });
+  });
+});

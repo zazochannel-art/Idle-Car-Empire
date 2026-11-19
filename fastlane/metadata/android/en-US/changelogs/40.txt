@@ -1,0 +1,3 @@
+What's new in 1.4.2:
+• Ads load only when the game can show them: less data and battery
+• Fixes and stability

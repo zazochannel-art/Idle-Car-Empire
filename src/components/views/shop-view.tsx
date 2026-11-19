@@ -276,7 +276,7 @@ function ShopCard({ item }: { item: ShopItem }) {
   const tone = TONES[item.tone];
 
   const buy = () => {
-    if (item.price === "ad") void playAd(() => useGame.getState().shopBuy(item.id), t);
+    if (item.price === "ad") void playAd(() => useGame.getState().shopBuy(item.id), t, `shop:${item.id}`);
     else shopBuy(item.id);
   };
 

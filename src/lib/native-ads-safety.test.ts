@@ -21,9 +21,9 @@ vi.mock("@capacitor-community/admob", () => ({
   AdmobConsentStatus: { REQUIRED: "REQUIRED" },
   AdmobConsentDebugGeography: { OTHER: 4 },
   MaxAdContentRating: { Teen: "Teen" },
-  AppOpenAdPluginEvents: { Opened: "appOpenOpened", Closed: "appOpenClosed", FailedToShow: "appOpenFailedToShow" },
-  InterstitialAdPluginEvents: { Showed: "interstitialShowed", Dismissed: "interstitialDismissed", FailedToShow: "interstitialFailedToShow" },
-  RewardAdPluginEvents: { Showed: "showed", Rewarded: "rewarded", Dismissed: "dismissed", FailedToShow: "failedToShow" },
+  AppOpenAdPluginEvents: { Opened: "appOpenOpened", Closed: "appOpenClosed", FailedToShow: "appOpenFailedToShow", FailedToLoad: "appOpenFailedToLoad", AdImpression: "appOpenImpression" },
+  InterstitialAdPluginEvents: { Showed: "interstitialShowed", Dismissed: "interstitialDismissed", FailedToShow: "interstitialFailedToShow", FailedToLoad: "interstitialFailedToLoad", AdImpression: "interstitialImpression" },
+  RewardAdPluginEvents: { Showed: "showed", Rewarded: "rewarded", Dismissed: "dismissed", FailedToShow: "failedToShow", FailedToLoad: "failedToLoad", AdImpression: "impression" },
   AdMob: {
     requestConsentInfo: async () => {
       if (h.consentError) throw new Error("offline");
@@ -88,6 +88,8 @@ beforeEach(async () => {
   vi.resetModules();
   native = await import("./native-ads");
   ads = await import("./ads");
+  // a company that may be shown every kind of ad (lib/ads.ts adNeeds)
+  ads.setAdNeeds({ rewarded: true, fullScreen: true });
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -152,8 +154,9 @@ describe("a start that fails", () => {
     await minutes(2);
     await seconds(0);
     expect(ads.getAdStatus().ready).toBe(true);
-    // ten ad events, added once: a second set would report every close twice
-    expect(h.adds).toBe(10);
+    // sixteen ad events (the shows and closes, plus each kind's load failure and impression for the
+    // ad log), added once: a second set would report every close twice
+    expect(h.adds).toBe(16);
   });
 
   it("the consent not checkable: one wait for the network, however many times it fails", async () => {
@@ -279,5 +282,54 @@ describe("the SDK's 'failed to show' that comes before the ad appears", () => {
     await seconds(0);
     expect(h.rewardPrepares).toBe(3);
     expect(ads.getAdStatus().ready).toBe(true);
+  });
+});
+
+describe("what is requested (only ads the game could show)", () => {
+  const loads = () => ({ rewarded: h.rewardPrepares, interstitial: h.interstitialPrepares, appOpen: h.appOpenLoads });
+
+  it("a young company: only the rewarded ad; the full-screen ones once it nears the hour", async () => {
+    ads.setAdNeeds(ads.adNeeds(false, 10 * 60, false));
+    await native.startAds();
+    await seconds(0);
+    expect(loads()).toEqual({ rewarded: 1, interstitial: 0, appOpen: 0 });
+    // 40 minutes of the minute's checks: still nothing more (the rewarded ad loaded is kept until it nears expiry)
+    await minutes(40);
+    expect(loads()).toEqual({ rewarded: 1, interstitial: 0, appOpen: 0 });
+    // its first car built and 55 minutes played: the full-screen ads load, once
+    ads.setAdNeeds(ads.adNeeds(false, ads.INTERSTITIAL.minPlayTime - ads.FULL_SCREEN_PRELOAD_SECONDS, true));
+    await seconds(0);
+    expect(loads()).toEqual({ rewarded: 1, interstitial: 1, appOpen: 1 });
+    await minutes(5);
+    expect(loads()).toEqual({ rewarded: 1, interstitial: 1, appOpen: 1 });
+  });
+
+  it("ad-free rewards: nothing is ever requested", async () => {
+    ads.setAdNeeds(ads.adNeeds(true, 10 * 3600, true));
+    await native.startAds();
+    await minutes(120);
+    expect(loads()).toEqual({ rewarded: 0, interstitial: 0, appOpen: 0 });
+  });
+
+  it("no fill: the minute's check doesn't go round the wait before the next try", async () => {
+    h.prepareFails = true;
+    await native.startAds();
+    await seconds(0);
+    // tries at 0, 30 s, 1 min 30, 3 min 30 and 7 min 30 (each wait twice the one before)
+    await minutes(10);
+    expect(h.rewardPrepares).toBe(5);
+  });
+
+  it("in the background nothing is requested; back on screen, what is missing loads", async () => {
+    let onVisible: (() => void) | undefined;
+    const doc = { visibilityState: "hidden", addEventListener: (_: string, fn: () => void) => (onVisible = fn) };
+    vi.stubGlobal("document", doc);
+    await native.startAds();
+    await minutes(10);
+    expect(loads()).toEqual({ rewarded: 0, interstitial: 0, appOpen: 0 });
+    doc.visibilityState = "visible";
+    onVisible?.();
+    await seconds(0);
+    expect(loads()).toEqual({ rewarded: 1, interstitial: 1, appOpen: 1 });
   });
 });

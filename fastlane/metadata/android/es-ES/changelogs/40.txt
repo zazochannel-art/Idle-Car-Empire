@@ -1,0 +1,3 @@
+Novedades de 1.4.2:
+• Los anuncios se cargan solo cuando el juego puede mostrarlos: menos datos y batería
+• Correcciones y estabilidad

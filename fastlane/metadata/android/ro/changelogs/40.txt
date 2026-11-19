@@ -1,0 +1,3 @@
+Noutăți în 1.4.2:
+• Reclamele se încarcă doar când jocul le poate arăta: mai puține date și baterie
+• Reparații și stabilitate

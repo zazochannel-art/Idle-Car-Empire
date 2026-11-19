@@ -1,0 +1,3 @@
+Neu in 1.4.2:
+• Werbung lädt nur, wenn das Spiel sie zeigen kann: weniger Daten und Akku
+• Fehlerbehebungen und Stabilität
