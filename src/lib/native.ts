@@ -2,7 +2,7 @@
 // components/game/native-app.tsx): the system Back button (Android), and the
 // app going to the background and coming back.
 import { App } from "@capacitor/app";
-import { adNeeds, maybeShowAppOpen, setAdFree, setAdNeeds } from "./ads";
+import { adNeeds, appPaused, appResumed, maybeShowAppOpen, setAdFree, setAdNeeds } from "./ads";
 import { reportError } from "./errors";
 import { iapConfigured } from "./iap";
 import { cancelAway, scheduleAway } from "./notify";
@@ -87,9 +87,10 @@ export async function startNative() {
   // game uses no battery. Coming back settles the time away like any absence.
   // With notifications on, the phone is told when something will be waiting (a building
   // finished, the offline limit reached); back in the game, those are taken back.
-  let pausedAt = 0;
+  // (the time away, for the App Open ad as the game comes back: lib/ads.ts appPaused; the game going
+  // under one of its own full-screen ads is no time away)
   await App.addListener("pause", () => {
-    pausedAt = Date.now();
+    appPaused();
     const g = useGame.getState();
     g.suspend();
     // the save suspend() just wrote, copied to the app's storage too (lib/save-mirror.ts)
@@ -100,7 +101,8 @@ export async function startNative() {
     void cancelAway();
     useGame.getState().resume();
     // back after a while: an App Open ad, if the rules in lib/ads.ts allow (the report of the time away waits under it)
-    if (pausedAt) void maybeShowAppOpen(useGame.getState().state.lifetime.playTime, useGame.getState().state.chain.firstCar, Date.now() - pausedAt, appOpenBusy).catch(() => {});
+    const away = appResumed();
+    if (away !== null) void maybeShowAppOpen(useGame.getState().state.lifetime.playTime, useGame.getState().state.chain.firstCar, away, appOpenBusy).catch(() => {});
   });
   void cancelAway();
   // ad-free rewards, for the company that bought them (also on a phone or a build that sells nothing).
