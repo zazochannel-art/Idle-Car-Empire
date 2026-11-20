@@ -4,14 +4,17 @@
 // none of these show). Each says what the ad gives before it plays; the reward
 // comes only when the ad network reports the ad watched to the end. With the
 // ad-free rewards purchase, each offer gives its reward at once (🎟️ instead of 📺).
-import { useState } from "react";
+// The one-time offers (the offline report, the daily login) say "loading" while the
+// app is still getting their ad, so a player opening the game sees them coming.
+import { useEffect, useState } from "react";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { ADS, type AdReward } from "@/game/config/ads";
-import { adBlock, buildWait } from "@/game/engine/ads";
+import { adOfferBlock, buildWait } from "@/game/engine/ads";
 import { formatDuration, formatMoney } from "@/game/format";
 import type { MessageKey, Vars } from "@/i18n";
 import { useT } from "@/i18n/use-t";
+import { adLog } from "@/lib/ad-log";
 import { canWatch, showAdPrivacyForm, useAdStatus, watchAd } from "@/lib/ads";
 import { uiEvents } from "@/store/events";
 import { useGame } from "@/store/game-store";
@@ -35,18 +38,46 @@ export async function playAd(onReward: () => boolean | void, t: T, place?: strin
 /** Plays an ad for `reward`. */
 const watch = (reward: AdReward, t: T, plot?: string) => playAd(() => useGame.getState().adReward(reward, plot), t, reward);
 
-/** An ad is loaded and not on screen (or ad-free rewards), and what would stop the game giving this reward now. */
+/**
+ * An ad is loaded and not on screen (or ad-free rewards), one is on its way (`loading`), and what
+ * would stop the game offering this reward now (adOfferBlock).
+ */
 function useAdOffer(reward: AdReward, plot?: string) {
   const status = useAdStatus();
-  const block = useGame((g) => adBlock(g.state, reward, g.state.lastActiveAt, plot));
-  return { ready: canWatch(status), free: status.adFree, block };
+  const block = useGame((g) => adOfferBlock(g.state, reward, g.state.lastActiveAt, plot));
+  const ready = canWatch(status);
+  return { ready, free: status.adFree, block, loading: !ready && status.loading && !status.showing };
+}
+
+/**
+ * The ad log's word on a one-time offer (the offline report, the daily login): once when it is on
+ * screen with its ad ready, once when it is still waiting for it. How often a report never got its
+ * offer shows in the log (AD_OFFER_LOADING without AD_OFFER_VISIBLE).
+ */
+function useOfferLog(place: AdReward, state: "visible" | "loading" | null) {
+  useEffect(() => {
+    if (state) adLog(state === "visible" ? "AD_OFFER_VISIBLE" : "AD_OFFER_LOADING", "rewarded", { place });
+  }, [place, state]);
+}
+
+/** A one-time offer whose ad is still loading: there, not yet tappable. */
+function LoadingAdButton({ size, className }: { size?: ButtonProps["size"]; className: string }) {
+  const { t } = useT();
+  return (
+    <Button variant="locked" size={size} disabled className={className}>
+      {t("ad.loading")}
+    </Button>
+  );
 }
 
 /** Offline report: collect twice the money for an ad. */
 export function OfflineAdButton({ amount }: { amount: number }) {
   const { t } = useT();
-  const { ready, free, block } = useAdOffer("offline");
-  if (!ready || block) return null;
+  const { ready, free, block, loading } = useAdOffer("offline");
+  const show = block ? null : ready ? "visible" : loading ? "loading" : null;
+  useOfferLog("offline", free ? null : show);
+  if (show === "loading") return <LoadingAdButton size="lg" className="mt-2 w-full text-base" />;
+  if (show !== "visible") return null;
   return (
     <Button variant="go" size="lg" className="mt-2 w-full text-base" onClick={() => void watch("offline", t)}>
       {free ? "🎟️" : "📺"} {t(free ? "ad.offlineFree" : "ad.offline", { amount: formatMoney(amount * ADS.offlineMult) })}
@@ -57,8 +88,11 @@ export function OfflineAdButton({ amount }: { amount: number }) {
 /** Daily login reward: take twice the money for an ad (not on a Star day), next to the plain claim. */
 export function LoginAdButton({ amount }: { amount: number }) {
   const { t } = useT();
-  const { ready, free, block } = useAdOffer("login");
-  if (!ready || block) return null;
+  const { ready, free, block, loading } = useAdOffer("login");
+  const show = block ? null : ready ? "visible" : loading ? "loading" : null;
+  useOfferLog("login", free ? null : show);
+  if (show === "loading") return <LoadingAdButton size="lg" className="mt-2 w-full" />;
+  if (show !== "visible") return null;
   return (
     <Button variant="go" size="lg" className="mt-2 w-full" onClick={() => void watch("login", t)}>
       {free ? "🎟️" : "📺"} {t(free ? "ad.loginFree" : "ad.login", { amount: formatMoney(amount * ADS.loginMult) })}

@@ -288,6 +288,7 @@ export const pt: Record<MessageKey, string> = {
   "ad.closedBody": "A recompensa vem quando o anúncio é visto até o final.",
   "ad.failed": "Não foi possível mostrar o anúncio",
   "ad.failedBody": "Tente de novo daqui a pouco.",
+  "ad.loading": "📺 Carregando o anúncio…",
   "ad.refused": "Nada para coletar",
   "ad.refusedBody": "A recompensa já foi coletada ou não está mais disponível.",
   "ad.limit": "Esses são todos os anúncios de hoje: amanhã tem mais.",

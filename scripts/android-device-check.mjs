@@ -11,6 +11,9 @@
 //   - leaving the app saves the game (the save on the phone is fresh);
 //   - the game survives the app being killed and an app update (reinstall over it);
 //   - a rewarded ad (Google's test ads) loads, plays and, watched to the end, gives its reward;
+//   - with a company past its first hour (e2e/fixtures/save-3h.json), the full-screen ads (test ads
+//     too): an interstitial at a map break (a screen closed) and an App Open ad on coming back to the
+//     game, each in its own screen and closed back to the game; then the company played before;
 //   - with --reboot, last, the phone restarting: same company, same settings.
 // Screenshots go to the output folder (default android-check/). Needs adb on the PATH
 // (Android SDK platform-tools) and Node 22+. Exits non-zero if a check fails.
@@ -33,6 +36,8 @@ const PORT = 9333;
 fs.mkdirSync(outDir, { recursive: true });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+/** A company with 3 hours of play and its first car (the e2e checks' save), as the game stores it on the phone. */
+const readFileSync3h = () => fs.readFileSync(new URL("../e2e/fixtures/save-3h.json", import.meta.url), "utf8");
 // every adb call is bounded (an install takes a minute at most): an emulator that dies mid-run makes
 // a call throw, and the run ends with what it found, instead of holding the job to its time limit
 const ADB_TIMEOUT = 180_000;
@@ -240,6 +245,17 @@ function lifecycle() {
     console.log("lifecycle:", e.message);
   }
 }
+/**
+ * The game's ad log since `since` (tag IDLE_CAR_ADMOB, lib/ad-log.ts): one line per step of each ad. Every
+ * line read is kept, so one logcat's buffer has since dropped (minutes of the WebView's logging) still counts.
+ */
+const adLines = new Set();
+const admobSince = (since) => {
+  for (const l of adbOr("", "logcat", "-d", "-v", "time", "-s", "IDLE_CAR_ADMOB").split("\n")) if (l.includes("IDLE_CAR_ADMOB")) adLines.add(l.trimEnd());
+  return [...adLines].filter((l) => l.slice(0, 14) >= since).sort();
+};
+const logged = (since, re) => admobSince(since).some((l) => re.test(l));
+
 /** How the ad SDK's loads went, from logcat (loaded / failed to load). */
 function adLoads() {
   try {
@@ -458,6 +474,90 @@ try {
       shot("6-after-ad");
     }
   }
+  // 8b. the full-screen ads (Google's test ads), which show only in a company past its first hour with
+  // its first car: the 3-hour save of the e2e checks is put in, and the company played so far comes back
+  // after. A test build takes quicker limits for them (lib/ads.ts quickenAdsForTest): no 8-minute pause
+  // after the rewarded ad above, every break (not one in two), and back after 20 s away (not 10 min).
+  const onAdScreen = () => focus().some((l) => /AdActivity/.test(l));
+  const closeAdScreen = async () => {
+    // a test ad can be closed after a few seconds: Back, again until the game is back in front
+    await sleep(8000);
+    for (let i = 0; i < 10 && onAdScreen(); i++) {
+      await stopOthersNotResponding();
+      adb("shell", "input", "keyevent", "KEYCODE_BACK");
+      await sleep(4000);
+    }
+    return !onAdScreen();
+  };
+  const closeDialogs = async () => {
+    for (let i = 0; i < 8 && (await evaluate(DIALOG_OPEN).catch(() => false)); i++) {
+      await pressBack();
+      await until(noDialog, 10_000);
+    }
+  };
+  /** Puts `save` (the stored copy's JSON) in the game's place while the app is in the background (it saves nothing there), then starts it again. */
+  const replaceSave = async (save, timing) => {
+    adb("shell", "input", "keyevent", "KEYCODE_HOME");
+    await until(() => evaluate(`document.visibilityState === "hidden"`).catch(() => false), 30_000);
+    await sleep(3000);
+    // (the company-name card, asked once per phone, would wait over the map without a dialog role: Back
+    // can't close it and it holds the full-screen ads back, so this phone counts as asked)
+    await evaluate(
+      `localStorage.setItem(${JSON.stringify(SAVE)}, ${JSON.stringify(save)}); localStorage.setItem("idle-car-empire:company-name-asked", "1"); ${timing ? `localStorage.setItem("ice.adTestTiming", ${JSON.stringify(JSON.stringify(timing))})` : `localStorage.removeItem("ice.adTestTiming")`}; true`,
+    );
+    // the WebView writes storage to disk a few seconds after a change
+    await sleep(6000);
+    adb("shell", "am", "force-stop", PKG);
+    await sleep(1000);
+    await launch();
+  };
+  const PLAYED = `(() => { const r = localStorage.getItem(${JSON.stringify(SAVE)}); return r ? Math.round(JSON.parse(r).state.lifetime.playTime) : 0; })()`;
+  const before3h = await evaluate(`localStorage.getItem(${JSON.stringify(SAVE)})`);
+  const since3h = deviceTime();
+  await replaceSave(readFileSync3h(), { minOpenMs: 0, gapMs: 0, chance: 1, minAwayMs: 20_000 });
+  const played = await evaluate(PLAYED);
+  check(played >= 3600, "a company past its first hour is in (the full-screen ads' age)", `${Math.round(played / 60)} min of play`);
+  // both full-screen ads load once the company is that old (on the emulator test ads can take minutes)
+  const fullLoaded = await until(() => logged(since3h, /AD_LOADED format=interstitial/) && logged(since3h, /AD_LOADED format=appOpen/), 360_000);
+  check(fullLoaded, "the full-screen test ads load (interstitial and App Open)", fullLoaded ? "" : admobSince(since3h).slice(-8).join(" | "));
+  if (fullLoaded) {
+    // a map break: a screen opened from the dock, then closed (the offline report and the like closed
+    // first; the game shows its dialogs one after another, so twice, a moment apart)
+    await closeDialogs();
+    await sleep(6000);
+    await closeDialogs();
+    await evaluate(`(${DOCK_MENU}).click()`);
+    await sleep(2000);
+    await evaluate(`(${DOCK_MENU}).click()`);
+    const interstitial = await until(onAdScreen, 30_000);
+    check(interstitial, "an interstitial shows at a map break, in its own screen", interstitial ? "" : `${focus().join(" · ")} | ${admobSince(since3h).slice(-4).join(" | ")}`);
+    if (interstitial) {
+      shot("7-interstitial");
+      const back = await closeAdScreen();
+      const dismissed = await until(() => logged(since3h, /AD_DISMISSED format=interstitial/), 20_000);
+      check(back && dismissed && inFront(), "the interstitial closes and the game is back", `${focus().join(" · ")}`);
+    }
+    // away for a while, then back: an App Open ad as the game returns
+    await sleep(3000);
+    const loadedAgain = await until(() => logged(since3h, /AD_LOADED format=appOpen/), 5_000);
+    adb("shell", "input", "keyevent", "KEYCODE_HOME");
+    await sleep(25_000);
+    adb("shell", "am", "start", "-W", "-n", `${PKG}/${ACTIVITY}`);
+    const appOpen = loadedAgain && (await until(onAdScreen, 30_000));
+    check(appOpen, "an App Open ad shows when the player comes back to the game", appOpen ? "" : `${focus().join(" · ")} | ${admobSince(since3h).slice(-4).join(" | ")}`);
+    if (appOpen) {
+      shot("8-app-open");
+      const back = await closeAdScreen();
+      const dismissed = await until(() => logged(since3h, /AD_DISMISSED format=appOpen/), 20_000);
+      check(back && dismissed && inFront(), "the App Open ad closes and the game is back", `${focus().join(" · ")}`);
+    }
+  }
+  console.log(`      ad log since the 3-hour save:\n        ${admobSince(since3h).slice(-30).join("\n        ")}`);
+  // the company played before comes back (the restart below checks it), with the usual limits
+  await replaceSave(before3h, null);
+  const restored = await evaluate(SAVED);
+  check(restored?.createdAt === first.createdAt, "after the full-screen ads: the company played before is back", JSON.stringify(restored));
+
   // 9. the phone restarts (last: an emulator that dies on the restart takes no other check with it)
   if (reboot) {
     dumpLogcat("logcat-before-reboot", 80);

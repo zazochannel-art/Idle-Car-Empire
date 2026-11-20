@@ -6,12 +6,12 @@ import { adNeeds, maybeShowAppOpen, setAdFree, setAdNeeds } from "./ads";
 import { reportError } from "./errors";
 import { iapConfigured } from "./iap";
 import { cancelAway, scheduleAway } from "./notify";
+// a dialog on screen (one already closing doesn't count: a second Back acts on what is under it)
+import { openDialog } from "./open-dialog";
 import { platform } from "./platform";
 import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 
-/** A dialog on screen (one already closing doesn't count: a second Back acts on what is under it). */
-const openDialog = () => document.querySelector('[role="dialog"]:not([data-state="closed"]), [role="alertdialog"]:not([data-state="closed"])');
 
 /** The game's screens over the map, in the order Back looks at them (the race viewer first). */
 const SCREENS = ["race", "view", "plot", "zone", "garage", "floor", "preview", "showcase", "celebrate"] as const;
@@ -57,6 +57,27 @@ const appOpenBusy = () => {
 
 let started = false;
 
+/**
+ * Whether the company last played had the ad-free rewards purchase, kept on the phone: before the
+ * save is loaded, a rewarded ad can then be requested at once (an offline report's ×2 offer has one
+ * ready sooner), never for a player who bought them. Unknown (a first start): requested.
+ */
+const AD_FREE_KEY = "ice.adFree";
+function lastAdFree(): boolean {
+  try {
+    return localStorage.getItem(AD_FREE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function keepAdFree(on: boolean) {
+  try {
+    localStorage.setItem(AD_FREE_KEY, on ? "1" : "0");
+  } catch {
+    // no storage: the next start waits for the save, as before
+  }
+}
+
 export async function startNative() {
   if (started) return;
   started = true;
@@ -88,28 +109,26 @@ export async function startNative() {
   const adFree = () => setAdFree(useGame.getState().ready && useGame.getState().state.iap.owned.includes("adFree"));
   useGame.subscribe(adFree);
   adFree();
-  // which ads may be requested at all (lib/ads.ts adNeeds): none until the game is loaded, none with
-  // ad-free rewards, the full-screen ones only once the company nears the age they may show at
+  // which ads may be requested at all (lib/ads.ts adNeeds): none with ad-free rewards, the full-screen
+  // ones only once the company nears the age they may show at. Before the save is loaded, the rewarded
+  // ad only, unless the company last played had ad-free rewards (the phone remembers it).
+  let remembered = lastAdFree();
   const needs = () => {
     const g = useGame.getState();
-    if (!g.ready) return;
-    setAdNeeds(adNeeds(g.state.iap.owned.includes("adFree"), g.state.lifetime.playTime, g.state.chain.firstCar));
+    if (!g.ready) {
+      setAdNeeds({ rewarded: !remembered, fullScreen: false });
+      return;
+    }
+    const owned = g.state.iap.owned.includes("adFree");
+    if (owned !== remembered) keepAdFree((remembered = owned));
+    setAdNeeds(adNeeds(owned, g.state.lifetime.playTime, g.state.chain.firstCar));
   };
   useGame.subscribe(needs);
   needs();
-  // rewarded ads, always the player's choice: the consent first, then an ad kept ready
+  // rewarded ads, always the player's choice: the consent first, then an ad kept ready. (No App Open
+  // ad as the game opens: the game is on screen at once, and an ad arriving seconds later would land
+  // on a screen in use. They show when the player comes back to the game: "resume" above.)
   void import("./native-ads").then((m) => m.startAds()).catch((e) => reportError(e, "rejection"));
-  // as the game opens: an App Open ad if one is ready within a few seconds (never in a young company)
-  const opening = () => {
-    if (!useGame.getState().ready) return false;
-    void maybeShowAppOpen(useGame.getState().state.lifetime.playTime, useGame.getState().state.chain.firstCar, null, appOpenBusy).catch(() => {});
-    return true;
-  };
-  if (!opening()) {
-    const stop = useGame.subscribe(() => {
-      if (opening()) stop();
-    });
-  }
   // Google Play Games (achievements, a leaderboard): Android only, and only when the build has its project id
   if (platform() === "android") void import("./native-play-games").then((m) => m.startPlayGames()).catch((e) => reportError(e, "rejection"));
   // in-app purchases: Google Play only, and only once the build has its products (docs/android/iap.md)

@@ -8,6 +8,10 @@ const h = vi.hoisted(() => ({
   consentError: false,
   initFailures: 0,
   prepareFails: false,
+  /** The SDK's code for a failed request (2: no network, 3: no fill). */
+  failCode: 3,
+  /** The consent's answer comes when this is called (null: at once). */
+  consentGate: null as null | Promise<void>,
   rewardPrepares: 0,
   interstitialPrepares: 0,
   appOpenLoads: 0,
@@ -23,9 +27,10 @@ vi.mock("@capacitor-community/admob", () => ({
   MaxAdContentRating: { Teen: "Teen" },
   AppOpenAdPluginEvents: { Opened: "appOpenOpened", Closed: "appOpenClosed", FailedToShow: "appOpenFailedToShow", FailedToLoad: "appOpenFailedToLoad", AdImpression: "appOpenImpression" },
   InterstitialAdPluginEvents: { Showed: "interstitialShowed", Dismissed: "interstitialDismissed", FailedToShow: "interstitialFailedToShow", FailedToLoad: "interstitialFailedToLoad", AdImpression: "interstitialImpression" },
-  RewardAdPluginEvents: { Showed: "showed", Rewarded: "rewarded", Dismissed: "dismissed", FailedToShow: "failedToShow", FailedToLoad: "failedToLoad", AdImpression: "impression" },
+  RewardAdPluginEvents: { Showed: "showed", Rewarded: "rewarded", Dismissed: "dismissed", FailedToShow: "failedToShow", FailedToLoad: "failedToLoad", AdImpression: "impression", adClicked: "clicked" },
   AdMob: {
     requestConsentInfo: async () => {
+      if (h.consentGate) await h.consentGate;
       if (h.consentError) throw new Error("offline");
       return { ...h.consent };
     },
@@ -44,7 +49,10 @@ vi.mock("@capacitor-community/admob", () => ({
     },
     prepareRewardVideoAd: async () => {
       h.rewardPrepares++;
-      if (h.prepareFails) throw new Error("no fill");
+      if (h.prepareFails) {
+        h.listeners.get("failedToLoad")?.({ code: h.failCode, message: "failed" });
+        throw new Error("failed");
+      }
     },
     prepareInterstitial: async () => {
       h.interstitialPrepares++;
@@ -74,6 +82,8 @@ type Ads = typeof import("./ads");
 let native: NativeAds;
 let ads: Ads;
 const emit = (event: string) => h.listeners.get(event)?.({});
+/** The phone coming back online (the "online" listener the ads added to the window). */
+const goOnline = () => (h.online.mock.calls.find((c) => c[0] === "online")?.[1] as (() => void) | undefined)?.();
 const minutes = (n: number) => vi.advanceTimersByTimeAsync(n * 60_000);
 const seconds = (n: number) => vi.advanceTimersByTimeAsync(n * 1000);
 
@@ -81,7 +91,7 @@ beforeEach(async () => {
   vi.useFakeTimers();
   vi.stubGlobal("window", { addEventListener: h.online });
   h.listeners.clear();
-  Object.assign(h, { adds: 0, consentError: false, initFailures: 0, prepareFails: false, rewardPrepares: 0, interstitialPrepares: 0, appOpenLoads: 0, rewardShows: 0, interstitialShows: 0, appOpenShows: 0 });
+  Object.assign(h, { adds: 0, consentError: false, consentGate: null, initFailures: 0, prepareFails: false, failCode: 3, rewardPrepares: 0, interstitialPrepares: 0, appOpenLoads: 0, rewardShows: 0, interstitialShows: 0, appOpenShows: 0 });
   h.consent.canRequestAds = true;
   h.online.mockClear();
   // each test starts the ads from scratch
@@ -154,9 +164,9 @@ describe("a start that fails", () => {
     await minutes(2);
     await seconds(0);
     expect(ads.getAdStatus().ready).toBe(true);
-    // sixteen ad events (the shows and closes, plus each kind's load failure and impression for the
-    // ad log), added once: a second set would report every close twice
-    expect(h.adds).toBe(16);
+    // seventeen ad events (the shows and closes, plus each kind's load failure and paid event and the
+    // rewarded ad's click, for the ad log), added once: a second set would report every close twice
+    expect(h.adds).toBe(17);
   });
 
   it("the consent not checkable: one wait for the network, however many times it fails", async () => {
@@ -169,6 +179,59 @@ describe("a start that fails", () => {
     await minutes(11);
     await seconds(0);
     expect(ads.getAdStatus().ready).toBe(true);
+  });
+});
+
+describe("a build for players", () => {
+  it("never takes the CI emulator's quicker full-screen limits, even if they are on the phone", async () => {
+    vi.stubGlobal("localStorage", { getItem: (k: string) => (k === ads.AD_TEST_TIMING_KEY ? JSON.stringify({ minOpenMs: 0, gapMs: 0, chance: 1, minAwayMs: 0 }) : null), setItem: () => {} });
+    const before = { interstitial: { ...ads.INTERSTITIAL }, appOpen: { ...ads.APP_OPEN } };
+    await native.startAds();
+    await seconds(0);
+    expect(ads.INTERSTITIAL).toEqual(before.interstitial);
+    expect(ads.APP_OPEN).toEqual(before.appOpen);
+  });
+});
+
+describe("a rewarded ad on its way", () => {
+  it("the start and the request say so (a one-time offer shows 'loading'), the ad loaded ends it", async () => {
+    let answer = () => {};
+    h.consentGate = new Promise<void>((r) => (answer = r));
+    const start = native.startAds();
+    await seconds(0);
+    expect(ads.getAdStatus()).toMatchObject({ loading: true, ready: false });
+    answer();
+    await start;
+    await seconds(0);
+    expect(ads.getAdStatus()).toMatchObject({ loading: false, ready: true });
+  });
+
+  it("not when the consent refuses ads, a request fails, or the company has ad-free rewards", async () => {
+    h.consent.canRequestAds = false;
+    await native.startAds();
+    await seconds(0);
+    expect(ads.getAdStatus().loading).toBe(false);
+    vi.resetModules();
+    native = await import("./native-ads");
+    ads = await import("./ads");
+    ads.setAdNeeds({ rewarded: true, fullScreen: false });
+    h.consent.canRequestAds = true;
+    h.prepareFails = true;
+    await native.startAds();
+    await seconds(0);
+    expect(ads.getAdStatus()).toMatchObject({ loading: false, ready: false });
+    vi.resetModules();
+    native = await import("./native-ads");
+    ads = await import("./ads");
+    ads.setAdNeeds({ rewarded: false, fullScreen: false });
+    h.prepareFails = false;
+    let answer = () => {};
+    h.consentGate = new Promise<void>((r) => (answer = r));
+    const start = native.startAds();
+    await seconds(0);
+    expect(ads.getAdStatus().loading).toBe(false);
+    answer();
+    await start;
   });
 });
 
@@ -262,14 +325,46 @@ describe("an ad whose close never comes", () => {
 });
 
 describe("the SDK's 'failed to show' that comes before the ad appears", () => {
-  it("the ad that shows anyway still rewards once, and its late close loads the ad the plugin dropped", async () => {
+  it("an ad that appears a moment later is watched like any other: no 'couldn't be shown' over it", async () => {
+    await native.startAds();
+    await seconds(0);
+    const reward = vi.fn();
+    let settled: string | undefined;
+    const result = ads.watchAd(reward).then((r) => (settled = r));
+    // "Timeout for show call succeed.", before the ad was on screen
+    emit("failedToShow");
+    await seconds(2);
+    expect(settled).toBeUndefined();
+    expect(ads.getAdStatus().showing).toBe(true);
+    // the ad appears, is watched to the end and closed
+    emit("showed");
+    await seconds(10);
+    expect(settled).toBeUndefined();
+    emit("rewarded");
+    emit("dismissed");
+    await seconds(2);
+    expect(await result).toBe("rewarded");
+    expect(reward).toHaveBeenCalledTimes(1);
+  });
+
+  it("one that doesn't appear within the grace is failed", async () => {
+    await native.startAds();
+    await seconds(0);
+    const result = ads.watchAd(vi.fn());
+    emit("failedToShow");
+    await seconds(6);
+    expect(await result).toBe("failed");
+    expect(ads.getAdStatus().showing).toBe(false);
+  });
+
+  it("the ad that shows anyway after that still rewards once, and its late close loads the ad the plugin dropped", async () => {
     await native.startAds();
     await seconds(0);
     const reward = vi.fn();
     const result = ads.watchAd(reward);
-    // "Timeout for show call succeed.", before the ad was on screen
+    // "Timeout for show call succeed.", before the ad was on screen, and the ad not there for a while
     emit("failedToShow");
-    await seconds(2);
+    await seconds(6);
     expect(await result).toBe("failed");
     await seconds(0);
     expect(h.rewardPrepares).toBe(2);
@@ -309,6 +404,32 @@ describe("what is requested (only ads the game could show)", () => {
     await native.startAds();
     await minutes(120);
     expect(loads()).toEqual({ rewarded: 0, interstitial: 0, appOpen: 0 });
+  });
+
+  it("no network: back online, the failed request is tried at once (no fill keeps its wait)", async () => {
+    h.prepareFails = true;
+    h.failCode = 2;
+    await native.startAds();
+    await seconds(0);
+    await minutes(4);
+    // tries at 0, 30 s, 1 min 30, 3 min 30: the next one would wait 4 minutes more
+    expect(h.rewardPrepares).toBe(4);
+    h.prepareFails = false;
+    goOnline();
+    await seconds(0);
+    expect(h.rewardPrepares).toBe(5);
+    expect(ads.getAdStatus().ready).toBe(true);
+  });
+
+  it("no fill: coming online doesn't go round the wait", async () => {
+    h.prepareFails = true;
+    h.failCode = 3;
+    await native.startAds();
+    await seconds(0);
+    expect(h.rewardPrepares).toBe(1);
+    goOnline();
+    await seconds(0);
+    expect(h.rewardPrepares).toBe(1);
   });
 
   it("no fill: the minute's check doesn't go round the wait before the next try", async () => {

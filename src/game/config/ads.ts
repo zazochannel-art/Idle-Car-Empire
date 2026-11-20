@@ -18,5 +18,10 @@ export const ADS = {
   buildCooldown: 10 * 60_000,
   /** The daily login reward, multiplied (money days only: the Star days are not doubled). */
   loginMult: 2,
+  /**
+   * An instant build or a quality-control skip is offered only with at least this much (seconds)
+   * left: an ad can last a minute, and one that ended with nothing left to skip was watched for nothing.
+   */
+  minOfferSeconds: 90,
   // (no daily limit on rewarded ads: each reward has its own limit, below and in the shop)
 };

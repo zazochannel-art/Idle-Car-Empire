@@ -1,0 +1,5 @@
+Novedades de 1.4.3:
+• «¡Hola de nuevo!» y la recompensa diaria muestran la oferta ×2 mientras carga su anuncio
+• Ningún anuncio a pantalla completa al abrir el juego ni sobre una ventana
+• Los anuncios vuelven antes cuando vuelve la conexión
+• Correcciones y estabilidad

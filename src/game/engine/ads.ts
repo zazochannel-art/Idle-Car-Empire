@@ -49,6 +49,19 @@ export function adBlock(s: GameState, reward: AdReward, now: number, plot?: stri
   }
 }
 
+/**
+ * Why an offer of `reward` isn't shown now: adBlock, and an instant build or a quality-control skip with
+ * under ADS.minOfferSeconds left (the ad could outlast the wait it skips). The reward itself, once
+ * the ad is watched, is given by adBlock's rules.
+ */
+export function adOfferBlock(s: GameState, reward: AdReward, now: number, plot?: string): AdBlock {
+  const block = adBlock(s, reward, now, plot);
+  if (block) return block;
+  if (reward === "build" && remainingOf(s, plot!) < ADS.minOfferSeconds) return "nothing";
+  if (reward === "qc" && (s.qc.nextAt - now) / 1000 < ADS.minOfferSeconds) return "nothing";
+  return null;
+}
+
 /** Milliseconds until the next instant build can be had (0: now). */
 export const buildWait = (s: GameState, now: number) => Math.max(0, s.ads.buildAt + ADS.buildCooldown - now);
 
@@ -59,6 +72,12 @@ export const buildWait = (s: GameState, now: number) => Math.max(0, s.ads.buildA
  * can't be had (then nothing changes).
  */
 export function grantAd(s: GameState, reward: AdReward, now: number, plot?: string, snap?: EconomySnapshot): boolean {
+  // the quality-control break runs on the clock, the game's other waits stop while an ad covers it: a
+  // break that ended during the ad left the next inspection ready, which is what the ad was for
+  if (reward === "qc" && qcBlock(s, now) === null) {
+    countAd(s, now);
+    return true;
+  }
   if (adBlock(s, reward, now, plot)) return false;
   if (reward === "offline") collectOffline(s, ADS.offlineMult);
   else if (reward === "boost") s.ads.boostLeft = ADS.boostSeconds;

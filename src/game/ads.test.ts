@@ -172,3 +172,36 @@ describe("rewarded ads", () => {
     expect(decodeSave(JSON.stringify(raw), T0).ads).toEqual(A.createAds());
   });
 });
+
+describe("an offer never ends in 'nothing to collect'", () => {
+  it("an instant build is offered only with time enough left for the ad; the reward itself only needs the job", () => {
+    const s = building();
+    const site = s.city.sites[ENGINE]!;
+    expect(A.adOfferBlock(s, "build", T0, ENGINE)).toBeNull();
+    site.t = site.dur - (ADS.minOfferSeconds - 1);
+    expect(A.adOfferBlock(s, "build", T0, ENGINE)).toBe("nothing");
+    // an ad already watched still finishes what is left
+    expect(A.adBlock(s, "build", T0, ENGINE)).toBeNull();
+    expect(A.grantAd(s, "build", T0, ENGINE)).toBe(true);
+  });
+
+  it("a quality-control skip is offered only with time enough left; a break that ended during the ad still counts", () => {
+    const s = createInitialState(T0);
+    s.qc.today = 1;
+    s.qc.day = dateKey(T0);
+    s.qc.nextAt = T0 + 10 * 60_000;
+    expect(A.adOfferBlock(s, "qc", T0)).toBeNull();
+    s.qc.nextAt = T0 + (ADS.minOfferSeconds - 1) * 1000;
+    expect(A.adOfferBlock(s, "qc", T0)).toBe("nothing");
+    // the break ran out while the ad played: the inspection is ready, the ad gave what it promised
+    const later = T0 + ADS.minOfferSeconds * 1000;
+    expect(qcBlock(s, later)).toBeNull();
+    const count = s.ads.count;
+    expect(A.grantAd(s, "qc", later)).toBe(true);
+    expect(s.ads.count).toBe(count + 1);
+    expect(qcBlock(s, later)).toBeNull();
+    // the day's inspections used up: nothing to give
+    s.qc.today = 99;
+    expect(A.grantAd(s, "qc", later)).toBe(false);
+  });
+});

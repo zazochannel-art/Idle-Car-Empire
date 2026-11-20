@@ -18,7 +18,7 @@ import type { EconomySnapshot } from "@/game/engine/economy";
 import { rewardCash } from "@/game/engine/progress";
 import { seasonAt } from "@/game/engine/season";
 import { owns, starterReward } from "@/game/engine/iap";
-import { blackFridayCut, crateWait, longestJob, packsToday, shopBlock, shopPrice, shopReward, type ShopBlock } from "@/game/engine/shop";
+import { blackFridayCut, crateWait, longestJob, packsToday, shopOfferBlock, shopPrice, shopReward, type ShopBlock } from "@/game/engine/shop";
 import { formatDuration, formatMoney, formatNumber } from "@/game/format";
 import type { GameState } from "@/game/types";
 import type { MessageKey } from "@/i18n";
@@ -269,7 +269,7 @@ function ShopCard({ item }: { item: ShopItem }) {
   const ad = useAdStatus();
   // the game's clock: the pauses count down with it
   const now = state.lastActiveAt;
-  const block = shopBlock(state, item.id, now);
+  const block = shopOfferBlock(state, item.id, now);
   const big = headline(item, state, snap, t);
   const packs = item.id === "cash" || item.id === "research" ? SHOP.packsPerDay - packsToday(state, item.id, now) : null;
   const ready = !block && (item.price !== "ad" || canWatch(ad));

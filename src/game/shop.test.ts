@@ -76,6 +76,14 @@ describe("the shop", () => {
     s.cash = 1e6;
     expect(Co.buyAndBuild(s, plot)).toBe(true);
     expect(S.longestJob(s)).toBe(plot);
+    expect(S.shopOfferBlock(s, "build", T0)).toBeNull();
+    // under a minute and a half left: not offered (the ad could outlast it), though one watched still finishes it
+    const site = s.city.sites[plot]!;
+    const dur = site.dur;
+    site.t = dur - (ADS.minOfferSeconds - 1);
+    expect(S.shopOfferBlock(s, "build", T0)).toBe("nothing");
+    expect(S.shopBlock(s, "build", T0)).toBeNull();
+    site.t = 0;
     expect(S.buyShop(s, "build", T0, snap)).toBe(true);
     expect(Co.remainingOf(s, plot)).toBe(0);
     expect(A.adsToday(s, T0)).toBe(2);

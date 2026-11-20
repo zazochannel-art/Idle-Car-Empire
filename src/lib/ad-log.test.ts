@@ -13,6 +13,13 @@ describe("the ad log", () => {
     expect(line).toBe('AD_FAILED_TO_LOAD format=interstitial code=3 message="No fill." t=1970-01-01T00:00:00.000Z');
   });
 
+  it("what decides whether ads may be requested at all has its own lines (the consent, the SDK)", () => {
+    expect(adLogLine("CONSENT_INFO", "consent", { place: "start", note: "status=REQUIRED,canRequestAds=false" }, 0)).toBe(
+      "CONSENT_INFO format=consent place=start note=status=REQUIRED,canRequestAds=false t=1970-01-01T00:00:00.000Z",
+    );
+    expect(adLogLine("SDK_INIT_FAILED", "sdk", { message: "no view" }, 0)).toBe('SDK_INIT_FAILED format=sdk message="no view" t=1970-01-01T00:00:00.000Z');
+  });
+
   it("masks a unit to its last 4 characters", () => {
     expect(maskUnit("ca-app-pub-0000/5914852757")).toBe("…2757");
     expect(maskUnit("")).toBe("");
