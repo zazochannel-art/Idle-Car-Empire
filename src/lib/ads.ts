@@ -147,10 +147,11 @@ export async function watchAd(onReward: () => void, place?: string): Promise<AdR
 
 // ───────────────────────────── full-screen ads (no reward) ─────────────────────────────
 //
-// Now and then, at a natural break (a screen the player closes), never in the middle of
-// something: not in the first minutes of a game, not twice in a row (any ad, rewarded or not,
-// starts the pause), and never with the ad-free rewards purchase. No limit a day: the pause,
-// the chance and the first hour are what keep them rare.
+// At a natural break (a screen the player closes), never in the middle of something: not in the
+// first hour of a company, not twice within 3 minutes (any ad, rewarded or not, starts the pause),
+// and never with the ad-free rewards purchase. No limit a day: the pause and the first hour are the
+// limits. (Not more often: AdMob and Google Play count ads that keep interrupting the game as
+// disruptive, which can limit the account's ad serving.)
 
 export const INTERSTITIAL = {
   /**
@@ -161,9 +162,9 @@ export const INTERSTITIAL = {
   /** The app open for this long (ms) before the first one of a run. */
   minOpenMs: 3 * 60_000,
   /** The pause after any ad (ms). */
-  gapMs: 8 * 60_000,
-  /** At an eligible break, the chance (0–1) that one shows: so it isn't a clock. */
-  chance: 0.5,
+  gapMs: 3 * 60_000,
+  /** At an eligible break, the chance (0–1) that one shows: every break once the pause is over. */
+  chance: 1,
   /** The pause between the break and the ad (ms): a tap on "close" never lands on it. */
   delayMs: 1_200,
 };
@@ -247,7 +248,7 @@ export async function maybeShowInterstitial(playTime: number, firstCar: boolean,
 
 export const APP_OPEN = {
   /** Away from the game for this long (ms) before coming back shows one: switching apps for a moment doesn't. */
-  minAwayMs: 10 * 60_000,
+  minAwayMs: 5 * 60_000,
 };
 
 export interface AppOpenContext extends InterstitialContext {

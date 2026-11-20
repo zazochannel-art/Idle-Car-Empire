@@ -41,7 +41,7 @@ describe("rewarded ads", () => {
     expect(A.adsToday(s, T0)).toBe(1);
   });
 
-  it("an ad finishes a construction, then waits before the next", () => {
+  it("an ad finishes a construction, and the next one can be finished at once", () => {
     const s = building();
     expect(Co.remainingOf(s, ENGINE)).toBeGreaterThan(0);
     const cash = s.cash;
@@ -53,13 +53,13 @@ describe("rewarded ads", () => {
     expect(Co.plotStatus(s, ENGINE)).toBe("operational");
     // a plot with nothing being built has nothing to finish
     expect(A.adBlock(s, "build", T0, ENGINE)).toBe("nothing");
-    // the next build waits for the pause
+    // no pause before the next one: another job can be finished for an ad straight away
     const s2 = building();
     s2.ads.buildAt = T0;
-    expect(A.adBlock(s2, "build", T0 + 60_000, ENGINE)).toBe("wait");
-    expect(A.buildWait(s2, T0 + 60_000)).toBe(ADS.buildCooldown - 60_000);
-    expect(A.grantAd(s2, "build", T0 + 60_000, ENGINE)).toBe(false);
-    expect(A.adBlock(s2, "build", T0 + ADS.buildCooldown, ENGINE)).toBeNull();
+    expect(ADS.buildCooldown).toBe(0);
+    expect(A.buildWait(s2, T0)).toBe(0);
+    expect(A.adBlock(s2, "build", T0, ENGINE)).toBeNull();
+    expect(A.grantAd(s2, "build", T0, ENGINE)).toBe(true);
   });
 
   it("an ad doubles today's login money, once, but not a Star day", () => {
@@ -116,13 +116,20 @@ describe("rewarded ads", () => {
     expect(s.qc.nextAt).toBe(T0 + 3600_000);
   });
 
-  it("the sales boost doubles the margin for 30 minutes of play", () => {
+  it("the sales boost doubles the margin for 30 minutes of play, and more ads add up to the cap", () => {
     const s = createInitialState(T0);
     const before = snapshot(s).gm.income;
     expect(A.grantAd(s, "boost", T0)).toBe(true);
     expect(snapshot(s).gm.income).toBeCloseTo(before * ADS.boostMult);
-    // one at a time
-    expect(A.adBlock(s, "boost", T0)).toBe("active");
+    // another ad adds its 30 minutes (the margin stays doubled, not quadrupled), up to the cap
+    expect(A.adBlock(s, "boost", T0)).toBeNull();
+    expect(A.grantAd(s, "boost", T0)).toBe(true);
+    expect(s.ads.boostLeft).toBe(2 * ADS.boostSeconds);
+    expect(snapshot(s).gm.income).toBeCloseTo(before * ADS.boostMult);
+    s.ads.boostLeft = SHOP.boostCap;
+    expect(A.adBlock(s, "boost", T0)).toBe("full");
+    expect(A.grantAd(s, "boost", T0)).toBe(false);
+    s.ads.boostLeft = ADS.boostSeconds;
     tick(s, ADS.boostSeconds - 10);
     expect(s.ads.boostLeft).toBeCloseTo(10);
     tick(s, 20);

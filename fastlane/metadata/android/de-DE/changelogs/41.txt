@@ -2,4 +2,5 @@ Neu in 1.4.3:
 • „Willkommen zurück!“ und die tägliche Belohnung zeigen das ×2-Angebot, während die Werbung lädt
 • Keine Vollbild-Werbung beim Öffnen des Spiels oder über einem Fenster
 • Werbung kommt schneller zurück, wenn die Verbindung wieder da ist
+• Shop: Werbung für Pakete, Überraschungsboxen und ×2 Gewinn ohne Limit
 • Fehlerbehebungen und Stabilität

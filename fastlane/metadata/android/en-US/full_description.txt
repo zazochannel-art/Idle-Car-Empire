@@ -30,4 +30,4 @@ PLAY YOUR WAY
 • Battery saver and low-graphics mode for older phones
 • English, Română, Русский, Español, Português, Deutsch
 
-Rewarded ads are optional: watch one only when you want a bonus. After your first hour of play, an occasional full-screen ad shows at a break or when you come back to the game. Optional in-app purchases: a starter pack, and ad-free rewards (every ad reward without the video, and no full-screen ads).
+Rewarded ads are optional: watch one only when you want a bonus. After your first hour of play, full-screen ads show at breaks (at most one every 3 minutes) or when you come back to the game. Optional in-app purchases: a starter pack, and ad-free rewards (every ad reward without the video, and no full-screen ads).
