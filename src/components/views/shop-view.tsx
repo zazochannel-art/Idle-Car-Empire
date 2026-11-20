@@ -18,7 +18,7 @@ import type { EconomySnapshot } from "@/game/engine/economy";
 import { rewardCash } from "@/game/engine/progress";
 import { seasonAt } from "@/game/engine/season";
 import { owns, starterReward } from "@/game/engine/iap";
-import { blackFridayCut, crateWait, longestJob, packsToday, shopOfferBlock, shopPrice, shopReward, type ShopBlock } from "@/game/engine/shop";
+import { blackFridayCut, crateWait, longestJob, shopOfferBlock, shopPrice, shopReward, type ShopBlock } from "@/game/engine/shop";
 import { formatDuration, formatMoney, formatNumber } from "@/game/format";
 import type { GameState } from "@/game/types";
 import type { MessageKey } from "@/i18n";
@@ -250,7 +250,7 @@ function buttonLabel(item: ShopItem, block: ShopBlock, ready: boolean, adFree: b
   if (block === "wait") return t("shop.in", { time: formatDuration(buildWait(s, s.lastActiveAt) / 1000) });
   if (block === "limit") return t("shop.limit");
   if (block === "active") return `${t("shop.active")} · ${formatDuration(s.ads.boostLeft)}`;
-  if (block === "full") return t("shop.full");
+  if (block === "full") return item.id === "boost" ? `${t("shop.full")} · ${formatDuration(s.ads.boostLeft)}` : t("shop.full");
   if (block === "nothing") return t("shop.nothing");
   if (item.price === "free") return t("shop.open");
   if (item.price === "ad") return !ready ? t("shop.noAd") : adFree ? `🎟️ ${t("shop.take")}` : `📺 ${t("shop.watch")}`;
@@ -271,7 +271,6 @@ function ShopCard({ item }: { item: ShopItem }) {
   const now = state.lastActiveAt;
   const block = shopOfferBlock(state, item.id, now);
   const big = headline(item, state, snap, t);
-  const packs = item.id === "cash" || item.id === "research" ? SHOP.packsPerDay - packsToday(state, item.id, now) : null;
   const ready = !block && (item.price !== "ad" || canWatch(ad));
   const tone = TONES[item.tone];
 
@@ -304,7 +303,6 @@ function ShopCard({ item }: { item: ShopItem }) {
         {big && <div className={cn("mt-0.5 text-[15px] font-black tabular-nums leading-tight", tone.value)}>{big}</div>}
         <div className="mt-1 text-[10.5px] leading-snug text-white/55">{t(`shop.desc.${item.id}` as MessageKey)}</div>
         {prizes}
-        {packs !== null && <div className="mt-0.5 text-[10px] font-bold text-white/40">{t("shop.left", { n: Math.max(0, packs) })}</div>}
       </div>
       {button}
     </div>

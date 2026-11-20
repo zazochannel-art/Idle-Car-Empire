@@ -2,4 +2,5 @@ What's new in 1.4.3:
 • "Welcome Back!" and the daily reward show their ×2 offer while its ad loads
 • No full-screen ad as the game opens or over a dialog
 • Ads come back sooner when the connection returns
+• Shop: watch ads for packs, mystery boxes and ×2 profit as often as you like
 • Fixes and stability

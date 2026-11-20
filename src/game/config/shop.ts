@@ -23,7 +23,7 @@ export interface ShopItem {
 
 export const SHOP_ITEMS: ShopItem[] = [
   { id: "crate", icon: "🎁", price: "free", tone: "gold" },
-  { id: "box", icon: "🎲", price: "ad", tone: "pink", tag: "daily", wide: true },
+  { id: "box", icon: "🎲", price: "ad", tone: "pink", wide: true },
   { id: "cash", icon: "💵", price: "ad", tone: "green" },
   { id: "research", icon: "🔬", price: "ad", tone: "blue" },
   { id: "boost", icon: "📈", price: "ad", tone: "orange" },
@@ -44,11 +44,10 @@ export const SHOP = {
   crateIncome: 15 * 60,
   crateRp: 10 * 60,
   crateRpMin: 10,
-  /** The ad packs: seconds of income or of research output, and how many of each a day. */
+  /** The ad packs: seconds of income or of research output, as many as the player wants (each one an ad). */
   packIncome: 30 * 60,
   packRp: 30 * 60,
   packRpMin: 25,
-  packsPerDay: 5,
   /** Time warps: seconds of income at once. */
   warp: { warp2: 2 * 3600, warp8: 8 * 3600, warp24: 24 * 3600 },
   /** The research warp: seconds of research output at once (and the least it gives). */
@@ -57,8 +56,9 @@ export const SHOP = {
   /** The tycoon pack: a time warp and a research warp of this many seconds, for less than the two. */
   bundle: 8 * 3600,
   /**
-   * The mystery box: one a day for an ad. What's inside is drawn from the day and the
-   * company (so it can't be opened again for a better one); weights add up to 100.
+   * The mystery box: one for every ad, as many as the player wants. What each holds is drawn from
+   * the company, the day and how many were opened that day (so one can't be tried again for a
+   * better prize); weights add up to 100.
    */
   box: [
     { weight: 40, incomeSeconds: 3600 },

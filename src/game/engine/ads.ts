@@ -28,16 +28,18 @@ export const adsToday = (s: GameState, now: number) => (s.ads.day === dateKey(no
 
 /**
  * Why a reward can't be had now: nothing to give (no report, no job, a Star day's login, no break
- * to skip), a boost already running, the pause after an instant build.
+ * to skip), a boost already as long as it can be ("full"), the pause after an instant build (none
+ * now: ADS.buildCooldown).
  */
-export type AdBlock = "nothing" | "active" | "wait" | null;
+export type AdBlock = "nothing" | "full" | "wait" | null;
 
 export function adBlock(s: GameState, reward: AdReward, now: number, plot?: string): AdBlock {
   switch (reward) {
     case "offline":
       return (s.pendingOffline?.money ?? 0) > 0 ? null : "nothing";
     case "boost":
-      return s.ads.boostLeft > 0 ? "active" : null;
+      // an ad adds its 30 minutes to a boost already running, up to the cap
+      return s.ads.boostLeft + ADS.boostSeconds > SHOP.boostCap ? "full" : null;
     case "build":
       if (!plot || remainingOf(s, plot) <= 0) return "nothing";
       return now < s.ads.buildAt + ADS.buildCooldown ? "wait" : null;
@@ -80,7 +82,7 @@ export function grantAd(s: GameState, reward: AdReward, now: number, plot?: stri
   }
   if (adBlock(s, reward, now, plot)) return false;
   if (reward === "offline") collectOffline(s, ADS.offlineMult);
-  else if (reward === "boost") s.ads.boostLeft = ADS.boostSeconds;
+  else if (reward === "boost") s.ads.boostLeft = Math.min(SHOP.boostCap, s.ads.boostLeft + ADS.boostSeconds);
   else if (reward === "login") {
     if (!snap || !claimLogin(s, snap, ADS.loginMult)) return false;
   } else if (reward === "qc") s.qc.nextAt = now;

@@ -9,14 +9,15 @@ iOS app shows the same offers ([../ios.md](../ios.md)).
 | Where | Reward | Limits |
 | --- | --- | --- |
 | Offline report ("Welcome back") | the money earned while away, ×2 | once per report |
-| A construction or an upgrade in progress | finished at once | then a 10-minute pause before the next; offered only with at least 90 s left |
-| The HUD chip "📺 ×2 profit" (asks first) | ×2 margin on every sale for **30 minutes of play** (the time waits while the game is closed) | one at a time |
+| A construction or an upgrade in progress | finished at once | no pause before the next; offered only with at least 90 s left |
+| The HUD chip "📺 ×2 profit" (asks first) | ×2 margin on every sale for **30 minutes of play** (the time waits while the game is closed) | when no boost is running (the shop adds to a running one) |
 | Daily login reward (money days only, not the Star days) | the day's money ×2, next to the normal "Claim" button | once a day |
 | Quality control, during the break between two inspections | the wait skipped (never more than the day's 6 inspections) | as the break; offered only with at least 90 s left |
-| The shop (🛒 top left): mystery box | one prize, fixed for the day: 1 h of income (40%), 1 h of research (30%), 3 h of income (20%) or 1 ⭐ Star (10%) | once a day |
-| The shop: cash pack | 30 minutes of income | 5 a day |
-| The shop: research pack | 30 minutes of research output (at least 25 RP) | 5 a day |
-| The shop: ×2 profit, instant build | the same as the chip and the construction button above | as above |
+| The shop (🛒 top left): mystery box | one prize per box: 1 h of income (40%), 1 h of research (30%), 3 h of income (20%) or 1 ⭐ Star (10%); each box opened is a new draw, which waiting can't change | **none** |
+| The shop: cash pack | 30 minutes of income | **none** |
+| The shop: research pack | 30 minutes of research output (at least 25 RP) | **none** |
+| The shop: ×2 profit | +30 minutes of ×2 profit, added to a boost already running | up to 4 hours in all |
+| The shop: instant build | the same as the construction button above | as above |
 
 The shop also has a **free crate** every 4 hours and items paid with in-game ⭐
 Stars (time warps of 2 h, 8 h and 24 h of income, 8 h of research, +2 h of ×2
@@ -39,8 +40,10 @@ and then, with no reward**. It never shows in the middle of something:
 - not in the first hour of a company, and not before its first car is built (a new
   company makes it at about 45 minutes), nor in the first 3 minutes after
   the app opens;
-- a break of 8 minutes after **any** ad (a rewarded one counts) and only half of
-  the eligible closes show one; there is **no limit a day**;
+- a break of 3 minutes after **any** ad (a rewarded one counts); after it, every
+  eligible close shows one; there is **no limit a day**. Not more often: AdMob
+  and Google Play count ads that keep interrupting the game as disruptive, which
+  can limit the account's ad serving;
 - **never with the ad-free rewards purchase**.
 
 The limits live in `INTERSTITIAL` in `src/lib/ads.ts`; the plugin side is in
@@ -57,7 +60,7 @@ and the content rating is Teen.
 
 An **App Open** ad can show when the player comes back to the game:
 
-- from another app or the Home screen after **at least 10 minutes** away (a
+- from another app or the Home screen after **at least 5 minutes** away (a
   quick app switch shows nothing), as the game returns, before the player can
   touch anything;
 - **never straight after one of the game's own ads**: Android pauses the game
@@ -68,7 +71,7 @@ An **App Open** ad can show when the player comes back to the game:
   (Google: App Open ads go over a loading screen, never over content in use);
 - never in a company with under an hour of play or before its first car (so never on the first
   opens or over the tour), never over a race;
-- the same 8-minute pause after any ad as above, and no limit a day;
+- the same 3-minute pause after any ad as above, and no limit a day;
 - **never with the ad-free rewards purchase**, and only after the consent.
 
 The code is `maybeShowAppOpen` in `src/lib/ads.ts` (the limits are in
@@ -82,10 +85,10 @@ always asks for a new ad, and one past its 4 hours is never shown
 (iOS: `ADMOB_APP_OPEN_ID_IOS`). Until it is set the build uses Google's sample
 unit (`ca-app-pub-3940256099942544/9257395921`), which pays nothing.
 
-There is **no limit on the rewarded ads a day**; each reward has its own limit
-(the table above: a boost runs one at a time, an instant build waits 10 minutes,
-the offline report and the daily login are taken once, the shop's packs and box
-count by themselves). The numbers live in
+There is **no limit on the rewarded ads**: the shop's packs and mystery box are
+there for every ad, a boost adds up to 4 hours, any job can be finished; only
+what has nothing to give is not offered (the offline report and the daily login
+are taken once, a job needs time left). The numbers live in
 `src/game/config/ads.ts`; the rules in `src/game/engine/ads.ts` (tested in
 `src/game/ads.test.ts`).
 

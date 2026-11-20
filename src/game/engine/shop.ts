@@ -17,11 +17,15 @@ export interface ShopState {
   day: string;
   cash: number;
   research: number;
-  /** The day (dateKey) the last mystery box was opened ("": never). */
+  /** The day (dateKey) the last mystery box was opened ("": never), and how many were opened that day. */
   boxDay: string;
+  boxes: number;
 }
 
-export const createShop = (): ShopState => ({ crateAt: 0, day: "", cash: 0, research: 0, boxDay: "" });
+export const createShop = (): ShopState => ({ crateAt: 0, day: "", cash: 0, research: 0, boxDay: "", boxes: 0 });
+
+/** Mystery boxes opened today. */
+export const boxesToday = (s: GameState, now: number) => (s.shop.boxDay === dateKey(now) ? s.shop.boxes : 0);
 
 /** Milliseconds until the next free crate (0: ready). */
 export const crateWait = (s: GameState, now: number) => Math.max(0, s.shop.crateAt + SHOP.crateEvery - now);
@@ -43,11 +47,13 @@ export function longestJob(s: GameState): string | undefined {
 const researchOutput = (snap: EconomySnapshot, seconds: number, min: number) => Math.max(min, Math.round(snap.rpPerSec * seconds));
 
 /**
- * Which of the mystery box's prizes (an index in SHOP.box) the company's box holds
- * on this day: fixed for the day, so opening it can't be tried again for a better one.
+ * Which of the mystery box's prizes (an index in SHOP.box) the company's next box holds: drawn from
+ * the company, the day and how many were opened that day, so each box is a new draw but one can't
+ * be tried again for a better prize.
  */
 export function boxPrize(s: GameState, now: number): number {
-  const key = `${s.createdAt}:${dateKey(now)}`;
+  const opened = boxesToday(s, now);
+  const key = `${s.createdAt}:${dateKey(now)}${opened ? `:${opened}` : ""}`;
   let h = 2166136261;
   for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 16777619);
   let roll = (h >>> 0) % 100;
@@ -94,9 +100,9 @@ export function shopReward(id: ShopItemId, snap: EconomySnapshot, s?: GameState,
 }
 
 /**
- * Why an item can't be had now: the crate not ready yet ("wait"), today's ad or
- * pack limit, nothing to build, a boost already running (or already as long as it
- * can be: "full"), not enough Stars. Null: it can be had.
+ * Why an item can't be had now: the crate not ready yet ("wait"), nothing to build, a boost
+ * already as long as it can be ("full"), not enough Stars. Null: it can be had. The ad items
+ * have no daily limit: the packs and the mystery box are there for every ad.
  */
 export type ShopBlock = "wait" | "limit" | "nothing" | "active" | "full" | "stars" | null;
 
@@ -119,11 +125,6 @@ export function shopBlock(s: GameState, id: ShopItemId, now: number): ShopBlock 
   switch (id) {
     case "crate":
       return crateWait(s, now) > 0 ? "wait" : null;
-    case "cash":
-    case "research":
-      return packsToday(s, id, now) >= SHOP.packsPerDay ? "limit" : null;
-    case "box":
-      return s.shop.boxDay === dateKey(now) ? "limit" : null;
     case "boost":
       return adBlock(s, "boost", now);
     case "build":
@@ -156,6 +157,7 @@ export function buyShop(s: GameState, id: ShopItemId, now: number, snap: Economy
   if (typeof price === "number") s.stars -= price;
   if (id === "crate") s.shop.crateAt = now;
   if (id === "box") {
+    s.shop.boxes = boxesToday(s, now) + 1;
     s.shop.boxDay = dateKey(now);
     countAd(s, now);
   }
@@ -170,7 +172,8 @@ export function buyShop(s: GameState, id: ShopItemId, now: number, snap: Economy
 
 /** A save's shop, within bounds (the merge already gave every field its type). */
 export function migrateShop(sh: ShopState, now: number): ShopState {
-  const packs = (n: number) => Math.max(0, Math.min(SHOP.packsPerDay, Math.floor(n)));
+  // (counts only, for the day: nothing is limited by them)
+  const packs = (n: number) => Math.max(0, Math.min(1_000_000, Math.floor(Number.isFinite(n) ? n : 0)));
   return {
     // a time from the future (a clock set back) would hold the crate for ever
     crateAt: Math.max(0, Math.min(now, sh.crateAt)),
@@ -178,5 +181,6 @@ export function migrateShop(sh: ShopState, now: number): ShopState {
     cash: packs(sh.cash),
     research: packs(sh.research),
     boxDay: /^\d{4}-\d{2}-\d{2}$/.test(sh.boxDay) ? sh.boxDay : "",
+    boxes: packs(sh.boxes),
   };
 }
