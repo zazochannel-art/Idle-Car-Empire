@@ -60,6 +60,9 @@ An **App Open** ad can show when the player comes back to the game:
 - from another app or the Home screen after **at least 10 minutes** away (a
   quick app switch shows nothing), as the game returns, before the player can
   touch anything;
+- **never straight after one of the game's own ads**: Android pauses the game
+  under a full-screen ad, and that is no time away (the close of an interstitial
+  or a rewarded ad never brings an App Open ad after it);
 - **not as the game opens**: the game is on screen at once from its own files,
   and an ad that arrived a few seconds later would land on a screen in use
   (Google: App Open ads go over a loading screen, never over content in use);

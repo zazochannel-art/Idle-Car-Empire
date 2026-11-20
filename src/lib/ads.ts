@@ -266,6 +266,25 @@ export function appOpenBlock(a: AdStatus, c: AppOpenContext): "adFree" | "notRea
 }
 
 /**
+ * The time away from the game, for the App Open ad as it comes back. A full-screen ad of the game's own
+ * also takes the screen from it (Android pauses the game under the ad), but that is no time away: its
+ * close must never bring an App Open ad straight after it (two full-screen ads in a row).
+ */
+let pausedAt = 0;
+
+/** The app left the screen: to the background, or under one of its own ads (then it counts as no time away). */
+export function appPaused(now: number = Date.now()) {
+  pausedAt = status.showing ? 0 : now;
+}
+
+/** The app is back on screen: how long it was away (ms), or null if it wasn't (never paused, or only under its own ad). */
+export function appResumed(now: number = Date.now()): number | null {
+  const at = pausedAt;
+  pausedAt = 0;
+  return at ? Math.max(0, now - at) : null;
+}
+
+/**
  * The player is back in the game (`awayMs`: how long it was away). `busy` says whether a tour or a
  * race is on screen. True if an App Open ad was shown.
  */

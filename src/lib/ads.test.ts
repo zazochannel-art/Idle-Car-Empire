@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { APP_OPEN, appOpenBlock, canWatch, INTERSTITIAL, interstitialBlock, maybeShowAppOpen, maybeShowInterstitial, registerAdDriver, setAdFree, setAdStatus, watchAd, type AdStatus, type AppOpenContext, type InterstitialContext } from "./ads";
+import { APP_OPEN, appOpenBlock, appPaused, appResumed, canWatch, INTERSTITIAL, interstitialBlock, maybeShowAppOpen, maybeShowInterstitial, registerAdDriver, setAdFree, setAdStatus, watchAd, type AdStatus, type AppOpenContext, type InterstitialContext } from "./ads";
 
 describe("watching an ad", () => {
   it("gives one reward per ad, even when the ad network reports it twice", async () => {
@@ -231,5 +231,26 @@ describe("a test build's quicker full-screen limits (the CI emulator check)", ()
     expect(ads.INTERSTITIAL).toMatchObject({ minOpenMs: 0, gapMs: 0, chance: 1, minPlayTime: before.minPlayTime, delayMs: before.delayMs });
     expect(ads.APP_OPEN.minAwayMs).toBe(20_000);
     vi.resetModules();
+  });
+});
+
+describe("the time away, for the App Open ad as the game comes back", () => {
+  afterEach(() => setAdStatus({ showing: false }));
+
+  it("leaving the game counts, once", () => {
+    setAdStatus({ showing: false });
+    appPaused(1_000);
+    expect(appResumed(1_000 + APP_OPEN.minAwayMs)).toBe(APP_OPEN.minAwayMs);
+    // a resume with no pause before it (the app opening) is no time away
+    expect(appResumed(2_000_000)).toBeNull();
+  });
+
+  it("going under one of its own full-screen ads is no time away: no App Open ad straight after an ad (seen on the CI emulator)", () => {
+    // the interstitial (or rewarded, or App Open) ad is on screen: Android pauses the game under it
+    setAdStatus({ showing: true });
+    appPaused(1_000);
+    setAdStatus({ showing: false });
+    // the ad closed half an hour later (the player had tapped it and stayed in the store)
+    expect(appResumed(1_000 + 30 * 60_000)).toBeNull();
   });
 });
