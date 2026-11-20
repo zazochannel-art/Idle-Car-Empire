@@ -2,10 +2,12 @@
 
 // Full-screen ads without a reward (the app only; lib/ads.ts has the limits): offered only at a
 // natural break, when the player closes a screen and is back on the map. Never over a tour, a
-// race, a factory, the offline report or the shop (where the rewarded ads are), and a moment
+// race, a factory, the offline report, the shop (where the rewarded ads are) or a dialog that
+// opened meanwhile (an unlock, the daily reward: the player is about to tap it), and a moment
 // after the close so a tap never lands on the ad.
 import { useEffect } from "react";
 import { INTERSTITIAL, maybeShowInterstitial } from "@/lib/ads";
+import { modalOnScreen } from "@/lib/open-dialog";
 import { useGame } from "@/store/game-store";
 import { useUi, type View } from "@/store/ui-store";
 
@@ -21,8 +23,8 @@ export function InterstitialBridge() {
       timer = setTimeout(() => {
         const ui = useUi.getState();
         const g = useGame.getState();
-        // still on the map, nothing else going on
-        if (!g.ready || ui.view || ui.tutorial || ui.race || ui.floor || ui.garage || ui.visit || ui.celebrate || g.state.pendingOffline) return;
+        // still on the map, nothing else going on (no dialog either)
+        if (!g.ready || ui.view || ui.tutorial || ui.race || ui.floor || ui.garage || ui.visit || ui.celebrate || g.state.pendingOffline || modalOnScreen()) return;
         void maybeShowInterstitial(g.state.lifetime.playTime, g.state.chain.firstCar);
       }, INTERSTITIAL.delayMs);
     });

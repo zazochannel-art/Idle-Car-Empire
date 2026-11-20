@@ -71,6 +71,16 @@ jobs:
             printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
             echo "NEXT_PUBLIC_PUSH=1" >> "$GITHUB_ENV"
           fi
+      # A build for players must carry the AdMob account's own ids. Without one the build would fall
+      # back to Google's sample ids without a word (test ads, which pay nothing): an unset, malformed or
+      # sample id, or units of another account than the app id's, stops the release here.
+      - name: AdMob ids for players
+        env:
+          ADMOB_APP_ID: ${{ vars.ADMOB_APP_ID }}
+          ADMOB_REWARDED_ID: ${{ vars.ADMOB_REWARDED_ID }}
+          ADMOB_INTERSTITIAL_ID: ${{ vars.ADMOB_INTERSTITIAL_ID }}
+          ADMOB_APP_OPEN_ID: ${{ vars.ADMOB_APP_OPEN_ID }}
+        run: node scripts/check-admob-ids.mjs
       - name: Build the game for the app
         run: npm run build:android
         env:
@@ -90,6 +100,13 @@ jobs:
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.TURNSTILE_SITE_KEY }}
           # this build's source maps, kept below as an artifact (not in the app) to read players' error reports
           SOURCE_MAPS: "1"
+      # ...and the game built for the app really has those units in it (the build read the variables)
+      - name: The game carries the AdMob units
+        env:
+          ADMOB_REWARDED_ID: ${{ vars.ADMOB_REWARDED_ID }}
+          ADMOB_INTERSTITIAL_ID: ${{ vars.ADMOB_INTERSTITIAL_ID }}
+          ADMOB_APP_OPEN_ID: ${{ vars.ADMOB_APP_OPEN_ID }}
+        run: node scripts/check-admob-ids.mjs --built android/app/src/main/assets/public
       - name: Upload key
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -111,11 +128,7 @@ jobs:
           # the Play Games project id (not a secret): the PLAY_GAMES_APP_ID variable if set, else the game's own (docs/android/play-games.md)
           PLAY_GAMES_APP_ID: ${{ vars.PLAY_GAMES_APP_ID || '297022434236' }}
         run: |
-          # a wrong AdMob app id would fall back to Google's test one: not in a release for players
-          if [ -n "$ADMOB_APP_ID" ] && ! echo "$ADMOB_APP_ID" | grep -qE '^ca-app-pub-[0-9]+~[0-9]+$'; then
-            echo "::error::Set the ADMOB_APP_ID variable to your AdMob app id, ca-app-pub-…~… (AdMob → Apps → App settings; an ad unit id has a / instead): docs/android/ads.md"
-            exit 1
-          fi
+          # (the AdMob app id was checked above: "AdMob ids for players")
           ./gradlew --no-daemon --stacktrace bundleRelease
           jarsigner -verify app/build/outputs/bundle/release/app-release.aab | grep -q "jar verified" || { echo "::error::the bundle is not signed"; exit 1; }
           grep -E "versionCode|versionName" version.properties

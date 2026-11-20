@@ -44,8 +44,10 @@ describe("watching an ad", () => {
   });
 
   it("an offer can be taken with an ad loaded and none on screen, or with ad-free rewards", () => {
-    const off = { ready: false, showing: false, privacyOptions: false, adFree: false, interstitialReady: false, appOpenReady: false };
+    const off = { ready: false, showing: false, privacyOptions: false, adFree: false, interstitialReady: false, appOpenReady: false, loading: false };
     expect(canWatch(off)).toBe(false);
+    // one on its way is not one to watch yet
+    expect(canWatch({ ...off, loading: true })).toBe(false);
     expect(canWatch({ ...off, ready: true })).toBe(true);
     expect(canWatch({ ...off, ready: true, showing: true })).toBe(false);
     expect(canWatch({ ...off, adFree: true })).toBe(true);
@@ -53,7 +55,7 @@ describe("watching an ad", () => {
 });
 
 describe("full-screen ads (no reward)", () => {
-  const status: AdStatus = { ready: true, showing: false, privacyOptions: false, adFree: false, interstitialReady: true, appOpenReady: true };
+  const status: AdStatus = { ready: true, showing: false, privacyOptions: false, adFree: false, interstitialReady: true, appOpenReady: true, loading: false };
   const ctx: InterstitialContext = { now: 10_000_000, playTime: INTERSTITIAL.minPlayTime, firstCar: true, lastAdAt: 0, openedAt: 0 };
 
   it("may show when everything allows", () => {
@@ -80,13 +82,11 @@ describe("full-screen ads (no reward)", () => {
 });
 
 describe("App Open ads", () => {
-  const status: AdStatus = { ready: true, showing: false, privacyOptions: false, adFree: false, interstitialReady: false, appOpenReady: true };
+  const status: AdStatus = { ready: true, showing: false, privacyOptions: false, adFree: false, interstitialReady: false, appOpenReady: true, loading: false };
   const ctx: AppOpenContext = { now: 10_000_000, playTime: INTERSTITIAL.minPlayTime, firstCar: true, lastAdAt: 0, openedAt: 0, awayMs: APP_OPEN.minAwayMs };
 
   it("may show when the player is back after a while", () => {
     expect(appOpenBlock(status, ctx)).toBeNull();
-    // and as the game opens (no time away to speak of)
-    expect(appOpenBlock(status, { ...ctx, awayMs: null })).toBeNull();
   });
 
   it("never with the ad-free rewards purchase, with no ad loaded or one on screen", () => {
@@ -97,7 +97,7 @@ describe("App Open ads", () => {
 
   it("not in a young company (so not on the first opens), nor after a short absence", () => {
     expect(appOpenBlock(status, { ...ctx, playTime: INTERSTITIAL.minPlayTime - 1 })).toBe("young");
-    expect(appOpenBlock(status, { ...ctx, playTime: 0, awayMs: null })).toBe("young");
+    expect(appOpenBlock(status, { ...ctx, playTime: 0 })).toBe("young");
     expect(appOpenBlock(status, { ...ctx, firstCar: false })).toBe("young");
     expect(appOpenBlock(status, { ...ctx, awayMs: APP_OPEN.minAwayMs - 1 })).toBe("short");
   });
@@ -215,5 +215,21 @@ describe("which ads to load", () => {
     expect(adNeeds(false, INTERSTITIAL.minPlayTime - FULL_SCREEN_PRELOAD_SECONDS - 1, true).fullScreen).toBe(false);
     expect(adNeeds(false, INTERSTITIAL.minPlayTime - FULL_SCREEN_PRELOAD_SECONDS, true).fullScreen).toBe(true);
     expect(adNeeds(true, 10 * 3600, true)).toEqual({ rewarded: false, fullScreen: false });
+  });
+});
+
+describe("a test build's quicker full-screen limits (the CI emulator check)", () => {
+  it("takes only the numbers it knows, and nothing that isn't one", async () => {
+    vi.resetModules();
+    const ads = await import("./ads");
+    const before = { ...ads.INTERSTITIAL };
+    ads.quickenAdsForTest(null);
+    ads.quickenAdsForTest("not json");
+    ads.quickenAdsForTest(JSON.stringify({ minPlayTime: 0, chance: "1", gapMs: -5 }));
+    expect(ads.INTERSTITIAL).toEqual(before);
+    ads.quickenAdsForTest(JSON.stringify({ minOpenMs: 0, gapMs: 0, chance: 1, minAwayMs: 20_000 }));
+    expect(ads.INTERSTITIAL).toMatchObject({ minOpenMs: 0, gapMs: 0, chance: 1, minPlayTime: before.minPlayTime, delayMs: before.delayMs });
+    expect(ads.APP_OPEN.minAwayMs).toBe(20_000);
+    vi.resetModules();
   });
 });

@@ -1,0 +1,5 @@
+Novidades da 1.4.3:
+• "Que bom ver você de novo!" e a recompensa diária mostram a oferta ×2 enquanto o anúncio carrega
+• Nenhum anúncio em tela cheia ao abrir o jogo ou sobre uma janela
+• Os anúncios voltam mais rápido quando a conexão volta
+• Correções e estabilidade

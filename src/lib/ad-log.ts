@@ -1,7 +1,8 @@
-// The ad diagnostics: one line per step of each ad (requested, loaded, failed, asked to show,
-// shown, impression, closed), in logcat under the tag IDLE_CAR_ADMOB in every build (the native
-// AdLog plugin, android/.../AdLogPlugin.java), and in the console of a debug build.
-// In Android Studio: Logcat, filter "tag:IDLE_CAR_ADMOB".
+// The ad diagnostics: one line per step of each ad (requested, loaded, failed, offered, asked to
+// show, shown, paid, clicked, rewarded, closed), and what decides whether any ad may be requested at
+// all (the consent's answer, the SDK's start), in logcat under the tag IDLE_CAR_ADMOB in every build
+// (the native AdLog plugin, android/.../AdLogPlugin.java), and in the console of a debug build.
+// In Android Studio: Logcat, filter "tag:IDLE_CAR_ADMOB". docs/android/ads.md lists the events.
 import { registerPlugin } from "@capacitor/core";
 
 export type AdEvent =
@@ -12,12 +13,23 @@ export type AdEvent =
   | "AD_SHOW_REQUESTED"
   | "AD_SHOWED"
   | "AD_FAILED_TO_SHOW"
-  | "AD_IMPRESSION_RECORDED"
+  | "AD_PAID_EVENT"
+  | "AD_CLICKED"
   | "AD_REWARDED"
   | "AD_DISMISSED"
-  | "AD_EXPIRED";
+  | "AD_EXPIRED"
+  /** A one-time offer (the offline report, the daily login) on screen with its ad ready, or still loading it. */
+  | "AD_OFFER_VISIBLE"
+  | "AD_OFFER_LOADING"
+  | "CONSENT_INFO"
+  | "CONSENT_FORM"
+  | "CONSENT_ERROR"
+  | "SDK_INIT_OK"
+  | "SDK_INIT_FAILED";
 
 export type AdFormat = "rewarded" | "interstitial" | "appOpen";
+/** What a line is about: an ad format, or the consent / the SDK (which decide whether any ad is requested). */
+export type AdLogScope = AdFormat | "consent" | "sdk";
 
 export interface AdLogFields {
   /** The ad unit (only its last 4 characters are written). */
@@ -52,7 +64,7 @@ export function enableAdLog() {
 export const maskUnit = (unit: string) => (unit ? `…${unit.slice(-4)}` : "");
 
 /** The line written: the event, then the fields that are set (values with a space quoted). */
-export function adLogLine(event: AdEvent, format: AdFormat, f: AdLogFields = {}, now = Date.now()): string {
+export function adLogLine(event: AdEvent, format: AdLogScope, f: AdLogFields = {}, now = Date.now()): string {
   const parts: [string, string | number | undefined][] = [
     ["format", format],
     ["unit", f.unit ? maskUnit(f.unit) : undefined],
@@ -66,7 +78,7 @@ export function adLogLine(event: AdEvent, format: AdFormat, f: AdLogFields = {},
   return [event, ...parts.filter(([, x]) => x !== undefined && x !== "").map(([k, x]) => `${k}=${v(x!)}`)].join(" ");
 }
 
-export function adLog(event: AdEvent, format: AdFormat, f: AdLogFields = {}) {
+export function adLog(event: AdEvent, format: AdLogScope, f: AdLogFields = {}) {
   if (!on) return;
   const line = adLogLine(event, format, f);
   if (process.env.NODE_ENV !== "production") console.info(`IDLE_CAR_ADMOB ${line}`);

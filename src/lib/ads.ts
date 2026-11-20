@@ -19,6 +19,11 @@ export interface AdStatus {
   interstitialReady: boolean;
   /** An App Open ad is loaded. */
   appOpenReady: boolean;
+  /**
+   * A rewarded ad is on its way (the consent and the SDK starting, or a request out): a one-time offer
+   * (the offline report, the daily login) says so instead of being missing until the ad arrives.
+   */
+  loading: boolean;
 }
 
 /** What the Android app's ad code does for the game. */
@@ -29,14 +34,14 @@ export interface AdDriver {
   privacyForm(): Promise<void>;
   /** Shows the loaded full-screen ad (true: it was shown and closed). */
   showInterstitial(): Promise<boolean>;
-  /** Shows the loaded App Open ad (true: it was shown and closed). `place`: "open" or "resume" (for the ad log). */
+  /** Shows the loaded App Open ad (true: it was shown and closed). `place`: where (for the ad log). */
   showAppOpen(place?: string): Promise<boolean>;
 }
 
 /** Rewarded (the reward was given), closed early (none), or the ad couldn't be shown. */
 export type AdResult = "rewarded" | "closed" | "failed";
 
-let status: AdStatus = { ready: false, showing: false, privacyOptions: false, adFree: false, interstitialReady: false, appOpenReady: false };
+let status: AdStatus = { ready: false, showing: false, privacyOptions: false, adFree: false, interstitialReady: false, appOpenReady: false, loading: false };
 let driver: AdDriver | null = null;
 const listeners = new Set<() => void>();
 
@@ -104,7 +109,7 @@ const current = () => status;
 
 /** The ad status now (outside a screen). */
 export const getAdStatus = () => status;
-const SERVER: AdStatus = { ready: false, showing: false, privacyOptions: false, adFree: false, interstitialReady: false, appOpenReady: false };
+const SERVER: AdStatus = { ready: false, showing: false, privacyOptions: false, adFree: false, interstitialReady: false, appOpenReady: false, loading: false };
 
 /** The ad status, for a screen that offers an ad. */
 export function useAdStatus(): AdStatus {
@@ -233,21 +238,21 @@ export async function maybeShowInterstitial(playTime: number, firstCar: boolean,
 
 // ───────────────────────────── App Open ads ─────────────────────────────
 //
-// When the player comes back to the game: from another app or the Home screen after a while
-// away, or as it opens if the ad is ready within a few seconds. Never in a young company
-// (so never on the first opens, nor over the tour), never over a race, after the same pause
-// as the other ads, and never with the ad-free rewards purchase.
+// When the player comes back to the game from another app or the Home screen after a while away,
+// as the game returns (before the player can touch anything). Not as the game opens: the game is on
+// screen at once from its own files, and an ad that arrived a few seconds later would land on a
+// screen in use (Google: App Open ads go over a loading screen, never over content in use). Never
+// in a young company (so never over the tour), never over a race, after the same pause as the
+// other ads, and never with the ad-free rewards purchase.
 
 export const APP_OPEN = {
   /** Away from the game for this long (ms) before coming back shows one: switching apps for a moment doesn't. */
   minAwayMs: 10 * 60_000,
-  /** As the game opens, how long (ms) to wait for the ad to be ready. */
-  openWaitMs: 4_000,
 };
 
 export interface AppOpenContext extends InterstitialContext {
-  /** Ms the game was away (null: it is opening). */
-  awayMs: number | null;
+  /** Ms the game was away. */
+  awayMs: number;
 }
 
 /** Why an App Open ad can't show now (null: it may). */
@@ -255,20 +260,16 @@ export function appOpenBlock(a: AdStatus, c: AppOpenContext): "adFree" | "notRea
   if (a.adFree) return "adFree";
   if (!a.appOpenReady || a.showing) return "notReady";
   if (!c.firstCar || c.playTime < INTERSTITIAL.minPlayTime) return "young";
-  if (c.awayMs !== null && c.awayMs < APP_OPEN.minAwayMs) return "short";
+  if (c.awayMs < APP_OPEN.minAwayMs) return "short";
   if (c.now - c.lastAdAt < INTERSTITIAL.gapMs) return "pause";
   return null;
 }
 
-const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-
 /**
- * The player is back in the game (`awayMs`: how long it was away; null: it is opening).
- * `busy` says whether a tour or a race is on screen. True if an App Open ad was shown.
+ * The player is back in the game (`awayMs`: how long it was away). `busy` says whether a tour or a
+ * race is on screen. True if an App Open ad was shown.
  */
-export async function maybeShowAppOpen(playTime: number, firstCar: boolean, awayMs: number | null, busy: () => boolean): Promise<boolean> {
-  // as the game opens, the ad may still be loading
-  if (awayMs === null) for (let t = 0; t < APP_OPEN.openWaitMs && !status.appOpenReady; t += 250) await wait(250);
+export async function maybeShowAppOpen(playTime: number, firstCar: boolean, awayMs: number, busy: () => boolean): Promise<boolean> {
   const now = Date.now();
   const last = lastAd();
   const ctx: AppOpenContext = { now, playTime, firstCar, lastAdAt: last, openedAt, awayMs };
@@ -277,13 +278,39 @@ export async function maybeShowAppOpen(playTime: number, firstCar: boolean, away
   const storedBefore = readLast();
   lastAdAt = now;
   writeLast(now);
-  const shown = await driver.showAppOpen(awayMs === null ? "open" : "resume").catch(() => false);
+  const shown = await driver.showAppOpen("resume").catch(() => false);
   if (shown) lastAdAt = Date.now();
   else {
     lastAdAt = before;
     writeLast(storedBefore);
   }
   return shown;
+}
+
+/**
+ * The localStorage key of a test build's quicker full-screen limits ({ minOpenMs, gapMs, chance, delayMs,
+ * minAwayMs }): the CI emulator check (scripts/android-device-check.mjs) plays an interstitial and an App
+ * Open ad without waiting the minutes players wait. Read only in a test build (lib/native-ads.ts: an app
+ * id ending in ".debug", which shows Google's test ads): a build for players never reads it.
+ */
+export const AD_TEST_TIMING_KEY = "ice.adTestTiming";
+
+/** A test build's quicker limits (AD_TEST_TIMING_KEY's value): only the numbers named, anything else ignored. */
+export function quickenAdsForTest(raw: string | null) {
+  if (!raw) return;
+  let o: Record<string, unknown>;
+  try {
+    o = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return;
+  }
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : null);
+  for (const k of ["minOpenMs", "gapMs", "chance", "delayMs"] as const) {
+    const v = num(o[k]);
+    if (v !== null) INTERSTITIAL[k] = v;
+  }
+  const away = num(o.minAwayMs);
+  if (away !== null) APP_OPEN.minAwayMs = away;
 }
 
 export async function showAdPrivacyForm() {

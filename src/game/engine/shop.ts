@@ -3,7 +3,7 @@
 // the ad was watched to the end (the ad itself is shown by the app, lib/ads.ts).
 import { SHOP, SHOP_ITEM_BY_ID, type ShopItemId, type ShopPrice } from "../config/shop";
 import type { GameState, Reward } from "../types";
-import { adBlock, countAd, grantAd } from "./ads";
+import { adBlock, adOfferBlock, countAd, grantAd } from "./ads";
 import { remainingOf } from "./construction";
 import type { EconomySnapshot } from "./economy";
 import { grantReward } from "./rewards";
@@ -133,6 +133,12 @@ export function shopBlock(s: GameState, id: ShopItemId, now: number): ShopBlock 
     default:
       return null;
   }
+}
+
+/** Why a shop item isn't offered now: shopBlock, and an instant build with too little left for an ad (adOfferBlock). */
+export function shopOfferBlock(s: GameState, id: ShopItemId, now: number): ShopBlock {
+  if (id === "build") return adOfferBlock(s, "build", now, longestJob(s));
+  return shopBlock(s, id, now);
 }
 
 /**

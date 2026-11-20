@@ -1,0 +1,5 @@
+Noutăți în 1.4.3:
+• „Bine ai revenit!” și recompensa zilnică arată oferta ×2 cât timp se încarcă reclama
+• Nicio reclamă pe tot ecranul la deschiderea jocului sau peste un dialog
+• Reclamele revin mai repede când revine conexiunea
+• Reparații și stabilitate

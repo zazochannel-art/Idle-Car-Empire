@@ -16,7 +16,7 @@ your choices or manual approval: they can't be done from the repository.
 | Legal pages | [privacy policy](https://zazochannel-art.github.io/Idle-Car-Empire/privacy/), [terms of use](https://zazochannel-art.github.io/Idle-Car-Empire/terms/), [account deletion](https://zazochannel-art.github.io/Idle-Car-Empire/delete-account/), each with a section in every game language (en/ro/ru/es/pt/de; the full text is the English one), also linked in the game (Settings, the account form), which opens them at the player's language |
 | Players' content (Google Play's [UGC policy](https://support.google.com/googleplay/android-developer/answer/9876937)) | terms accepted when creating an account, a name filter in the game and on the server, in-app reports of players and alliances, hiding players; [moderation.md](../moderation.md) |
 | Accounts | registration works for every address (no confirmation email needed); in-app account deletion; *Forgot password?* (by email once SMTP is set, else the contact address) |
-| Ads | rewarded ads only, Google AdMob with Google's consent form (UMP); test ads until you set your AdMob ids ([ads.md](ads.md)) |
+| Ads | rewarded ads (always the player's choice), and after the first hour of play full-screen ads (interstitial at a break, App Open on coming back); Google AdMob with Google's consent form (UMP); *Publish to Google Play* stops without the account's own AdMob ids ([ads.md](ads.md)) |
 | In-app purchases | a starter pack and ad-free rewards through Google Play Billing, **off** until you create the products and set their ids ([iap.md](iap.md)) |
 | Ratings | the store's own rating card after collecting the offline earnings, for engaged players, at most every 45 days (`src/lib/review.ts`) |
 | Updates | when Google Play has a newer version, the game offers it (Update opens Play's own update screen; Later is always there), once per new version and again every 3 days (`src/lib/play-update.ts`); nothing to set up, it works for any app installed from Play |
@@ -44,9 +44,11 @@ your choices or manual approval: they can't be done from the repository.
 6. **A reviewer account** (*App access*, below): create one in the game and
    enter its email and password in Play Console. Not in this repository.
 7. **AdMob** ([ads.md](ads.md)): create the account and the app (link it to
-   the Play listing once it exists), set the `ADMOB_APP_ID` and
-   `ADMOB_REWARDED_ID` repository variables. Until then the game shows test
-   ads, which pay nothing (the Android build warns about it).
+   the Play listing once it exists), set the `ADMOB_APP_ID`,
+   `ADMOB_REWARDED_ID`, `ADMOB_INTERSTITIAL_ID` and `ADMOB_APP_OPEN_ID`
+   repository variables. Without them a build shows test ads, which pay
+   nothing: the Android build warns about it, and *Publish to Google Play*
+   refuses to build.
 8. **First upload by hand**: download `idle-car-empire-release-aab` from the
    latest *Actions → Android* run on `main` (signed), then Testing → Internal
    testing → Create release → upload `app-release.aab` → accept **Play App
@@ -117,7 +119,7 @@ Management, Simulation.
 
 **Privacy policy**: the URL above.
 
-**Ads**: *Yes, my app contains ads* (rewarded ads, Google AdMob).
+**Ads**: *Yes, my app contains ads* (rewarded, interstitial and App Open ads, Google AdMob). The store listing and the privacy policy describe both kinds: rewarded ads the player chooses, and occasional full-screen ads after the first hour of play.
 
 **Advertising ID**: *Yes* (the Google Mobile Ads SDK adds the `AD_ID`
 permission), for **Advertising or marketing**.

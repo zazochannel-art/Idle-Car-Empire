@@ -288,6 +288,7 @@ export const de: Record<MessageKey, string> = {
   "ad.closedBody": "Die Belohnung gibt es, wenn die Werbung bis zum Ende gelaufen ist.",
   "ad.failed": "Die Werbung konnte nicht gezeigt werden",
   "ad.failedBody": "Versuch es gleich noch einmal.",
+  "ad.loading": "📺 Werbung wird geladen…",
   "ad.refused": "Nichts abzuholen",
   "ad.refusedBody": "Die Belohnung wurde schon abgeholt oder ist nicht mehr verfügbar.",
   "ad.limit": "Das war alle Werbung für heute: morgen gibt es mehr.",
