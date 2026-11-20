@@ -36,8 +36,18 @@ const PORT = 9333;
 fs.mkdirSync(outDir, { recursive: true });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-/** A company with 3 hours of play and its first car (the e2e checks' save), as the game stores it on the phone. */
-const readFileSync3h = () => fs.readFileSync(new URL("../e2e/fixtures/save-3h.json", import.meta.url), "utf8");
+/**
+ * A company with 3 hours of play and its first car (the e2e checks' save), as the game stores it on the
+ * phone. Its pending choices are taken out (a recall to pay or risk, a staff or poaching card): their
+ * cards wait for an answer, Back doesn't close them, and no full-screen ad shows over one.
+ */
+const readFileSync3h = () => {
+  const copy = JSON.parse(fs.readFileSync(new URL("../e2e/fixtures/save-3h.json", import.meta.url), "utf8"));
+  if (copy.state.quality) copy.state.quality.recall = null;
+  if (copy.state.staff) copy.state.staff.card = null;
+  if (copy.state.engineers) copy.state.engineers.poach = null;
+  return JSON.stringify(copy);
+};
 // every adb call is bounded (an install takes a minute at most): an emulator that dies mid-run makes
 // a call throw, and the run ends with what it found, instead of holding the job to its time limit
 const ADB_TIMEOUT = 180_000;
@@ -484,13 +494,28 @@ try {
     await sleep(8000);
     for (let i = 0; i < 10 && onAdScreen(); i++) {
       await stopOthersNotResponding();
+      // (the "Viewing full screen" notice, if it came anyway, is dismissed first: it holds the focus)
+      if (focus().some((l) => /ImmersiveModeConfirmation/.test(l))) {
+        console.log("      (Android's full-screen notice was on screen: dismissed)");
+        adb("shell", "input", "keyevent", "KEYCODE_TAB");
+        adb("shell", "input", "keyevent", "KEYCODE_ENTER");
+        await sleep(2000);
+      }
       adb("shell", "input", "keyevent", "KEYCODE_BACK");
       await sleep(4000);
     }
     return !onAdScreen();
   };
+  // a choice card (a recall, the staff, a rival poaching) that came up meanwhile: Back never closes one
+  // (the player must choose), so its last button is tapped (the "no" of each)
+  const ANSWER_CHOICE = `(() => { const card = [...document.querySelectorAll('[role="dialog"]:not([data-state])')].at(-1); const b = card && [...card.querySelectorAll("button:not([disabled])")].at(-1); if (!b) return false; b.click(); return true; })()`;
   const closeDialogs = async () => {
     for (let i = 0; i < 8 && (await evaluate(DIALOG_OPEN).catch(() => false)); i++) {
+      if (await evaluate(ANSWER_CHOICE).catch(() => false)) {
+        console.log("      (a choice card was on screen: answered)");
+        await sleep(1500);
+        continue;
+      }
       await pressBack();
       await until(noDialog, 10_000);
     }
@@ -512,6 +537,9 @@ try {
     await launch();
   };
   const PLAYED = `(() => { const r = localStorage.getItem(${JSON.stringify(SAVE)}); return r ? Math.round(JSON.parse(r).state.lifetime.playTime) : 0; })()`;
+  // Android's one-time "Viewing full screen" notice, which a full-screen ad can bring up, takes the keys
+  // meant for the ad (seen: Back never reached the App Open ad): this phone has seen it already
+  adbOr("", "shell", "settings", "put", "secure", "immersive_mode_confirmations", "confirmed");
   const before3h = await evaluate(`localStorage.getItem(${JSON.stringify(SAVE)})`);
   const since3h = deviceTime();
   await replaceSave(readFileSync3h(), { minOpenMs: 0, gapMs: 0, chance: 1, minAwayMs: 20_000 });
