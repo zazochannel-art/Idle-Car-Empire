@@ -422,8 +422,8 @@ describe("the welcome page before the game", () => {
     await alice.saves.start(T0, registers(alice, "Alice"));
 
     const pc = device(server);
-    const signIn = vi.fn(async (returning: boolean, guestGame: boolean) => {
-      expect([returning, guestGame]).toEqual([false, false]);
+    const signIn = vi.fn(async (returning: boolean) => {
+      expect(returning).toBe(false);
       // a name that is taken: nothing else happens, and the next try goes on with the same account
       expect(await pc.saves.welcomeRegister("alice", "b@test.dev", "secret1", "")).toMatchObject({ ok: false, error: "taken", field: "name" });
       const first = pc.cloud.user;
@@ -500,28 +500,53 @@ describe("the welcome page before the game", () => {
     expect((await again.saves.start(T0 + 60_000, hooks())).state?.cash).toBe(3);
   });
 
-  it("a guest from before (who played without an account) creates one and keeps its game", async () => {
+  it("a guest account plays at once, with no welcome page, and keeps its game", async () => {
     const server = new Server();
     const pc = device(server);
-    // the game used to let players in as guests: an anonymous account with a game
+    // "Play now" on an earlier visit: an anonymous account with a game
     await pc.cloud.signInGuest();
     const id = pc.cloud.user!;
     server.rows.set(id, { data: game(5), version: SAVE_VERSION, revision: 1, updatedAt: T0 });
     pc.saves.local.write({ state: game(5), savedAt: T0, owner: id, base: 1, dirty: false });
 
-    const signIn = vi.fn(async (returning: boolean, guestGame: boolean) => {
-      expect([returning, guestGame]).toEqual([false, true]);
-      expect(await pc.saves.welcomeRegister("Gus", "g@test.dev", "secret1", "")).toEqual({ ok: true });
-    });
-    const res = await pc.saves.start(T0 + 60_000, hooks({ signIn }));
-    expect(signIn).toHaveBeenCalledOnce();
+    const res = await pc.saves.start(T0 + 60_000, hooks());
     expect(res.state?.cash).toBe(5);
-    // the same account, now with an email and a password
+    expect(pc.saves.account).toMatchObject({ id, guest: true });
+  });
+
+  it("\"Play now\" starts a guest on the welcome page, who later adds an email and a password and keeps the same game", async () => {
+    const server = new Server();
+    const pc = device(server);
+    const signIn = vi.fn(async (returning: boolean) => {
+      expect(returning).toBe(false);
+      expect(await pc.saves.playAsGuest()).toEqual({ ok: true });
+    });
+    const res = await pc.saves.start(T0, hooks({ signIn }));
+    expect(signIn).toHaveBeenCalledOnce();
+    expect(res.state).toBeNull();
+    const id = pc.saves.account!.id;
+    expect(pc.saves.account).toMatchObject({ guest: true });
+    // a retry of "Play now" goes on with the same account
+    expect(await pc.saves.playAsGuest()).toEqual({ ok: true });
+    expect(server.users.size).toBe(1);
+    // later: the email and the password (Profile, or the card after the first car)
+    expect(await pc.saves.register("g@test.dev", "secret1", "")).toEqual({ ok: true });
     expect(pc.saves.account).toMatchObject({ id, guest: false, email: "g@test.dev" });
     expect(server.users.size).toBe(1);
   });
 
-  it("a guest from before who signs in to another account: its game stays on this device as a backup", async () => {
+  it("the short form (no name) keeps the server's name for the player", async () => {
+    const server = new Server();
+    const pc = device(server);
+    const signIn = async () => {
+      expect(await pc.saves.welcomeRegister(null, "n@test.dev", "secret1", "")).toEqual({ ok: true });
+    };
+    await pc.saves.start(T0, hooks({ signIn }));
+    expect(pc.saves.account).toMatchObject({ guest: false, email: "n@test.dev" });
+    expect(server.users.size).toBe(1);
+  });
+
+  it("a guest who signs in to another account: its game stays on this device as a backup", async () => {
     const server = new Server();
     const other = device(server);
     await other.saves.start(T0, registers(other, "Hal", "h@test.dev"));
@@ -531,10 +556,8 @@ describe("the welcome page before the game", () => {
     const pc = device(server);
     await pc.cloud.signInGuest();
     pc.saves.local.write({ state: game(5), savedAt: T0, owner: pc.cloud.user!, base: 0, dirty: true });
-    const signIn = vi.fn(async () => {
-      expect(await pc.saves.welcomeLogin("h@test.dev", "secret1")).toEqual({ ok: true });
-    });
-    const res = await pc.saves.start(T0 + 60_000, hooks({ signIn }));
+    expect(await pc.saves.welcomeLogin("h@test.dev", "secret1")).toEqual({ ok: true });
+    const res = await pc.saves.start(T0 + 60_000, hooks());
     expect(res.state?.cash).toBe(900);
     expect(pc.saves.backups().map((b) => b.summary.cash)).toEqual([5]);
   });

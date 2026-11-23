@@ -55,6 +55,7 @@ import { UnlockCard } from "./unlock-card";
 import { RecallDialog } from "./recall-dialog";
 import { StaffDialog } from "./staff-dialog";
 import { CompanyNameDialog } from "./company-name";
+import { SaveAccountDialog } from "./save-account";
 import { MenuUnlockWatcher, useFreshTiles, viewLocked } from "./menu-unlocks";
 import { menuOpen } from "@/game/engine/menu";
 import { PoachDialog } from "../views/expansion-cards";
@@ -391,6 +392,7 @@ function Shell() {
       <RecallDialog />
       <StaffDialog />
       <CompanyNameDialog />
+      <SaveAccountDialog />
       <MenuUnlockWatcher />
       <PoachDialog />
 

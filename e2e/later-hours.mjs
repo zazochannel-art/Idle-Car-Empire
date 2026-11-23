@@ -154,12 +154,10 @@ try {
   });
 
   await step("create the account", async () => {
-    await page.getByLabel("Player name").fill("E2E Driver");
     await page.getByLabel("Email").fill("new.player@example.com");
     await page.getByLabel("Password").fill("First-minutes-2026");
     await page.getByRole("button", { name: "Create account and play" }).click();
     await page.getByText("Check your email").waitFor();
-    if (server_.profile?.username !== "E2E Driver") throw new Error(`the server got the name ${JSON.stringify(server_.profile?.username)}`);
   });
 
   await step("enter the game", async () => {

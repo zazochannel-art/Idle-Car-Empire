@@ -124,17 +124,14 @@ Management, Simulation.
 **Advertising ID**: *Yes* (the Google Mobile Ads SDK adds the `AD_ID`
 permission), for **Advertising or marketing**.
 
-**App access**: *All or some functionality in my app is restricted*: the game
-needs an account.
-- **(you)** create an account for the reviewers in the game (any name, an
-  email address you own, a password) and enter that email and password in
-  Play Console → App access. Never put the password in this repository.
-- Instructions: "Open the app, tap *Sign in* on the welcome page, enter the
-  email and password above. (Anyone can also create an account: *Create
-  account* needs a name, an email and a password, no confirmation email.)"
-- The same credentials let the **pre-launch report**'s test robot sign in
-  (Testing → Pre-launch report → Settings → *Sign-in credentials*, or it
-  uses App access).
+**App access**: *All functionality is available without special access*: "Play
+now" starts a guest account with no form. (Before "Play now" existed the game
+needed an account and this said *restricted*: change the declaration in Play
+Console → App content → App access when this version is out.)
+- No credentials are needed: the reviewers and the **pre-launch report**'s
+  test robot tap *Play now* on the welcome page. (An account with an email and
+  a password still works: *Sign in*, or *Create account*, which needs an
+  email and a password, no name and no confirmation email to play.)
 
 **Content rating** (IARC questionnaire), as the game is today:
 - Category: Game.

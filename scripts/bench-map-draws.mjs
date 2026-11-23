@@ -70,13 +70,12 @@ await page.goto(BASE, { timeout: 240_000 });
 await page.getByText("Welcome to Idle Car Empire!").waitFor({ timeout: 240_000 });
 // the dev build hydrates late: fill until the values stick
 for (let i = 0; i < 20; i++) {
-  await page.getByLabel("Player name").fill("Tester");
   await page.getByLabel("Email").fill("bench@example.com");
   await page.getByLabel("Password").fill("Quartz-lantern-4082");
-  if ((await page.getByLabel("Player name").inputValue()) === "Tester" && (await page.getByRole("button", { name: "Create account and play" }).isEnabled())) break;
+  if ((await page.getByLabel("Email").inputValue()) === "bench@example.com" && (await page.getByRole("button", { name: "Create account and play" }).isEnabled())) break;
   await page.waitForTimeout(3000);
 }
-console.log("filled", await page.getByLabel("Player name").inputValue());
+console.log("filled", await page.getByLabel("Email").inputValue());
 await page.getByRole("button", { name: "Create account and play" }).click();
 console.log("clicked");
 await page.getByText("Check your email").waitFor();

@@ -29,19 +29,11 @@ export interface StartHooks {
   /** Both copies hold progress the other has not: the player keeps one. */
   choose(local: SaveSummary, cloud: SaveSummary, reason: "both-changed" | "different-games"): Promise<"local" | "cloud">;
   /**
-   * The welcome page: no account is signed in on this device (a new player, after a logout, or
-   * a guest from when the game could be played without an account, `guestGame` when its game is
-   * here). Resolves once the player registered or signed in.
+   * The welcome page: no account is signed in on this device (a new player, or after a logout).
+   * Resolves once the player registered, signed in or chose to play as a guest.
    */
-  signIn(returning: boolean, guestGame: boolean): Promise<void>;
+  signIn(returning: boolean): Promise<void>;
 }
-
-/**
- * Who may play: an account with an email and a password, or one just registered whose email is
- * still to be confirmed. A guest (an anonymous account, from when the game could be played
- * without an account) registers first, keeping its game.
- */
-export const registered = (a: Account): boolean => !a.guest || !!a.pendingEmail;
 
 export interface StartResult {
   /** The game to play (null: a new company). */
@@ -138,12 +130,12 @@ export class SaveManager {
     const legacy = this.local.read(null);
     if (!this.backend) return { state: legacy ? this.read(legacy.state, now) : null, mode: "local" };
 
-    // who plays: the account signed in on this device, or whoever registers or signs in on the
-    // welcome page. Nobody plays without an account: the page stays until there is one.
+    // who plays: the account signed in on this device, or whoever registers, signs in or starts as a
+    // guest on the welcome page. A guest (an anonymous account) plays at once and adds an email and a
+    // password later (Profile, or the card that asks after the first car), keeping the same save.
     let account = await this.currentAccount();
-    while (!account || !registered(account)) {
-      const guestGame = !!account?.guest && !!this.local.read(account.id);
-      await hooks.signIn(flag(SIGNED_OUT_KEY), guestGame);
+    while (!account) {
+      await hooks.signIn(flag(SIGNED_OUT_KEY));
       account = await this.currentAccount();
     }
     flag(SIGNED_OUT_KEY, false);
@@ -342,14 +334,11 @@ export class SaveManager {
   }
 
   /**
-   * The welcome page's "create account": a new account with this name, email and password.
-   * (It starts as a guest account that gets the email and password, so a confirmation link
-   * the player hasn't clicked yet never blocks the game.) A failed attempt can be retried:
-   * it goes on with the same account.
+   * The welcome page's "Play now": a guest account (anonymous sign-in), signed in on this device
+   * only until an email and a password are added. Its name is the server's "Player-…" one.
+   * The same account is used if one is already signed in (a retry).
    */
-  async welcomeRegister(username: string, email: string, password: string, redirectTo: string): Promise<AuthResult & { field?: "name" }> {
-    // the server checks the name too; this answers at once, before an account is made
-    if (!isCleanName(username)) return { ok: false, error: "blocked", field: "name" };
+  async playAsGuest(): Promise<AuthResult> {
     if (!this.backend) return { ok: false, error: "network" };
     try {
       // the robot check may wait for the player's tap (lib/captcha.ts)
@@ -357,9 +346,26 @@ export class SaveManager {
     } catch (e) {
       return { ok: false, error: captchaFailed(e) ? "captcha" : "network" };
     }
-    const named = await this.backend.updateProfile({ username });
-    if (!named.ok) return { ...named, field: "name" };
-    return this.backend.register(email, password, redirectTo);
+    return { ok: true };
+  }
+
+  /**
+   * The welcome page's "create account": a new account with this email and password, and this
+   * name (none: the server's "Player-…" name stays, to change in the Profile). (It starts as a
+   * guest account that gets the email and password, so a confirmation link the player hasn't
+   * clicked yet never blocks the game.) A failed attempt can be retried: it goes on with the
+   * same account.
+   */
+  async welcomeRegister(username: string | null, email: string, password: string, redirectTo: string): Promise<AuthResult & { field?: "name" }> {
+    // the server checks the name too; this answers at once, before an account is made
+    if (username !== null && !isCleanName(username)) return { ok: false, error: "blocked", field: "name" };
+    const guest = await this.playAsGuest();
+    if (!guest.ok) return guest;
+    if (username !== null) {
+      const named = await this.backend!.updateProfile({ username });
+      if (!named.ok) return { ...named, field: "name" };
+    }
+    return this.backend!.register(email, password, redirectTo);
   }
 
   /**

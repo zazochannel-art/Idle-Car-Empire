@@ -298,7 +298,7 @@ async function launch() {
   adb("shell", "am", "start", "-W", "-n", `${PKG}/${ACTIVITY}`);
   await connect();
   // a build without the cloud (android.yml makes one for this check) goes straight in; a cloud
-  // build stops at the welcome page, where only an account gets in
+  // build stops at the welcome page (Play now, or an account, gets in)
   const end = Date.now() + 240_000;
   let since = Date.now();
   while (Date.now() < end) {
@@ -309,7 +309,7 @@ async function launch() {
       return;
     }
     if (await evaluate(`!!document.querySelector('form input[type="password"]')`, 30_000).catch(() => false))
-      throw new Error("the welcome page asks for an account: this check needs a build without the Supabase settings");
+      throw new Error("the welcome page is up: this check needs a build without the Supabase settings");
     // Android can recreate the activity as it starts (a new WebView, the first page dropped):
     // after a while without the game, follow the newest page
     if (Date.now() - since > 30_000) {
