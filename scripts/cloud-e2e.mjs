@@ -11,6 +11,7 @@
 // It leaves nothing behind: each test player deletes its own save, then its
 // account.
 import { createClient } from "@supabase/supabase-js";
+import { execFileSync } from "node:child_process";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -154,12 +155,24 @@ check((await redeem(a, inviteB?.code)) === "self", "A can't use the code of a fr
 check((await b.client.rpc("player_by_code", { p_code: ` ${inviteA?.code?.toLowerCase()} ` })).data === idA, "B finds A by A's code (typed loosely)");
 check((await b.client.rpc("player_by_code", { p_code: "NOPE22" })).data === null, "an unknown code finds nobody");
 check((await a.client.rpc("my_invite")).data?.friends === 1 && (await a.client.rpc("claim_invite_rewards")).data === 0, "A sees one friend, no reward before B's first car");
-const sB2 = one(await b.client.rpc("save_game", { p_data: { cash: 7, lifetime: { carsProduced: 1 } }, p_save_version: 3, p_base_revision: Number(sB?.revision ?? 1), p_device: "e2e" }));
+const sB2 = one(await b.client.rpc("save_game", { p_data: { cash: 7, lifetime: { carsProduced: 1, playTime: 1200 } }, p_save_version: 3, p_base_revision: Number(sB?.revision ?? 1), p_device: "e2e" }));
 check(sB2?.ok === true, "B builds their first car");
-check((await a.client.rpc("my_invite")).data?.due === 1, "A's reward is due");
-check((await b.client.rpc("claim_invite_rewards")).data === 0, "B can't take A's reward");
-check((await a.client.rpc("claim_invite_rewards")).data === 1, "A takes it");
-check((await a.client.rpc("claim_invite_rewards")).data === 0 && (await a.client.rpc("my_invite")).data?.rewarded === 1, "only once");
+// (0036) a car and play time aren't enough on a brand-new account: the reward waits for the account to be 2 hours old
+check((await a.client.rpc("my_invite")).data?.due === 0 && (await a.client.rpc("claim_invite_rewards")).data === 0, "A's reward still waits: B's account is minutes old");
+// The account's age is the server's clock, which the public API can't move. On the local copy (database.yml
+// gives DB_URL) B's account is made 3 hours old; against a real project there is no way to, so the rest of the
+// invite check is skipped there.
+if (process.env.DB_URL) {
+  execFileSync("psql", [process.env.DB_URL, "-v", "ON_ERROR_STOP=1", "-q", "-c", `update auth.users set created_at = now() - interval '3 hours' where id = '${idB}'`]);
+  check((await a.client.rpc("my_invite")).data?.due === 1, "A's reward is due (B's account is 2 hours old, with a car and 15 minutes of play)");
+} else {
+  console.log("SKIP  A's reward is due, taken, only once: needs the local copy (DB_URL) to age B's account");
+}
+if (process.env.DB_URL) {
+  check((await b.client.rpc("claim_invite_rewards")).data === 0, "B can't take A's reward");
+  check((await a.client.rpc("claim_invite_rewards")).data === 1, "A takes it");
+  check((await a.client.rpc("claim_invite_rewards")).data === 0 && (await a.client.rpc("my_invite")).data?.rewarded === 1, "only once");
+}
 const invitesTable = await b.client.schema("ops").from("invites").select("invitee");
 const codesTable = await b.client.schema("ops").from("invite_codes").select("code");
 check(!!invitesTable.error && !!codesTable.error, "the invite tables aren't reachable from the API", invitesTable.error?.code);
