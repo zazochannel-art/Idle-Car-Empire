@@ -555,6 +555,9 @@ async function setup(testBuild: boolean) {
       added.push(await AdMob.addListener(InterstitialAdPluginEvents.Dismissed, () => interstitialClosed(true)));
       added.push(
         await AdMob.addListener(InterstitialAdPluginEvents.FailedToShow, (err) => {
+          // on a slow phone the SDK reports "Timeout for show call succeed." with the ad already on
+          // screen (seen on the CI emulator): only its real close ends it, as for a rewarded ad
+          if (interstitialVisible) return;
           failedToShow("interstitial")(err);
           interstitialClosed(false);
         }),
@@ -568,6 +571,8 @@ async function setup(testBuild: boolean) {
       added.push(await AdMob.addListener(AppOpenAdPluginEvents.Closed, () => appOpenClosed(true)));
       added.push(
         await AdMob.addListener(AppOpenAdPluginEvents.FailedToShow, (err) => {
+          // the same late "Timeout for show call succeed.": the ad is on screen, its close ends it
+          if (appOpenVisible) return;
           failedToShow("appOpen")(err);
           appOpenClosed(false);
         }),

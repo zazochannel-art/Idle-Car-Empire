@@ -324,6 +324,50 @@ describe("an ad whose close never comes", () => {
   });
 });
 
+describe("the SDK's 'failed to show' that comes after the ad is on screen", () => {
+  it("App Open: the ad stays up (and the game keeps waiting) until its real close", async () => {
+    await native.startAds();
+    await minutes(10);
+    const shown = ads.maybeShowAppOpen(ads.INTERSTITIAL.minPlayTime, true, ads.APP_OPEN.minAwayMs, () => false);
+    await seconds(0);
+    emit("appOpenOpened");
+    // "Timeout for show call succeed.", seen on the CI emulator 0.5 s after the ad appeared
+    emit("appOpenFailedToShow");
+    await seconds(1);
+    expect(ads.getAdStatus().showing).toBe(true);
+    const loads = h.appOpenLoads;
+    emit("appOpenClosed");
+    expect(await shown).toBe(true);
+    expect(ads.getAdStatus().showing).toBe(false);
+    await seconds(1);
+    expect(h.appOpenLoads).toBeGreaterThanOrEqual(loads);
+  });
+
+  it("full-screen: the same", async () => {
+    await native.startAds();
+    await minutes(10);
+    const shown = ads.maybeShowInterstitial(ads.INTERSTITIAL.minPlayTime, true, 0);
+    await seconds(0);
+    emit("interstitialShowed");
+    emit("interstitialFailedToShow");
+    await seconds(1);
+    expect(ads.getAdStatus().showing).toBe(true);
+    emit("interstitialDismissed");
+    expect(await shown).toBe(true);
+    expect(ads.getAdStatus().showing).toBe(false);
+  });
+
+  it("one that fails before it appears still ends the wait", async () => {
+    await native.startAds();
+    await minutes(10);
+    const shown = ads.maybeShowAppOpen(ads.INTERSTITIAL.minPlayTime, true, ads.APP_OPEN.minAwayMs, () => false);
+    await seconds(0);
+    emit("appOpenFailedToShow");
+    expect(await shown).toBe(false);
+    expect(ads.getAdStatus().showing).toBe(false);
+  });
+});
+
 describe("the SDK's 'failed to show' that comes before the ad appears", () => {
   it("an ad that appears a moment later is watched like any other: no 'couldn't be shown' over it", async () => {
     await native.startAds();
