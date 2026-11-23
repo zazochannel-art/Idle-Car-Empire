@@ -25,6 +25,11 @@ on:
         description: "Also upload the store listing (texts, icon, feature graphic, screenshots)"
         type: boolean
         default: false
+      update_priority:
+        description: "In-app update priority 0-5 (0: none; 4 or 5: the game makes the update required for older builds, docs/android/play-store.md). Only for a build that older ones must not outlive."
+        type: choice
+        options: ["0", "1", "2", "3", "4", "5"]
+        default: "0"
 
 permissions:
   contents: read
@@ -144,12 +149,16 @@ jobs:
           TRACK: ${{ inputs.track }}
           STATUS: ${{ inputs.status }}
           LISTING: ${{ inputs.listing }}
+          UPDATE_PRIORITY: ${{ inputs.update_priority }}
         run: |
           sudo gem install fastlane --no-document --quiet
           printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/play.json"
           skip=true
           [ "$LISTING" = "true" ] && skip=false
-          fastlane supply \
+          # only when asked for: the default run is the one that always worked
+          priority=()
+          [ "${UPDATE_PRIORITY:-0}" != "0" ] && priority=(--in_app_update_priority "$UPDATE_PRIORITY")
+          fastlane supply "${priority[@]}" \
             --package_name com.zazochannel.idlecarempire \
             --json_key "$RUNNER_TEMP/play.json" \
             --aab android/app/build/outputs/bundle/release/app-release.aab \

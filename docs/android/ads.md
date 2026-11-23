@@ -40,8 +40,9 @@ and then, with no reward**. It never shows in the middle of something:
 - not in the first hour of a company, and not before its first car is built (a new
   company makes it at about 45 minutes), nor in the first 3 minutes after
   the app opens;
-- a break of 3 minutes after **any** ad (a rewarded one counts); after it, every
-  eligible close shows one; there is **no limit a day**. Not more often: AdMob
+- a break of 5 minutes after **any** ad (a rewarded one counts); after it, every
+  eligible close shows one, at most **12 a day** (these and the App Open ads together,
+  counted on the phone: `INTERSTITIAL.perDay`). Not more often: AdMob
   and Google Play count ads that keep interrupting the game as disruptive, which
   can limit the account's ad serving;
 - **never with the ad-free rewards purchase**.
@@ -71,7 +72,7 @@ An **App Open** ad can show when the player comes back to the game:
   (Google: App Open ads go over a loading screen, never over content in use);
 - never in a company with under an hour of play or before its first car (so never on the first
   opens or over the tour), never over a race;
-- the same 3-minute pause after any ad as above, and no limit a day;
+- the same 5-minute pause after any ad as above, and the same 12 a day;
 - **never with the ad-free rewards purchase**, and only after the consent.
 
 The code is `maybeShowAppOpen` in `src/lib/ads.ts` (the limits are in
@@ -85,9 +86,11 @@ always asks for a new ad, and one past its 4 hours is never shown
 (iOS: `ADMOB_APP_OPEN_ID_IOS`). Until it is set the build uses Google's sample
 unit (`ca-app-pub-3940256099942544/9257395921`), which pays nothing.
 
-There is **no limit on the rewarded ads**: the shop's packs and mystery box are
-there for every ad, a boost adds up to 4 hours, any job can be finished; only
-what has nothing to give is not offered (the offline report and the daily login
+The rewarded ads that finish a job or add a boost have **no daily limit** (a boost
+adds up to 4 hours, any job can be finished). The shop's money and research packs
+(10 of each a day) and the mystery box (5 a day) have one (`SHOP.packsPerDay`,
+`SHOP.boxesPerDay` in `src/game/config/shop.ts`): each pack is 30 minutes of income, and
+without a limit the ads would pay out a day's income in a few minutes. What has nothing to give is not offered (the offline report and the daily login
 are taken once, a job needs time left). The numbers live in
 `src/game/config/ads.ts`; the rules in `src/game/engine/ads.ts` (tested in
 `src/game/ads.test.ts`).

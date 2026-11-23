@@ -292,3 +292,13 @@ about every August. Capacitor's next major versions bring the next target.
   them; the rating card in the game asks engaged players.
 - **The keep-alive run**: if *Supabase keep-alive* turns red, restore the
   project in the Supabase dashboard.
+
+## A required update (retiring an old build)
+
+A build that older ones must not outlive (a save format they would break, a purchase bug) can be made
+**required**: run *Publish to Google Play* with `update_priority` 4 or 5. Google Play records that
+priority with the release, and the game (`PlayUpdate`, `lib/play-update.ts`) shows a dialog without
+*Later* that cannot be closed, on every older build that has the Play update API, as soon as it looks
+(25 s after the start and whenever the app comes back). Priority 0 (the default) changes nothing, and
+the usual optional offer (once, then every 3 days) stays. It works only for players who installed from
+Google Play and whose Play app knows the new release (a few hours after it is rolled out).

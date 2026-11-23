@@ -1,0 +1,6 @@
+Novedades de 1.4.4:
+• «Jugar ya»: empieza como invitado con un toque y añade un correo más tarde para conservar tu empresa
+• «Lo siguiente» ya no ahorra para la planta de hidrógeno antes que las plantas baratas de piezas: el juego avanzado crece más rápido
+• Tienda: hasta 10 paquetes de dinero, 10 de investigación y 5 cajas sorpresa al día
+• Anuncios a pantalla completa: como mucho uno cada 5 minutos y 12 al día
+• Correcciones y estabilidad

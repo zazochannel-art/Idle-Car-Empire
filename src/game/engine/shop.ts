@@ -101,8 +101,8 @@ export function shopReward(id: ShopItemId, snap: EconomySnapshot, s?: GameState,
 
 /**
  * Why an item can't be had now: the crate not ready yet ("wait"), nothing to build, a boost
- * already as long as it can be ("full"), not enough Stars. Null: it can be had. The ad items
- * have no daily limit: the packs and the mystery box are there for every ad.
+ * already as long as it can be ("full"), not enough Stars, the day's packs or boxes taken
+ * ("limit": SHOP.packsPerDay of each pack, SHOP.boxesPerDay boxes). Null: it can be had.
  */
 export type ShopBlock = "wait" | "limit" | "nothing" | "active" | "full" | "stars" | null;
 
@@ -131,6 +131,11 @@ export function shopBlock(s: GameState, id: ShopItemId, now: number): ShopBlock 
       return adBlock(s, "build", now, longestJob(s));
     case "boostLong":
       return s.ads.boostLeft + SHOP.boostLong > SHOP.boostCap ? "full" : null;
+    case "cash":
+    case "research":
+      return packsToday(s, id, now) >= SHOP.packsPerDay ? "limit" : null;
+    case "box":
+      return boxesToday(s, now) >= SHOP.boxesPerDay ? "limit" : null;
     default:
       return null;
   }
@@ -172,7 +177,7 @@ export function buyShop(s: GameState, id: ShopItemId, now: number, snap: Economy
 
 /** A save's shop, within bounds (the merge already gave every field its type). */
 export function migrateShop(sh: ShopState, now: number): ShopState {
-  // (counts only, for the day: nothing is limited by them)
+  // (the day's counts: shopBlock limits the packs and boxes by them)
   const packs = (n: number) => Math.max(0, Math.min(1_000_000, Math.floor(Number.isFinite(n) ? n : 0)));
   return {
     // a time from the future (a clock set back) would hold the crate for ever

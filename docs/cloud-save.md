@@ -263,8 +263,11 @@ one friend's code in their account's first 7 days:
   their income (`src/game/engine/invites.ts`).
 - **The friend** gets 2 ⭐ and 30 minutes of income once the new player has
   built their first car, for up to 10 friends in all. The server reads that
-  from the new player's own cloud save (`lifetime.carsProduced ≥ 1`), so a
-  friend's reward can't be claimed by an account that never played. The game
+  from the new player's own cloud save (`lifetime.carsProduced ≥ 1` and at
+  least 15 minutes of `lifetime.playTime`) and from its own clock (the account
+  is at least 2 hours old, migration 0036), so a friend's reward can't be
+  claimed by an account that never played, nor by guest accounts made and
+  edited in a minute. The game
   collects due rewards on the same timer as gifts.
 - Both are rewards: they don't count as money earned (not for the board, not
   for resets).

@@ -198,3 +198,23 @@ plant kept back, twice (Engine Factory, then the Assembly Plant). The first car 
 | 24 h of play-1-h / away-7-h (`24 sessions`) | $200M | $193M, max owed $2.4K, no rescues |
 
 Only the start moves: from the first car on the economy is the same.
+
+## 9. The late-game plateau, found and fixed (Nov 23, 2026)
+
+A goal-following bot (`goal-bot.ts 24 full`) earned **$13.1B** in 24 h on Nov 9 and **$3.6B** on Nov 23, with
+the same config numbers. Bisecting the commits with the same bot found two causes, both in *what the
+What's-next goals suggest*, not in a price or a rate:
+
+| Cause | What it did | Fix |
+|---|---|---|
+| **The next plant was the first one in the list's order** (#228 put the 150M Hydrogen Works before the transmission, wheel and brake plants, which cost 250–450K). Once its research was done, the goal became "save 150M" and the three cheap model lines were never built: the bot ended with 11 plants instead of 14, only mid-range cars, and empty luxury/supercar showrooms. | A player who follows the hints saves for hours for the wrong plant. | `pickNextPlant` (`engine/insights.ts`): the list's order, but never a plant that costs more than 20× the cheapest open one. The early game is untouched (first car still 30 min 14 s). |
+| **The "dealers are the bottleneck" goal (`dealerSlow`, #218) came before the plant, car-model and upgrade goals.** A cheap dealer step was suggested again and again and kept the goals that raise the price of every car off the 2–3 places of the list. | 24 h: 2.4× less money. | It is listed after those goals, and only while there is room. |
+
+Measured after the fix (same bot): first car 30 min 14 s (unchanged); 3 h $9.1M; 6 h goal-follower
+(`6 q`) $144M (was $97M with the goal first, $18.5M before #218); 8 h `8 q` $299M; 10 h $670M; 24 h full
+**$12.5B** (14–15 plants, $386K/s steady, was 11 plants and $46K/s). Nothing in `config/` changed.
+
+Still true from Nov 9 (not touched): prices in ⭐ are "time of income" (a 24 h warp is worth more the richer the
+company is), and the shop's money packs are 30 minutes of income each. The packs are now limited to 10 a
+day each (`SHOP.packsPerDay`) and the mystery box to 5 (`SHOP.boxesPerDay`): without a limit, 20 ads
+paid out 10 hours of income a day.

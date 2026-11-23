@@ -44,7 +44,8 @@ export const SHOP = {
   crateIncome: 15 * 60,
   crateRp: 10 * 60,
   crateRpMin: 10,
-  /** The ad packs: seconds of income or of research output, as many as the player wants (each one an ad). */
+  /** The ad packs: seconds of income or of research output (each one an ad), this many of each a day. */
+  packsPerDay: 10,
   packIncome: 30 * 60,
   packRp: 30 * 60,
   packRpMin: 25,
@@ -56,7 +57,7 @@ export const SHOP = {
   /** The tycoon pack: a time warp and a research warp of this many seconds, for less than the two. */
   bundle: 8 * 3600,
   /**
-   * The mystery box: one for every ad, as many as the player wants. What each holds is drawn from
+   * The mystery box: one for every ad, this many a day. What each holds is drawn from
    * the company, the day and how many were opened that day (so one can't be tried again for a
    * better prize); weights add up to 100.
    */
@@ -66,6 +67,7 @@ export const SHOP = {
     { weight: 20, incomeSeconds: 3 * 3600 },
     { weight: 10, stars: 1 },
   ] as { weight: number; incomeSeconds?: number; rpSeconds?: number; stars?: number }[],
+  boxesPerDay: 5,
   boxRpMin: 25,
   /** The long ×2 profit boost: seconds added, and the longest the boost can run in all. */
   boostLong: 2 * 3600,

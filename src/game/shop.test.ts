@@ -42,22 +42,24 @@ describe("the shop", () => {
     expect(S.shopReward("research", { ...snap, rpPerSec: 0 }).rp).toBe(SHOP.packRpMin);
   });
 
-  it("ad packs: one for every ad, no limit a day, counted with every other ad", () => {
+  it("ad packs: one for every ad up to the day's limit, counted with every other ad", () => {
     const s = createInitialState(T0);
     const snap = snapshot(s);
     const cash = s.cash;
-    for (let i = 0; i < 25; i++) expect(S.buyShop(s, "cash", T0, snap)).toBe(true);
-    expect(s.cash).toBeCloseTo(cash + 25 * rewardCash({ incomeSeconds: SHOP.packIncome }, snap));
-    expect(S.shopBlock(s, "cash", T0)).toBeNull();
-    // the research packs too, and every pack counts as an ad watched today
-    for (let i = 0; i < 25; i++) expect(S.buyShop(s, "research", T0, snap)).toBe(true);
-    expect(S.packsToday(s, "research", T0)).toBe(25);
-    expect(A.adsToday(s, T0)).toBe(50);
-    // the ads watched today limit nothing
-    s.ads.count = 1000;
-    expect(S.shopBlock(s, "research", T0)).toBeNull();
+    for (let i = 0; i < SHOP.packsPerDay; i++) expect(S.buyShop(s, "cash", T0, snap)).toBe(true);
+    expect(s.cash).toBeCloseTo(cash + SHOP.packsPerDay * rewardCash({ incomeSeconds: SHOP.packIncome }, snap));
+    // the next one is for tomorrow, and gives nothing
+    expect(S.shopBlock(s, "cash", T0)).toBe("limit");
+    expect(S.buyShop(s, "cash", T0, snap)).toBe(false);
+    expect(s.cash).toBeCloseTo(cash + SHOP.packsPerDay * rewardCash({ incomeSeconds: SHOP.packIncome }, snap));
+    // the research packs have their own count, and every pack counts as an ad watched today
+    for (let i = 0; i < SHOP.packsPerDay; i++) expect(S.buyShop(s, "research", T0, snap)).toBe(true);
+    expect(S.shopBlock(s, "research", T0)).toBe("limit");
+    expect(S.packsToday(s, "research", T0)).toBe(SHOP.packsPerDay);
+    expect(A.adsToday(s, T0)).toBe(2 * SHOP.packsPerDay);
     // a new day: the counts start again
     expect(S.packsToday(s, "cash", T0 + 24 * HOUR)).toBe(0);
+    expect(S.shopBlock(s, "cash", T0 + 24 * HOUR)).toBeNull();
   });
 
   it("the ad boost and the instant build are the rewarded ads' own", () => {
@@ -154,7 +156,7 @@ describe("the shop", () => {
     expect(decodeSave(JSON.stringify(older), T0).shop.boxes).toBe(0);
   });
 
-  it("the mystery box: one for every ad, each a new draw that can't be tried again", () => {
+  it("the mystery box: one for every ad up to the day's limit, each a new draw that can't be tried again", () => {
     const s = createInitialState(T0);
     const snap = snapshot(s);
     const prize = S.boxPrize(s, T0);
@@ -169,20 +171,19 @@ describe("the shop", () => {
     expect(s.stars).toBe(stars + (r.stars ?? 0));
     expect(A.adsToday(s, T0)).toBe(1);
     expect(S.boxesToday(s, T0)).toBe(1);
-    // another box at once, and another: no limit a day, each opened one moves to the next draw
+    // another box at once, and another, up to the day's limit; each opened one moves to the next draw
     expect(S.shopBlock(s, "box", T0 + HOUR)).toBeNull();
     const draws = new Set<number>();
-    for (let i = 0; i < 40; i++) {
+    for (let i = 1; i < SHOP.boxesPerDay; i++) {
       draws.add(S.boxPrize(s, T0 + HOUR));
       expect(S.buyShop(s, "box", T0 + HOUR, snap)).toBe(true);
     }
-    expect(S.boxesToday(s, T0)).toBe(41);
+    expect(S.boxesToday(s, T0)).toBe(SHOP.boxesPerDay);
     expect(draws.size).toBeGreaterThan(1);
+    expect(S.shopBlock(s, "box", T0 + HOUR)).toBe("limit");
+    expect(S.buyShop(s, "box", T0 + HOUR, snap)).toBe(false);
     // tomorrow the count starts again
     expect(S.boxesToday(s, T0 + 24 * HOUR)).toBe(0);
-    // the ads watched today limit nothing
-    s.ads.day = dateKey(T0 + 24 * HOUR);
-    s.ads.count = 1000;
     expect(S.shopBlock(s, "box", T0 + 24 * HOUR)).toBeNull();
     // without the company and the day, the box is a surprise
     expect(S.shopReward("box", snap)).toEqual({});

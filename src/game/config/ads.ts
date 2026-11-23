@@ -1,9 +1,10 @@
 /**
  * Rewarded ads (the Android app only): the player chooses to watch one and gets
- * a reward. Nothing in the game needs one. There is no limit on how many: a boost
- * adds up to its cap, any job can be finished, the shop's packs and box are there
- * for every ad; only what has nothing to give is not offered (the offline report
- * collected, the day's login taken, no job to finish).
+ * a reward. Nothing in the game needs one. There is no limit on the offers that
+ * finish a job or boost (a boost adds up to its cap, any job can be finished); the
+ * shop's money and research packs and its mystery box have a limit a day (config/shop.ts),
+ * and what has nothing to give is not offered (the offline report collected, the day's
+ * login taken, no job to finish).
  */
 export type AdReward = "offline" | "build" | "boost" | "login" | "qc";
 

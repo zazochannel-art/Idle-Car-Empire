@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lastOffered, PLAY_UPDATE, playUpdateToOffer, updateOfferDue } from "./play-update";
+import { lastOffered, PLAY_UPDATE, playUpdateRequired, playUpdateToOffer, updateOfferDue, updateRequired } from "./play-update";
 
 const DAY = 86_400_000;
 const NOW = Date.UTC(2026, 9, 19);
@@ -23,5 +23,18 @@ describe("offering a Google Play update", () => {
 
   it("never looks outside the Android app", async () => {
     expect(await playUpdateToOffer(NOW)).toBeNull();
+  });
+
+  it("a release is required from the update priority the publisher gave it", () => {
+    expect(updateRequired(undefined)).toBe(false);
+    expect(updateRequired(0)).toBe(false);
+    expect(updateRequired(PLAY_UPDATE.requiredPriority - 1)).toBe(false);
+    expect(updateRequired(PLAY_UPDATE.requiredPriority)).toBe(true);
+    expect(updateRequired(5)).toBe(true);
+    expect(updateRequired(Number.NaN)).toBe(false);
+  });
+
+  it("never asks Play outside the Android app", async () => {
+    expect(await playUpdateRequired()).toBe(false);
   });
 });
