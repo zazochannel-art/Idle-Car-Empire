@@ -1,7 +1,7 @@
 // A brand-new player's first minutes, end to end: the production build (out/) in a phone-sized
 // browser, against a fake Supabase answered here (nothing reaches the real project).
 //
-//   the welcome page → name, email, password → "check your email" → the game →
+//   the welcome page → "Play now" (a guest account, no form) → the game →
 //   the tutorial's buttons → the factory makes its first body → the first cloud save.
 //
 // It fails on a page error, a step that doesn't happen, or a save that doesn't reach the cloud.
@@ -147,18 +147,11 @@ try {
     await page.getByText("Welcome to Idle Car Empire!").waitFor({ timeout: 120_000 });
   });
 
-  await step("create the account", async () => {
-    await page.getByLabel("Player name").fill("E2E Driver");
-    await page.getByLabel("Email").fill("new.player@example.com");
-    await page.getByLabel("Password").fill("First-minutes-2026");
-    await page.getByRole("button", { name: "Create account and play" }).click();
-    await page.getByText("Check your email").waitFor();
-    if (server_.profile?.username !== "E2E Driver") throw new Error(`the server got the name ${JSON.stringify(server_.profile?.username)}`);
-  });
-
-  await step("enter the game", async () => {
-    await page.getByRole("button", { name: "Enter the game" }).click();
+  await step("play now (a guest account, no form)", async () => {
+    await page.getByRole("button", { name: "Play now" }).click();
     await page.getByText("This is your factory").waitFor({ timeout: 60_000 });
+    if (!server_.calls.includes("POST /auth/v1/signup")) throw new Error("no guest account was made");
+    if (server_.calls.some((c) => c.startsWith("PUT /auth/v1/user"))) throw new Error("an email was asked for before the game");
   });
 
   await step("tutorial: open the factory", async () => {

@@ -34,6 +34,11 @@ function markAsked() {
   }
 }
 
+/** The company's name is still to be asked (a car made, no name, not asked yet on this device). */
+export function companyNameDue(brandName: string, carsProduced: number): boolean {
+  return !brandName && carsProduced >= 1 && !asked();
+}
+
 export function CompanyNameDialog() {
   // whether to ask: a running game, no name yet, a car made, and not asked on this device
   const due = useGame((g) => g.ready && !g.state.brand.name && g.state.lifetime.carsProduced >= 1);

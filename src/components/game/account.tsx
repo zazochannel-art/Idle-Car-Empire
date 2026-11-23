@@ -4,7 +4,7 @@
 // the profile page, the sign-in and registration forms, and the choices the
 // start of the game and a save conflict may ask for.
 import { motion } from "framer-motion";
-import { Cloud, CloudOff, History, KeyRound, LogIn, LogOut, RefreshCw, Trash2, UserPlus } from "lucide-react";
+import { Cloud, CloudOff, History, KeyRound, LogIn, LogOut, Play, RefreshCw, Trash2, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -29,6 +29,7 @@ import { useGame } from "@/store/game-store";
 import { useUi } from "@/store/ui-store";
 import { ViewHeader } from "../views/section-title";
 import { HiddenPlayersCard, TermsConsent } from "./player-safety";
+import { stopAskingToSave } from "@/lib/save-account-ask";
 import { StartLoading } from "./start-screen";
 
 type T = ReturnType<typeof useT>["t"];
@@ -181,7 +182,7 @@ function ForgotPassword({ email: typed }: { email: string }) {
  * Sign in to an account (login), or, for a guest, register: the guest's
  * account gets the email and password, so its save stays the same.
  */
-export function AccountForms({ initial, guest, onDone }: { initial: "login" | "register"; guest: boolean; onDone?: () => void }) {
+export function AccountForms({ initial, guest, registerOnly, onDone }: { initial: "login" | "register"; guest: boolean; registerOnly?: boolean; onDone?: (text: string) => void }) {
   const saves = useGame((g) => g.saves);
   const { t } = useT();
   const [tab, setTab] = useState<"login" | "register">(guest ? initial : "login");
@@ -211,7 +212,7 @@ export function AccountForms({ initial, guest, onDone }: { initial: "login" | "r
   const canSubmit = validEmail(email) && (tab === "register" ? !passwordIssue(password, { email }) : password.length >= 6) && !busy;
   return (
     <div className="space-y-2.5">
-      {guest && (
+      {guest && !registerOnly && (
         <div className="grid grid-cols-2 gap-1 rounded-xl bg-white/[0.04] p-1 ring-1 ring-white/[0.07]">
           {(["register", "login"] as const).map((k) => (
             <button key={k} onClick={() => setTab(k)} className={cn("rounded-lg py-1.5 text-[11px] font-black uppercase tracking-wide", tab === k ? "bg-gold text-black" : "text-white/60")}>
@@ -238,8 +239,10 @@ export function AccountForms({ initial, guest, onDone }: { initial: "login" | "r
                 const account = saves.account;
                 useCloud.setState({ account });
                 void saves.profile().then((profile) => useCloud.setState({ profile }), () => {});
-                onDone?.();
-                return r.ok && r.pending ? t("account.registerPending", { email: email.trim() }) : t("account.registered");
+                stopAskingToSave();
+                const text = r.ok && r.pending ? t("account.registerPending", { email: email.trim() }) : t("account.registered");
+                onDone?.(text);
+                return text;
               },
             )
           }
@@ -1003,10 +1006,10 @@ export function OpenElsewhere() {
 }
 
 /**
- * Before the game: create an account or sign in (nobody plays without an account). A guest from
- * when the game could be played without one ("guest") registers its own account, keeping its game.
+ * Before the game: "Play now" (a guest account, no form: an email and a password are added later,
+ * keeping the same game), or create an account (an email and a password), or sign in.
  */
-function WelcomeGate({ mode }: { mode: "new" | "returning" | "guest" }) {
+function WelcomeGate({ mode }: { mode: "new" | "returning" }) {
   const saves = useGame((g) => g.saves);
   const { t } = useT();
   // the anonymous funnel's first step: a new visitor saw the welcome page
@@ -1014,7 +1017,6 @@ function WelcomeGate({ mode }: { mode: "new" | "returning" | "guest" }) {
     if (mode === "new") trackGate();
   }, [mode]);
   const [tab, setTab] = useState<"register" | "login">(mode === "returning" ? "login" : "register");
-  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -1023,8 +1025,7 @@ function WelcomeGate({ mode }: { mode: "new" | "returning" | "guest" }) {
   const [pending, setPending] = useState<string | null>(null);
   if (!saves) return null;
 
-  const nameOk = name.trim().length >= 3 && name.trim().length <= 20;
-  const canSubmit = !busy && validEmail(email) && (tab === "login" ? password.length >= 6 : nameOk && !passwordIssue(password, { email, name }));
+  const canSubmit = !busy && validEmail(email) && (tab === "login" ? password.length >= 6 : !passwordIssue(password, { email }));
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -1038,11 +1039,21 @@ function WelcomeGate({ mode }: { mode: "new" | "returning" | "guest" }) {
     }
   };
 
+  // "Play now": a guest account, and into the game at once
+  const playNow = () =>
+    run(async () => {
+      const r = await saves.playAsGuest();
+      if (!r.ok) return setMsg({ text: errorText(t, r), bad: true });
+      enterGame();
+    });
+
   const submit = () =>
     run(async () => {
       if (tab === "register") {
-        const r = await saves.welcomeRegister(name.trim(), email.trim(), password, here());
-        if (!r.ok) return setMsg({ text: r.field === "name" ? t(r.error === "taken" ? "account.err.nameTaken" : r.error === "invalid" ? "account.err.nameInvalid" : r.error === "blocked" ? "account.err.blocked" : "account.err.unknown") : errorText(t, r), bad: true });
+        // no name asked: the server's "Player-…" one stays, to change in the Profile
+        const r = await saves.welcomeRegister(null, email.trim(), password, here());
+        if (!r.ok) return setMsg({ text: errorText(t, r), bad: true });
+        stopAskingToSave();
         if (r.pending) return setPending(email.trim());
       } else {
         const r = await saves.welcomeLogin(email.trim(), password);
@@ -1070,7 +1081,7 @@ function WelcomeGate({ mode }: { mode: "new" | "returning" | "guest" }) {
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={card}>
       <div className="text-center">
         <div className="race-type text-2xl leading-none">{t(mode === "new" ? "welcome.title" : "account.welcomeBack")}</div>
-        <p className="mt-1.5 text-xs leading-snug text-white/65">{t(mode === "guest" ? "welcome.guestNote" : "welcome.subtitle")}</p>
+        <p className="mt-1.5 text-xs leading-snug text-white/65">{t("welcome.subtitle")}</p>
         <div className="mt-2.5 flex flex-wrap justify-center gap-1.5 text-[10px] font-bold text-white/75">
           {(
             [
@@ -1084,6 +1095,15 @@ function WelcomeGate({ mode }: { mode: "new" | "returning" | "guest" }) {
             </span>
           ))}
         </div>
+      </div>
+      <Button variant="gold" size="lg" className="w-full" disabled={busy} onClick={() => void playNow()}>
+        <Play /> {t("welcome.playNow")}
+      </Button>
+      <p className="-mt-1 text-center text-[10px] leading-snug text-white/50">{t("welcome.playNowHint")}</p>
+      <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-white/35">
+        <span className="h-px flex-1 bg-white/10" />
+        {t("welcome.or")}
+        <span className="h-px flex-1 bg-white/10" />
       </div>
       <div className="grid grid-cols-2 gap-1 rounded-xl bg-black/30 p-1 ring-1 ring-white/[0.08]">
         {(["register", "login"] as const).map((k) => (
@@ -1108,10 +1128,9 @@ function WelcomeGate({ mode }: { mode: "new" | "returning" | "guest" }) {
           if (canSubmit) void submit();
         }}
       >
-        {tab === "register" && <Field label={t("account.username")} autoComplete="nickname" maxLength={20} value={name} onChange={(e) => setName(e.target.value)} />}
         <Field label={t("account.email")} type="email" inputMode="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         <Field label={t("account.password")} type="password" autoComplete={tab === "register" ? "new-password" : "current-password"} value={password} onChange={(e) => setPassword(e.target.value)} />
-        {tab === "register" && <PasswordHint pw={password} email={email} name={name} />}
+        {tab === "register" && <PasswordHint pw={password} email={email} />}
         <Button type="submit" variant="gold" size="lg" className="w-full" disabled={!canSubmit}>
           {tab === "register" ? (
             <>
@@ -1124,11 +1143,12 @@ function WelcomeGate({ mode }: { mode: "new" | "returning" | "guest" }) {
           )}
         </Button>
       </form>
-      {tab === "register" && <TermsConsent />}
       {tab === "login" && <ForgotPassword email={email} />}
-      {tab === "login" && mode === "guest" && <p className="text-[11px] leading-snug text-amber-300/90">{t("welcome.guestLoginNote")}</p>}
       {msg && <p className={cn("text-center text-xs", msg.bad ? "text-rose-300" : "text-sky-300")}>{msg.text}</p>}
-      <p className="border-t border-white/10 pt-2.5 text-center text-[10px] leading-snug text-white/45">{t("welcome.needsAccount")}</p>
+      <div className="space-y-1.5 border-t border-white/10 pt-2.5">
+        <TermsConsent />
+        <p className="text-center text-[10px] leading-snug text-white/45">{t("welcome.needsAccount")}</p>
+      </div>
     </motion.div>
   );
 }

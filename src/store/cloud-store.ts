@@ -23,11 +23,8 @@ interface CloudStore {
   sync: SyncInfo;
   /** At the start: which save to keep. */
   startChoice: StartChoice | null;
-  /**
-   * The welcome page (register or sign in): a "new" player, "returning" after a logout, or a
-   * "guest" whose game from when the game could be played without an account is here.
-   */
-  welcome: "new" | "returning" | "guest" | null;
+  /** The welcome page (play now, register or sign in): a "new" player, or "returning" after a logout. */
+  welcome: "new" | "returning" | null;
   /** The cloud save comes from a newer version of the game. */
   outdated: boolean;
   /** What the loading screen is doing. */
@@ -63,9 +60,9 @@ export function answerStartChoice(keep: "local" | "cloud") {
   choose = null;
 }
 
-/** Shows the welcome page; resolves once the player registered or signed in. */
-export function askWelcome(returning: boolean, guestGame: boolean): Promise<void> {
-  useCloud.setState({ welcome: guestGame ? "guest" : returning ? "returning" : "new" });
+/** Shows the welcome page; resolves once the player registered, signed in or started as a guest. */
+export function askWelcome(returning: boolean): Promise<void> {
+  useCloud.setState({ welcome: returning ? "returning" : "new" });
   return new Promise((resolve) => {
     entered = resolve;
   });

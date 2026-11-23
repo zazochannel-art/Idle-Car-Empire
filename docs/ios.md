@@ -91,7 +91,7 @@ the repository.
    `https://zazochannel-art.github.io/Idle-Car-Empire/privacy/`.
 7. **Age rating**: answer the questionnaire; the game targets 13+ and its ads
    are limited to the *Teen* rating.
-8. **Sign-in for App Review**: the game needs an account. In App Store
+8. **Sign-in for App Review**: the game starts with *Play now* (a guest account); a test account is still useful for the account screens. In App Store
    Connect → the version → *App Review Information*, tick *Sign-in required*
    and enter a test account's email and password (create it in the app; keep
    the password out of this repository). Apple's guideline 5.1.1(v) asks

@@ -7,22 +7,28 @@ settings, or while it can't be reached, it saves on the device only.
 ## How it works for a player
 
 - **Welcome page**: before the game, a player who isn't signed in on this
-  device sees "Create account" (name, email, password) and "Sign in" (email
-  and password). Nobody plays without an account: nothing starts or saves
-  behind the page, and it stays until the player registered or signed in
-  (`SaveManager.start`). Creating the account needs a connection; after that
-  the game plays offline too.
+  device sees **"Play now"**, "Create account" (email and password) and
+  "Sign in" (email and password). Nothing starts or saves behind the page; it
+  stays until the player chose one of the three (`SaveManager.start`). The
+  first start needs a connection (the account is made then); after that the
+  game plays offline too.
+- **Play now**: a guest account (a Supabase anonymous sign-in, behind the
+  robot check when it is on), no form. The game starts at once. The guest's
+  name is the server's `Player-…` one; the game is saved to the cloud under
+  the guest account, but only this device can reach it until an email and a
+  password are added.
 - **Create an account**: under the hood it is a guest account that gets the
-  name, email and password, so a confirmation email the player hasn't
-  clicked yet never blocks the game (they play meanwhile, the profile shows
-  the email as waiting). A failed attempt (name or email taken) is retried
-  with the same account.
-- **Guests from before** (when the game could be played without an
-  account: a Supabase anonymous account): their next start shows the welcome
-  page with a note. "Create account" adds the name, email and password to
-  their guest account, so their game, id and progress stay as they are.
-  "Sign in" to another account plays that account's game, and the guest's
-  game is kept on the device as a backup (Profile → Backups on this device).
+  email and password (no name is asked: the `Player-…` name stays, to change
+  in the Profile), so a confirmation email the player hasn't clicked yet never
+  blocks the game (they play meanwhile, the profile shows the email as
+  waiting). A failed attempt (email taken) is retried with the same account.
+- **A guest adds an email later**: in the Profile (the account section), or
+  on the card "Keep your empire safe" (`SaveAccountDialog`), which a guest
+  sees after the first car or 20 minutes of play, a day apart and three times
+  at most (never again once an email was added). It is the same account, so
+  the game, id and progress stay as they are. "Sign in" to another account
+  plays that account's game, and the guest's game is kept on the device as a
+  backup (Profile → Backups on this device).
 - **Sign in on another device** (welcome page or profile): the account's game
   is loaded from the cloud.
 - **Log out**: the game is saved first, then the account's copy is removed
@@ -412,8 +418,8 @@ Level Security. The game doesn't need it.
 1. **Authentication → Sign In / Providers**: enable **Anonymous sign-ins**
    and **Email**.
 2. **Email confirmation** (Authentication → Sign In / Providers → Email →
-   "Confirm email"). Playing needs an account, so registering must work for
-   everyone. Supabase's built-in email sender only delivers to the project's
+   "Confirm email"). Registering must work for everyone (a guest adds an
+   email to keep the game on any device). Supabase's built-in email sender only delivers to the project's
    team members and a few emails per hour, so for public players either:
    - turn **Confirm email off**: registering adds email + password right
      away (no email is sent), or
@@ -469,9 +475,10 @@ Level Security. The game doesn't need it.
 - `npx vitest run src/game/save` — the start policy, the sync engine
   (grouping, ordering, retries, conflicts, backups) and whole-player
   scenarios against an in-memory server with the same rules as the database:
-  no game without an account (the welcome page stays until there is one),
-  player A (account → second device), player B (isolation, name
-  uniqueness), a guest from before registering or signing in elsewhere, an
+  no game before the welcome page's answer (it stays until there is an
+  account, a guest included), player A (account → second device), player B
+  (isolation, name uniqueness), a guest registering later or signing in
+  elsewhere, "Play now", the short form without a name, an
   email still to confirm, a save from before accounts, logout/sign-in,
   offline start, a damaged cloud save.
 The `.sql` files below and `scripts/cloud-e2e.mjs` run in CI on a local copy
