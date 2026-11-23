@@ -148,10 +148,10 @@ export async function watchAd(onReward: () => void, place?: string): Promise<AdR
 // ───────────────────────────── full-screen ads (no reward) ─────────────────────────────
 //
 // At a natural break (a screen the player closes), never in the middle of something: not in the
-// first hour of a company, not twice within 3 minutes (any ad, rewarded or not, starts the pause),
-// and never with the ad-free rewards purchase. No limit a day: the pause and the first hour are the
-// limits. (Not more often: AdMob and Google Play count ads that keep interrupting the game as
-// disruptive, which can limit the account's ad serving.)
+// first hour of a company, not twice within 5 minutes (any ad, rewarded or not, starts the pause),
+// at most 12 a day (these and the App Open ads together), and never with the ad-free rewards purchase.
+// (Not more often: AdMob and Google Play count ads that keep interrupting the game as disruptive,
+// which can limit the account's ad serving.)
 
 export const INTERSTITIAL = {
   /**
@@ -162,7 +162,9 @@ export const INTERSTITIAL = {
   /** The app open for this long (ms) before the first one of a run. */
   minOpenMs: 3 * 60_000,
   /** The pause after any ad (ms). */
-  gapMs: 3 * 60_000,
+  gapMs: 5 * 60_000,
+  /** Full-screen ads a day, the interstitial and the App Open together (a rewarded ad doesn't count). */
+  perDay: 12,
   /** At an eligible break, the chance (0–1) that one shows: every break once the pause is over. */
   chance: 1,
   /** The pause between the break and the ad (ms): a tap on "close" never lands on it. */
@@ -173,23 +175,59 @@ const openedAt = Date.now();
 let lastAdAt = 0;
 const STORE = "ice.interstitial";
 
+interface Stored {
+  last: number;
+  /** The day (local date) the count is for, and the full-screen ads shown that day. */
+  day: string;
+  n: number;
+}
+
+const dayKey = (now: number) => {
+  const d = new Date(now);
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+};
+
+function readStore(): Stored {
+  try {
+    const v = JSON.parse(localStorage.getItem(STORE) ?? "null") as Partial<Stored> | null;
+    return {
+      last: typeof v?.last === "number" && Number.isFinite(v.last) && v.last > 0 ? Math.floor(v.last) : 0,
+      day: typeof v?.day === "string" ? v.day : "",
+      n: typeof v?.n === "number" && Number.isFinite(v.n) && v.n > 0 ? Math.floor(v.n) : 0,
+    };
+  } catch {
+    return { last: 0, day: "", n: 0 };
+  }
+}
+
+function writeStore(v: Stored) {
+  try {
+    localStorage.setItem(STORE, JSON.stringify(v));
+  } catch {
+    // no storage: the pause within this run still limits them
+  }
+}
+
 /** When the last ad of any kind began: kept on the phone, so a restart doesn't end the pause. */
 function readLast(): number {
-  try {
-    const v = JSON.parse(localStorage.getItem(STORE) ?? "null") as { last?: number } | null;
-    return typeof v?.last === "number" && Number.isFinite(v.last) && v.last > 0 ? Math.floor(v.last) : 0;
-  } catch {
-    return 0;
-  }
+  return readStore().last;
 }
 
 /** An ad begins at `now` (or is taken back: `now` is then the time of the ad before). */
 function writeLast(now: number) {
-  try {
-    localStorage.setItem(STORE, JSON.stringify({ last: now }));
-  } catch {
-    // no storage: the pause within this run still limits them
-  }
+  writeStore({ ...readStore(), last: now });
+}
+
+/** Full-screen ads shown today (kept on the phone, so a restart doesn't reset the day). */
+export function shownToday(now: number = Date.now()): number {
+  const v = readStore();
+  return v.day === dayKey(now) ? v.n : 0;
+}
+
+/** A full-screen ad was shown. */
+function countShown(now: number) {
+  const v = readStore();
+  writeStore({ ...v, day: dayKey(now), n: (v.day === dayKey(now) ? v.n : 0) + 1 });
 }
 
 /** The last ad of any kind began at this time (this run, or an earlier one). */
@@ -203,14 +241,17 @@ export interface InterstitialContext {
   firstCar: boolean;
   lastAdAt: number;
   openedAt: number;
+  /** Full-screen ads shown today (none when left out). */
+  shownToday?: number;
 }
 
 /** Why a full-screen ad can't show now (null: it may). */
-export function interstitialBlock(a: AdStatus, c: InterstitialContext): "adFree" | "notReady" | "young" | "pause" | null {
+export function interstitialBlock(a: AdStatus, c: InterstitialContext): "adFree" | "notReady" | "young" | "pause" | "limit" | null {
   if (a.adFree) return "adFree";
   if (!a.interstitialReady || a.showing) return "notReady";
   if (!c.firstCar || c.playTime < INTERSTITIAL.minPlayTime || c.now - c.openedAt < INTERSTITIAL.minOpenMs) return "young";
   if (c.now - c.lastAdAt < INTERSTITIAL.gapMs) return "pause";
+  if ((c.shownToday ?? 0) >= INTERSTITIAL.perDay) return "limit";
   return null;
 }
 
@@ -222,15 +263,17 @@ export function interstitialBlock(a: AdStatus, c: InterstitialContext): "adFree"
 export async function maybeShowInterstitial(playTime: number, firstCar: boolean, rand: number = Math.random()): Promise<boolean> {
   const now = Date.now();
   const last = lastAd();
-  if (interstitialBlock(status, { now, playTime, firstCar, lastAdAt: last, openedAt }) || rand >= INTERSTITIAL.chance || !driver) return false;
+  if (interstitialBlock(status, { now, playTime, firstCar, lastAdAt: last, openedAt, shownToday: shownToday(now) }) || rand >= INTERSTITIAL.chance || !driver) return false;
   const before = lastAdAt;
   const storedBefore = readLast();
   lastAdAt = now;
   writeLast(now);
   const shown = await driver.showInterstitial().catch(() => false);
   // one that never showed doesn't start the pause
-  if (shown) lastAdAt = Date.now();
-  else {
+  if (shown) {
+    lastAdAt = Date.now();
+    countShown(lastAdAt);
+  } else {
     lastAdAt = before;
     writeLast(storedBefore);
   }
@@ -257,12 +300,13 @@ export interface AppOpenContext extends InterstitialContext {
 }
 
 /** Why an App Open ad can't show now (null: it may). */
-export function appOpenBlock(a: AdStatus, c: AppOpenContext): "adFree" | "notReady" | "young" | "short" | "pause" | null {
+export function appOpenBlock(a: AdStatus, c: AppOpenContext): "adFree" | "notReady" | "young" | "short" | "pause" | "limit" | null {
   if (a.adFree) return "adFree";
   if (!a.appOpenReady || a.showing) return "notReady";
   if (!c.firstCar || c.playTime < INTERSTITIAL.minPlayTime) return "young";
   if (c.awayMs < APP_OPEN.minAwayMs) return "short";
   if (c.now - c.lastAdAt < INTERSTITIAL.gapMs) return "pause";
+  if ((c.shownToday ?? 0) >= INTERSTITIAL.perDay) return "limit";
   return null;
 }
 
@@ -292,15 +336,17 @@ export function appResumed(now: number = Date.now()): number | null {
 export async function maybeShowAppOpen(playTime: number, firstCar: boolean, awayMs: number, busy: () => boolean): Promise<boolean> {
   const now = Date.now();
   const last = lastAd();
-  const ctx: AppOpenContext = { now, playTime, firstCar, lastAdAt: last, openedAt, awayMs };
+  const ctx: AppOpenContext = { now, playTime, firstCar, lastAdAt: last, openedAt, awayMs, shownToday: shownToday(now) };
   if (appOpenBlock(status, ctx) || busy() || !driver) return false;
   const before = lastAdAt;
   const storedBefore = readLast();
   lastAdAt = now;
   writeLast(now);
   const shown = await driver.showAppOpen("resume").catch(() => false);
-  if (shown) lastAdAt = Date.now();
-  else {
+  if (shown) {
+    lastAdAt = Date.now();
+    countShown(lastAdAt);
+  } else {
     lastAdAt = before;
     writeLast(storedBefore);
   }
@@ -325,7 +371,7 @@ export function quickenAdsForTest(raw: string | null) {
     return;
   }
   const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : null);
-  for (const k of ["minOpenMs", "gapMs", "chance", "delayMs"] as const) {
+  for (const k of ["minOpenMs", "gapMs", "perDay", "chance", "delayMs"] as const) {
     const v = num(o[k]);
     if (v !== null) INTERSTITIAL[k] = v;
   }

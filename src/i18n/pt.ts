@@ -3025,6 +3025,8 @@ export const pt: Record<MessageKey, string> = {
   "update.play.title": "Atualização disponível",
   "update.play.body": "Uma nova versão do jogo está no Google Play. Atualize agora: leva um instante, e sua empresa continua como está.",
   "update.play.update": "Atualizar",
+  "update.required.title": "Atualização necessária",
+  "update.required.body": "Esta versão do jogo está desatualizada e já não consegue manter sua empresa em segurança. Atualize pelo Google Play para continuar: leva um instante, e sua empresa continua como está.",
   "flag.report": "Denunciar",
   "flag.title": "Denunciar este jogador",
   "flag.hint": "As denúncias vão para o desenvolvedor do jogo, que as analisa e pode renomear ou remover um jogador.",

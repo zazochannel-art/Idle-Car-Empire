@@ -1,0 +1,6 @@
+What's new in 1.4.4:
+• "Play now": start as a guest in one tap, add an email later to keep your company
+• "What's next" no longer saves up for the Hydrogen Works before the cheap parts plants: the late game grows faster
+• Shop: up to 10 money packs, 10 research packs and 5 mystery boxes a day
+• Full-screen ads: at most one every 5 minutes and 12 a day
+• Fixes and stability

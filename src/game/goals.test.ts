@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { RESEARCH } from "./config/research";
 import { snapshot } from "./engine/economy";
-import { SHOWROOM_BACKLOG, nextGoals, showroomBacklog } from "./engine/insights";
+import { PLANT_BY_ID } from "./config/chain";
+import { SHOWROOM_BACKLOG, nextGoals, pickNextPlant, showroomBacklog } from "./engine/insights";
 import { createInitialState } from "./engine/state";
 import type { GameState } from "./types";
 
@@ -44,5 +45,24 @@ describe("what's-next goals: research and slow dealers", () => {
     const g = nextGoals(s, snapshot(s), 10).find((x) => x.kind === "dealerSlow");
     expect(g).toBeDefined();
     expect(g && g.kind === "dealerSlow" && g.cost).toBeGreaterThan(0);
+  });
+});
+
+describe("what's-next goals: the next plant", () => {
+  const plants = (...ids: (keyof typeof PLANT_BY_ID)[]) => ids.map((id) => PLANT_BY_ID[id]);
+
+  it("keeps the chain's order when the open plants cost about the same", () => {
+    expect(pickNextPlant(plants("assemblyPlant", "tireFactory"))?.id).toBe("assemblyPlant");
+    expect(pickNextPlant(plants("interiorFactory", "transmissionFactory"))?.id).toBe("interiorFactory");
+  });
+
+  it("does not save up for the Hydrogen Works while the cheap model lines are unbuilt", () => {
+    expect(pickNextPlant(plants("hydrogenWorks", "transmissionFactory", "wheelFactory", "brakeFactory"))?.id).toBe("transmissionFactory");
+    expect(pickNextPlant(plants("softwareStudio", "hydrogenWorks"))?.id).toBe("softwareStudio");
+  });
+
+  it("is the Hydrogen Works once nothing cheaper is left", () => {
+    expect(pickNextPlant(plants("hydrogenWorks"))?.id).toBe("hydrogenWorks");
+    expect(pickNextPlant([])).toBeUndefined();
   });
 });

@@ -1,0 +1,6 @@
+Neu in 1.4.4:
+• „Jetzt spielen“: als Gast mit einem Tipp starten, später eine E-Mail hinzufügen, um die Firma zu behalten
+• „Als Nächstes“ spart nicht mehr zuerst für das Wasserstoffwerk, bevor die günstigen Teilewerke stehen: das späte Spiel wächst schneller
+• Shop: bis zu 10 Geldpakete, 10 Forschungspakete und 5 Überraschungsboxen pro Tag
+• Vollbild-Werbung: höchstens eine alle 5 Minuten und 12 pro Tag
+• Fehlerbehebungen und Stabilität

@@ -11,7 +11,16 @@ const DAY = 86_400_000;
 export const PLAY_UPDATE = {
   /** Days before the same version is offered again. */
   remindDays: 3,
+  /**
+   * A release uploaded with this in-app update priority (0-5, set when it is published: the Publish to
+   * Google Play workflow's "update_priority") is not optional: the game says so and offers nothing but
+   * the update, so an old build that must not keep saving (a broken save format, a purchase bug) can be retired.
+   */
+  requiredPriority: 4,
 };
+
+/** Whether a release's in-app update priority makes the update required. */
+export const updateRequired = (priority: number | undefined) => typeof priority === "number" && priority >= PLAY_UPDATE.requiredPriority;
 
 /** The version last offered on this device, and when. */
 export interface Offered {
@@ -57,6 +66,22 @@ export async function playUpdateToOffer(now = Date.now()): Promise<string | null
   } catch {
     // not installed from Play (a file, an emulator), no Play services, storage unavailable
     return null;
+  }
+}
+
+/**
+ * Whether Google Play has a newer version that is required (its priority: PLAY_UPDATE.requiredPriority
+ * or more). Null/false: none, not installed from Play, offline, not the Play app.
+ */
+export async function playUpdateRequired(): Promise<boolean> {
+  if (!playApp()) return false;
+  try {
+    const { AppUpdate, AppUpdateAvailability } = await import("@capawesome/capacitor-app-update");
+    const info = await AppUpdate.getAppUpdateInfo();
+    if (info.updateAvailability !== AppUpdateAvailability.UPDATE_AVAILABLE && info.updateAvailability !== AppUpdateAvailability.UPDATE_IN_PROGRESS) return false;
+    return updateRequired(info.updatePriority);
+  } catch {
+    return false;
   }
 }
 

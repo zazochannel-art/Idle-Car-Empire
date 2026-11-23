@@ -120,6 +120,15 @@ function makerPlot(s: GameState, snap: EconomySnapshot, c: ComponentId): string 
   return best;
 }
 
+/** Plants cost at most this many times the cheapest open one to be "the next plant" of the chain. */
+export const NEXT_PLANT_SPREAD = 20;
+
+/** The next plant to suggest among the open ones: the first in the chain's order that isn't far dearer than the cheapest. */
+export function pickNextPlant<T extends { cost: number }>(open: readonly T[]): T | undefined {
+  const cheapest = Math.min(...open.map((p) => p.cost));
+  return open.find((p) => p.cost <= cheapest * NEXT_PLANT_SPREAD);
+}
+
 export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] {
   const goals: Goal[] = [];
   const gm = snap.gm;
@@ -190,6 +199,7 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
   }
 
   // Dealers can't keep up: finished cars are waiting at the plants.
+  let slowGoal: Extract<Goal, { kind: "dealerSlow" }> | null = null;
   const waiting = plantsOf(s).reduce((a, [, b]) => (b.type === "assemblyPlant" && b.plant.status === "full" ? a + Math.floor(b.plant.out) : a), 0);
   if (waiting >= 1) {
     const best = cheapestDealerStep(s);
@@ -197,10 +207,12 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
   } else {
     // ...or before that: the showrooms are nearly full, so they (not the plants) set the pace of sales.
     // Without this a player who follows the goals keeps one dealer for hours and sales stop growing.
+    // (listed after the plant, car and upgrade goals, below: a cheap dealer step first, every time,
+    // kept the goals that grow the empire off the list; the 24 h goal-follower earned 2.4 times less)
     const slow = showroomBacklog(s, snap);
     if (slow) {
       const best = cheapestDealerStep(s);
-      if (best) goals.push({ kind: "dealerSlow", icon: best.icon, cost: best.cost, dealer: best.dealer, open: best.open, waiting: slow });
+      if (best) slowGoal = { kind: "dealerSlow", icon: best.icon, cost: best.cost, dealer: best.dealer, open: best.open, waiting: slow };
     }
   }
 
@@ -224,7 +236,10 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
   // (a plant whose site is going up already counts: the next one can start alongside it)
   const building = (t: PlantType) => Object.entries(s.city.sites).find(([, st]) => st.type === t)?.[0];
   // (the landmark works have their own screen and steps: config/landmarks.ts)
-  const next = PLANTS.find((p) => !p.landmark && !hasPlant(s, p.id) && !building(p.id) && plantLock(s, p.id) === null);
+  // (in the list's order, but not one that costs 20 times the cheapest open one: the order would put
+  // the 150M Hydrogen Works ahead of the transmission, wheel and brake plants that cost a few hundred
+  // thousand, and a player following the goals saved up for it for hours with those lines unbuilt)
+  const next = pickNextPlant(PLANTS.filter((p) => !p.landmark && !hasPlant(s, p.id) && !building(p.id) && plantLock(s, p.id) === null));
   if (next) {
     const plot = freePlotFor(s, next.id);
     if (plot) {
@@ -279,6 +294,7 @@ export function nextGoals(s: GameState, snap: EconomySnapshot, max = 3): Goal[] 
     const urgent = goals[0]?.kind === "shortage" || goals[0]?.kind === "dealer" || goals[0]?.kind === "materials" ? 1 : 0;
     goals.splice(urgent, 0, best);
   } else if (best && goals.length < max) goals.push(best);
+  if (slowGoal && goals.length < max) goals.push(slowGoal);
 
   // Garages are a side business: keep them staffed.
   for (const [plot, st] of Object.entries(snap.city.garages)) {

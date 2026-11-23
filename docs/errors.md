@@ -85,3 +85,11 @@ Maps from another build don't match: use the run of the same commit. A local bui
 - **One way in:** `public.report_error()` checks the kind and the lengths, and turns requests away (`busy`) after 300 reports in a minute or 2,000 different errors in a day (a flood, not players).
 - **Clean test calls:** the live check (`scripts/cloud-e2e.mjs`) sends an unknown kind, which is answered `unknown` without writing anything, so CI never adds rows.
 - **Old rows:** reports older than 90 days are deleted as new ones come in.
+
+## Why there is no Firebase Crashlytics
+
+Crashes of the app itself (the Java/Kotlin side, ANRs) are already counted by **Android vitals** in Play Console, with
+no code and no extra data collected; errors inside the game are the reports above. Crashlytics would add a second
+list of the same native crashes, a Gradle plugin that has to match the Android Gradle plugin 9, an SDK that
+collects crash logs and an install id (the privacy policy and Play's Data safety form would have to say so), and a
+switch to turn on in the Firebase console. Add it if native crashes become frequent and vitals' stack traces aren't enough.

@@ -3028,6 +3028,8 @@ export const en = {
   "update.play.title": "Update available",
   "update.play.body": "A new version of the game is on Google Play. Update now: it takes a moment, and your company stays as it is.",
   "update.play.update": "Update",
+  "update.required.title": "Update required",
+  "update.required.body": "This version of the game is out of date and can't keep your company safe. Update from Google Play to go on: it takes a moment, and your company stays as it is.",
   "flag.report": "Report",
   "flag.title": "Report this player",
   "flag.hint": "Reports go to the game's developer, who reviews them and can rename or remove a player.",

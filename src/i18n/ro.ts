@@ -3025,6 +3025,8 @@ export const ro: Record<MessageKey, string> = {
   "update.play.title": "Actualizare disponibilă",
   "update.play.body": "O versiune nouă a jocului e pe Google Play. Actualizează acum: durează puțin, iar compania ta rămâne cum e.",
   "update.play.update": "Actualizează",
+  "update.required.title": "Actualizare necesară",
+  "update.required.body": "Această versiune a jocului e depășită și nu-ți mai poate păstra compania în siguranță. Actualizează din Google Play ca să continui: durează puțin, iar compania ta rămâne cum e.",
   "flag.report": "Raportează",
   "flag.title": "Raportează jucătorul",
   "flag.hint": "Raportările ajung la dezvoltatorul jocului, care le verifică și poate redenumi sau elimina un jucător.",
